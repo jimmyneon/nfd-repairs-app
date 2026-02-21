@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         customer_phone,
       })
       .select()
-      .single()
+      .single() as any
 
     if (jobError) {
       console.error('Failed to create job:', jobError)
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       job_id: job.id,
       type: 'SYSTEM',
       message: 'Job created via API',
-    })
+    } as any)
 
     await supabase.from('notifications').insert({
       type: 'NEW_JOB',
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       body: device_summary,
       job_id: job.id,
       is_read: false,
-    })
+    } as any)
 
     if (deposit_required) {
       const { data: template } = await supabase
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
           template_key: 'DEPOSIT_REQUIRED',
           body_rendered: smsBody,
           status: 'PENDING',
-        })
+        } as any)
       }
     }
 

@@ -99,7 +99,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     await supabase
       .from('jobs')
-      .update({ status: pendingWorkflowStatus })
+      .update({ status: pendingWorkflowStatus } as any)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
@@ -129,7 +129,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     await supabase
       .from('jobs')
-      .update({ status: newStatus })
+      .update({ status: newStatus } as any)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
@@ -159,14 +159,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .update({ 
         deposit_received: true,
         status: 'PARTS_ORDERED'
-      })
+      } as any)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
       message: `Deposit of £${job.deposit_amount} received`,
-    })
+    } as any)
 
     await loadJobData()
     setActionLoading(false)

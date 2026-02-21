@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   await supabase
     .from('magic_links')
-    .update({ used: true })
+    .update({ used: true } as any)
     .eq('token', token)
 
   const response = NextResponse.redirect(new URL(`/repair/${magicLink.repair_id}`, request.url))

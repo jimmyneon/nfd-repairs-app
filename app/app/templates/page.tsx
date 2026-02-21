@@ -67,7 +67,7 @@ export default function TemplatesPage() {
   const toggleActive = async (id: string, currentStatus: boolean) => {
     await supabase
       .from('sms_templates')
-      .update({ is_active: !currentStatus })
+      .update({ is_active: !currentStatus } as any)
       .eq('id', id)
 
     await loadTemplates()

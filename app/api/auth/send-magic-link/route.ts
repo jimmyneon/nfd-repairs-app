@@ -44,7 +44,9 @@ export async function POST(request: NextRequest) {
         token,
         expires_at: expiresAt.toISOString(),
         used: false,
-      })
+      } as any)
+      .select()
+      .single()
 
     if (linkError) {
       console.error('Failed to create magic link:', linkError)
