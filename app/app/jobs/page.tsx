@@ -241,7 +241,7 @@ export default function JobsListPage() {
             <p className="text-gray-500">No jobs found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {filteredJobs.map((job) => (
               <Link
                 key={job.id}
