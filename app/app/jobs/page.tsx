@@ -112,7 +112,7 @@ export default function JobsListPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <NotificationSetup />
       {showScanner && (
         <QRScanner 
@@ -120,10 +120,10 @@ export default function JobsListPage() {
           onScan={handleQRScan}
         />
       )}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-gray-900">Repair Jobs</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Repair Jobs</h1>
             <div className="flex items-center space-x-3">
               <Link href="/app/templates" className="text-gray-600 hover:text-primary">
                 <MessageSquare className="h-6 w-6" />
@@ -150,7 +150,7 @@ export default function JobsListPage() {
                 placeholder="Search by job ref, name, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-base font-medium"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             <button
@@ -218,15 +218,9 @@ export default function JobsListPage() {
 
                   {/* Device - Compact */}
                   <div className="flex-1 flex flex-col justify-center text-center mb-2">
-                    <p className="text-xs font-bold leading-tight mb-1">
-                      {job.device_make}
-                    </p>
-                    <p className="text-xs leading-tight mb-1">
-                      {job.device_model}
-                    </p>
-                    <p className="text-xs leading-tight truncate">
-                      {job.issue}
-                    </p>
+                    <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{job.device_summary}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{job.repair_summary}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{job.customer_name}</p>
                   </div>
 
                   {/* Customer - Bottom */}

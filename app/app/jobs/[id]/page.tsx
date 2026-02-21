@@ -189,8 +189,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
           <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">
             <ArrowLeft className="h-6 w-6 mr-2" />
@@ -218,41 +218,41 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           {/* Device Details */}
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Device</p>
-              <p className="text-lg font-bold text-gray-900">{job.device_make} {job.device_model}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</p>
+              <p className="text-base text-gray-900 dark:text-white break-words">{job.device_make} {job.device_model}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Issue</p>
-              <p className="text-base text-gray-900">{job.issue}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Issue</p>
+              <p className="text-base text-gray-900 dark:text-white break-words">{job.issue}</p>
             </div>
           </div>
         </div>
 
         {/* Price Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 font-medium">Total Price</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Total Price</span>
               <span className="text-3xl font-black text-primary">£{job.price_total.toFixed(2)}</span>
             </div>
             
             {job.deposit_required && (
               <>
                 <div className="flex items-center justify-between pt-3 border-t-2 border-gray-100">
-                  <span className="text-sm text-gray-600 font-medium flex items-center gap-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2">
                     Deposit (Parts Required)
                     {job.deposit_received && (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     )}
                   </span>
-                  <span className="text-xl font-bold text-gray-900">
+                  <span className="text-xl font-bold text-gray-900 dark:text-white">
                     £20.00
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 font-medium">Remaining Balance</span>
-                  <span className="text-2xl font-black text-gray-900">
+                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Remaining Balance</span>
+                  <span className="text-2xl font-black text-gray-900 dark:text-white">
                     £{(job.price_total - 20).toFixed(2)}
                   </span>
                 </div>

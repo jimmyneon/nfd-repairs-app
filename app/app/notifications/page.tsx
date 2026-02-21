@@ -79,8 +79,8 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">
             <ArrowLeft className="h-5 w-5 mr-2" />
@@ -119,8 +119,8 @@ export default function NotificationsPage() {
                 onClick={() => handleNotificationClick(notification)}
                 className={`w-full text-left p-4 rounded-lg transition-colors ${
                   notification.is_read
-                    ? 'bg-white'
-                    : 'bg-blue-50 border border-blue-200'
+                    ? 'bg-white dark:bg-gray-800'
+                    : 'bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700'
                 }`}
               >
                 <div className="flex items-start justify-between">
