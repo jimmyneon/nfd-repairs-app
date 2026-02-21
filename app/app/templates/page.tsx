@@ -13,6 +13,7 @@ export default function TemplatesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ key: '', body: '', is_active: true })
   const [saving, setSaving] = useState(false)
+  const [showVariableModal, setShowVariableModal] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function TemplatesPage() {
         ...prev,
         body: prev.body + variable,
       }))
+      setShowVariableModal(false)
     }
   }
 
@@ -91,37 +93,19 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">
             <ArrowLeft className="h-5 w-5 mr-2" />
             Back to Jobs
           </Link>
-          <h1 className="text-xl font-bold text-gray-900">SMS Templates</h1>
-          <p className="text-sm text-gray-600">Manage customer notification templates</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">SMS Templates</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Manage customer notification templates</p>
         </div>
       </header>
 
       <main className="p-4 space-y-4">
-        <div className="card bg-blue-50 border border-blue-200">
-          <h2 className="font-semibold text-blue-900 mb-2">Available Variables</h2>
-          <div className="flex flex-wrap gap-2">
-            {SMS_TEMPLATE_VARIABLES.map((variable) => (
-              <button
-                key={variable}
-                onClick={() => insertVariable(variable)}
-                disabled={!editingId}
-                className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono disabled:opacity-50"
-              >
-                {variable}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-blue-700 mt-2">
-            Click a variable to insert it into the template you're editing
-          </p>
-        </div>
 
         {templates.map((template) => (
           <div key={template.id} className="card">
@@ -154,14 +138,23 @@ export default function TemplatesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Message Template
                   </label>
-                  <textarea
-                    value={editForm.body}
-                    onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    placeholder="Enter your SMS template..."
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <div className="relative">
+                    <textarea
+                      value={editForm.body}
+                      onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Enter your SMS template..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowVariableModal(true)}
+                      className="absolute bottom-2 right-2 bg-primary text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-primary-dark"
+                    >
+                      + Insert Variable
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Character count: {editForm.body.length} (SMS limit: 160)
                   </p>
                 </div>
@@ -183,15 +176,15 @@ export default function TemplatesPage() {
                   <button
                     onClick={() => saveTemplate(template.id)}
                     disabled={saving}
-                    className="flex-1 btn-primary disabled:opacity-50"
+                    className="flex-1 bg-primary text-white px-4 py-3 rounded-xl font-bold hover:bg-primary-dark disabled:opacity-50 shadow-md"
                   >
-                    <Save className="h-4 w-4 mr-2 inline" />
+                    <Save className="h-5 w-5 mr-2 inline" />
                     {saving ? 'Saving...' : 'Save'}
                   </button>
                   <button
                     onClick={cancelEdit}
                     disabled={saving}
-                    className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                    className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -204,7 +197,7 @@ export default function TemplatesPage() {
                 </div>
                 <button
                   onClick={() => startEdit(template)}
-                  className="w-full bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark"
+                  className="w-full bg-primary text-white px-4 py-3 rounded-xl font-bold hover:bg-primary-dark shadow-md"
                 >
                   Edit Template
                 </button>
@@ -212,6 +205,35 @@ export default function TemplatesPage() {
             )}
           </div>
         ))}
+
+        {/* Variable Selection Modal */}
+        {showVariableModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">Insert Variable</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Select a variable to insert into your template:</p>
+              
+              <div className="space-y-2">
+                {SMS_TEMPLATE_VARIABLES.map((variable) => (
+                  <button
+                    key={variable}
+                    onClick={() => insertVariable(variable)}
+                    className="w-full text-left bg-gray-50 dark:bg-gray-700 hover:bg-primary hover:text-white dark:hover:bg-primary px-4 py-3 rounded-xl font-mono text-sm font-bold transition-colors"
+                  >
+                    {variable}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowVariableModal(false)}
+                className="w-full mt-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
