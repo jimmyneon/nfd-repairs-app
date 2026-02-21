@@ -115,6 +115,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       job_id: job.id,
     })
 
+    // Queue SMS for status change
+    try {
+      await fetch('/api/jobs/queue-status-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          status: pendingWorkflowStatus,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to queue status SMS:', error)
+    }
+
     await loadJobData()
     setActionLoading(false)
     setPendingWorkflowStatus(null)
@@ -144,6 +158,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       body: message,
       job_id: job.id,
     })
+
+    // Queue SMS for status change
+    try {
+      await fetch('/api/jobs/queue-status-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          status: newStatus,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to queue status SMS:', error)
+    }
 
     await loadJobData()
     setActionLoading(false)
