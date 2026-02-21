@@ -3,26 +3,50 @@ import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const { sms_log_id } = await request.json()
+    let smsLog
+    let sms_log_id
 
-    if (!sms_log_id) {
-      return NextResponse.json(
-        { error: 'SMS log ID required' },
-        { status: 400 }
-      )
+    // Try to get sms_log_id from request body (optional)
+    try {
+      const body = await request.json()
+      sms_log_id = body?.sms_log_id
+    } catch {
+      // No body provided, that's fine
     }
 
-    const { data: smsLog, error: fetchError } = await supabase
-      .from('sms_logs')
-      .select('*, jobs(customer_phone)')
-      .eq('id', sms_log_id)
-      .single()
+    if (sms_log_id) {
+      // Send specific SMS
+      const { data, error: fetchError } = await supabase
+        .from('sms_logs')
+        .select('*, jobs(customer_phone)')
+        .eq('id', sms_log_id)
+        .single()
 
-    if (fetchError || !smsLog) {
-      return NextResponse.json(
-        { error: 'SMS log not found' },
-        { status: 404 }
-      )
+      if (fetchError || !data) {
+        return NextResponse.json(
+          { error: 'SMS log not found' },
+          { status: 404 }
+        )
+      }
+      smsLog = data
+    } else {
+      // Send all PENDING SMS
+      const { data: pendingSms, error: fetchError } = await supabase
+        .from('sms_logs')
+        .select('*, jobs(customer_phone)')
+        .eq('status', 'PENDING')
+        .order('created_at', { ascending: true })
+        .limit(10)
+
+      if (fetchError || !pendingSms || pendingSms.length === 0) {
+        return NextResponse.json(
+          { success: true, message: 'No pending SMS to send' }
+        )
+      }
+
+      // Send the first pending SMS
+      smsLog = pendingSms[0]
+      sms_log_id = smsLog.id
     }
 
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
