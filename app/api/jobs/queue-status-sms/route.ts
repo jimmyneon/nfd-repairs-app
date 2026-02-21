@@ -38,6 +38,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Only send SMS for key status changes
+    const smsStatuses = ['READY_TO_BOOK_IN', 'READY_TO_COLLECT', 'COMPLETED']
+    
+    if (!smsStatuses.includes(status)) {
+      console.log(`Status ${status} does not trigger SMS notification`)
+      return NextResponse.json({ success: true, message: 'Status does not trigger SMS' })
+    }
+
     // Get SMS template for this status
     const { data: template } = await supabase
       .from('sms_templates')
