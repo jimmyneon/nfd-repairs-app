@@ -167,7 +167,9 @@ export async function POST(request: NextRequest) {
       // Automatically send the SMS
       if (smsLog) {
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/send`, {
+          // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
+          const appUrl = 'https://nfd-repairs-app.vercel.app'
+          await fetch(`${appUrl}/api/sms/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           })
