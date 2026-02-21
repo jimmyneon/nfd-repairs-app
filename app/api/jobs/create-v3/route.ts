@@ -123,55 +123,56 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Queue deposit SMS if required
-    console.log('SMS Check - deposit_required:', jobData.deposit_required)
-    console.log('SMS Check - requires_parts_order:', requires_parts_order)
-    console.log('SMS Check - parts_required:', parts_required)
+    // Queue SMS for all new jobs (different template based on deposit requirement)
+    const templateKey = jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN'
+    console.log('Querying for template:', templateKey)
     
-    if (jobData.deposit_required) {
-      console.log('Querying for DEPOSIT_REQUIRED template...')
-      const { data: template, error: templateError } = await supabase
-        .from('sms_templates')
-        .select('*')
-        .eq('key', 'DEPOSIT_REQUIRED')
-        .eq('is_active', true)
-        .single()
+    const { data: template, error: templateError } = await supabase
+      .from('sms_templates')
+      .select('*')
+      .eq('key', templateKey)
+      .eq('is_active', true)
+      .single()
 
-      console.log('Template found:', !!template, 'Error:', templateError)
+    console.log('Template found:', !!template, 'Error:', templateError)
 
-      if (template) {
-        const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
-        const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
-        
-        const smsBody = template.body
-          .replace('{customer_name}', jobData.customer_name)
-          .replace('{device_make}', jobData.device_make)
-          .replace('{device_model}', jobData.device_model)
-          .replace('{price_total}', jobData.price_total.toString())
-          .replace('{deposit_amount}', jobData.deposit_amount?.toString() || '0')
-          .replace('{tracking_link}', trackingUrl)
+    if (template) {
+      const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
+      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      
+      let smsBody = template.body
+        .replace('{customer_name}', jobData.customer_name)
+        .replace('{device_make}', jobData.device_make)
+        .replace('{device_model}', jobData.device_model)
+        .replace('{price_total}', jobData.price_total.toString())
+        .replace('{tracking_link}', trackingUrl)
+        .replace('{job_ref}', job.job_ref)
+
+      // Add deposit-specific replacements if needed
+      if (jobData.deposit_required) {
+        smsBody = smsBody
+          .replace('{deposit_amount}', jobData.deposit_amount?.toString() || '20')
           .replace('{deposit_link}', depositUrl)
-          .replace('{job_ref}', job.job_ref)
+      }
 
-        const { data: smsLog } = await supabase.from('sms_logs').insert({
-          job_id: job.id,
-          template_key: 'DEPOSIT_REQUIRED',
-          body_rendered: smsBody,
-          status: 'PENDING',
-        } as any)
-        .select()
-        .single()
+      const { data: smsLog } = await supabase.from('sms_logs').insert({
+        job_id: job.id,
+        template_key: templateKey,
+        body_rendered: smsBody,
+        status: 'PENDING',
+      } as any)
+      .select()
+      .single()
 
-        // Automatically send the SMS
-        if (smsLog) {
-          try {
-            await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/send`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-            })
-          } catch (error) {
-            console.error('Failed to trigger SMS send:', error)
-          }
+      // Automatically send the SMS
+      if (smsLog) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+        } catch (error) {
+          console.error('Failed to trigger SMS send:', error)
         }
       }
     }
