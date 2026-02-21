@@ -5,6 +5,38 @@ This API allows the AI Responder to check repair job statuses by customer phone 
 
 ---
 
+## 🚀 Quick Integration Summary
+
+**For AI Responder Team:**
+
+**API Endpoint:**
+```
+GET https://nfd-repairs-app.vercel.app/api/jobs/check-status?phone={phone}
+```
+
+**What it does:**
+- Takes a phone number (UK format: 07... or +44...)
+- Returns all repair jobs for that customer
+- Includes current status, device info, pricing, tracking links
+
+**What you get back:**
+```json
+{
+  "success": true,
+  "phone": "+447410381247",
+  "jobs": [...]  // Array of job objects
+}
+```
+
+**Important:**
+- If `jobs` array is empty, **DO NOT** say "no repairs found"
+- Instead, suggest customer may be texting from wrong number
+- Offer to escalate or ask for job reference number
+
+**See "Usage in AI Responder" section below for detailed response templates.**
+
+---
+
 ## Endpoint
 
 **GET** `/api/jobs/check-status`
@@ -103,6 +135,20 @@ GET https://nfd-repairs-app.vercel.app/api/jobs/check-status?phone=07410381247
 
 ## Usage in AI Responder
 
+### Quick Start for AI Responder
+
+**API Endpoint:** `https://nfd-repairs-app.vercel.app/api/jobs/check-status?phone={phone}`
+
+**When to use:** Customer asks about repair status, wants an update, or inquires about their device.
+
+**Steps:**
+1. Extract phone number from conversation context (the number they're texting from)
+2. Call API: `GET /api/jobs/check-status?phone={phone}`
+3. Check if `jobs` array has items
+4. Format response based on results
+
+---
+
 ### Example Conversation Flow
 
 **Customer:** "What's the status of my repair?"
@@ -112,40 +158,71 @@ GET https://nfd-repairs-app.vercel.app/api/jobs/check-status?phone=07410381247
 2. Call API: `GET /api/jobs/check-status?phone={phone}`
 3. Parse response and format for customer
 
-**Response Examples:**
+---
 
-**Single Job:**
+### Response Templates for AI Responder
+
+#### **Single Job Found:**
 ```
 I can see you have one repair with us:
 
-📱 Apple iPhone 14 Pro - Screen replacement
-Status: Ready to Collect
-Job Ref: NFD-2024-001
+📱 {device_make} {device_model} - {issue}
+Status: {status_label}
+Job Ref: {job_ref}
 
-Your device is ready to collect! Opening hours: [link]
-Track your repair: [tracking_url]
+{status_specific_message}
+
+Track your repair: {tracking_url}
 ```
 
-**Multiple Jobs:**
+**Status-Specific Messages:**
+- **Ready to Collect:** "Great news! Your device is ready to collect. Opening hours: https://share.google/wCwHX4X6N79tT6b5N"
+- **In Repair:** "Our technicians are currently working on your device. We'll update you when it's ready."
+- **Awaiting Deposit:** "We need a £{deposit_amount} deposit to order parts. You can pay here: {deposit_link}"
+- **Parts Ordered:** "Parts have been ordered and we'll notify you when they arrive."
+
+#### **Multiple Jobs Found:**
 ```
-I can see you have 2 repairs with us:
+I can see you have {count} repairs with us:
 
-1. 📱 Apple iPhone 14 Pro - Screen replacement
-   Status: Ready to Collect
-   Job Ref: NFD-2024-001
+1. 📱 {device_make} {device_model} - {issue}
+   Status: {status_label}
+   Job Ref: {job_ref}
 
-2. 💻 Samsung Galaxy S23 - Battery replacement
-   Status: In Repair
-   Job Ref: NFD-2024-002
+2. 💻 {device_make} {device_model} - {issue}
+   Status: {status_label}
+   Job Ref: {job_ref}
 
 Would you like details about a specific repair?
 ```
 
-**No Jobs:**
+#### **No Jobs Found - IMPORTANT:**
+
+**⚠️ If `jobs` array is empty, this does NOT mean there are no repairs.**
+
+It could mean:
+- Customer is texting from a different phone number
+- Phone number format doesn't match database
+- Job was booked under a different number
+
+**Recommended Response:**
 ```
-I couldn't find any repairs associated with this phone number. 
-Could you provide your job reference number instead?
+I can't seem to find any repair jobs under this phone number.
+
+This could be because:
+• You're texting from a different number than the one used for booking
+• The repair was booked under a different phone number
+
+Please try:
+1. Text from the phone number you used when booking the repair, OR
+2. Reply with your job reference number (e.g., NFD-2024-001), OR
+3. Let me know and I'll escalate this to our team for assistance
+
+How would you like to proceed?
 ```
+
+**DO NOT say:** "You don't have any repairs" or "No repairs found"
+**DO say:** "I can't seem to find any repair jobs under this phone number"
 
 ---
 
