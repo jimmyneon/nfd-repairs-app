@@ -59,8 +59,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'No template for this status' })
     }
 
-    // Build tracking URL
-    const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
+    // Build tracking URL (use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes)
+    const appUrl = 'https://nfd-repairs-app.vercel.app'
+    const trackingUrl = `${appUrl}/t/${job.tracking_token}`
 
     // Replace template variables
     const smsBody = template.body

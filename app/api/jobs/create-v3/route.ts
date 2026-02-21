@@ -137,7 +137,9 @@ export async function POST(request: NextRequest) {
     console.log('Template found:', !!template, 'Error:', templateError)
 
     if (template) {
-      const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
+      // Use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes
+      const appUrl = 'https://nfd-repairs-app.vercel.app'
+      const trackingUrl = `${appUrl}/t/${job.tracking_token}`
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
       
       let smsBody = template.body
