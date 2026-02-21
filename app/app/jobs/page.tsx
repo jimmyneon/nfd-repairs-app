@@ -151,12 +151,12 @@ export default function JobsListPage() {
                 placeholder="Search by job ref, name, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
             <button
               onClick={() => setShowScanner(!showScanner)}
-              className="flex-shrink-0 w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-xl flex items-center justify-center transition-colors"
+              className="flex-shrink-0 w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-xl flex items-center justify-center transition-colors shadow-md"
               title="Scan QR Code"
             >
               <QrCode className="h-6 w-6" />
@@ -165,7 +165,7 @@ export default function JobsListPage() {
 
           <button
             onClick={() => setShowFilterModal(true)}
-            className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-between mb-3"
+            className="w-full h-14 bg-primary text-white px-4 rounded-xl font-bold hover:bg-primary-dark transition-colors flex items-center justify-between mb-3 shadow-md"
           >
             <span>Filter: {statusFilter === 'ALL' ? 'All Jobs' : 
               statusFilter === 'AWAITING_DEPOSIT' ? 'Deposit' :
@@ -182,6 +182,55 @@ export default function JobsListPage() {
         </div>
       </header>
 
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">Filter Jobs</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Select a status to filter:</p>
+            
+            <div className="space-y-2">
+              {statusOptions.map((status) => {
+                const isActive = statusFilter === status
+                const statusColor = status === 'ALL' ? 'bg-gray-800 text-white' : JOB_STATUS_COLORS[status]
+                
+                return (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      setStatusFilter(status)
+                      setShowFilterModal(false)
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-colors ${
+                      isActive
+                        ? statusColor
+                        : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {status === 'ALL' ? 'All Jobs' : 
+                      status === 'AWAITING_DEPOSIT' ? 'Deposit' :
+                      status === 'PARTS_ORDERED' ? 'Parts' :
+                      status === 'READY_TO_BOOK_IN' ? 'Book In' :
+                      status === 'IN_REPAIR' ? 'Repair' :
+                      status === 'READY_TO_COLLECT' ? 'Collect' :
+                      status === 'COMPLETED' ? 'Done' :
+                      status === 'CANCELLED' ? 'Cancel' :
+                      JOB_STATUS_LABELS[status]}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              onClick={() => setShowFilterModal(false)}
+              className="w-full mt-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="p-4">
         {loading ? (
           <div className="text-center py-12">
@@ -192,7 +241,7 @@ export default function JobsListPage() {
             <p className="text-gray-500">No jobs found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {filteredJobs.map((job) => (
               <Link
                 key={job.id}
