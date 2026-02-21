@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
 
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
 
+    console.log('=== SMS SEND DEBUG ===')
+    console.log('SMS Log ID:', sms_log_id)
+    console.log('Phone:', smsLog.jobs?.customer_phone)
+    console.log('Message preview:', smsLog.body_rendered?.substring(0, 50) + '...')
+    console.log('Webhook URL configured:', !!webhookUrl)
+    console.log('Webhook URL:', webhookUrl ? webhookUrl.substring(0, 40) + '...' : 'NOT SET')
+
     if (!webhookUrl) {
       console.error('MacroDroid webhook not configured')
       await supabase
@@ -72,6 +79,9 @@ export async function POST(request: NextRequest) {
       message: smsLog.body_rendered,
     }
 
+    console.log('Sending to MacroDroid webhook...')
+    console.log('Payload:', JSON.stringify(smsPayload, null, 2))
+
     const smsResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -80,7 +90,11 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(smsPayload),
     })
 
+    console.log('MacroDroid response status:', smsResponse.status)
+    console.log('MacroDroid response ok:', smsResponse.ok)
+
     if (smsResponse.ok) {
+      console.log('✅ SMS sent successfully via MacroDroid')
       await supabase
         .from('sms_logs')
         .update({ 
@@ -92,6 +106,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     } else {
       const errorText = await smsResponse.text()
+      console.error('❌ MacroDroid webhook failed:', errorText)
       
       await supabase
         .from('sms_logs')
@@ -102,7 +117,7 @@ export async function POST(request: NextRequest) {
         .eq('id', sms_log_id)
 
       return NextResponse.json(
-        { error: 'Failed to send SMS' },
+        { error: 'Failed to send SMS', details: errorText },
         { status: 500 }
       )
     }
