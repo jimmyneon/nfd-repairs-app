@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +11,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Use service role key for server-side database operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     const { error } = await supabase
       .from('push_subscriptions')
@@ -27,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Failed to save subscription:', error)
       return NextResponse.json(
-        { error: 'Failed to save subscription' },
+        { error: 'Failed to save subscription', details: error.message },
         { status: 500 }
       )
     }
