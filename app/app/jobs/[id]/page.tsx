@@ -489,10 +489,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         <div className="card">
-          <h2 className="font-semibold text-gray-900 mb-2">Customer Tracking Link</h2>
-          <p className="text-xs text-gray-600 mb-2">Share this link with the customer:</p>
-          <div className="bg-gray-50 p-2 rounded text-xs break-all">
-            {process.env.NEXT_PUBLIC_APP_URL}/t/{job.tracking_token}
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Tracking Link</h2>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Share this link with the customer:</p>
+          <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-xs break-all text-gray-900 dark:text-white">
+            https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
           </div>
         </div>
       </main>

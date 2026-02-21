@@ -78,7 +78,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     )
@@ -122,8 +122,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const currentStepIndex = statusSteps.indexOf(job.status)
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-6 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
             <Package className="h-8 w-8 text-primary" />
@@ -141,18 +141,19 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               {getDeviceIcon(job.device_make, job.device_model)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs md:text-sm text-gray-500 mb-1 md:mb-2">Your Device</p>
-              <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-1 md:mb-2 leading-tight">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1 md:mb-2">Your Device</p>
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white">Track Your Repair</h1>
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-1 md:mb-2 leading-tight">
                 {job.device_make} {job.device_model}
               </h2>
-              <p className="text-base md:text-lg text-gray-700 font-medium">{job.issue}</p>
+              <p className="text-base md:text-lg text-gray-700 dark:text-gray-400 font-medium">{job.issue}</p>
             </div>
           </div>
         </div>
 
         {/* PRIMARY: Current Status - Second Most Important */}
-        <div className="bg-white rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
-          <p className="text-xs md:text-sm text-gray-500 mb-3 text-center">Current Status</p>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
+          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-3 text-center">Current Status</p>
           <div className="flex items-center justify-center mb-4">
             <span className={`px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black text-lg md:text-xl ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md`}>
               {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
@@ -202,7 +203,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         </div>
 
         {/* SECONDARY: QR Code - Expandable */}
-        <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
           <button
             onClick={() => setShowQRCode(!showQRCode)}
             className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors"
