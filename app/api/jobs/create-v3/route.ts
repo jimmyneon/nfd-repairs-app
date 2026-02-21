@@ -124,13 +124,20 @@ export async function POST(request: NextRequest) {
     } as any)
 
     // Queue deposit SMS if required
+    console.log('SMS Check - deposit_required:', jobData.deposit_required)
+    console.log('SMS Check - requires_parts_order:', requires_parts_order)
+    console.log('SMS Check - parts_required:', parts_required)
+    
     if (jobData.deposit_required) {
-      const { data: template } = await supabase
+      console.log('Querying for DEPOSIT_REQUIRED template...')
+      const { data: template, error: templateError } = await supabase
         .from('sms_templates')
         .select('*')
         .eq('key', 'DEPOSIT_REQUIRED')
         .eq('is_active', true)
         .single()
+
+      console.log('Template found:', !!template, 'Error:', templateError)
 
       if (template) {
         const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
