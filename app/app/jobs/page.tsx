@@ -27,6 +27,18 @@ export default function JobsListPage() {
     setShowScanner(false)
   }
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showFilterModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [showFilterModal])
+
   useEffect(() => {
     loadJobs()
     loadUnreadNotifications()
