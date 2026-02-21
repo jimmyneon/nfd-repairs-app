@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /repair/
+
+Sitemap: https://repairs.newforestdevicerepairs.co.uk/sitemap.xml
