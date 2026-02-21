@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       message: smsLog.body_rendered,
     }
 
-    const smsResponse = await fetch(`${webhookUrl}/send-sms`, {
+    const smsResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
