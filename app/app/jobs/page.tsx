@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, JOB_STATUS_BORDER_COLORS } from '@/lib/constants'
-import { Search, Filter, Bell, Settings, MessageSquare, QrCode, LogOut } from 'lucide-react'
+import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -18,6 +18,7 @@ export default function JobsListPage() {
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL')
   const [unreadCount, setUnreadCount] = useState(0)
   const [showScanner, setShowScanner] = useState(false)
+  const [showFilterModal, setShowFilterModal] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -162,34 +163,22 @@ export default function JobsListPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-            {statusOptions.map((status) => {
-              const isActive = statusFilter === status
-              const statusColor = status === 'ALL' ? 'bg-gray-800 text-white' : JOB_STATUS_COLORS[status]
-              
-              return (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-5 py-3 rounded-xl text-base font-semibold whitespace-nowrap transition-all min-w-[100px] ${
-                    isActive
-                      ? `${statusColor} shadow-lg scale-105`
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {status === 'ALL' ? 'All' : 
-                    status === 'AWAITING_DEPOSIT' ? 'Deposit' :
-                    status === 'PARTS_ORDERED' ? 'Parts' :
-                    status === 'READY_TO_BOOK_IN' ? 'Book In' :
-                    status === 'IN_REPAIR' ? 'Repair' :
-                    status === 'READY_TO_COLLECT' ? 'Collect' :
-                    status === 'COMPLETED' ? 'Done' :
-                    status === 'CANCELLED' ? 'Cancel' :
-                    JOB_STATUS_LABELS[status]}
-                </button>
-              )
-            })}
-          </div>
+          <button
+            onClick={() => setShowFilterModal(true)}
+            className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center justify-between mb-3"
+          >
+            <span>Filter: {statusFilter === 'ALL' ? 'All Jobs' : 
+              statusFilter === 'AWAITING_DEPOSIT' ? 'Deposit' :
+              statusFilter === 'PARTS_ORDERED' ? 'Parts' :
+              statusFilter === 'READY_TO_BOOK_IN' ? 'Book In' :
+              statusFilter === 'IN_REPAIR' ? 'Repair' :
+              statusFilter === 'READY_TO_COLLECT' ? 'Collect' :
+              statusFilter === 'COMPLETED' ? 'Done' :
+              statusFilter === 'CANCELLED' ? 'Cancel' :
+              JOB_STATUS_LABELS[statusFilter]}
+            </span>
+            <ChevronDown className="h-5 w-5" />
+          </button>
         </div>
       </header>
 
