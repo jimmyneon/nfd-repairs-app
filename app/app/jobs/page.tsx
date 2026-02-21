@@ -177,7 +177,15 @@ export default function JobsListPage() {
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {status === 'ALL' ? 'All Jobs' : JOB_STATUS_LABELS[status]}
+                  {status === 'ALL' ? 'All' : 
+                    status === 'AWAITING_DEPOSIT' ? 'Deposit' :
+                    status === 'PARTS_ORDERED' ? 'Parts' :
+                    status === 'READY_TO_BOOK_IN' ? 'Book In' :
+                    status === 'IN_REPAIR' ? 'Repair' :
+                    status === 'READY_TO_COLLECT' ? 'Collect' :
+                    status === 'COMPLETED' ? 'Done' :
+                    status === 'CANCELLED' ? 'Cancel' :
+                    JOB_STATUS_LABELS[status]}
                 </button>
               )
             })}
@@ -204,28 +212,24 @@ export default function JobsListPage() {
               >
                 {/* Status fills entire tile background */}
                 <div className="p-3 h-full flex flex-col relative text-white">
-                  {/* Status Label - Large and Prominent */}
-                  <div className="text-center mb-3">
-                    <p className="font-black text-sm leading-tight">
-                      {JOB_STATUS_LABELS[job.status]}
+                  {/* Status Label - Top */}
+                  <div className="text-center mb-2">
+                    <p className="font-black text-xs leading-tight uppercase tracking-wide">
+                      {job.status === 'AWAITING_DEPOSIT' ? 'Deposit' :
+                       job.status === 'PARTS_ORDERED' ? 'Parts' :
+                       job.status === 'READY_TO_BOOK_IN' ? 'Book In' :
+                       job.status === 'IN_REPAIR' ? 'Repair' :
+                       job.status === 'READY_TO_COLLECT' ? 'Collect' :
+                       job.status === 'COMPLETED' ? 'Done' :
+                       job.status === 'CANCELLED' ? 'Cancel' :
+                       JOB_STATUS_LABELS[job.status]}
                     </p>
                   </div>
 
-                  {/* Price - Large */}
-                  <div className="text-center mb-3">
-                    <p className="text-2xl font-black">£{job.price_total.toFixed(2)}</p>
-                  </div>
-
-                  {/* Device - Compact */}
-                  <div className="flex-1 flex flex-col justify-center text-center mb-2">
-                    <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{job.device_summary}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{job.repair_summary}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{job.customer_name}</p>
-                  </div>
-
-                  {/* Customer - Bottom */}
-                  <div className="border-t border-white border-opacity-30 pt-2">
-                    <p className="text-xs font-bold truncate text-center">{job.customer_name}</p>
+                  {/* Device & Repair - Main Content */}
+                  <div className="flex-1 flex flex-col justify-center text-center">
+                    <p className="text-sm font-black leading-tight mb-1 truncate">{job.device_make} {job.device_model}</p>
+                    <p className="text-xs font-semibold truncate">{job.issue}</p>
                   </div>
 
                   {/* Deposit Indicator */}
