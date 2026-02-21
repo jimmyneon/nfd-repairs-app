@@ -146,12 +146,26 @@ export async function POST(request: NextRequest) {
           .replace('{deposit_link}', depositUrl)
           .replace('{job_ref}', job.job_ref)
 
-        await supabase.from('sms_logs').insert({
+        const { data: smsLog } = await supabase.from('sms_logs').insert({
           job_id: job.id,
           template_key: 'DEPOSIT_REQUIRED',
           body_rendered: smsBody,
           status: 'PENDING',
         } as any)
+        .select()
+        .single()
+
+        // Automatically send the SMS
+        if (smsLog) {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/sms/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            })
+          } catch (error) {
+            console.error('Failed to trigger SMS send:', error)
+          }
+        }
       }
     }
 
