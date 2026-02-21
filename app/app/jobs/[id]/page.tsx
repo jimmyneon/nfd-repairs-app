@@ -117,7 +117,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Queue SMS for status change
     try {
-      await fetch('/api/jobs/queue-status-sms', {
+      console.log('🔔 Queueing SMS for status:', pendingWorkflowStatus)
+      const response = await fetch('/api/jobs/queue-status-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,6 +126,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           status: pendingWorkflowStatus,
         }),
       })
+      console.log('SMS queue response:', response.status, response.ok)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('SMS queue failed:', error)
+      }
     } catch (error) {
       console.error('Failed to queue status SMS:', error)
     }
@@ -161,7 +167,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Queue SMS for status change
     try {
-      await fetch('/api/jobs/queue-status-sms', {
+      console.log('🔔 Queueing SMS for status:', newStatus)
+      const response = await fetch('/api/jobs/queue-status-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,6 +176,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           status: newStatus,
         }),
       })
+      console.log('SMS queue response:', response.status, response.ok)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('SMS queue failed:', error)
+      }
     } catch (error) {
       console.error('Failed to queue status SMS:', error)
     }
