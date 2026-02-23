@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, JOB_STATUS_BORDER_COLORS } from '@/lib/constants'
-import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown, Plus } from 'lucide-react'
+import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown, Plus, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -17,6 +17,7 @@ export default function JobsListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL')
   const [unreadCount, setUnreadCount] = useState(0)
+  const [warrantyCount, setWarrantyCount] = useState(0)
   const [showScanner, setShowScanner] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
   const router = useRouter()
@@ -42,6 +43,7 @@ export default function JobsListPage() {
   useEffect(() => {
     loadJobs()
     loadUnreadNotifications()
+    loadWarrantyTickets()
     
     const jobsSubscription = supabase
       .channel('jobs-changes')
@@ -57,9 +59,17 @@ export default function JobsListPage() {
       })
       .subscribe()
 
+    const warrantySubscription = supabase
+      .channel('warranty-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'warranty_tickets' }, () => {
+        loadWarrantyTickets()
+      })
+      .subscribe()
+
     return () => {
       jobsSubscription.unsubscribe()
       notificationsSubscription.unsubscribe()
+      warrantySubscription.unsubscribe()
     }
   }, [])
 
@@ -107,6 +117,15 @@ export default function JobsListPage() {
     setUnreadCount(count || 0)
   }
 
+  const loadWarrantyTickets = async () => {
+    const { count } = await supabase
+      .from('warranty_tickets')
+      .select('*', { count: 'exact', head: true })
+      .in('status', ['NEW', 'NEEDS_ATTENTION'])
+
+    setWarrantyCount(count || 0)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -140,6 +159,14 @@ export default function JobsListPage() {
             <div className="flex items-center space-x-3">
               <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
                 <Plus className="h-6 w-6" />
+              </Link>
+              <Link href="/app/warranty" className="relative text-gray-600 hover:text-primary" title="Warranty Tickets">
+                <Shield className="h-6 w-6" />
+                {warrantyCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {warrantyCount}
+                  </span>
+                )}
               </Link>
               <Link href="/app/templates" className="text-gray-600 hover:text-primary">
                 <MessageSquare className="h-6 w-6" />
