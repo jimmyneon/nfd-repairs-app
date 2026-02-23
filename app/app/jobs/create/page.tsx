@@ -11,14 +11,14 @@ export default function CreateJobPage() {
   const supabase = createClient()
   
   const [loading, setLoading] = useState(false)
-  const [signature, setSignature] = useState<string | null>(null)
-  const [isDrawing, setIsDrawing] = useState(false)
-  const canvasRef = useState<HTMLCanvasElement | null>(null)[0]
+  const [showMakeOther, setShowMakeOther] = useState(false)
+  const [showIssueOther, setShowIssueOther] = useState(false)
   
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
     customer_email: '',
+    device_type: '',
     device_make: '',
     device_model: '',
     issue: '',
@@ -29,6 +29,51 @@ export default function CreateJobPage() {
     password_na: false,
     terms_accepted: false,
   })
+
+  // Device type options
+  const deviceTypes = [
+    { value: 'phone', label: 'Mobile Phone' },
+    { value: 'tablet', label: 'Tablet' },
+    { value: 'laptop', label: 'Laptop' },
+    { value: 'desktop', label: 'Desktop PC' },
+    { value: 'console', label: 'Gaming Console' },
+    { value: 'other', label: 'Other' },
+  ]
+
+  // Common makes by device type
+  const makesByType: Record<string, string[]> = {
+    phone: ['Apple', 'Samsung', 'Google', 'OnePlus', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Other'],
+    tablet: ['Apple', 'Samsung', 'Amazon', 'Lenovo', 'Microsoft', 'Huawei', 'Other'],
+    laptop: ['Apple', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Microsoft', 'MSI', 'Razer', 'Other'],
+    desktop: ['Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Custom Build', 'Other'],
+    console: ['Sony PlayStation', 'Microsoft Xbox', 'Nintendo Switch', 'Nintendo', 'Other'],
+    other: ['Other'],
+  }
+
+  // Common issues
+  const commonIssues = [
+    'Screen Replacement',
+    'Battery Replacement',
+    'Charging Port Replacement',
+    'Not Charging',
+    'No Power',
+    'Water Damage',
+    'Data Recovery',
+    'Windows 10 Installation',
+    'Windows 11 Installation',
+    'Software Glitches',
+    'Not Loading',
+    'Black Screen',
+    'Blue Screen of Death',
+    'SSD Upgrade',
+    'Hard Drive Replacement',
+    'RAM Upgrade',
+    'HDMI Port Repair',
+    'Software Malfunction',
+    'Overheating',
+    'Virus Removal',
+    'Other',
+  ]
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,6 +87,7 @@ export default function CreateJobPage() {
           name: formData.customer_name,
           phone: formData.customer_phone,
           email: formData.customer_email || null,
+          device_type: formData.device_type,
           device_make: formData.device_make,
           device_model: formData.device_model,
           issue: formData.issue,
@@ -52,7 +98,7 @@ export default function CreateJobPage() {
           source: 'staff_manual',
           device_password: formData.password_na ? null : formData.device_password,
           password_not_applicable: formData.password_na,
-          customer_signature: signature,
+          customer_signature: null,
           terms_accepted: formData.terms_accepted,
           onboarding_completed: true,
         }),
@@ -73,9 +119,30 @@ export default function CreateJobPage() {
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
+    
+    // Reset make when device type changes
+    if (name === 'device_type') {
+      setFormData(prev => ({
+        ...prev,
+        device_type: value,
+        device_make: '',
+      }))
+      setShowMakeOther(false)
+      return
+    }
+
+    // Show "Other" input for make
+    if (name === 'device_make') {
+      setShowMakeOther(value === 'Other')
+    }
+
+    // Show "Other" input for issue
+    if (name === 'issue') {
+      setShowIssueOther(value === 'Other')
+    }
     
     setFormData(prev => ({
       ...prev,
@@ -153,22 +220,55 @@ export default function CreateJobPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Device Make *
+                  Device Type *
                 </label>
-                <input
-                  type="text"
-                  name="device_make"
-                  value={formData.device_make}
+                <select
+                  name="device_type"
+                  value={formData.device_type}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Apple, Samsung, etc."
-                />
+                >
+                  <option value="">Select device type...</option>
+                  {deviceTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
               </div>
+
+              {formData.device_type && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Make *
+                  </label>
+                  <select
+                    name="device_make"
+                    value={formData.device_make}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select make...</option>
+                    {makesByType[formData.device_type]?.map(make => (
+                      <option key={make} value={make}>{make}</option>
+                    ))}
+                  </select>
+                  {showMakeOther && (
+                    <input
+                      type="text"
+                      name="device_make"
+                      value={formData.device_make === 'Other' ? '' : formData.device_make}
+                      onChange={handleChange}
+                      placeholder="Enter make..."
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
+                    />
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Device Model *
+                  Model *
                 </label>
                 <input
                   type="text"
@@ -177,7 +277,7 @@ export default function CreateJobPage() {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="iPhone 12 Pro, Galaxy S21, etc."
+                  placeholder="e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"
                 />
               </div>
 
@@ -185,15 +285,28 @@ export default function CreateJobPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Issue *
                 </label>
-                <input
-                  type="text"
+                <select
                   name="issue"
                   value={formData.issue}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Cracked screen, battery replacement, etc."
-                />
+                >
+                  <option value="">Select issue...</option>
+                  {commonIssues.map(issue => (
+                    <option key={issue} value={issue}>{issue}</option>
+                  ))}
+                </select>
+                {showIssueOther && (
+                  <input
+                    type="text"
+                    name="issue"
+                    value={formData.issue === 'Other' ? '' : formData.issue}
+                    onChange={handleChange}
+                    placeholder="Describe the issue..."
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
+                  />
+                )}
               </div>
 
               <div>
