@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/jobs/send-collection-sms",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }
