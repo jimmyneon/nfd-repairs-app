@@ -1,0 +1,129 @@
+═══════════════════════════════════════════════════════════════
+  WARRANTY API - QUICK REFERENCE FOR WEBSITE TEAM
+═══════════════════════════════════════════════════════════════
+
+📍 API ENDPOINT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST https://nfd-repairs-app.vercel.app/api/warranty-tickets
+
+🔑 GET YOUR API KEY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Run this in Supabase SQL Editor:
+
+    SELECT value FROM admin_settings WHERE key = 'warranty_api_key';
+
+Or once deployed: Settings → Admin Settings in the repair app
+
+📤 MINIMUM REQUEST (REQUIRED FIELDS ONLY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Headers:
+    Content-Type: application/json
+    X-API-KEY: your-api-key-here
+
+Body:
+{
+  "customer": {
+    "name": "John Smith",
+    "phone": "+447410381247"
+  },
+  "issue": {
+    "description": "Screen still cracked after repair"
+  }
+}
+
+📤 FULL REQUEST (ALL OPTIONAL FIELDS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{
+  "source": "website",
+  "submittedAt": "2024-02-23T10:00:00Z",
+  "customer": {
+    "name": "John Smith",
+    "phone": "+447410381247",
+    "email": "john@example.com"
+  },
+  "repair": {
+    "jobId": "uuid-if-known",
+    "reference": "NFD-2024-001",
+    "deviceModel": "iPhone 14 Pro"
+  },
+  "issue": {
+    "description": "Screen still cracked after repair",
+    "category": "warranty"
+  },
+  "attachments": [
+    {
+      "url": "https://your-cdn.com/photo.jpg",
+      "type": "image/jpeg",
+      "filename": "photo.jpg"
+    }
+  ],
+  "metadata": {
+    "ip": "1.2.3.4",
+    "userAgent": "Mozilla/5.0..."
+  }
+}
+
+📥 SUCCESS RESPONSE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{
+  "ticketId": "550e8400-e29b-41d4-a716-446655440000",
+  "ticketRef": "WRT-2024-0001",
+  "matchedJobId": "uuid-or-null",
+  "matchConfidence": "high|medium|low|none",
+  "status": "NEW"
+}
+
+🧪 TEST WITH CURL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+curl -X POST https://nfd-repairs-app.vercel.app/api/warranty-tickets \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key-here" \
+  -d '{
+    "customer": {
+      "name": "Test Customer",
+      "phone": "+447410381247"
+    },
+    "issue": {
+      "description": "Test warranty claim"
+    }
+  }'
+
+🔒 SECURITY REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ MUST call API from server-side (PHP/Node/Python)
+✓ NEVER expose API key in client-side JavaScript
+✓ Store API key in environment variables
+✓ Validate all form inputs before sending
+✓ Rate limit form submissions
+
+📞 PHONE NUMBER FORMATS (ALL ACCEPTED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
++447410381247
+07410381247
++44 7410 381247
+07410 381 247
+
+🎯 AUTO-MATCHING LOGIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Job ID provided → High confidence
+2. Job reference provided → High confidence
+3. Phone + recent job (90 days) → Medium/Low confidence
+4. No match → Ticket created anyway (confidence: none)
+
+❌ ERROR RESPONSES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+401: Missing or invalid API key
+400: Missing required fields
+500: Server error
+
+📚 FULL DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+See WEBSITE_WARRANTY_API.md for:
+- Complete field descriptions
+- Code examples (JavaScript, PHP)
+- Error handling
+- Idempotency
+- Attachment handling
+- Integration checklist
+
+═══════════════════════════════════════════════════════════════
