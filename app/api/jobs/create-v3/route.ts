@@ -79,10 +79,10 @@ export async function POST(request: NextRequest) {
       customer_id: customer_id || null,
       quote_request_id: quote_request_id || null,
       
-      // Status
+      // Status - manual entry starts as RECEIVED, online starts as READY_TO_BOOK_IN
       status: (requires_parts_order || parts_required)
         ? 'AWAITING_DEPOSIT' 
-        : 'READY_TO_BOOK_IN',
+        : (source === 'staff_manual' ? 'RECEIVED' : 'READY_TO_BOOK_IN'),
       
       // Onboarding fields (if provided from manual creation)
       device_password: device_password || null,
@@ -150,8 +150,14 @@ export async function POST(request: NextRequest) {
       // Use deposit-specific onboarding template if deposit required
       templateKey = jobData.deposit_required ? 'ONBOARDING_WITH_DEPOSIT' : 'ONBOARDING_REQUIRED'
     } else {
-      // Normal flow - deposit or ready to book in
-      templateKey = jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN'
+      // Normal flow - deposit, received (manual), or ready to book in (online)
+      if (jobData.deposit_required) {
+        templateKey = 'DEPOSIT_REQUIRED'
+      } else if (source === 'staff_manual') {
+        templateKey = 'RECEIVED'
+      } else {
+        templateKey = 'READY_TO_BOOK_IN'
+      }
     }
     
     console.log('Needs onboarding:', needsOnboarding)
