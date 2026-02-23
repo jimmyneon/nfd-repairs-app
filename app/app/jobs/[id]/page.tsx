@@ -11,6 +11,7 @@ import ContactActions from '@/components/ContactActions'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
+import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -21,6 +22,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showStatusSelector, setShowStatusSelector] = useState(false)
   const [showSimpleConfirm, setShowSimpleConfirm] = useState(false)
+  const [showManualOnboarding, setShowManualOnboarding] = useState(false)
   const [newStatus, setNewStatus] = useState<JobStatus | null>(null)
   const [pendingWorkflowStatus, setPendingWorkflowStatus] = useState<JobStatus | null>(null)
   const router = useRouter()
@@ -335,10 +337,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         </div>
 
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
-        <OnboardingGate 
-          onboardingCompleted={job.onboarding_completed || false}
-          jobRef={job.job_ref}
-        />
+        {!job.onboarding_completed && (
+          <div className="card bg-yellow-50 border-2 border-yellow-300">
+            <OnboardingGate 
+              onboardingCompleted={false}
+              jobRef={job.job_ref}
+            />
+            <button
+              onClick={() => setShowManualOnboarding(true)}
+              className="w-full mt-4 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all"
+            >
+              Complete Onboarding In-Shop
+            </button>
+          </div>
+        )}
 
         <div className="card">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Customer Contact</h2>
@@ -482,15 +494,24 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {showStatusSelector && (
           <StatusSelectorModal
             currentStatus={job.status}
-            onSelectStatus={(status) => {
-              setShowStatusSelector(false)
-              handleManualStatusChange(status)
-            }}
-            onCancel={() => setShowStatusSelector(false)}
+            onSelect={handleManualStatusChange}
+            onClose={() => setShowStatusSelector(false)}
           />
         )}
 
-        {/* Simple Confirmation Modal (for workflow changes) */}
+        {showManualOnboarding && (
+          <ManualOnboardingModal
+            jobId={job.id}
+            jobRef={job.job_ref}
+            customerName={job.customer_name}
+            onComplete={() => {
+              setShowManualOnboarding(false)
+              loadJob()
+            }}
+            onClose={() => setShowManualOnboarding(false)}
+          />
+        )}
+
         {showSimpleConfirm && pendingWorkflowStatus && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">

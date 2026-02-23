@@ -66,7 +66,9 @@ CREATE POLICY "Public can update job via onboarding token"
 
 -- Add SMS template for onboarding
 INSERT INTO sms_templates (key, body, is_active) VALUES
-('ONBOARDING_REQUIRED', 'Hi {customer_name}, we need a few more details to start your {device_make} {device_model} repair. Please complete your details here: {onboarding_link} - Job ref: {job_ref} - NFD Repairs', true)
+('ONBOARDING_REQUIRED', 'Thank you {customer_name}! Your {device_make} {device_model} repair request has been approved. Please complete this form to authorize the repair: {onboarding_link} - Job ref: {job_ref} - NFD Repairs', true),
+('ONBOARDING_WITH_DEPOSIT', 'Thank you {customer_name}! Your {device_make} {device_model} repair has been approved. A £{deposit_amount} deposit is required for parts. Please complete this form: {onboarding_link} - Job ref: {job_ref} - NFD Repairs', true),
+('TRACKING_LINK_ONLY', 'Hi {customer_name}, here is your repair tracking link: {tracking_link} - We will notify you when your {device_make} {device_model} is ready for collection. Job ref: {job_ref} - NFD Repairs', true)
 ON CONFLICT (key) DO UPDATE SET 
     body = EXCLUDED.body,
     updated_at = NOW();

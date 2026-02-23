@@ -14,6 +14,8 @@ interface Job {
   device_model: string
   issue: string
   price_total: number
+  deposit_required: boolean
+  deposit_amount: number | null
   onboarding_completed: boolean
   terms_accepted: boolean
   device_password: string | null
@@ -31,6 +33,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
   
   const [formData, setFormData] = useState({
     email: '',
+    emailOptOut: false,
     devicePassword: '',
     passwordNA: false,
     termsAccepted: false,
@@ -66,6 +69,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
     setJob(data)
     setFormData({
       email: data.customer_email || '',
+      emailOptOut: false,
       devicePassword: data.device_password || '',
       passwordNA: data.password_not_applicable || false,
       termsAccepted: data.terms_accepted || false,
@@ -134,8 +138,8 @@ export default function OnboardingPage({ params }: { params: { token: string } }
     if (!job) return
 
     // Validation
-    if (!formData.email) {
-      setError('Email address is required')
+    if (!formData.email && !formData.emailOptOut) {
+      setError('Please provide email address or select "No Email"')
       return
     }
 
@@ -161,7 +165,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
       const { error: updateError } = await supabase
         .from('jobs')
         .update({
-          customer_email: formData.email,
+          customer_email: formData.emailOptOut ? null : formData.email,
           device_password: formData.passwordNA ? null : formData.devicePassword,
           password_not_applicable: formData.passwordNA,
           customer_signature: signature,
@@ -180,8 +184,23 @@ export default function OnboardingPage({ params }: { params: { token: string } }
       await supabase.from('job_events').insert({
         job_id: job.id,
         type: 'SYSTEM',
-        message: 'Customer completed onboarding',
+        message: formData.emailOptOut 
+          ? 'Customer completed onboarding (SMS only - no email provided)'
+          : 'Customer completed onboarding',
       })
+
+      // If email opted out, send tracking link SMS
+      if (formData.emailOptOut) {
+        try {
+          await fetch('/api/jobs/send-tracking-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobId: job.id }),
+          })
+        } catch (err) {
+          console.error('Failed to send tracking SMS:', err)
+        }
+      }
 
       // Success - redirect to tracking page
       router.push(`/repair/${job.id}`)
@@ -232,6 +251,22 @@ export default function OnboardingPage({ params }: { params: { token: string } }
               <p><span className="text-gray-600">Issue:</span> <span className="font-semibold">{job.issue}</span></p>
               <p><span className="text-gray-600">Price:</span> <span className="font-semibold">£{job.price_total.toFixed(2)}</span></p>
             </div>
+
+            {/* Deposit Alert */}
+            {job.deposit_required && (
+              <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
+                <h3 className="font-bold text-amber-900 mb-2 flex items-center">
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  Deposit Required
+                </h3>
+                <p className="text-sm text-amber-800 mb-2">
+                  A deposit of <span className="font-bold">£{job.deposit_amount?.toFixed(2) || '20.00'}</span> is required for parts ordering.
+                </p>
+                <p className="text-xs text-amber-700">
+                  You'll receive payment details after completing this form.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Form */}
@@ -247,17 +282,33 @@ export default function OnboardingPage({ params }: { params: { token: string } }
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Mail className="h-4 w-4 inline mr-2" />
-                Email Address *
+                Email Address {!formData.emailOptOut && '*'}
               </label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={(e) => setFormData({ ...formData, email: e.target.value, emailOptOut: false })}
+                disabled={formData.emailOptOut}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 disabled:text-gray-500"
                 placeholder="your.email@example.com"
               />
-              <p className="text-xs text-gray-500 mt-1">We'll send repair updates to this email</p>
+              <div className="mt-2 flex items-center">
+                <input
+                  type="checkbox"
+                  id="emailOptOut"
+                  checked={formData.emailOptOut}
+                  onChange={(e) => setFormData({ ...formData, emailOptOut: e.target.checked, email: '' })}
+                  className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="emailOptOut" className="ml-2 text-sm text-gray-700">
+                  I don't have an email address (SMS only)
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.emailOptOut 
+                  ? 'You will receive updates via SMS and tracking link only'
+                  : 'We\'ll send detailed repair updates to this email'}
+              </p>
             </div>
 
             {/* Device Password */}

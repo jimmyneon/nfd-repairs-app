@@ -129,9 +129,14 @@ export async function POST(request: NextRequest) {
                            !job.terms_accepted
 
     // Queue SMS - onboarding link if needed, otherwise regular status SMS
-    const templateKey = needsOnboarding 
-      ? 'ONBOARDING_REQUIRED'
-      : (jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN')
+    let templateKey: string
+    if (needsOnboarding) {
+      // Use deposit-specific onboarding template if deposit required
+      templateKey = jobData.deposit_required ? 'ONBOARDING_WITH_DEPOSIT' : 'ONBOARDING_REQUIRED'
+    } else {
+      // Normal flow - deposit or ready to book in
+      templateKey = jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN'
+    }
     
     console.log('Needs onboarding:', needsOnboarding)
     console.log('Querying for template:', templateKey)
