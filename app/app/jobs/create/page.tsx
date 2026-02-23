@@ -11,6 +11,10 @@ export default function CreateJobPage() {
   const supabase = createClient()
   
   const [loading, setLoading] = useState(false)
+  const [signature, setSignature] = useState<string | null>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const canvasRef = useState<HTMLCanvasElement | null>(null)[0]
+  
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -21,6 +25,9 @@ export default function CreateJobPage() {
     description: '',
     price_total: '',
     requires_parts_order: false,
+    device_password: '',
+    password_na: false,
+    terms_accepted: false,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,6 +50,11 @@ export default function CreateJobPage() {
           quoted_price: parseFloat(formData.price_total),
           requires_parts_order: formData.requires_parts_order,
           source: 'staff_manual',
+          device_password: formData.password_na ? null : formData.device_password,
+          password_not_applicable: formData.password_na,
+          customer_signature: signature,
+          terms_accepted: formData.terms_accepted,
+          onboarding_completed: true,
         }),
       })
 
@@ -232,6 +244,151 @@ export default function CreateJobPage() {
                 />
                 <label htmlFor="requires_parts" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
                   Requires parts order (£20 deposit will be requested)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Onboarding Information</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Collect this information while the customer is present
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Device Password/Passcode
+                </label>
+                <input
+                  type="text"
+                  name="device_password"
+                  value={formData.device_password}
+                  onChange={handleChange}
+                  disabled={formData.password_na}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  placeholder="Enter device password"
+                />
+                <div className="mt-2 flex items-center">
+                  <input
+                    type="checkbox"
+                    name="password_na"
+                    checked={formData.password_na}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    id="password_na"
+                  />
+                  <label htmlFor="password_na" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                    Device has no password
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Customer Signature *
+                </label>
+                <div className="border-2 border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden bg-white">
+                  <canvas
+                    ref={(ref) => {
+                      if (ref && !canvasRef) {
+                        const canvas = ref
+                        canvas.width = canvas.offsetWidth
+                        canvas.height = 200
+                        const ctx = canvas.getContext('2d')
+                        if (ctx) {
+                          ctx.strokeStyle = '#000'
+                          ctx.lineWidth = 2
+                          ctx.lineCap = 'round'
+                        }
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      setIsDrawing(true)
+                      const canvas = e.currentTarget
+                      const ctx = canvas.getContext('2d')
+                      if (ctx) {
+                        const rect = canvas.getBoundingClientRect()
+                        ctx.beginPath()
+                        ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
+                      }
+                    }}
+                    onMouseMove={(e) => {
+                      if (!isDrawing) return
+                      const canvas = e.currentTarget
+                      const ctx = canvas.getContext('2d')
+                      if (ctx) {
+                        const rect = canvas.getBoundingClientRect()
+                        ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
+                        ctx.stroke()
+                      }
+                    }}
+                    onMouseUp={(e) => {
+                      setIsDrawing(false)
+                      const canvas = e.currentTarget
+                      setSignature(canvas.toDataURL())
+                    }}
+                    onTouchStart={(e) => {
+                      setIsDrawing(true)
+                      const canvas = e.currentTarget
+                      const ctx = canvas.getContext('2d')
+                      if (ctx && e.touches[0]) {
+                        const rect = canvas.getBoundingClientRect()
+                        ctx.beginPath()
+                        ctx.moveTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+                      }
+                    }}
+                    onTouchMove={(e) => {
+                      if (!isDrawing) return
+                      const canvas = e.currentTarget
+                      const ctx = canvas.getContext('2d')
+                      if (ctx && e.touches[0]) {
+                        const rect = canvas.getBoundingClientRect()
+                        ctx.lineTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top)
+                        ctx.stroke()
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      setIsDrawing(false)
+                      const canvas = e.currentTarget
+                      setSignature(canvas.toDataURL())
+                    }}
+                    className="w-full h-[200px] cursor-crosshair"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const canvas = document.querySelector('canvas')
+                    if (canvas) {
+                      const ctx = canvas.getContext('2d')
+                      if (ctx) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height)
+                        setSignature(null)
+                      }
+                    }
+                  }}
+                  className="mt-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                >
+                  Clear Signature
+                </button>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
+                <input
+                  type="checkbox"
+                  name="terms_accepted"
+                  checked={formData.terms_accepted}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5"
+                  id="terms_accepted"
+                  required
+                />
+                <label htmlFor="terms_accepted" className="text-sm text-gray-900 dark:text-white cursor-pointer">
+                  <strong>Customer accepts terms and conditions *</strong>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    By checking this box, the customer agrees to our repair terms and conditions, including warranty coverage and liability limitations.
+                  </p>
                 </label>
               </div>
             </div>

@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
       price_total,
       parts_required,
       deposit_amount,
+      
+      // Onboarding fields (from manual job creation)
+      device_password,
+      password_not_applicable,
+      customer_signature,
+      terms_accepted,
+      onboarding_completed,
     } = body
 
     // Map quote_requests fields to jobs fields
@@ -76,6 +83,15 @@ export async function POST(request: NextRequest) {
       status: (requires_parts_order || parts_required)
         ? 'AWAITING_DEPOSIT' 
         : 'READY_TO_BOOK_IN',
+      
+      // Onboarding fields (if provided from manual creation)
+      device_password: device_password || null,
+      password_not_applicable: password_not_applicable || false,
+      customer_signature: customer_signature || null,
+      terms_accepted: terms_accepted || false,
+      terms_accepted_at: terms_accepted ? new Date().toISOString() : null,
+      onboarding_completed: onboarding_completed || false,
+      onboarding_completed_at: onboarding_completed ? new Date().toISOString() : null,
     }
 
     // Validate required fields
