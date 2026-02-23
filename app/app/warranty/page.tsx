@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, AlertTriangle, ArrowLeft, Clock, CheckCircle, XCircle, Settings } from 'lucide-react'
+import { Search, AlertTriangle, ArrowLeft, Clock, CheckCircle, Settings, ChevronDown, Bell, MessageSquare, Plus, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -60,11 +60,25 @@ export default function WarrantyTicketsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
+    if (showFilterModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [showFilterModal])
+
+  useEffect(() => {
     loadTickets()
+    loadUnreadNotifications()
 
     const subscription = supabase
       .channel('warranty-tickets-changes')
@@ -73,8 +87,16 @@ export default function WarrantyTicketsPage() {
       })
       .subscribe()
 
+    const notificationsSubscription = supabase
+      .channel('notifications-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
+        loadUnreadNotifications()
+      })
+      .subscribe()
+
     return () => {
       subscription.unsubscribe()
+      notificationsSubscription.unsubscribe()
     }
   }, [])
 
@@ -112,6 +134,15 @@ export default function WarrantyTicketsPage() {
     setLoading(false)
   }
 
+  const loadUnreadNotifications = async () => {
+    const { count } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_read', false)
+
+    setUnreadCount(count || 0)
+  }
+
   const newTicketsCount = tickets.filter(t => t.status === 'NEW').length
   const needsAttentionCount = tickets.filter(t => t.status === 'NEEDS_ATTENTION').length
 
@@ -123,37 +154,37 @@ export default function WarrantyTicketsPage() {
     )
   }
 
+  const statusOptions = ['ALL', 'NEW', 'NEEDS_ATTENTION', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
-          <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Jobs
-          </Link>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <AlertTriangle className="h-6 w-6 text-orange-500" />
-                Warranty Tickets
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {newTicketsCount > 0 && (
-                  <span className="text-red-600 font-semibold">{newTicketsCount} new</span>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Warranty Tickets</h1>
+            <div className="flex items-center space-x-3">
+              <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
+                <Plus className="h-6 w-6" />
+              </Link>
+              <Link href="/app/jobs" className="text-gray-600 hover:text-primary" title="Repair Jobs">
+                <Shield className="h-6 w-6" />
+              </Link>
+              <Link href="/app/templates" className="text-gray-600 hover:text-primary">
+                <MessageSquare className="h-6 w-6" />
+              </Link>
+              <Link href="/app/notifications" className="relative text-gray-600 hover:text-primary">
+                <Bell className="h-6 w-6" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
                 )}
-                {newTicketsCount > 0 && needsAttentionCount > 0 && <span className="mx-1">•</span>}
-                {needsAttentionCount > 0 && (
-                  <span className="text-orange-600 font-semibold">{needsAttentionCount} need attention</span>
-                )}
-                {newTicketsCount === 0 && needsAttentionCount === 0 && (
-                  <span className="text-gray-500">All tickets handled</span>
-                )}
-              </p>
+              </Link>
+              <Link href="/app/settings" className="text-gray-600 hover:text-primary">
+                <Settings className="h-6 w-6" />
+              </Link>
             </div>
-            <Link href="/app/settings" className="p-2 hover:bg-gray-100 rounded-lg">
-              <Settings className="h-5 w-5 text-gray-600" />
-            </Link>
           </div>
 
           {/* Search */}
@@ -164,72 +195,75 @@ export default function WarrantyTicketsPage() {
               placeholder="Search tickets..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
-          {/* Status Filter */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
+          {/* Filter Button */}
+          <button
+            onClick={() => setShowFilterModal(true)}
+            className="w-full h-14 bg-primary text-white px-4 rounded-xl font-bold hover:bg-primary-dark transition-colors flex items-center justify-between mb-3 shadow-md"
+          >
+            <span>Filter: {statusFilter === 'ALL' ? 'All Tickets' : statusFilter.replace('_', ' ')}</span>
+            <ChevronDown className="h-5 w-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">Filter Tickets</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Select a status to filter:</p>
+            
+            <div className="space-y-2">
+              {statusOptions.map((status) => {
+                const isActive = statusFilter === status
+                const counts = {
+                  ALL: tickets.length,
+                  NEW: newTicketsCount,
+                  NEEDS_ATTENTION: needsAttentionCount,
+                  IN_PROGRESS: tickets.filter(t => t.status === 'IN_PROGRESS').length,
+                  RESOLVED: tickets.filter(t => t.status === 'RESOLVED').length,
+                  CLOSED: tickets.filter(t => t.status === 'CLOSED').length
+                }
+                
+                return (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      setStatusFilter(status)
+                      setShowFilterModal(false)
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-colors ${
+                      isActive
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {status === 'ALL' ? 'All Tickets' : status.replace('_', ' ')} ({counts[status as keyof typeof counts]})
+                  </button>
+                )
+              })}
+            </div>
+            
             <button
-              onClick={() => setStatusFilter('ALL')}
-              className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                statusFilter === 'ALL'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              onClick={() => setShowFilterModal(false)}
+              className="w-full mt-4 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              All ({tickets.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('NEW')}
-              className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                statusFilter === 'NEW'
-                  ? 'bg-red-500 text-white'
-                  : 'bg-red-100 text-red-700 hover:bg-red-200'
-              }`}
-            >
-              New ({newTicketsCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('NEEDS_ATTENTION')}
-              className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                statusFilter === 'NEEDS_ATTENTION'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-              }`}
-            >
-              Needs Attention ({needsAttentionCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('IN_PROGRESS')}
-              className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                statusFilter === 'IN_PROGRESS'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
-            >
-              In Progress
-            </button>
-            <button
-              onClick={() => setStatusFilter('RESOLVED')}
-              className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                statusFilter === 'RESOLVED'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-            >
-              Resolved
+              Close
             </button>
           </div>
         </div>
-      </header>
+      )}
 
       {/* Tickets List */}
       <main className="p-4">
         {filteredTickets.length === 0 ? (
           <div className="text-center py-12">
             <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">
+            <p className="text-gray-500 dark:text-gray-400">
               {searchTerm || statusFilter !== 'ALL' ? 'No tickets match your filters' : 'No warranty tickets yet'}
             </p>
           </div>
@@ -239,13 +273,13 @@ export default function WarrantyTicketsPage() {
               <Link
                 key={ticket.id}
                 href={`/app/warranty/${ticket.id}`}
-                className="block bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                className="block bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-gray-900">{ticket.ticket_ref}</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{ticket.ticket_ref}</span>
                       <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_COLORS[ticket.status]}`}>
                         {STATUS_LABELS[ticket.status]}
                       </span>
@@ -255,7 +289,7 @@ export default function WarrantyTicketsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
                       <span className="font-medium">{ticket.customer_name}</span>
                       <span className="mx-1">•</span>
                       <span>{ticket.customer_phone}</span>
@@ -267,12 +301,12 @@ export default function WarrantyTicketsPage() {
                 </div>
 
                 {/* Issue */}
-                <p className="text-sm text-gray-700 mb-3 line-clamp-2">
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3 line-clamp-2">
                   {ticket.issue_description}
                 </p>
 
                 {/* Metadata */}
-                <div className="flex items-center gap-3 text-xs text-gray-500">
+                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                   {ticket.job_reference && (
                     <span className="flex items-center gap-1">
                       <CheckCircle className="h-3 w-3" />

@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, CheckCircle, XCircle, Clock, AlertTriangle, Package, Send, Link as LinkIcon } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { use } from 'react'
 
 interface WarrantyTicket {
   id: string
@@ -43,8 +42,7 @@ interface JobSuggestion {
   status: string
 }
 
-export default function WarrantyTicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
+export default function WarrantyTicketDetailPage({ params }: { params: { id: string } }) {
   const [ticket, setTicket] = useState<WarrantyTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -60,12 +58,12 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
     loadTicket()
 
     const subscription = supabase
-      .channel(`warranty-ticket-${resolvedParams.id}`)
+      .channel(`warranty-ticket-${params.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'warranty_tickets',
-        filter: `id=eq.${resolvedParams.id}`
+        filter: `id=eq.${params.id}`
       }, () => {
         loadTicket()
       })
@@ -74,13 +72,13 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
     return () => {
       subscription.unsubscribe()
     }
-  }, [resolvedParams.id])
+  }, [params.id])
 
   const loadTicket = async () => {
     const { data, error } = await supabase
       .from('warranty_tickets')
       .select('*')
-      .eq('id', resolvedParams.id)
+      .eq('id', params.id)
       .single()
 
     if (!error && data) {
@@ -100,18 +98,18 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
       .update({ 
         matched_job_id: jobId,
         match_confidence: 'high'
-      })
-      .eq('id', resolvedParams.id)
+      } as any)
+      .eq('id', params.id)
 
     if (!error) {
       await supabase
         .from('warranty_ticket_events')
         .insert({
-          ticket_id: resolvedParams.id,
+          ticket_id: params.id,
           type: 'SYSTEM',
           message: `Manually linked to job`,
           metadata: { jobId }
-        })
+        } as any)
       
       setSelectedJobId(jobId)
       await loadTicket()
@@ -123,7 +121,6 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
   const handleApprove = async () => {
     setActionLoading(true)
     
-    // Update ticket status
     const { error } = await supabase
       .from('warranty_tickets')
       .update({ 
@@ -131,22 +128,20 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
         approved_at: new Date().toISOString(),
         requires_parts: requiresParts,
         parts_ordered_at: requiresParts ? new Date().toISOString() : null
-      })
-      .eq('id', resolvedParams.id)
+      } as any)
+      .eq('id', params.id)
 
     if (!error && ticket) {
-      // Log event
       await supabase
         .from('warranty_ticket_events')
         .insert({
-          ticket_id: resolvedParams.id,
+          ticket_id: params.id,
           type: 'STATUS_CHANGE',
           message: `Warranty approved${requiresParts ? ' - Parts required' : ''}`,
           metadata: { requiresParts }
-        })
+        } as any)
 
       // TODO: Send SMS to customer
-      // Will implement SMS sending in next step
       
       setShowApproveModal(false)
       await loadTicket()
@@ -168,18 +163,18 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
       .update({ 
         status: 'CLOSED',
         decline_reason: declineReason
-      })
-      .eq('id', resolvedParams.id)
+      } as any)
+      .eq('id', params.id)
 
     if (!error) {
       await supabase
         .from('warranty_ticket_events')
         .insert({
-          ticket_id: resolvedParams.id,
+          ticket_id: params.id,
           type: 'STATUS_CHANGE',
           message: `Warranty declined: ${declineReason}`,
           metadata: { declineReason }
-        })
+        } as any)
 
       // TODO: Send decline SMS to customer
       
@@ -192,7 +187,7 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
@@ -200,9 +195,9 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500">Ticket not found</p>
+          <p className="text-gray-500 dark:text-gray-400">Ticket not found</p>
           <Link href="/app/warranty" className="text-primary mt-2 inline-block">
             Back to Warranty Tickets
           </Link>
@@ -214,9 +209,9 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
   const suggestions: JobSuggestion[] = ticket.suggested_jobs || []
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <Link href="/app/warranty" className="inline-flex items-center text-primary mb-3">
             <ArrowLeft className="h-5 w-5 mr-2" />
@@ -224,17 +219,17 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{ticket.ticket_ref}</h1>
-              <p className="text-sm text-gray-600">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{ticket.ticket_ref}</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Submitted {new Date(ticket.submitted_at).toLocaleString('en-GB')}
               </p>
             </div>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              ticket.status === 'NEW' ? 'bg-red-100 text-red-800' :
-              ticket.status === 'NEEDS_ATTENTION' ? 'bg-orange-100 text-orange-800' :
-              ticket.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-              ticket.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-              'bg-gray-100 text-gray-800'
+              ticket.status === 'NEW' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+              ticket.status === 'NEEDS_ATTENTION' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+              ticket.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+              ticket.status === 'RESOLVED' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
             }`}>
               {ticket.status.replace('_', ' ')}
             </span>
@@ -244,48 +239,48 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
 
       <main className="p-4 space-y-4">
         {/* Customer Info */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h2 className="font-semibold text-lg mb-3">Customer Information</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Customer Information</h2>
           <div className="space-y-2">
             <div>
-              <span className="text-sm text-gray-600">Name:</span>
-              <p className="font-medium">{ticket.customer_name}</p>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Name:</span>
+              <p className="font-medium text-gray-900 dark:text-white">{ticket.customer_name}</p>
             </div>
             <div>
-              <span className="text-sm text-gray-600">Phone:</span>
-              <p className="font-medium">{ticket.customer_phone}</p>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Phone:</span>
+              <p className="font-medium text-gray-900 dark:text-white">{ticket.customer_phone}</p>
             </div>
             {ticket.customer_email && (
               <div>
-                <span className="text-sm text-gray-600">Email:</span>
-                <p className="font-medium">{ticket.customer_email}</p>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Email:</span>
+                <p className="font-medium text-gray-900 dark:text-white">{ticket.customer_email}</p>
               </div>
             )}
             {ticket.device_model && (
               <div>
-                <span className="text-sm text-gray-600">Device:</span>
-                <p className="font-medium">{ticket.device_model}</p>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Device:</span>
+                <p className="font-medium text-gray-900 dark:text-white">{ticket.device_model}</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Issue Description */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h2 className="font-semibold text-lg mb-3">Issue Description</h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{ticket.issue_description}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Issue Description</h2>
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{ticket.issue_description}</p>
         </div>
 
         {/* Job Matching */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h2 className="font-semibold text-lg mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <h2 className="font-semibold text-lg mb-3 flex items-center gap-2 text-gray-900 dark:text-white">
             <LinkIcon className="h-5 w-5" />
             Job Matching
           </h2>
           
           {ticket.matched_job_id ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-              <div className="flex items-center gap-2 text-green-800">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                 <CheckCircle className="h-5 w-5" />
                 <span className="font-medium">Linked to Job</span>
               </div>
@@ -298,7 +293,7 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
             </div>
           ) : suggestions.length > 0 ? (
             <div>
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 {suggestions.length} possible {suggestions.length === 1 ? 'match' : 'matches'} found. Select the correct job:
               </p>
               <div className="space-y-2">
@@ -307,21 +302,21 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
                     key={suggestion.jobId}
                     onClick={() => handleLinkJob(suggestion.jobId)}
                     disabled={actionLoading}
-                    className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-primary transition-colors disabled:opacity-50"
+                    className="w-full text-left p-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary transition-colors disabled:opacity-50 bg-white dark:bg-gray-800"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <span className="font-semibold text-gray-900">{suggestion.jobRef}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{suggestion.jobRef}</span>
                         <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                          suggestion.confidence === 'high' ? 'bg-green-100 text-green-800' :
-                          suggestion.confidence === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-orange-100 text-orange-800'
+                          suggestion.confidence === 'high' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          suggestion.confidence === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                          'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
                         }`}>
                           {suggestion.confidence} match
                         </span>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
                       <p><strong>{suggestion.customerName}</strong></p>
                       <p>{suggestion.deviceMake} {suggestion.deviceModel}</p>
                       <p className="text-xs mt-1">
@@ -334,16 +329,16 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
               </div>
             </div>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <p className="text-gray-600 text-sm">No matching jobs found</p>
+            <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">No matching jobs found</p>
             </div>
           )}
         </div>
 
         {/* Actions */}
         {ticket.status === 'NEW' || ticket.status === 'NEEDS_ATTENTION' ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <h2 className="font-semibold text-lg mb-3">Actions</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h2 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Actions</h2>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowApproveModal(true)}
@@ -367,13 +362,13 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
       {/* Approve Modal */}
       {showApproveModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-bold mb-4">Approve Warranty</h3>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Approve Warranty</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               This will approve the warranty and send a message to the customer.
             </p>
             
-            <label className="flex items-center gap-2 mb-4 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            <label className="flex items-center gap-2 mb-4 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
               <input
                 type="checkbox"
                 checked={requiresParts}
@@ -381,18 +376,18 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
                 className="w-5 h-5"
               />
               <div>
-                <div className="font-medium flex items-center gap-2">
+                <div className="font-medium flex items-center gap-2 text-gray-900 dark:text-white">
                   <Package className="h-4 w-4" />
                   Parts Required
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   We need to order parts before customer brings device in
                 </div>
               </div>
             </label>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
                 <strong>Customer will receive:</strong><br />
                 {requiresParts 
                   ? 'SMS: "We\'ve approved your warranty. We need to order parts - we\'ll let you know when they arrive."'
@@ -405,7 +400,7 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
               <button
                 onClick={() => setShowApproveModal(false)}
                 disabled={actionLoading}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
               >
                 Cancel
               </button>
@@ -431,9 +426,9 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
       {/* Decline Modal */}
       {showDeclineModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-bold mb-4">Decline Warranty</h3>
-            <p className="text-gray-600 mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Decline Warranty</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               Please provide a reason for declining this warranty request:
             </p>
             
@@ -441,11 +436,11 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
               placeholder="e.g., This is accidental damage, not covered under warranty"
-              className="w-full border border-gray-300 rounded-lg p-3 mb-4 min-h-[100px]"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 mb-4 min-h-[100px] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
 
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-orange-800">
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-orange-800 dark:text-orange-200">
                 <strong>Customer will receive:</strong><br />
                 SMS: "Unfortunately, this issue isn't covered under our warranty. {declineReason}"
               </p>
@@ -455,7 +450,7 @@ export default function WarrantyTicketDetailPage({ params }: { params: Promise<{
               <button
                 onClick={() => setShowDeclineModal(false)}
                 disabled={actionLoading}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
               >
                 Cancel
               </button>
