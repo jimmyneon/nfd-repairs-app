@@ -301,6 +301,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <p className="text-base text-gray-900 dark:text-white break-words">{job.issue}</p>
             </div>
           </div>
+
+          {/* Edit Button */}
+          <Link
+            href={`/app/jobs/${job.id}/edit`}
+            className="mt-4 flex items-center justify-center gap-2 w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl transition-colors font-medium"
+          >
+            <Edit className="h-4 w-4" />
+            <span>Edit Job Details</span>
+          </Link>
         </div>
 
         {/* Price Card */}

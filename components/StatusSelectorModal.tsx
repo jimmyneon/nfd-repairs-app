@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { JobStatus } from '@/lib/types'
+import { JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS } from '@/lib/constants'
 
 interface StatusSelectorModalProps {
@@ -21,6 +21,7 @@ export default function StatusSelectorModal({
     'PARTS_ORDERED',
     'READY_TO_BOOK_IN',
     'IN_REPAIR',
+    'DELAYED',
     'READY_TO_COLLECT',
     'COMPLETED',
     'CANCELLED'
@@ -33,6 +34,7 @@ export default function StatusSelectorModal({
       PARTS_ORDERED: 'bg-purple-600 hover:bg-purple-700',
       READY_TO_BOOK_IN: 'bg-indigo-600 hover:bg-indigo-700',
       IN_REPAIR: 'bg-orange-600 hover:bg-orange-700',
+      DELAYED: 'bg-amber-600 hover:bg-amber-700',
       READY_TO_COLLECT: 'bg-green-600 hover:bg-green-700',
       COMPLETED: 'bg-gray-700 hover:bg-gray-800',
       CANCELLED: 'bg-red-600 hover:bg-red-700',
