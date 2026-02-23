@@ -18,6 +18,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [googleReviewLink, setGoogleReviewLink] = useState('')
+  const [googleMapsLink, setGoogleMapsLink] = useState('')
   const [warrantyApiKey, setWarrantyApiKey] = useState('')
   const supabase = createClient()
 
@@ -29,14 +30,16 @@ export default function AdminSettingsPage() {
     const { data, error } = await supabase
       .from('admin_settings')
       .select('*')
-      .in('key', ['google_review_link', 'warranty_api_key'])
+      .in('key', ['google_review_link', 'google_maps_link', 'warranty_api_key'])
 
     if (!error && data) {
       setSettings(data)
       const reviewLink = data.find(s => s.key === 'google_review_link')
+      const mapsLink = data.find(s => s.key === 'google_maps_link')
       const apiKey = data.find(s => s.key === 'warranty_api_key')
       
       if (reviewLink) setGoogleReviewLink(reviewLink.value)
+      if (mapsLink) setGoogleMapsLink(mapsLink.value)
       if (apiKey) setWarrantyApiKey(apiKey.value)
     }
     setLoading(false)
@@ -52,6 +55,22 @@ export default function AdminSettingsPage() {
     if (!error) {
       await loadSettings()
       alert('Google review link saved successfully!')
+    } else {
+      alert('Failed to save: ' + error.message)
+    }
+    setSaving(false)
+  }
+
+  const saveGoogleMapsLink = async () => {
+    setSaving(true)
+    const { error } = await supabase
+      .from('admin_settings')
+      .update({ value: googleMapsLink })
+      .eq('key', 'google_maps_link')
+
+    if (!error) {
+      await loadSettings()
+      alert('Google Maps link saved successfully!')
     } else {
       alert('Failed to save: ' + error.message)
     }
@@ -140,6 +159,43 @@ export default function AdminSettingsPage() {
                 <Save className="h-5 w-5" />
               )}
               <span>Save Google Review Link</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Google Maps Link */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center mb-4">
+            <LinkIcon className="h-6 w-6 text-green-500 mr-2" />
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Google Maps Link</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            This link is included in SMS messages to help customers find your shop location.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Maps Link URL
+              </label>
+              <input
+                type="url"
+                value={googleMapsLink}
+                onChange={(e) => setGoogleMapsLink(e.target.value)}
+                placeholder="https://maps.app.goo.gl/..."
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <button
+              onClick={saveGoogleMapsLink}
+              disabled={saving}
+              className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Save className="h-5 w-5" />
+              )}
+              <span>Save Google Maps Link</span>
             </button>
           </div>
         </div>
