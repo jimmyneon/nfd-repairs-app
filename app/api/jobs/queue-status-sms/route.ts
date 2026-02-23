@@ -47,9 +47,25 @@ export async function POST(request: NextRequest) {
 
     if (config && (!config.send_sms || !config.is_active)) {
       console.log(`SMS disabled for status: ${status}`)
+      
+      // Special handling for COLLECTED status - schedule post-collection SMS
+      if (status === 'COLLECTED') {
+        try {
+          const appUrl = 'https://nfd-repairs-app.vercel.app'
+          await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobId })
+          })
+          console.log('Post-collection SMS scheduled for job:', job.job_ref)
+        } catch (error) {
+          console.error('Failed to schedule post-collection SMS:', error)
+        }
+      }
+      
       return NextResponse.json({ 
         success: true, 
-        message: `SMS notifications disabled for ${status}` 
+        message: 'SMS disabled for this status' 
       })
     }
 
