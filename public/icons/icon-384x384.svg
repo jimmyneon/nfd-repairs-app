@@ -1,0 +1,8 @@
+<svg width="384" height="384" xmlns="http://www.w3.org/2000/svg">
+  <rect width="384" height="384" fill="#FAF5E9" rx="76.80000000000001"/>
+  <g transform="translate(76.80000000000001, 76.80000000000001)">
+    <path fill="#009B4D" d="M 115.19999999999999 57.599999999999994 L 172.8 115.19999999999999 L 115.19999999999999 172.8 L 57.599999999999994 115.19999999999999 Z"/>
+    <circle cx="115.19999999999999" cy="172.8" r="19.200000000000003" fill="#009B4D"/>
+  </g>
+  <text x="50%" y="75%" text-anchor="middle" font-family="Arial, sans-serif" font-size="57.599999999999994" font-weight="bold" fill="#009B4D">NFD</text>
+</svg>

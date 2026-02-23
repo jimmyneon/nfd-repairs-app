@@ -181,6 +181,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Send email notification if customer has email
+    if (jobData.customer_email) {
+      try {
+        const appUrl = 'https://nfd-repairs-app.vercel.app'
+        await fetch(`${appUrl}/api/email/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            type: 'JOB_CREATED',
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to send email:', error)
+      }
+    }
+
     // Return success response
     return NextResponse.json({
       success: true,

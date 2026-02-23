@@ -1,0 +1,8 @@
+<svg width="72" height="72" xmlns="http://www.w3.org/2000/svg">
+  <rect width="72" height="72" fill="#FAF5E9" rx="14.4"/>
+  <g transform="translate(14.4, 14.4)">
+    <path fill="#009B4D" d="M 21.599999999999998 10.799999999999999 L 32.4 21.599999999999998 L 21.599999999999998 32.4 L 10.799999999999999 21.599999999999998 Z"/>
+    <circle cx="21.599999999999998" cy="32.4" r="3.6" fill="#009B4D"/>
+  </g>
+  <text x="50%" y="75%" text-anchor="middle" font-family="Arial, sans-serif" font-size="10.799999999999999" font-weight="bold" fill="#009B4D">NFD</text>
+</svg>

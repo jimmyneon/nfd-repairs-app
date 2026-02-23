@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, JOB_STATUS_BORDER_COLORS } from '@/lib/constants'
-import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown } from 'lucide-react'
+import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -138,6 +138,9 @@ export default function JobsListPage() {
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Repair Jobs</h1>
             <div className="flex items-center space-x-3">
+              <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
+                <Plus className="h-6 w-6" />
+              </Link>
               <Link href="/app/templates" className="text-gray-600 hover:text-primary">
                 <MessageSquare className="h-6 w-6" />
               </Link>

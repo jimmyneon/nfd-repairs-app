@@ -34,7 +34,12 @@ export default function NotificationsPage() {
       .order('created_at', { ascending: false })
       .limit(50)
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error loading notifications:', error)
+    }
+    
+    if (data) {
+      console.log('Loaded notifications:', data.length)
       setNotifications(data)
     }
     setLoading(false)

@@ -38,19 +38,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check notification config to see if SMS should be sent for this status
+    const { data: config } = await supabase
+      .from('notification_config')
+      .select('send_sms, is_active')
+      .eq('status_key', status)
+      .single()
+
+    if (config && (!config.send_sms || !config.is_active)) {
+      console.log(`SMS disabled for status: ${status}`)
+      return NextResponse.json({ 
+        success: true, 
+        message: `SMS notifications disabled for ${status}` 
+      })
+    }
+
     // Only send SMS for key status changes
-    const smsStatuses = ['READY_TO_BOOK_IN', 'READY_TO_COLLECT', 'COMPLETED']
+    const smsStatuses = ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'READY_TO_BOOK_IN', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED']
     
     if (!smsStatuses.includes(status)) {
       console.log(`Status ${status} does not trigger SMS notification`)
       return NextResponse.json({ success: true, message: 'Status does not trigger SMS' })
     }
 
+    // Map status to template key (AWAITING_DEPOSIT uses DEPOSIT_REQUIRED template)
+    const templateKey = status === 'AWAITING_DEPOSIT' ? 'DEPOSIT_REQUIRED' : status
+
     // Get SMS template for this status
     const { data: template } = await supabase
       .from('sms_templates')
       .select('*')
-      .eq('key', status)
+      .eq('key', templateKey)
       .eq('is_active', true)
       .single()
 
@@ -62,22 +80,30 @@ export async function POST(request: NextRequest) {
     // Build tracking URL (use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes)
     const appUrl = 'https://nfd-repairs-app.vercel.app'
     const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+    const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     // Replace template variables
-    const smsBody = template.body
+    let smsBody = template.body
       .replace('{customer_name}', job.customer_name)
       .replace('{device_make}', job.device_make)
       .replace('{device_model}', job.device_model)
       .replace('{price_total}', job.price_total?.toString() || '0')
       .replace('{tracking_link}', trackingUrl)
       .replace('{job_ref}', job.job_ref)
+    
+    // Add deposit-specific replacements if needed
+    if (job.deposit_required) {
+      smsBody = smsBody
+        .replace('{deposit_amount}', job.deposit_amount?.toString() || '20.00')
+        .replace('{deposit_link}', depositUrl)
+    }
 
     // Queue SMS
     const { data: smsLog, error: smsError } = await supabase
       .from('sms_logs')
       .insert({
         job_id: jobId,
-        template_key: status,
+        template_key: templateKey,
         body_rendered: smsBody,
         status: 'PENDING',
       })

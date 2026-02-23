@@ -127,6 +127,16 @@ export default function SettingsPage() {
           </h2>
           <div className="space-y-3">
             <Link
+              href="/app/settings/notifications"
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">Notification Settings</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Configure email/SMS per status</p>
+              </div>
+              <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
+            </Link>
+            <Link
               href="/app/templates"
               className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >

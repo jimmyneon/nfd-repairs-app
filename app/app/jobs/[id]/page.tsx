@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Job, JobEvent, SMSLog, JobStatus } from '@/lib/types'
+import { Job, JobEvent, SMSLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
 import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch } from 'lucide-react'
 import Link from 'next/link'
@@ -135,6 +135,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       console.error('Failed to queue status SMS:', error)
     }
 
+    // Send email notification
+    if (job.customer_email) {
+      try {
+        await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            type: 'STATUS_UPDATE',
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to send email:', error)
+      }
+    }
+
     await loadJobData()
     setActionLoading(false)
     setPendingWorkflowStatus(null)
@@ -183,6 +199,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       }
     } catch (error) {
       console.error('Failed to queue status SMS:', error)
+    }
+
+    // Send email notification
+    if (job.customer_email) {
+      try {
+        await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            type: 'STATUS_UPDATE',
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to send email:', error)
+      }
     }
 
     await loadJobData()
