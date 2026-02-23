@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
+import OnboardingGate from '@/components/OnboardingGate'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -333,6 +334,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
+        {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
+        <OnboardingGate 
+          onboardingCompleted={job.onboarding_completed || false}
+          jobRef={job.job_ref}
+        />
+
         <div className="card">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Customer Contact</h2>
           <p className="text-sm text-gray-600 mb-3">Tap to call, text, or message</p>
@@ -374,11 +381,18 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         <div className="card">
           <h2 className="text-xl font-black text-gray-900 mb-5">Update Status</h2>
+          {!job.onboarding_completed && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
+              <p className="text-sm text-yellow-800 font-semibold">
+                ⚠️ Status changes disabled until customer completes onboarding
+              </p>
+            </div>
+          )}
           <div className="space-y-4">
             {job.status === 'RECEIVED' && (
               <button
                 onClick={() => handleWorkflowStatusChange('READY_TO_BOOK_IN')}
-                disabled={actionLoading}
+                disabled={actionLoading || !job.onboarding_completed}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
                 <CheckCircle className="h-8 w-8" />

@@ -123,8 +123,17 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Queue SMS for all new jobs (different template based on deposit requirement)
-    const templateKey = jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN'
+    // Check if onboarding is needed (missing email, password info, or terms)
+    const needsOnboarding = !jobData.customer_email || 
+                           (!job.device_password && !job.password_not_applicable) ||
+                           !job.terms_accepted
+
+    // Queue SMS - onboarding link if needed, otherwise regular status SMS
+    const templateKey = needsOnboarding 
+      ? 'ONBOARDING_REQUIRED'
+      : (jobData.deposit_required ? 'DEPOSIT_REQUIRED' : 'READY_TO_BOOK_IN')
+    
+    console.log('Needs onboarding:', needsOnboarding)
     console.log('Querying for template:', templateKey)
     
     const { data: template, error: templateError } = await supabase
@@ -141,6 +150,7 @@ export async function POST(request: NextRequest) {
       const appUrl = 'https://nfd-repairs-app.vercel.app'
       const trackingUrl = `${appUrl}/t/${job.tracking_token}`
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      const onboardingUrl = `${appUrl}/onboard/${job.onboarding_token}`
       
       let smsBody = template.body
         .replace('{customer_name}', jobData.customer_name)
@@ -149,6 +159,7 @@ export async function POST(request: NextRequest) {
         .replace('{price_total}', jobData.price_total.toString())
         .replace('{tracking_link}', trackingUrl)
         .replace('{job_ref}', job.job_ref)
+        .replace('{onboarding_link}', onboardingUrl)
 
       // Add deposit-specific replacements if needed
       if (jobData.deposit_required) {
