@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(process.env.RESEND_API_KEY || 'dummy_key_for_build')
 
 export interface EmailTemplate {
   subject: string
@@ -15,6 +15,12 @@ export async function sendEmail(
   text?: string
 ) {
   try {
+    // Check if API key is configured
+    if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 'dummy_key_for_build') {
+      console.warn('RESEND_API_KEY not configured - email not sent')
+      return { success: false, error: 'Email service not configured' }
+    }
+
     const { data, error } = await resend.emails.send({
       from: 'NFD Repairs <repairs@newforestdevicerepairs.co.uk>',
       to: [to],
