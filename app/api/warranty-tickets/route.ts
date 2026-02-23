@@ -99,13 +99,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Attempt to match to existing job
-    const matchResult = await matchToJob(supabase, {
+    // Find suggested job matches
+    const suggestions = await findJobSuggestions(supabase, {
       jobId: body.repair?.jobId,
       reference: body.repair?.reference,
-      phone: body.customer.phone
+      phone: body.customer.phone,
+      deviceModel: body.repair?.deviceModel
     })
 
+    // Only auto-match if we have a high confidence match with exact reference
+    const autoMatch = suggestions.find(s => s.confidence === 'high' && s.matchReason === 'reference')
+    
     // Create warranty ticket
     const { data: ticket, error: ticketError } = await supabase
       .from('warranty_tickets')
@@ -115,8 +119,9 @@ export async function POST(request: NextRequest) {
         customer_name: body.customer.name,
         customer_phone: body.customer.phone,
         customer_email: body.customer.email || null,
-        matched_job_id: matchResult.jobId,
-        match_confidence: matchResult.confidence,
+        matched_job_id: autoMatch?.jobId || null,
+        match_confidence: autoMatch ? 'high' : (suggestions.length > 0 ? 'none' : 'none'),
+        suggested_jobs: suggestions,
         job_reference: body.repair?.reference || null,
         device_model: body.repair?.deviceModel || null,
         issue_description: body.issue.description,
@@ -144,20 +149,22 @@ export async function POST(request: NextRequest) {
       .insert({
         ticket_id: ticket.id,
         type: 'SYSTEM',
-        message: `Ticket created from ${body.source || 'website'}`,
+        message: `Ticket created from ${body.source || 'website'}${autoMatch ? ' - Auto-matched to job' : suggestions.length > 0 ? ` - ${suggestions.length} job suggestions found` : ' - No matching jobs found'}`,
         metadata: {
-          matchConfidence: matchResult.confidence,
-          matchedJobId: matchResult.jobId
+          autoMatched: !!autoMatch,
+          suggestionsCount: suggestions.length,
+          matchedJobId: autoMatch?.jobId || null
         }
       })
 
-    console.log('Warranty ticket created:', ticket.ticket_ref)
+    console.log('Warranty ticket created:', ticket.ticket_ref, `(${suggestions.length} suggestions)`)
 
     return NextResponse.json({
       ticketId: ticket.id,
       ticketRef: ticket.ticket_ref,
-      matchedJobId: matchResult.jobId,
-      matchConfidence: matchResult.confidence,
+      matchedJobId: autoMatch?.jobId || null,
+      matchConfidence: autoMatch ? 'high' : 'none',
+      suggestionsCount: suggestions.length,
       status: ticket.status
     }, {
       headers: {
@@ -198,63 +205,139 @@ function generateIdempotencyKey(phone: string, description: string, timestamp: s
 }
 
 /**
- * Match warranty ticket to existing job
- * Priority: jobId > reference > phone + recent job
+ * Find suggested job matches for warranty ticket
+ * Returns array of suggestions with confidence scores
+ * Staff will manually select the correct match
  */
-async function matchToJob(
+async function findJobSuggestions(
   supabase: any,
-  params: { jobId?: string; reference?: string; phone: string }
-): Promise<{ jobId: string | null; confidence: string }> {
+  params: { jobId?: string; reference?: string; phone: string; deviceModel?: string }
+): Promise<Array<{
+  jobId: string
+  jobRef: string
+  confidence: 'high' | 'medium' | 'low'
+  matchReason: string
+  customerName: string
+  deviceMake: string
+  deviceModel: string
+  createdAt: string
+  status: string
+}>> {
   
-  // Try matching by jobId (highest confidence)
-  if (params.jobId) {
-    const { data: job } = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('id', params.jobId)
-      .single()
-    
-    if (job) {
-      return { jobId: job.id, confidence: 'high' }
-    }
-  }
+  const suggestions: any[] = []
 
-  // Try matching by job reference (high confidence)
+  // 1. Try matching by exact job reference (100% match)
   if (params.reference) {
     const { data: job } = await supabase
       .from('jobs')
-      .select('id')
+      .select('id, job_ref, customer_name, device_make, device_model, created_at, status')
       .eq('job_ref', params.reference)
       .single()
     
     if (job) {
-      return { jobId: job.id, confidence: 'high' }
+      suggestions.push({
+        jobId: job.id,
+        jobRef: job.job_ref,
+        confidence: 'high',
+        matchReason: 'reference',
+        customerName: job.customer_name,
+        deviceMake: job.device_make,
+        deviceModel: job.device_model,
+        createdAt: job.created_at,
+        status: job.status
+      })
+      // If we have exact reference match, return only this
+      return suggestions
     }
   }
 
-  // Try matching by phone + most recent job within 90 days (medium/low confidence)
+  // 2. Try matching by jobId if provided
+  if (params.jobId) {
+    const { data: job } = await supabase
+      .from('jobs')
+      .select('id, job_ref, customer_name, device_make, device_model, created_at, status')
+      .eq('id', params.jobId)
+      .single()
+    
+    if (job) {
+      suggestions.push({
+        jobId: job.id,
+        jobRef: job.job_ref,
+        confidence: 'high',
+        matchReason: 'job_id',
+        customerName: job.customer_name,
+        deviceMake: job.device_make,
+        deviceModel: job.device_model,
+        createdAt: job.created_at,
+        status: job.status
+      })
+    }
+  }
+
+  // 3. Find jobs by phone number within 90 days
   const ninetyDaysAgo = new Date()
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
 
-  const { data: jobs } = await supabase
+  const { data: phoneJobs } = await supabase
     .from('jobs')
-    .select('id, created_at, status')
+    .select('id, job_ref, customer_name, device_make, device_model, created_at, status')
     .eq('customer_phone', params.phone)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(5)
 
-  if (jobs && jobs.length > 0) {
-    const job = jobs[0]
-    const daysSinceCreation = Math.floor(
-      (Date.now() - new Date(job.created_at).getTime()) / (1000 * 60 * 60 * 24)
-    )
-    
-    // Medium confidence if within 30 days, low if 30-90 days
-    const confidence = daysSinceCreation <= 30 ? 'medium' : 'low'
-    return { jobId: job.id, confidence }
+  if (phoneJobs && phoneJobs.length > 0) {
+    phoneJobs.forEach((job: any) => {
+      // Skip if already added
+      if (suggestions.find(s => s.jobId === job.id)) return
+
+      const daysSinceCreation = Math.floor(
+        (Date.now() - new Date(job.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      )
+      
+      // Check if device model matches
+      const deviceMatch = params.deviceModel && 
+        job.device_model.toLowerCase().includes(params.deviceModel.toLowerCase())
+      
+      let confidence: 'high' | 'medium' | 'low'
+      let matchReason: string
+      
+      if (deviceMatch && daysSinceCreation <= 30) {
+        confidence = 'high'
+        matchReason = 'phone_device_recent'
+      } else if (deviceMatch) {
+        confidence = 'medium'
+        matchReason = 'phone_device'
+      } else if (daysSinceCreation <= 30) {
+        confidence = 'medium'
+        matchReason = 'phone_recent'
+      } else {
+        confidence = 'low'
+        matchReason = 'phone_old'
+      }
+
+      suggestions.push({
+        jobId: job.id,
+        jobRef: job.job_ref,
+        confidence,
+        matchReason,
+        customerName: job.customer_name,
+        deviceMake: job.device_make,
+        deviceModel: job.device_model,
+        createdAt: job.created_at,
+        status: job.status
+      })
+    })
   }
 
-  // No match found
-  return { jobId: null, confidence: 'none' }
+  // Sort by confidence and date
+  suggestions.sort((a, b) => {
+    const confOrder = { high: 3, medium: 2, low: 1 }
+    if (confOrder[a.confidence] !== confOrder[b.confidence]) {
+      return confOrder[b.confidence] - confOrder[a.confidence]
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+
+  return suggestions
 }
