@@ -3,6 +3,22 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 /**
+ * OPTIONS /api/warranty-tickets
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
+      'Access-Control-Max-Age': '86400',
+    },
+  })
+}
+
+/**
  * POST /api/warranty-tickets
  * Create warranty ticket from website or external source
  * Requires X-API-KEY header for authentication
@@ -15,12 +31,18 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
+    }
+
     // Verify API key
     const apiKey = request.headers.get('X-API-KEY')
     if (!apiKey) {
       return NextResponse.json(
         { error: 'Missing X-API-KEY header' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
 
@@ -34,7 +56,7 @@ export async function POST(request: NextRequest) {
     if (!settingData || apiKey !== settingData.value) {
       return NextResponse.json(
         { error: 'Invalid API key' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
 
@@ -45,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (!body.customer?.name || !body.customer?.phone || !body.issue?.description) {
       return NextResponse.json(
         { error: 'Missing required fields: customer.name, customer.phone, issue.description' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -72,6 +94,8 @@ export async function POST(request: NextRequest) {
         matchedJobId: existingTicket.matched_job_id,
         status: existingTicket.status,
         duplicate: true
+      }, {
+        headers: corsHeaders
       })
     }
 
@@ -110,7 +134,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating warranty ticket:', ticketError)
       return NextResponse.json(
         { error: 'Failed to create warranty ticket' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       )
     }
 
@@ -135,13 +159,26 @@ export async function POST(request: NextRequest) {
       matchedJobId: matchResult.jobId,
       matchConfidence: matchResult.confidence,
       status: ticket.status
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
+      }
     })
 
   } catch (error) {
     console.error('Error in warranty-tickets API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
+        }
+      }
     )
   }
 }
