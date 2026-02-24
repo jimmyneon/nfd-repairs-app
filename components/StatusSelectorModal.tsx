@@ -6,14 +6,14 @@ import { JOB_STATUS_LABELS } from '@/lib/constants'
 
 interface StatusSelectorModalProps {
   currentStatus: JobStatus
-  onSelectStatus: (status: JobStatus) => void
-  onCancel: () => void
+  onSelect: (status: JobStatus) => void
+  onClose: () => void
 }
 
 export default function StatusSelectorModal({
   currentStatus,
-  onSelectStatus,
-  onCancel
+  onSelect,
+  onClose
 }: StatusSelectorModalProps) {
   const statuses: JobStatus[] = [
     'RECEIVED',
@@ -43,7 +43,7 @@ export default function StatusSelectorModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -54,7 +54,7 @@ export default function StatusSelectorModal({
             </p>
           </div>
           <button
-            onClick={onCancel}
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-1"
           >
             <X className="h-5 w-5" />
@@ -66,7 +66,7 @@ export default function StatusSelectorModal({
           {statuses.map((status) => (
             <button
               key={status}
-              onClick={() => onSelectStatus(status)}
+              onClick={() => onSelect(status)}
               disabled={status === currentStatus}
               className={`${getStatusColor(status)} text-white font-bold py-3 px-2 rounded-lg text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md active:scale-95 h-16 flex items-center justify-center text-center leading-tight`}
             >
@@ -77,7 +77,7 @@ export default function StatusSelectorModal({
 
         {/* Cancel Button */}
         <button
-          onClick={onCancel}
+          onClick={onClose}
           className="w-full bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-3 px-4 rounded-xl text-base transition-colors"
         >
           Cancel

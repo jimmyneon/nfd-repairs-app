@@ -522,7 +522,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {showSimpleConfirm && pendingWorkflowStatus && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
               <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Status Change</h2>
               <p className="text-gray-700 mb-6">

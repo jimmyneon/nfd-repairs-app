@@ -44,7 +44,7 @@ export default function StatusChangeModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
