@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
       notificationType = 'READY_TO_COLLECT'
     } else if (title.includes('New Job') || title.includes('Job Created')) {
       notificationType = 'NEW_JOB'
+    } else if (title.includes('Warranty Claim') || title.includes('WARRANTY')) {
+      notificationType = 'WARRANTY_CLAIM'
     }
 
     const payload = JSON.stringify({

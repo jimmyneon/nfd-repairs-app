@@ -157,6 +157,16 @@ export async function POST(request: NextRequest) {
         }
       })
 
+    // Create staff notification for push notification
+    await supabase
+      .from('notifications')
+      .insert({
+        type: 'WARRANTY_CLAIM',
+        title: 'New Warranty Claim',
+        body: `${ticket.customer_name} - ${ticket.device_model || 'Device'} - ${ticket.issue_description.substring(0, 100)}`,
+        job_id: autoMatch?.jobId || null,
+      })
+
     console.log('Warranty ticket created:', ticket.ticket_ref, `(${suggestions.length} suggestions)`)
 
     return NextResponse.json({

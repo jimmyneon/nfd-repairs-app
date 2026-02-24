@@ -46,6 +46,7 @@ self.addEventListener('push', (event) => {
   // Custom vibration patterns based on notification type
   const vibrationPatterns = {
     'NEW_JOB': [200, 100, 200, 100, 200], // Excited pattern
+    'WARRANTY_CLAIM': [300, 100, 300, 100, 300], // Urgent pattern (customer needs help)
     'PARTS_ARRIVED': [300, 100, 300], // Urgent pattern
     'READY_TO_COLLECT': [100, 50, 100, 50, 100, 50, 100], // Happy pattern
     'URGENT': [500, 200, 500], // Strong urgent pattern
@@ -59,7 +60,7 @@ self.addEventListener('push', (event) => {
   const silent = data.silent || false
   
   // Require interaction for important notifications
-  const requireInteraction = ['PARTS_ARRIVED', 'READY_TO_COLLECT', 'URGENT'].includes(notificationType)
+  const requireInteraction = ['WARRANTY_CLAIM', 'PARTS_ARRIVED', 'READY_TO_COLLECT', 'URGENT'].includes(notificationType)
   
   const options = {
     body: data.body || 'New notification',
