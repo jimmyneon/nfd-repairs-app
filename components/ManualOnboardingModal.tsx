@@ -109,11 +109,6 @@ export default function ManualOnboardingModal({
       return
     }
 
-    if (!signature) {
-      setError('Customer signature required')
-      return
-    }
-
     setSubmitting(true)
     setError(null)
 
@@ -124,7 +119,7 @@ export default function ManualOnboardingModal({
           customer_email: formData.emailOptOut ? null : formData.email,
           device_password: formData.passwordNA ? null : formData.devicePassword,
           password_not_applicable: formData.passwordNA,
-          customer_signature: signature,
+          customer_signature: signature || null,
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
           onboarding_completed: true,
@@ -262,7 +257,7 @@ export default function ManualOnboardingModal({
             {/* Signature Pad */}
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Customer Signature *
+                Customer Signature (Optional)
               </label>
               <div className="border-2 border-gray-300 rounded-xl overflow-hidden">
                 <canvas

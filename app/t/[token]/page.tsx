@@ -110,7 +110,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     return messages[status] || 'We\'ll keep you updated on your repair progress.'
   }
 
-  const statusSteps = [
+  // Filter status steps based on whether parts are required
+  const allStatusSteps = [
     'RECEIVED',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
@@ -120,6 +121,11 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     'READY_TO_COLLECT',
     'COMPLETED',
   ]
+
+  // Remove parts-related statuses if parts not required
+  const statusSteps = job.parts_required || job.deposit_required
+    ? allStatusSteps
+    : allStatusSteps.filter(s => !['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(s))
 
   const currentStepIndex = statusSteps.indexOf(job.status)
 

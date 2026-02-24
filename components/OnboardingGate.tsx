@@ -25,7 +25,7 @@ export default function OnboardingGate({ onboardingCompleted, jobRef }: Onboardi
           <ul className="text-yellow-800 text-sm space-y-1 mb-3">
             <li>• Email address (if not provided)</li>
             <li>• Device password/passcode</li>
-            <li>• Signature and terms acceptance</li>
+            <li>• Terms acceptance</li>
           </ul>
           <p className="text-yellow-800 text-sm font-semibold">
             An SMS with the onboarding link has been sent to the customer.
