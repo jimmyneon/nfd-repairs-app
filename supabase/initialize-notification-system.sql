@@ -73,7 +73,7 @@ true),
 true),
 
 ('PARTS_ARRIVED', 'Parts Arrived - Please Drop Off: {job_ref}', 
-'<h2>Parts Have Arrived!</h2><p>The parts for your {device_make} {device_model} have arrived.</p><p><strong>Please drop your device off at:</strong><br>New Forest Device Repairs</p><p><a href="{google_maps_link}">Get Directions</a></p><p>Opening Hours: Mon-Sat 9am-5pm</p><p><a href="{tracking_link}">Track your repair</a></p>',
+'<h2>Parts Have Arrived!</h2><p>The parts for your {device_make} {device_model} have arrived.</p><p><strong>Please drop your device off at New Forest Device Repairs.</strong></p><p><a href="{google_maps_link}">Get Directions & Opening Hours</a></p><p><a href="{tracking_link}">Track your repair</a></p>',
 'Parts arrived for {device_make} {device_model}. Please drop off at New Forest Device Repairs. Find us: {google_maps_link} Track at {tracking_link}',
 true),
 
@@ -93,8 +93,8 @@ true),
 true),
 
 ('READY_TO_COLLECT', 'Ready to Collect: {job_ref}', 
-'<h2>Your Repair is Complete!</h2><p>Great news! Your {device_make} {device_model} is ready to collect.</p><p><strong>Collection Details:</strong><br>New Forest Device Repairs<br>Mon-Sat 9am-5pm</p><p><a href="{google_maps_link}">Get Directions</a></p><p><a href="{tracking_link}">Track your repair</a></p>',
-'Your {device_make} {device_model} is ready to collect at New Forest Device Repairs. Mon-Sat 9am-5pm. Find us: {google_maps_link} Track at {tracking_link}',
+'<h2>Your Repair is Complete!</h2><p>Great news! Your {device_make} {device_model} is ready to collect.</p><p><strong>New Forest Device Repairs</strong></p><p><a href="{google_maps_link}">Get Directions & Opening Hours</a></p><p><a href="{tracking_link}">Track your repair</a></p>',
+'Your {device_make} {device_model} is ready to collect at New Forest Device Repairs. Find us: {google_maps_link} Track at {tracking_link}',
 true),
 
 ('COMPLETED', 'Repair Completed: {job_ref}', 

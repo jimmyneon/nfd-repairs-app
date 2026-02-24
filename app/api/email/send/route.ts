@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please drop your device off at New Forest Device Repairs.',
       'READY_TO_BOOK_IN': 'Your device is ready to be booked in for repair. We\'ll contact you to arrange a convenient time.',
       'IN_REPAIR': 'Our technicians are working on your repair. We\'ll update you when it\'s ready.',
-      'READY_TO_COLLECT': 'Great news! Your repair is complete and ready to collect. We\'re open Mon-Sat 9am-5pm.',
+      'READY_TO_COLLECT': 'Great news! Your repair is complete and ready to collect.',
       'COMPLETED': 'Thank you for choosing New Forest Device Repairs!',
       'CANCELLED': 'Your repair has been cancelled. If you have any questions, please contact us.'
     }
