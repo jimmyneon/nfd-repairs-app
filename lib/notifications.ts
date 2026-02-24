@@ -55,6 +55,9 @@ export async function subscribeToPushNotifications() {
 
 export async function savePushSubscription(subscription: PushSubscription, userId: string) {
   try {
+    console.log('Saving push subscription for user:', userId)
+    console.log('Subscription endpoint:', subscription.endpoint)
+    
     const response = await fetch('/api/notifications/subscribe', {
       method: 'POST',
       headers: {
@@ -66,10 +69,17 @@ export async function savePushSubscription(subscription: PushSubscription, userI
       }),
     })
 
-    return response.ok
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error('Failed to save subscription:', errorData)
+      throw new Error(errorData.details || errorData.error || 'Failed to save subscription')
+    }
+
+    console.log('Push subscription saved successfully')
+    return true
   } catch (error) {
     console.error('Failed to save push subscription:', error)
-    return false
+    throw error
   }
 }
 

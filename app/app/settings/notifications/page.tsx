@@ -97,15 +97,15 @@ export default function NotificationSettingsPage() {
         return
       }
       
-      const saved = await savePushSubscription(subscription, user.id)
-      
-      if (saved) {
+      try {
+        await savePushSubscription(subscription, user.id)
         setPushTestResult('✅ Successfully subscribed to push notifications!')
         setHasSubscription(true)
         // Clear localStorage flag so prompt can show again if needed
         localStorage.removeItem('notification-prompt-shown')
-      } else {
-        setPushTestResult('❌ Failed to save subscription to database')
+      } catch (saveError) {
+        console.error('Failed to save subscription:', saveError)
+        setPushTestResult(`❌ Failed to save to database: ${saveError instanceof Error ? saveError.message : 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Subscription error:', error)

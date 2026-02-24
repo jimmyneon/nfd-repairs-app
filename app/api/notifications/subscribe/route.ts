@@ -38,17 +38,25 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Failed to save subscription:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
       return NextResponse.json(
-        { error: 'Failed to save subscription', details: error.message },
+        { 
+          error: 'Failed to save subscription', 
+          details: error.message,
+          code: error.code,
+          hint: error.hint
+        },
         { status: 500 }
       )
     }
 
+    console.log('Push subscription saved successfully for user:', userId)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in subscribe endpoint:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     )
   }
