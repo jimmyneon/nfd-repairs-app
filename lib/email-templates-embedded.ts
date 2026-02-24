@@ -117,17 +117,17 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #FAF5E9;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FAF5E9; padding: 20px;">
+<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; padding: 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
           
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #009B4D 0%, #007A3D 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">New Forest Device Repairs</h1>
-              <p style="color: #E8F5E9; margin: 10px 0 0 0; font-size: 14px;">Professional Device Repair Services</p>
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; font-family: 'Poppins', sans-serif;">New Forest Device Repairs</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px; font-weight: 300;">Professional Device Repair Services</p>
             </td>
           </tr>
 
@@ -173,17 +173,23 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                 </div>
               ` : ''}
 
-              <!-- Action Button -->
+              <!-- Action Buttons -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
                   <td align="center">
-                    <a href="${trackingUrl}" style="display: inline-block; background-color: #009B4D; color: #ffffff; padding: 16px 45px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(0, 155, 77, 0.3);">View Full Tracking Page</a>
+                    <a href="${trackingUrl}" style="display: inline-block; background-color: #009B4D; color: #ffffff; padding: 16px 45px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 155, 77, 0.25); margin-bottom: 12px;">View Full Tracking Page</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top: 12px;">
+                    <a href="https://www.newforestdevicerepairs.co.uk/start" style="display: inline-block; background-color: #ffffff; color: #009B4D; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; border: 2px solid #009B4D;">Contact Us</a>
                   </td>
                 </tr>
               </table>
 
-              <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0; text-align: center;">
-                Questions? Reply to this email or call us at <strong>07410 381247</strong>
+              <p style="color: #999999; font-size: 12px; line-height: 1.5; margin: 25px 0 0 0; text-align: center; font-style: italic;">
+                ⚠️ This is an automated notification email. Please do not reply to this email.<br>
+                For questions or support, please use the Contact Us button above.
               </p>
             </td>
           </tr>
@@ -191,17 +197,15 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           <!-- Footer -->
           <tr>
             <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-              <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;">
-                <strong>New Forest Device Repairs</strong>
+              <p style="color: #1a1a2e; font-size: 15px; font-weight: 600; margin: 0 0 12px 0;">
+                New Forest Device Repairs
               </p>
-              <p style="color: #666666; font-size: 13px; margin: 0 0 5px 0;">
-                📞 07410 381247
+              <p style="color: #666666; font-size: 13px; margin: 0 0 8px 0;">
+                🌐 <a href="https://www.newforestdevicerepairs.co.uk" style="color: #009B4D; text-decoration: none; font-weight: 500;">newforestdevicerepairs.co.uk</a>
               </p>
-              <p style="color: #666666; font-size: 13px; margin: 0 0 15px 0;">
-                🌐 <a href="https://newforestdevicerepairs.co.uk" style="color: #009B4D; text-decoration: none;">newforestdevicerepairs.co.uk</a>
-              </p>
-              <p style="color: #999999; font-size: 11px; margin: 0;">
-                This email was sent regarding job ${job.job_ref}
+              <p style="color: #999999; font-size: 11px; margin: 15px 0 0 0; line-height: 1.4;">
+                Job Reference: ${job.job_ref}<br>
+                This is an automated notification from updates.newforestdevicerepairs.co.uk
               </p>
             </td>
           </tr>
@@ -242,11 +246,13 @@ Pay here: ${depositUrl}
 
 View full tracking page: ${trackingUrl}
 
-Questions? Reply to this email or call us at 07410 381247
+Contact us: https://www.newforestdevicerepairs.co.uk/start
 
 ---
+⚠️ DO NOT REPLY TO THIS EMAIL
+This is an automated notification. For questions or support, please use the contact link above.
+
 New Forest Device Repairs
-Phone: 07410 381247
 Web: newforestdevicerepairs.co.uk
 Job Reference: ${job.job_ref}
   `
