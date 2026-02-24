@@ -258,9 +258,13 @@ export default function WarrantyTicketsPage() {
         </div>
       )}
 
-      {/* Tickets List */}
+      {/* Tickets Grid */}
       <main className="p-4">
-        {filteredTickets.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredTickets.length === 0 ? (
           <div className="text-center py-12">
             <AlertTriangle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 dark:text-gray-400">
@@ -268,62 +272,55 @@ export default function WarrantyTicketsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredTickets.map((ticket) => (
-              <Link
-                key={ticket.id}
-                href={`/app/warranty/${ticket.id}`}
-                className="block bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-gray-900 dark:text-white">{ticket.ticket_ref}</span>
-                      <span className={`text-xs px-2 py-1 rounded-full border ${STATUS_COLORS[ticket.status]}`}>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {filteredTickets.map((ticket) => {
+              const tileColor = ticket.status === 'NEW' ? 'bg-red-500' :
+                               ticket.status === 'NEEDS_ATTENTION' ? 'bg-orange-500' :
+                               ticket.status === 'IN_PROGRESS' ? 'bg-blue-500' :
+                               ticket.status === 'RESOLVED' ? 'bg-green-500' :
+                               'bg-gray-500'
+              
+              return (
+                <Link
+                  key={ticket.id}
+                  href={`/app/warranty/${ticket.id}`}
+                  className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all aspect-square ${tileColor}`}
+                >
+                  <div className="p-3 h-full flex flex-col relative text-white">
+                    {/* Status Label - Top */}
+                    <div className="text-center mb-2">
+                      <p className="font-black text-xs leading-tight uppercase tracking-wide">
                         {STATUS_LABELS[ticket.status]}
-                      </span>
-                      {ticket.match_confidence !== 'none' && (
-                        <span className={`text-xs px-2 py-1 rounded-full ${CONFIDENCE_COLORS[ticket.match_confidence as keyof typeof CONFIDENCE_COLORS]}`}>
-                          {CONFIDENCE_LABELS[ticket.match_confidence as keyof typeof CONFIDENCE_LABELS]}
-                        </span>
-                      )}
+                      </p>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">{ticket.customer_name}</span>
-                      <span className="mx-1">•</span>
-                      <span>{ticket.customer_phone}</span>
+
+                    {/* Customer & Issue - Main Content */}
+                    <div className="flex-1 flex flex-col justify-center text-center">
+                      <p className="text-sm font-black leading-tight mb-1 truncate">{ticket.customer_name}</p>
+                      <p className="text-xs font-semibold truncate">{ticket.device_model || 'Device'}</p>
+                      <p className="text-xs opacity-90 truncate mt-1">{ticket.issue_description.substring(0, 30)}...</p>
                     </div>
+
+                    {/* Importance Indicators */}
+                    {ticket.status === 'NEW' && (
+                      <div className="absolute top-2 right-2 w-4 h-4 bg-white rounded-full shadow-md flex items-center justify-center">
+                        <span className="text-xs font-black text-red-600">!</span>
+                      </div>
+                    )}
+                    {ticket.status === 'NEEDS_ATTENTION' && (
+                      <div className="absolute top-2 right-2 w-4 h-4 bg-white rounded-full shadow-md flex items-center justify-center">
+                        <span className="text-xs font-black text-orange-600">⚠</span>
+                      </div>
+                    )}
+                    {ticket.matched_job_id && (
+                      <div className="absolute top-2 left-2 w-4 h-4 bg-white rounded-full shadow-md flex items-center justify-center">
+                        <CheckCircle className="h-3 w-3 text-green-600" />
+                      </div>
+                    )}
                   </div>
-                  {ticket.status === 'NEW' && (
-                    <span className="w-3 h-3 bg-red-500 rounded-full flex-shrink-0"></span>
-                  )}
-                </div>
-
-                {/* Issue */}
-                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3 line-clamp-2">
-                  {ticket.issue_description}
-                </p>
-
-                {/* Metadata */}
-                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                  {ticket.job_reference && (
-                    <span className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      Job: {ticket.job_reference}
-                    </span>
-                  )}
-                  {ticket.device_model && (
-                    <span>{ticket.device_model}</span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {new Date(ticket.submitted_at).toLocaleDateString('en-GB')}
-                  </span>
-                  <span className="ml-auto capitalize">{ticket.source}</span>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
         )}
       </main>

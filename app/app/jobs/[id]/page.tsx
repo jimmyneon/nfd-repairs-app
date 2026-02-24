@@ -586,13 +586,39 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <div key={sms.id} className="bg-gray-50 rounded p-2 text-sm">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-gray-700">{sms.template_key}</span>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      sms.status === 'SENT' ? 'bg-green-100 text-green-800' :
-                      sms.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {sms.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        sms.status === 'SENT' ? 'bg-green-100 text-green-800' :
+                        sms.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {sms.status}
+                      </span>
+                      {(sms.status === 'FAILED' || sms.status === 'PENDING') && (
+                        <button
+                          onClick={async () => {
+                            setActionLoading(true)
+                            try {
+                              const response = await fetch('/api/sms/send', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                              })
+                              if (response.ok) {
+                                await loadJobData()
+                              }
+                            } catch (error) {
+                              console.error('Failed to retry SMS:', error)
+                            }
+                            setActionLoading(false)
+                          }}
+                          disabled={actionLoading}
+                          className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
+                          title="Send SMS Again"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-gray-600 text-xs">{sms.body_rendered}</p>
                   <p className="text-gray-400 text-xs mt-1">

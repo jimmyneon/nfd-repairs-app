@@ -160,8 +160,11 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    console.log('Needs onboarding:', needsOnboarding)
-    console.log('Querying for template:', templateKey)
+    console.log('🔍 SMS DEBUG - Job:', job.id, job.job_ref)
+    console.log('🔍 Needs onboarding:', needsOnboarding)
+    console.log('🔍 Deposit required:', jobData.deposit_required)
+    console.log('🔍 Source:', source)
+    console.log('🔍 Template key:', templateKey)
     
     const { data: template, error: templateError } = await supabase
       .from('sms_templates')
@@ -170,9 +173,21 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
       .single()
 
-    console.log('Template found:', !!template, 'Error:', templateError)
+    console.log('🔍 Template found:', !!template)
+    if (templateError) {
+      console.error('❌ Template error:', templateError)
+    }
 
-    if (template) {
+    if (!template) {
+      console.error('❌ NO TEMPLATE FOUND FOR:', templateKey)
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'ERROR',
+        message: `SMS template '${templateKey}' not found - SMS not queued`,
+      } as any)
+    } else {
+      console.log('✅ Template found:', template.key)
+      
       // Use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes
       const appUrl = 'https://nfd-repairs-app.vercel.app'
       const trackingUrl = `${appUrl}/t/${job.tracking_token}`
@@ -195,7 +210,8 @@ export async function POST(request: NextRequest) {
           .replace('{deposit_link}', depositUrl)
       }
 
-      const { data: smsLog } = await supabase.from('sms_logs').insert({
+      console.log('📝 Creating SMS log...')
+      const { data: smsLog, error: smsLogError } = await supabase.from('sms_logs').insert({
         job_id: job.id,
         template_key: templateKey,
         body_rendered: smsBody,
@@ -204,18 +220,41 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+      if (smsLogError) {
+        console.error('❌ SMS log insert failed:', smsLogError)
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'ERROR',
+          message: `Failed to create SMS log: ${smsLogError.message}`,
+        } as any)
+      } else {
+        console.log('✅ SMS log created:', smsLog?.id)
+      }
+
       // Automatically send the SMS
       if (smsLog) {
+        console.log('📤 Triggering SMS send...')
         try {
-          // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
-          const appUrl = 'https://nfd-repairs-app.vercel.app'
-          await fetch(`${appUrl}/api/sms/send`, {
+          const sendResponse = await fetch(`${appUrl}/api/sms/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           })
+          console.log('📤 SMS send response:', sendResponse.status, sendResponse.ok)
         } catch (error) {
-          console.error('Failed to trigger SMS send:', error)
+          console.error('❌ Failed to trigger SMS send:', error)
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'ERROR',
+            message: `Failed to trigger SMS send: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          } as any)
         }
+      } else {
+        console.error('❌ No SMS log created, cannot send')
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'ERROR',
+          message: 'No SMS log created, cannot send',
+        } as any)
       }
     }
 
