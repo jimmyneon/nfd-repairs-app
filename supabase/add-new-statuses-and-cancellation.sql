@@ -2,6 +2,16 @@
 -- New statuses: QUOTE_APPROVED, DROPPED_OFF, COLLECTED
 -- Add cancellation_reason field
 
+-- 0. Migrate existing READY_TO_BOOK_IN jobs to new status
+-- For API/online jobs: READY_TO_BOOK_IN → QUOTE_APPROVED
+-- For manual jobs: READY_TO_BOOK_IN → RECEIVED
+UPDATE jobs 
+SET status = CASE 
+  WHEN source = 'staff_manual' THEN 'RECEIVED'
+  ELSE 'QUOTE_APPROVED'
+END
+WHERE status = 'READY_TO_BOOK_IN';
+
 -- 1. Add cancellation_reason column to jobs table
 ALTER TABLE jobs 
 ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
