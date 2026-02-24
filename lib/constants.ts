@@ -57,4 +57,5 @@ export const SMS_TEMPLATE_VARIABLES = [
   '{deposit_link}',
   '{shop_address}',
   '{opening_times}',
+  '{google_maps_link}',
 ]

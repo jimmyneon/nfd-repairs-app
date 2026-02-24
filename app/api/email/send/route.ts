@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const statusMessages: Record<string, string> = {
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
       'PARTS_ORDERED': 'Parts have been ordered and we\'ll notify you when they arrive.',
-      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please drop your device off at New Forest Device Repairs, Lyndhurst. <a href="https://maps.google.com/?q=New+Forest+Device+Repairs+Lyndhurst">Get Directions</a>',
+      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please drop your device off at New Forest Device Repairs.',
       'READY_TO_BOOK_IN': 'Your device is ready to be booked in for repair. We\'ll contact you to arrange a convenient time.',
       'IN_REPAIR': 'Our technicians are working on your repair. We\'ll update you when it\'s ready.',
       'READY_TO_COLLECT': 'Great news! Your repair is complete and ready to collect. We\'re open Mon-Sat 9am-5pm.',
