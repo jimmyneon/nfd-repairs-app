@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   const { email, magicLink } = await request.json();
   
   await resend.emails.send({
-    from: 'repairs@newforestdevicerepairs.co.uk',
+    from: 'repairs@updates.newforestdevicerepairs.co.uk',
     to: email,
     subject: 'Access Your Repair Status',
     html: `
