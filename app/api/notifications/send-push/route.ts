@@ -57,11 +57,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Determine notification type based on title or body content
+    let notificationType = 'default'
+    if (title.includes('Parts Arrived') || body.includes('Parts Arrived')) {
+      notificationType = 'PARTS_ARRIVED'
+    } else if (title.includes('Ready to Collect') || body.includes('Ready to Collect')) {
+      notificationType = 'READY_TO_COLLECT'
+    } else if (title.includes('New Job') || title.includes('Job Created')) {
+      notificationType = 'NEW_JOB'
+    }
+
     const payload = JSON.stringify({
       title,
       body,
       url: url || '/app/jobs',
       jobId,
+      type: notificationType,
+      timestamp: Date.now()
     })
 
     const sendPromises = subscriptions.map(async (sub) => {

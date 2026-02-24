@@ -147,6 +147,16 @@ export default function SettingsPage() {
               <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
             </Link>
             <Link
+              href="/app/email-templates"
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">Email Templates</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Manage HTML email templates</p>
+              </div>
+              <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
+            </Link>
+            <Link
               href="/app/notifications"
               className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >

@@ -4,7 +4,7 @@
 SELECT * FROM notification_config ORDER BY status_key;
 
 -- 2. Check if email_templates table exists and its data
-SELECT * FROM email_templates ORDER BY key;
+SELECT * FROM email_templates ORDER BY status_key;
 
 -- 3. Check SMS templates
 SELECT * FROM sms_templates ORDER BY status_key;

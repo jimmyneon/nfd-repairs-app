@@ -35,29 +35,64 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Push notification handler
+// Push notification handler with enhanced customization
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
   const title = data.title || 'NFD Repairs'
+  
+  // Determine notification type and customize accordingly
+  const notificationType = data.type || 'default'
+  
+  // Custom vibration patterns based on notification type
+  const vibrationPatterns = {
+    'NEW_JOB': [200, 100, 200, 100, 200], // Excited pattern
+    'PARTS_ARRIVED': [300, 100, 300], // Urgent pattern
+    'READY_TO_COLLECT': [100, 50, 100, 50, 100, 50, 100], // Happy pattern
+    'URGENT': [500, 200, 500], // Strong urgent pattern
+    'default': [200, 100, 200]
+  }
+  
+  // Custom tags for notification grouping
+  const tag = data.jobId ? `job-${data.jobId}` : 'general'
+  
+  // Determine if notification should be silent (for low priority updates)
+  const silent = data.silent || false
+  
+  // Require interaction for important notifications
+  const requireInteraction = ['PARTS_ARRIVED', 'READY_TO_COLLECT', 'URGENT'].includes(notificationType)
+  
   const options = {
     body: data.body || 'New notification',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-96x96.png',
-    vibrate: [200, 100, 200],
+    vibrate: vibrationPatterns[notificationType] || vibrationPatterns.default,
+    tag: tag, // Groups notifications by job
+    renotify: true, // Re-alert even if notification with same tag exists
+    requireInteraction: requireInteraction, // Stays visible until user interacts
+    silent: silent,
+    timestamp: Date.now(),
     data: {
       url: data.url || '/app/jobs',
       jobId: data.jobId,
+      type: notificationType,
+      timestamp: Date.now()
     },
     actions: [
       {
         action: 'view',
-        title: 'View Job',
+        title: '👁️ View Job',
+        icon: '/icons/icon-96x96.png'
       },
       {
         action: 'close',
-        title: 'Dismiss',
+        title: '✕ Dismiss',
       },
     ],
+  }
+  
+  // Add image for specific notification types
+  if (notificationType === 'READY_TO_COLLECT' || notificationType === 'PARTS_ARRIVED') {
+    options.image = '/icons/icon-512x512.png' // Large image for important notifications
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
