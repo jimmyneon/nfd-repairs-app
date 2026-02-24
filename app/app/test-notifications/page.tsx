@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Send, Bell, CheckCircle, XCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -13,6 +13,9 @@ export default function TestNotificationsPage() {
   const [testTitle, setTestTitle] = useState('New Repair Job')
   const [testBody, setTestBody] = useState('iPhone 14 Pro - Screen Repair')
   const [testUrl, setTestUrl] = useState('/app/jobs')
+  const [swStatus, setSwStatus] = useState<string>('Checking...')
+  const [permission, setPermission] = useState<string>('Checking...')
+  const [isClient, setIsClient] = useState(false)
 
   const sendTestNotification = async () => {
     setLoading(true)
@@ -47,33 +50,35 @@ export default function TestNotificationsPage() {
     setLoading(false)
   }
 
-  const checkPermission = () => {
-    if (!('Notification' in window)) {
-      return 'Not Supported'
+  useEffect(() => {
+    setIsClient(true)
+    
+    // Check permission
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPermission(Notification.permission)
+    } else {
+      setPermission('Not Supported')
     }
-    return Notification.permission
-  }
+
+    // Check service worker
+    const checkServiceWorker = async () => {
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration()
+        setSwStatus(registration ? 'Registered' : 'Not Registered')
+      } else {
+        setSwStatus('Not Supported')
+      }
+    }
+    
+    checkServiceWorker()
+  }, [])
 
   const requestPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission()
-      window.location.reload()
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const perm = await Notification.requestPermission()
+      setPermission(perm)
     }
   }
-
-  const checkServiceWorker = async () => {
-    if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.getRegistration()
-      return registration ? 'Registered' : 'Not Registered'
-    }
-    return 'Not Supported'
-  }
-
-  const [swStatus, setSwStatus] = useState<string>('Checking...')
-
-  useState(() => {
-    checkServiceWorker().then(setSwStatus)
-  })
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -101,11 +106,11 @@ export default function TestNotificationsPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Notification Permission:</span>
               <span className={`text-sm font-medium ${
-                checkPermission() === 'granted' ? 'text-green-600' :
-                checkPermission() === 'denied' ? 'text-red-600' :
+                permission === 'granted' ? 'text-green-600' :
+                permission === 'denied' ? 'text-red-600' :
                 'text-yellow-600'
               }`}>
-                {checkPermission()}
+                {permission}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -119,14 +124,14 @@ export default function TestNotificationsPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">Browser Support:</span>
               <span className={`text-sm font-medium ${
-                'Notification' in window && 'serviceWorker' in navigator ? 'text-green-600' : 'text-red-600'
+                isClient && typeof window !== 'undefined' && 'Notification' in window && typeof navigator !== 'undefined' && 'serviceWorker' in navigator ? 'text-green-600' : 'text-red-600'
               }`}>
-                {'Notification' in window && 'serviceWorker' in navigator ? 'Supported' : 'Not Supported'}
+                {isClient && typeof window !== 'undefined' && 'Notification' in window && typeof navigator !== 'undefined' && 'serviceWorker' in navigator ? 'Supported' : 'Not Supported'}
               </span>
             </div>
           </div>
 
-          {checkPermission() !== 'granted' && (
+          {permission !== 'granted' && permission !== 'Checking...' && (
             <button
               onClick={requestPermission}
               className="w-full mt-4 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-medium"
@@ -179,7 +184,7 @@ export default function TestNotificationsPage() {
 
             <button
               onClick={sendTestNotification}
-              disabled={loading || checkPermission() !== 'granted'}
+              disabled={loading || permission !== 'granted'}
               className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -192,7 +197,7 @@ export default function TestNotificationsPage() {
               )}
             </button>
 
-            {checkPermission() !== 'granted' && (
+            {permission !== 'granted' && permission !== 'Checking...' && (
               <p className="text-sm text-yellow-600 dark:text-yellow-400 text-center">
                 ⚠️ Please grant notification permission first
               </p>
