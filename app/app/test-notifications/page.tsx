@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { ArrowLeft, Send, Bell, CheckCircle, XCircle } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default function TestNotificationsPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
