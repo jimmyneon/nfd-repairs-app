@@ -627,7 +627,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <h2 className="font-semibold text-gray-900 mb-3">SMS History</h2>
             <div className="space-y-2">
               {smsLogs.map((sms) => (
-                <div key={sms.id} className="bg-gray-50 rounded p-2 text-sm">
+                <div key={sms.id} className="bg-gray-50 rounded p-2 text-sm overflow-hidden">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-gray-700">{sms.template_key}</span>
                     <div className="flex items-center gap-2">
@@ -664,7 +664,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       )}
                     </div>
                   </div>
-                  <p className="text-gray-600 text-xs">{sms.body_rendered}</p>
+                  <p className="text-gray-600 text-xs break-words">{sms.body_rendered}</p>
                   <p className="text-gray-400 text-xs mt-1">
                     {new Date(sms.created_at).toLocaleString('en-GB')}
                   </p>
