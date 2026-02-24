@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Providers } from './providers'
 
@@ -11,6 +11,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'NFD Repairs',
   },
+}
+
+export const viewport: Viewport = {
   themeColor: '#009B4D',
 }
 
