@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Mail, MessageSquare, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Mail, MessageSquare, Save, Loader2, Bell, Send } from 'lucide-react'
 import Link from 'next/link'
 
 interface NotificationConfig {
@@ -19,10 +19,16 @@ export default function NotificationSettingsPage() {
   const [configs, setConfigs] = useState<NotificationConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [pushTestLoading, setPushTestLoading] = useState(false)
+  const [pushTestResult, setPushTestResult] = useState<string | null>(null)
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
   const supabase = createClient()
 
   useEffect(() => {
     loadConfigs()
+    if ('Notification' in window) {
+      setPushPermission(Notification.permission)
+    }
   }, [])
 
   const loadConfigs = async () => {
@@ -68,6 +74,42 @@ export default function NotificationSettingsPage() {
     
     await loadConfigs()
     setSaving(false)
+  }
+
+  const sendTestPushNotification = async () => {
+    setPushTestLoading(true)
+    setPushTestResult(null)
+
+    try {
+      const response = await fetch('/api/notifications/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Test Notification',
+          body: 'This is a test push notification from NFD Repairs',
+          url: '/app/jobs',
+        }),
+      })
+
+      if (response.ok) {
+        setPushTestResult('✅ Test notification sent successfully!')
+      } else {
+        const error = await response.text()
+        setPushTestResult(`❌ Failed to send: ${error}`)
+      }
+    } catch (error) {
+      setPushTestResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    setPushTestLoading(false)
+    setTimeout(() => setPushTestResult(null), 5000)
+  }
+
+  const requestPushPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission()
+      setPushPermission(permission)
+    }
   }
 
   if (loading) {
@@ -200,6 +242,85 @@ export default function NotificationSettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border-2 border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <Bell className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-white">Push Notifications Test</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Test browser push notifications to all subscribed devices
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Permission Status</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {pushPermission === 'granted' ? 'Notifications enabled' : 
+                   pushPermission === 'denied' ? 'Notifications blocked' : 
+                   'Not yet requested'}
+                </p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                pushPermission === 'granted' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                pushPermission === 'denied' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+              }`}>
+                {pushPermission}
+              </span>
+            </div>
+
+            {pushPermission !== 'granted' && (
+              <button
+                onClick={requestPushPermission}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                <Bell className="h-5 w-5" />
+                Enable Push Notifications
+              </button>
+            )}
+
+            {pushPermission === 'granted' && (
+              <button
+                onClick={sendTestPushNotification}
+                disabled={pushTestLoading}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+              >
+                {pushTestLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-5 w-5" />
+                    Send Test Notification
+                  </>
+                )}
+              </button>
+            )}
+
+            {pushTestResult && (
+              <div className={`p-3 rounded-lg text-sm ${
+                pushTestResult.startsWith('✅') 
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+              }`}>
+                {pushTestResult}
+              </div>
+            )}
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                <strong>Note:</strong> Push notifications are sent to all devices that have subscribed. 
+                Make sure you've enabled notifications in your browser and subscribed on this device first.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 bg-gray-100 dark:bg-gray-800 rounded-xl p-4">
