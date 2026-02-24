@@ -36,6 +36,10 @@ CHECK (
 );
 
 -- 3. Update status constraint to include new statuses
+-- Drop both old and new constraint names to be safe
+ALTER TABLE jobs
+DROP CONSTRAINT IF EXISTS jobs_status_check;
+
 ALTER TABLE jobs
 DROP CONSTRAINT IF EXISTS valid_status;
 
