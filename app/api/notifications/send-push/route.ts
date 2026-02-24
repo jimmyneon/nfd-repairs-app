@@ -3,16 +3,27 @@ import { supabase } from '@/lib/supabase'
 import webpush from 'web-push'
 
 // Configure web-push with VAPID keys
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     'mailto:nfdrepairs@gmail.com',
-    process.env.VAPID_PUBLIC_KEY,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   )
+} else {
+  console.error('VAPID keys not configured! Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in environment variables')
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if VAPID keys are configured
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      console.error('VAPID keys not configured')
+      return NextResponse.json(
+        { error: 'Push notifications not configured. VAPID keys missing.' },
+        { status: 500 }
+      )
+    }
+
     const { title, body, url, jobId } = await request.json()
 
     if (!title || !body) {
