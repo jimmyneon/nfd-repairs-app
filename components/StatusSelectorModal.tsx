@@ -16,30 +16,34 @@ export default function StatusSelectorModal({
   onClose
 }: StatusSelectorModalProps) {
   const statuses: JobStatus[] = [
+    'QUOTE_APPROVED',
+    'DROPPED_OFF',
     'RECEIVED',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
     'PARTS_ARRIVED',
-    'READY_TO_BOOK_IN',
     'IN_REPAIR',
     'DELAYED',
     'READY_TO_COLLECT',
+    'COLLECTED',
     'COMPLETED',
-    'CANCELLED'
+    'CANCELLED',
   ]
 
   const getStatusColor = (status: JobStatus) => {
     const colors: Record<JobStatus, string> = {
-      RECEIVED: 'bg-blue-600 hover:bg-blue-700',
+      QUOTE_APPROVED: 'bg-cyan-600 hover:bg-cyan-700',
+      DROPPED_OFF: 'bg-blue-600 hover:bg-blue-700',
+      RECEIVED: 'bg-blue-700 hover:bg-blue-800',
       AWAITING_DEPOSIT: 'bg-yellow-500 hover:bg-yellow-600',
       PARTS_ORDERED: 'bg-purple-600 hover:bg-purple-700',
       PARTS_ARRIVED: 'bg-purple-700 hover:bg-purple-800',
-      READY_TO_BOOK_IN: 'bg-indigo-600 hover:bg-indigo-700',
       IN_REPAIR: 'bg-orange-600 hover:bg-orange-700',
-      DELAYED: 'bg-amber-600 hover:bg-amber-700',
+      DELAYED: 'bg-red-600 hover:bg-red-700',
       READY_TO_COLLECT: 'bg-green-600 hover:bg-green-700',
-      COMPLETED: 'bg-gray-700 hover:bg-gray-800',
-      CANCELLED: 'bg-red-600 hover:bg-red-700',
+      COLLECTED: 'bg-green-700 hover:bg-green-800',
+      COMPLETED: 'bg-gray-600 hover:bg-gray-700',
+      CANCELLED: 'bg-gray-800 hover:bg-gray-900',
     }
     return colors[status]
   }

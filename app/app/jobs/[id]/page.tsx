@@ -412,12 +412,45 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="space-y-4">
             {job.status === 'RECEIVED' && (
               <button
-                onClick={() => handleWorkflowStatusChange('READY_TO_BOOK_IN')}
+                onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                 disabled={actionLoading || !job.onboarding_completed}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
+                <Wrench className="h-8 w-8" />
+                <span>Start Repair</span>
+              </button>
+            )}
+            
+            {job.status === 'QUOTE_APPROVED' && (
+              <button
+                onClick={() => handleWorkflowStatusChange('DROPPED_OFF')}
+                disabled={actionLoading}
+                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
                 <CheckCircle className="h-8 w-8" />
-                <span>Ready to Book In</span>
+                <span>Device Dropped Off</span>
+              </button>
+            )}
+            
+            {job.status === 'DROPPED_OFF' && !job.parts_required && (
+              <button
+                onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
+                disabled={actionLoading}
+                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                <Wrench className="h-8 w-8" />
+                <span>Start Repair</span>
+              </button>
+            )}
+            
+            {job.status === 'DROPPED_OFF' && job.parts_required && (
+              <button
+                onClick={() => handleWorkflowStatusChange('AWAITING_DEPOSIT')}
+                disabled={actionLoading}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                <DollarSign className="h-8 w-8" />
+                <span>Request Deposit</span>
               </button>
             )}
             
@@ -445,17 +478,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'PARTS_ARRIVED' && (
               <button
-                onClick={() => handleWorkflowStatusChange('READY_TO_BOOK_IN')}
-                disabled={actionLoading}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <CheckCircle className="h-8 w-8" />
-                <span>Device Dropped Off - Ready to Book In</span>
-              </button>
-            )}
-
-            {job.status === 'READY_TO_BOOK_IN' && (
-              <button
                 onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                 disabled={actionLoading}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
@@ -478,12 +500,23 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'READY_TO_COLLECT' && (
               <button
-                onClick={() => handleWorkflowStatusChange('COMPLETED')}
+                onClick={() => handleWorkflowStatusChange('COLLECTED')}
                 disabled={actionLoading}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
                 <CheckCircle className="h-8 w-8" />
-                <span>Mark Completed</span>
+                <span>Customer Collected Device</span>
+              </button>
+            )}
+            
+            {job.status === 'COLLECTED' && (
+              <button
+                onClick={() => handleWorkflowStatusChange('COMPLETED')}
+                disabled={actionLoading}
+                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                <CheckCircle className="h-8 w-8" />
+                <span>Close Job</span>
               </button>
             )}
 

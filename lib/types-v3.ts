@@ -1,14 +1,16 @@
 // Updated types to match aligned schema with quote_requests
 
 export type JobStatus =
+  | 'QUOTE_APPROVED'
+  | 'DROPPED_OFF'
   | 'RECEIVED'
   | 'AWAITING_DEPOSIT'
   | 'PARTS_ORDERED'
   | 'PARTS_ARRIVED'
-  | 'READY_TO_BOOK_IN'
   | 'IN_REPAIR'
   | 'DELAYED'
   | 'READY_TO_COLLECT'
+  | 'COLLECTED'
   | 'COMPLETED'
   | 'CANCELLED'
 

@@ -79,10 +79,10 @@ export async function POST(request: NextRequest) {
       customer_id: customer_id || null,
       quote_request_id: quote_request_id || null,
       
-      // Status - manual entry starts as RECEIVED, online starts as READY_TO_BOOK_IN
-      status: (requires_parts_order || parts_required)
-        ? 'AWAITING_DEPOSIT' 
-        : (source === 'staff_manual' ? 'RECEIVED' : 'READY_TO_BOOK_IN'),
+      // Status - manual entry starts as RECEIVED, API/online starts as QUOTE_APPROVED
+      status: source === 'staff_manual' 
+        ? 'RECEIVED'
+        : 'QUOTE_APPROVED',
       
       // Onboarding fields (if provided from manual creation)
       device_password: device_password || null,

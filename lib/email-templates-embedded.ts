@@ -11,27 +11,35 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   const { job, trackingUrl, depositUrl, statusMessage } = data
 
   const statusLabels: Record<string, string> = {
-    'RECEIVED': 'Received',
-    'AWAITING_DEPOSIT': 'Awaiting Deposit',
-    'PARTS_ORDERED': 'Parts Ordered',
-    'PARTS_ARRIVED': 'Parts Arrived',
-    'READY_TO_BOOK_IN': 'Ready to Book In',
-    'IN_REPAIR': 'In Repair',
-    'READY_TO_COLLECT': 'Ready to Collect',
-    'COMPLETED': 'Completed',
-    'CANCELLED': 'Cancelled'
+    QUOTE_APPROVED: 'Quote Approved',
+    DROPPED_OFF: 'Dropped Off',
+    RECEIVED: 'Received',
+    AWAITING_DEPOSIT: 'Awaiting Deposit',
+    PARTS_ORDERED: 'Parts Ordered',
+    PARTS_ARRIVED: 'Parts Arrived',
+    IN_REPAIR: 'In Repair',
+    DELAYED: 'Delayed',
+    READY_TO_BOOK_IN: 'Ready to Book In',
+    READY_TO_COLLECT: 'Ready to Collect',
+    COLLECTED: 'Collected',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled',
   }
 
   const statusColors: Record<string, string> = {
-    'RECEIVED': '#6B7280',
-    'AWAITING_DEPOSIT': '#F59E0B',
-    'PARTS_ORDERED': '#8B5CF6',
-    'PARTS_ARRIVED': '#7C3AED',
-    'READY_TO_BOOK_IN': '#3B82F6',
-    'IN_REPAIR': '#EF4444',
-    'READY_TO_COLLECT': '#10B981',
-    'COMPLETED': '#059669',
-    'CANCELLED': '#6B7280'
+    QUOTE_APPROVED: '#0891B2',
+    DROPPED_OFF: '#3B82F6',
+    RECEIVED: '#2563EB',
+    AWAITING_DEPOSIT: '#EAB308',
+    PARTS_ORDERED: '#9333EA',
+    PARTS_ARRIVED: '#7C3AED',
+    IN_REPAIR: '#EA580C',
+    DELAYED: '#DC2626',
+    READY_TO_BOOK_IN: '#3B82F6',
+    READY_TO_COLLECT: '#16A34A',
+    COLLECTED: '#15803D',
+    COMPLETED: '#6B7280',
+    CANCELLED: '#1F2937',
   }
 
   const subject = type === 'JOB_CREATED' 

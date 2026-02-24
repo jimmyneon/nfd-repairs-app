@@ -133,12 +133,15 @@ export default function JobsListPage() {
 
   const statusOptions: (JobStatus | 'ALL')[] = [
     'ALL',
+    'QUOTE_APPROVED',
+    'DROPPED_OFF',
     'RECEIVED',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
-    'READY_TO_BOOK_IN',
+    'PARTS_ARRIVED',
     'IN_REPAIR',
     'READY_TO_COLLECT',
+    'COLLECTED',
     'COMPLETED',
     'CANCELLED',
   ]
@@ -210,11 +213,14 @@ export default function JobsListPage() {
             className="w-full h-14 bg-primary text-white px-4 rounded-xl font-bold hover:bg-primary-dark transition-colors flex items-center justify-between mb-3 shadow-md"
           >
             <span>Filter: {statusFilter === 'ALL' ? 'All Jobs' : 
+              statusFilter === 'QUOTE_APPROVED' ? 'Approved' :
+              statusFilter === 'DROPPED_OFF' ? 'Dropped Off' :
               statusFilter === 'AWAITING_DEPOSIT' ? 'Deposit' :
               statusFilter === 'PARTS_ORDERED' ? 'Parts' :
-              statusFilter === 'READY_TO_BOOK_IN' ? 'Book In' :
+              statusFilter === 'PARTS_ARRIVED' ? 'Parts Arrived' :
               statusFilter === 'IN_REPAIR' ? 'Repair' :
               statusFilter === 'READY_TO_COLLECT' ? 'Collect' :
+              statusFilter === 'COLLECTED' ? 'Collected' :
               statusFilter === 'COMPLETED' ? 'Done' :
               statusFilter === 'CANCELLED' ? 'Cancel' :
               JOB_STATUS_LABELS[statusFilter]}
@@ -250,11 +256,14 @@ export default function JobsListPage() {
                     }`}
                   >
                     {status === 'ALL' ? 'All Jobs' : 
+                      status === 'QUOTE_APPROVED' ? 'Approved' :
+                      status === 'DROPPED_OFF' ? 'Dropped Off' :
                       status === 'AWAITING_DEPOSIT' ? 'Deposit' :
                       status === 'PARTS_ORDERED' ? 'Parts' :
-                      status === 'READY_TO_BOOK_IN' ? 'Book In' :
+                      status === 'PARTS_ARRIVED' ? 'Parts Arrived' :
                       status === 'IN_REPAIR' ? 'Repair' :
                       status === 'READY_TO_COLLECT' ? 'Collect' :
+                      status === 'COLLECTED' ? 'Collected' :
                       status === 'COMPLETED' ? 'Done' :
                       status === 'CANCELLED' ? 'Cancel' :
                       JOB_STATUS_LABELS[status]}
@@ -295,11 +304,14 @@ export default function JobsListPage() {
                   {/* Status Label - Top */}
                   <div className="text-center mb-2">
                     <p className="font-black text-xs leading-tight uppercase tracking-wide">
-                      {job.status === 'AWAITING_DEPOSIT' ? 'Deposit' :
+                      {job.status === 'QUOTE_APPROVED' ? 'Approved' :
+                       job.status === 'DROPPED_OFF' ? 'Dropped' :
+                       job.status === 'AWAITING_DEPOSIT' ? 'Deposit' :
                        job.status === 'PARTS_ORDERED' ? 'Parts' :
-                       job.status === 'READY_TO_BOOK_IN' ? 'Book In' :
+                       job.status === 'PARTS_ARRIVED' ? 'Arrived' :
                        job.status === 'IN_REPAIR' ? 'Repair' :
                        job.status === 'READY_TO_COLLECT' ? 'Collect' :
+                       job.status === 'COLLECTED' ? 'Collected' :
                        job.status === 'COMPLETED' ? 'Done' :
                        job.status === 'CANCELLED' ? 'Cancel' :
                        JOB_STATUS_LABELS[job.status]}

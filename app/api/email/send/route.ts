@@ -61,14 +61,18 @@ export async function POST(request: NextRequest) {
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     const statusMessages: Record<string, string> = {
+      'QUOTE_APPROVED': 'Your repair quote has been approved! Please drop off your device at New Forest Device Repairs to begin the repair.',
+      'DROPPED_OFF': 'We have received your device and will begin the repair process.',
+      'RECEIVED': 'We have received your device and will assess it shortly.',
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
       'PARTS_ORDERED': 'Parts have been ordered and we\'ll notify you when they arrive.',
-      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please drop your device off at New Forest Device Repairs.',
-      'READY_TO_BOOK_IN': 'Your device is ready to be booked in for repair. We\'ll contact you to arrange a convenient time.',
+      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. We\'re ready to start your repair.',
       'IN_REPAIR': 'Our technicians are working on your repair. We\'ll update you when it\'s ready.',
-      'READY_TO_COLLECT': 'Great news! Your repair is complete and ready to collect.',
+      'READY_TO_COLLECT': 'Your repair is complete! Your device is ready to collect at New Forest Device Repairs.',
+      'COLLECTED': 'Thank you for collecting your device!',
       'COMPLETED': 'Thank you for choosing New Forest Device Repairs!',
-      'CANCELLED': 'Your repair has been cancelled. If you have any questions, please contact us.'
+      'CANCELLED': 'This repair has been cancelled. If you have any questions, please contact us.',
+      'DELAYED': 'Your repair is experiencing a delay. We\'ll contact you with more information shortly.',
     }
 
     const emailTemplate = generateEmbeddedJobEmail(

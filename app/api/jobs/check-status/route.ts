@@ -133,13 +133,16 @@ export async function GET(request: NextRequest) {
 // Helper function to get human-readable status labels
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    'QUOTE_APPROVED': 'Quote Approved',
+    'DROPPED_OFF': 'Dropped Off',
     'RECEIVED': 'Received',
     'AWAITING_DEPOSIT': 'Awaiting Deposit',
     'PARTS_ORDERED': 'Parts Ordered',
     'PARTS_ARRIVED': 'Parts Arrived',
-    'READY_TO_BOOK_IN': 'Ready to Book In',
     'IN_REPAIR': 'In Repair',
+    'DELAYED': 'Delayed',
     'READY_TO_COLLECT': 'Ready to Collect',
+    'COLLECTED': 'Collected',
     'COMPLETED': 'Completed',
     'CANCELLED': 'Cancelled',
   }
