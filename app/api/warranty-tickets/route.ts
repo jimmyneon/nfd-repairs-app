@@ -205,6 +205,43 @@ function generateIdempotencyKey(phone: string, description: string, timestamp: s
 }
 
 /**
+ * Generate all possible phone number format variants
+ * Handles: +44, 0, 00, with/without spaces
+ */
+function generatePhoneVariants(phone: string): string[] {
+  const variants = new Set<string>()
+  
+  // Normalize: remove all spaces and non-digit characters except +
+  const normalized = phone.replace(/[\s\-()]/g, '')
+  variants.add(normalized)
+  
+  // Extract the core number (without country code)
+  let coreNumber = normalized
+  
+  if (normalized.startsWith('+44')) {
+    coreNumber = normalized.substring(3)
+  } else if (normalized.startsWith('0044')) {
+    coreNumber = normalized.substring(4)
+  } else if (normalized.startsWith('44')) {
+    coreNumber = normalized.substring(2)
+  } else if (normalized.startsWith('0')) {
+    coreNumber = normalized.substring(1)
+  }
+  
+  // Generate all variants
+  variants.add('+44' + coreNumber)           // +447410381247
+  variants.add('0' + coreNumber)             // 07410381247
+  variants.add('0044' + coreNumber)          // 00447410381247
+  variants.add('44' + coreNumber)            // 447410381247
+  
+  // Also add with spaces (common formats)
+  variants.add('+44 ' + coreNumber)
+  variants.add('0' + coreNumber.substring(0, 4) + ' ' + coreNumber.substring(4))
+  
+  return Array.from(variants)
+}
+
+/**
  * Find suggested job matches for warranty ticket
  * Returns array of suggestions with confidence scores
  * Staff will manually select the correct match
@@ -275,16 +312,19 @@ async function findJobSuggestions(
   }
 
   // 3. Find jobs by phone number within 90 days
+  // Try multiple phone number formats: +44, 0, 00
   const ninetyDaysAgo = new Date()
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
 
+  const phoneVariants = generatePhoneVariants(params.phone)
+  
   const { data: phoneJobs } = await supabase
     .from('jobs')
-    .select('id, job_ref, customer_name, device_make, device_model, created_at, status')
-    .eq('customer_phone', params.phone)
+    .select('id, job_ref, customer_name, device_make, device_model, created_at, status, customer_phone')
+    .in('customer_phone', phoneVariants)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .order('created_at', { ascending: false })
-    .limit(5)
+    .limit(10)
 
   if (phoneJobs && phoneJobs.length > 0) {
     phoneJobs.forEach((job: any) => {

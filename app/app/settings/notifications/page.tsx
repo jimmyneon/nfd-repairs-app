@@ -22,14 +22,36 @@ export default function NotificationSettingsPage() {
   const [pushTestLoading, setPushTestLoading] = useState(false)
   const [pushTestResult, setPushTestResult] = useState<string | null>(null)
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [checkingSubscription, setCheckingSubscription] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     loadConfigs()
+    checkPushSubscription()
     if ('Notification' in window) {
       setPushPermission(Notification.permission)
     }
   }, [])
+
+  const checkPushSubscription = async () => {
+    setCheckingSubscription(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data, error } = await supabase
+          .from('push_subscriptions')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
+        
+        setHasSubscription(!!data && !error)
+      }
+    } catch (error) {
+      console.error('Error checking subscription:', error)
+    }
+    setCheckingSubscription(false)
+  }
 
   const loadConfigs = async () => {
     const { data, error } = await supabase
@@ -274,6 +296,23 @@ export default function NotificationSettingsPage() {
               </span>
             </div>
 
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Subscription Status</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {checkingSubscription ? 'Checking...' :
+                   hasSubscription ? 'Subscribed to push notifications' : 
+                   'Not subscribed yet'}
+                </p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                hasSubscription ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+              }`}>
+                {checkingSubscription ? '...' : hasSubscription ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+
             {pushPermission !== 'granted' && (
               <button
                 onClick={requestPushPermission}
@@ -284,7 +323,7 @@ export default function NotificationSettingsPage() {
               </button>
             )}
 
-            {pushPermission === 'granted' && (
+            {pushPermission === 'granted' && hasSubscription && (
               <button
                 onClick={sendTestPushNotification}
                 disabled={pushTestLoading}
@@ -304,6 +343,23 @@ export default function NotificationSettingsPage() {
               </button>
             )}
 
+            {pushPermission === 'granted' && !hasSubscription && !checkingSubscription && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                  ⚠️ You need to subscribe to push notifications first
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  Go to the Jobs page and click "Enable Notifications" when prompted, or refresh this page after enabling.
+                </p>
+                <button
+                  onClick={checkPushSubscription}
+                  className="mt-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded"
+                >
+                  Recheck Subscription
+                </button>
+              </div>
+            )}
+
             {pushTestResult && (
               <div className={`p-3 rounded-lg text-sm ${
                 pushTestResult.startsWith('✅') 
@@ -316,8 +372,8 @@ export default function NotificationSettingsPage() {
 
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> Push notifications are sent to all devices that have subscribed. 
-                Make sure you've enabled notifications in your browser and subscribed on this device first.
+                <strong>How to subscribe:</strong> Go to the Jobs page and you'll see a prompt to enable push notifications. 
+                Click "Enable Notifications" and allow browser permission. Once subscribed, you can test notifications here.
               </p>
             </div>
           </div>
