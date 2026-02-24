@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         auth: subscription.keys.auth,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id'
+        onConflict: 'endpoint'
       })
 
     if (error) {
