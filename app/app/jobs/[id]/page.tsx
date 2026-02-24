@@ -434,12 +434,23 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'PARTS_ORDERED' && (
               <button
-                onClick={() => handleWorkflowStatusChange('READY_TO_BOOK_IN')}
+                onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
                 disabled={actionLoading}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
                 <Package className="h-8 w-8" />
                 <span>Parts Arrived</span>
+              </button>
+            )}
+
+            {job.status === 'PARTS_ARRIVED' && (
+              <button
+                onClick={() => handleWorkflowStatusChange('READY_TO_BOOK_IN')}
+                disabled={actionLoading}
+                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                <CheckCircle className="h-8 w-8" />
+                <span>Device Dropped Off - Ready to Book In</span>
               </button>
             )}
 

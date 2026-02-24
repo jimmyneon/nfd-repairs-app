@@ -136,6 +136,7 @@ function getStatusLabel(status: string): string {
     'RECEIVED': 'Received',
     'AWAITING_DEPOSIT': 'Awaiting Deposit',
     'PARTS_ORDERED': 'Parts Ordered',
+    'PARTS_ARRIVED': 'Parts Arrived',
     'READY_TO_BOOK_IN': 'Ready to Book In',
     'IN_REPAIR': 'In Repair',
     'READY_TO_COLLECT': 'Ready to Collect',
