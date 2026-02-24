@@ -22,7 +22,7 @@ export async function sendEmail(
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'NFD Repairs <repairs@updates.newforestdevicerepairs.co.uk>',
+      from: 'NFD Repairs <repairs@newforestdevicerepairs.co.uk>',
       to: [to],
       subject,
       html,

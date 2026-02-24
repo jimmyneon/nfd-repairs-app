@@ -27,7 +27,7 @@ RESEND_API_KEY=re_your_actual_api_key_here
 In `lib/email.ts`, the from address uses the verified Resend domain:
 
 ```typescript
-from: 'NFD Repairs <repairs@updates.newforestdevicerepairs.co.uk>'
+from: 'NFD Repairs <repairs@newforestdevicerepairs.co.uk>'
 ```
 
 ---

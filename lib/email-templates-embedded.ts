@@ -205,7 +205,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
               </p>
               <p style="color: #999999; font-size: 11px; margin: 15px 0 0 0; line-height: 1.4;">
                 Job Reference: ${job.job_ref}<br>
-                This is an automated notification from updates.newforestdevicerepairs.co.uk
+                This is an automated notification from newforestdevicerepairs.co.uk
               </p>
             </td>
           </tr>
