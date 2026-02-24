@@ -2,7 +2,14 @@
 -- New statuses: QUOTE_APPROVED, DROPPED_OFF, COLLECTED
 -- Add cancellation_reason field
 
--- 0. Migrate existing READY_TO_BOOK_IN jobs to new status
+-- STEP 1: Drop old status constraints FIRST (before any data changes)
+ALTER TABLE jobs
+DROP CONSTRAINT IF EXISTS jobs_status_check;
+
+ALTER TABLE jobs
+DROP CONSTRAINT IF EXISTS valid_status;
+
+-- STEP 2: Now migrate existing READY_TO_BOOK_IN jobs to new status
 -- For API/online jobs: READY_TO_BOOK_IN → QUOTE_APPROVED
 -- For manual jobs: READY_TO_BOOK_IN → RECEIVED
 UPDATE jobs 
@@ -12,12 +19,12 @@ SET status = CASE
 END
 WHERE status = 'READY_TO_BOOK_IN';
 
--- 1. Add cancellation_reason column to jobs table
+-- STEP 3: Add cancellation_reason columns
 ALTER TABLE jobs 
 ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
 ADD COLUMN IF NOT EXISTS cancellation_notes TEXT;
 
--- 2. Create enum-like constraint for cancellation reasons
+-- STEP 4: Create constraint for cancellation reasons
 ALTER TABLE jobs
 DROP CONSTRAINT IF EXISTS valid_cancellation_reason;
 
@@ -35,14 +42,7 @@ CHECK (
   )
 );
 
--- 3. Update status constraint to include new statuses
--- Drop both old and new constraint names to be safe
-ALTER TABLE jobs
-DROP CONSTRAINT IF EXISTS jobs_status_check;
-
-ALTER TABLE jobs
-DROP CONSTRAINT IF EXISTS valid_status;
-
+-- STEP 5: Add new status constraint with all new statuses
 ALTER TABLE jobs
 ADD CONSTRAINT valid_status 
 CHECK (
