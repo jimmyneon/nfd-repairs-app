@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Mail, MessageSquare, Save, Loader2, Bell, Send } from 'lucide-react'
 import Link from 'next/link'
+import { 
+  registerServiceWorker, 
+  requestNotificationPermission, 
+  subscribeToPushNotifications,
+  savePushSubscription
+} from '@/lib/notifications'
 
 interface NotificationConfig {
   id: string
@@ -24,6 +30,7 @@ export default function NotificationSettingsPage() {
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
   const [hasSubscription, setHasSubscription] = useState(false)
   const [checkingSubscription, setCheckingSubscription] = useState(true)
+  const [subscribing, setSubscribing] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -51,6 +58,61 @@ export default function NotificationSettingsPage() {
       console.error('Error checking subscription:', error)
     }
     setCheckingSubscription(false)
+  }
+
+  const manualSubscribe = async () => {
+    setSubscribing(true)
+    setPushTestResult(null)
+    
+    try {
+      // Register service worker first
+      await registerServiceWorker()
+      
+      // Request permission
+      const permission = await requestNotificationPermission()
+      
+      if (!permission) {
+        setPushTestResult('❌ Notification permission denied')
+        setSubscribing(false)
+        return
+      }
+      
+      setPushPermission('granted')
+      
+      // Subscribe to push notifications
+      const subscription = await subscribeToPushNotifications()
+      
+      if (!subscription) {
+        setPushTestResult('❌ Failed to create push subscription')
+        setSubscribing(false)
+        return
+      }
+      
+      // Save to database
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        setPushTestResult('❌ User not authenticated')
+        setSubscribing(false)
+        return
+      }
+      
+      const saved = await savePushSubscription(subscription, user.id)
+      
+      if (saved) {
+        setPushTestResult('✅ Successfully subscribed to push notifications!')
+        setHasSubscription(true)
+        // Clear localStorage flag so prompt can show again if needed
+        localStorage.removeItem('notification-prompt-shown')
+      } else {
+        setPushTestResult('❌ Failed to save subscription to database')
+      }
+    } catch (error) {
+      console.error('Subscription error:', error)
+      setPushTestResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+    
+    setSubscribing(false)
   }
 
   const loadConfigs = async () => {
@@ -313,13 +375,23 @@ export default function NotificationSettingsPage() {
               </span>
             </div>
 
-            {pushPermission !== 'granted' && (
+            {!hasSubscription && !checkingSubscription && (
               <button
-                onClick={requestPushPermission}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                onClick={manualSubscribe}
+                disabled={subscribing}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
               >
-                <Bell className="h-5 w-5" />
-                Enable Push Notifications
+                {subscribing ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Subscribing...
+                  </>
+                ) : (
+                  <>
+                    <Bell className="h-5 w-5" />
+                    Subscribe to Push Notifications
+                  </>
+                )}
               </button>
             )}
 
@@ -343,22 +415,6 @@ export default function NotificationSettingsPage() {
               </button>
             )}
 
-            {pushPermission === 'granted' && !hasSubscription && !checkingSubscription && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
-                  ⚠️ You need to subscribe to push notifications first
-                </p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                  Go to the Jobs page and click "Enable Notifications" when prompted, or refresh this page after enabling.
-                </p>
-                <button
-                  onClick={checkPushSubscription}
-                  className="mt-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded"
-                >
-                  Recheck Subscription
-                </button>
-              </div>
-            )}
 
             {pushTestResult && (
               <div className={`p-3 rounded-lg text-sm ${
@@ -372,8 +428,8 @@ export default function NotificationSettingsPage() {
 
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>How to subscribe:</strong> Go to the Jobs page and you'll see a prompt to enable push notifications. 
-                Click "Enable Notifications" and allow browser permission. Once subscribed, you can test notifications here.
+                <strong>How it works:</strong> Click "Subscribe to Push Notifications" above, allow browser permission when prompted, 
+                and you'll start receiving push notifications for job updates. You can test it with the button below once subscribed.
               </p>
             </div>
           </div>
