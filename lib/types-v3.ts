@@ -4,6 +4,7 @@ export type JobStatus =
   | 'RECEIVED'
   | 'AWAITING_DEPOSIT'
   | 'PARTS_ORDERED'
+  | 'PARTS_ARRIVED'
   | 'READY_TO_BOOK_IN'
   | 'IN_REPAIR'
   | 'DELAYED'
