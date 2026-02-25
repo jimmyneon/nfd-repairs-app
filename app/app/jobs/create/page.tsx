@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Plus, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, FileJson } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import ImportJobDataModal from '@/components/ImportJobDataModal'
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -13,6 +14,7 @@ export default function CreateJobPage() {
   const [loading, setLoading] = useState(false)
   const [showMakeOther, setShowMakeOther] = useState(false)
   const [showIssueOther, setShowIssueOther] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -150,6 +152,36 @@ export default function CreateJobPage() {
     }))
   }
 
+  const handleImportData = (importedData: any) => {
+    // Convert price to string for form input
+    const priceString = importedData.price_total ? String(importedData.price_total) : ''
+    
+    // Update form data with imported values
+    setFormData({
+      customer_name: importedData.customer_name || '',
+      customer_phone: importedData.customer_phone || '',
+      customer_email: importedData.customer_email || '',
+      device_type: importedData.device_type || '',
+      device_make: importedData.device_make || '',
+      device_model: importedData.device_model || '',
+      issue: importedData.issue || '',
+      description: importedData.description || '',
+      price_total: priceString,
+      requires_parts_order: importedData.requires_parts_order || false,
+      device_password: importedData.device_password || '',
+      password_na: importedData.password_na || false,
+      terms_accepted: importedData.terms_accepted || false,
+    })
+
+    // Handle "Other" selections
+    if (importedData.device_make === 'Other') {
+      setShowMakeOther(true)
+    }
+    if (importedData.issue === 'Other') {
+      setShowIssueOther(true)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
@@ -158,9 +190,26 @@ export default function CreateJobPage() {
             <ArrowLeft className="h-6 w-6 mr-2" />
             <span className="font-bold">Back to Jobs</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Job</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Job</h1>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm"
+            >
+              <FileJson className="h-4 w-4" />
+              Import from JSON
+            </button>
+          </div>
         </div>
       </header>
+
+      {showImportModal && (
+        <ImportJobDataModal
+          onImport={handleImportData}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
 
       <main className="p-4 max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
