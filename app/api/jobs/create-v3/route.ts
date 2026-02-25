@@ -44,6 +44,10 @@ export async function POST(request: NextRequest) {
       
       // Device possession tracking
       device_in_shop,
+      
+      // Import options (from JSON import)
+      initial_status,
+      skip_sms,
     } = body
 
     // Map quote_requests fields to jobs fields
@@ -88,10 +92,10 @@ export async function POST(request: NextRequest) {
         ? (device_in_shop || false)  // Use explicit value from manual form
         : false,  // API jobs - customer has device
       
-      // Status - depends on device possession for manual jobs
-      status: source === 'staff_manual' 
+      // Status - use initial_status if provided (from import), otherwise calculate
+      status: initial_status || (source === 'staff_manual' 
         ? (device_in_shop ? 'RECEIVED' : 'QUOTE_APPROVED')  // Manual: RECEIVED if in shop, QUOTE_APPROVED if not
-        : 'QUOTE_APPROVED',  // API: always QUOTE_APPROVED (customer has device)
+        : 'QUOTE_APPROVED'),  // API: always QUOTE_APPROVED (customer has device)
       
       // Onboarding fields (if provided from manual creation)
       device_password: device_password || null,
@@ -202,6 +206,23 @@ export async function POST(request: NextRequest) {
       } as any)
     } else {
       console.log('✅ Template found:', template.key)
+      
+      // Skip SMS if requested (e.g., from batch import)
+      if (skip_sms) {
+        console.log('⏭️ Skipping SMS (skip_sms flag set)')
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'SYSTEM',
+          message: 'SMS notification skipped (imported job)',
+        } as any)
+        
+        return NextResponse.json({ 
+          success: true, 
+          job_id: job.id,
+          job_ref: job.job_ref,
+          sms_skipped: true,
+        })
+      }
       
       // Use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes
       const appUrl = 'https://nfd-repairs-app.vercel.app'

@@ -92,6 +92,10 @@ export default function CreateJobPage() {
     setShowConfirmationModal(false)
     setLoading(true)
 
+    // Check if this is an imported job with custom options
+    // @ts-ignore
+    const importOptions = window.__importOptions || {}
+    
     const payload = {
           customer_name: formData.customer_name,
           customer_phone: formData.customer_phone,
@@ -111,7 +115,14 @@ export default function CreateJobPage() {
           terms_accepted: true,
           onboarding_completed: true,
           device_in_shop: formData.device_left_with_us,
+          // Import options (if from JSON import)
+          initial_status: importOptions.initial_status,
+          skip_sms: importOptions.skip_sms,
         }
+    
+    // Clear import options after use
+    // @ts-ignore
+    delete window.__importOptions
 
     console.log('Creating job with payload:', payload)
 
@@ -173,6 +184,12 @@ export default function CreateJobPage() {
     // Convert price to string for form input
     const priceString = importedData.price_total ? String(importedData.price_total) : ''
     
+    // Store import options for later use
+    const importOptions = {
+      initial_status: importedData.initial_status,
+      skip_sms: importedData.skip_sms,
+    }
+    
     // Update form data with imported values
     setFormData({
       customer_name: importedData.customer_name || '',
@@ -195,6 +212,10 @@ export default function CreateJobPage() {
     if (importedData.issue === 'Other') {
       setShowIssueOther(true)
     }
+    
+    // Store import options in state for use when creating job
+    // @ts-ignore - temporary storage
+    window.__importOptions = importOptions
   }
 
   return (

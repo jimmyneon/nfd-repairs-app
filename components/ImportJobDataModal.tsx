@@ -12,6 +12,8 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
   const [jsonInput, setJsonInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [initialStatus, setInitialStatus] = useState('RECEIVED')
+  const [skipSMS, setSkipSMS] = useState(false)
 
   const sampleJSON = {
     customer_name: "John Smith",
@@ -70,7 +72,11 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
 
       setSuccess(true)
       setTimeout(() => {
-        onImport(parsed)
+        onImport({
+          ...parsed,
+          initial_status: initialStatus,
+          skip_sms: skipSMS,
+        })
         onClose()
       }, 500)
 
@@ -130,6 +136,44 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
             <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto">
 {JSON.stringify(sampleJSON, null, 2)}
             </pre>
+          </div>
+
+          {/* Import Options */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Initial Status:
+              </label>
+              <select
+                value={initialStatus}
+                onChange={(e) => setInitialStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="RECEIVED">RECEIVED - Device in shop</option>
+                <option value="QUOTE_APPROVED">QUOTE_APPROVED - Awaiting drop-off</option>
+                <option value="AWAITING_DEPOSIT">AWAITING_DEPOSIT - Needs deposit</option>
+                <option value="PARTS_ORDERED">PARTS_ORDERED - Parts on order</option>
+                <option value="PARTS_ARRIVED">PARTS_ARRIVED - Parts ready</option>
+                <option value="IN_REPAIR">IN_REPAIR - Currently repairing</option>
+                <option value="READY_TO_COLLECT">READY_TO_COLLECT - Ready for pickup</option>
+                <option value="COMPLETED">COMPLETED - Job done</option>
+              </select>
+            </div>
+            
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer p-3 bg-yellow-50 border-2 border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors w-full">
+                <input
+                  type="checkbox"
+                  checked={skipSMS}
+                  onChange={(e) => setSkipSMS(e.target.checked)}
+                  className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-900 block">Skip SMS Notification</span>
+                  <span className="text-xs text-gray-600">Don't send SMS to customer</span>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* JSON Input */}
