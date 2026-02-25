@@ -29,10 +29,7 @@ export default function CreateJobPage() {
     description: '',
     price_total: '',
     requires_parts_order: false,
-    device_password: '',
-    password_na: false,
-    terms_accepted: false,
-    device_left_with_us: false,
+    device_left_with_us: true,
   })
 
   // Device type options
@@ -417,58 +414,9 @@ export default function CreateJobPage() {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Onboarding Information</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Collect this information while the customer is present
-            </p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Status</h2>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Device Password/Passcode
-                </label>
-                <input
-                  type="text"
-                  name="device_password"
-                  value={formData.device_password}
-                  onChange={handleChange}
-                  disabled={formData.password_na}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-600"
-                  placeholder="Enter device password"
-                />
-                <div className="mt-2 flex items-center">
-                  <input
-                    type="checkbox"
-                    name="password_na"
-                    checked={formData.password_na}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-                    id="password_na"
-                  />
-                  <label htmlFor="password_na" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                    Device has no password
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border-2 border-blue-200 dark:border-blue-800">
-                <input
-                  type="checkbox"
-                  name="terms_accepted"
-                  checked={formData.terms_accepted}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5"
-                  id="terms_accepted"
-                  required
-                />
-                <label htmlFor="terms_accepted" className="text-sm text-gray-900 dark:text-white cursor-pointer">
-                  <strong>Customer accepts terms and conditions *</strong>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    By checking this box, the customer agrees to our repair terms and conditions, including warranty coverage and liability limitations.
-                  </p>
-                </label>
-              </div>
-
               <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-200 dark:border-green-800">
                 <input
                   type="checkbox"
@@ -484,6 +432,12 @@ export default function CreateJobPage() {
                     Check this if the customer is leaving their device with us now. Leave unchecked if they're taking it away (e.g., waiting for parts to arrive).
                   </p>
                 </label>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  <strong>Next Step:</strong> After clicking "Continue to Customer Confirmation", hand the device to the customer to review the details, enter their device password, and accept the terms and conditions.
+                </p>
               </div>
             </div>
           </div>
@@ -501,8 +455,8 @@ export default function CreateJobPage() {
                 </>
               ) : (
                 <>
-                  <Plus className="h-5 w-5" />
-                  <span>Create Job</span>
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Continue to Customer Confirmation</span>
                 </>
               )}
             </button>
@@ -525,7 +479,7 @@ export default function CreateJobPage() {
         />
       )}
 
-      <ManualJobConfirmationModal
+      <CustomerConfirmationModal
         isOpen={showConfirmationModal}
         onClose={() => setShowConfirmationModal(false)}
         onConfirm={handleConfirmJob}
