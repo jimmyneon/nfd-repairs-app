@@ -6,6 +6,7 @@ import { ArrowLeft, Plus, Loader2, FileJson } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
+import ManualJobConfirmationModal from '@/components/ManualJobConfirmationModal'
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -15,6 +16,7 @@ export default function CreateJobPage() {
   const [showMakeOther, setShowMakeOther] = useState(false)
   const [showIssueOther, setShowIssueOther] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
   
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -80,6 +82,13 @@ export default function CreateJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Show confirmation modal instead of creating job immediately
+    setShowConfirmationModal(true)
+  }
+
+  const handleConfirmJob = async () => {
+    setShowConfirmationModal(false)
     setLoading(true)
 
     try {
@@ -87,9 +96,9 @@ export default function CreateJobPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.customer_name,
-          phone: formData.customer_phone,
-          email: formData.customer_email || null,
+          customer_name: formData.customer_name,
+          customer_phone: formData.customer_phone,
+          customer_email: formData.customer_email || null,
           device_type: formData.device_type,
           device_make: formData.device_make,
           device_model: formData.device_model,
@@ -102,7 +111,7 @@ export default function CreateJobPage() {
           device_password: formData.password_na ? null : formData.device_password,
           password_not_applicable: formData.password_na,
           customer_signature: null,
-          terms_accepted: formData.terms_accepted,
+          terms_accepted: true,  // Always true after modal confirmation
           onboarding_completed: true,
           device_in_shop: formData.device_left_with_us,
         }),
@@ -117,8 +126,8 @@ export default function CreateJobPage() {
         setLoading(false)
       }
     } catch (error) {
-      console.error('Failed to create job:', error)
-      alert('Failed to create job. Please try again.')
+      console.error('Error creating job:', error)
+      alert('Failed to create job')
       setLoading(false)
     }
   }
@@ -507,13 +516,27 @@ export default function CreateJobPage() {
             
             <Link
               href="/app/jobs"
-              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center"
+              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-2"
             >
-              Cancel
+              <ArrowLeft className="h-5 w-5" />
+              <span>Cancel</span>
             </Link>
           </div>
         </form>
-      </main>
+      </div>
+
+      <ImportJobDataModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImportData}
+      />
+
+      <ManualJobConfirmationModal
+        isOpen={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        onConfirm={handleConfirmJob}
+        jobData={formData}
+      />
     </div>
   )
 }
