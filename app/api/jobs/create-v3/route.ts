@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       customer_email: email || null,
       
       // Device details
+      device_type: body.device_type || null,
       device_make: device_make || 'Unknown',
       device_model: device_model || device_summary || 'Unknown',
       issue: issue || repair_summary || 'Repair needed',
