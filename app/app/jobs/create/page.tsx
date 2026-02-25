@@ -92,11 +92,7 @@ export default function CreateJobPage() {
     setShowConfirmationModal(false)
     setLoading(true)
 
-    try {
-      const response = await fetch('/api/jobs/create-v3', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const payload = {
           customer_name: formData.customer_name,
           customer_phone: formData.customer_phone,
           customer_email: formData.customer_email || null,
@@ -115,7 +111,15 @@ export default function CreateJobPage() {
           terms_accepted: true,
           onboarding_completed: true,
           device_in_shop: formData.device_left_with_us,
-        }),
+        }
+
+    console.log('Creating job with payload:', payload)
+
+    try {
+      const response = await fetch('/api/jobs/create-v3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
 
       const result = await response.json()
@@ -123,12 +127,13 @@ export default function CreateJobPage() {
       if (response.ok) {
         router.push(`/app/jobs/${result.job_id}`)
       } else {
-        alert(`Error: ${result.error}`)
+        console.error('API Error Response:', result)
+        alert(`Error: ${result.error}\n${result.details || ''}`)
         setLoading(false)
       }
     } catch (error) {
       console.error('Error creating job:', error)
-      alert('Failed to create job')
+      alert(`Failed to create job: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setLoading(false)
     }
   }
