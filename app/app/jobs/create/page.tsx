@@ -523,12 +523,11 @@ export default function CreateJobPage() {
             </Link>
           </div>
         </form>
-      </div>
+      </main>
 
       <ImportJobDataModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
         onImport={handleImportData}
+        onClose={() => setShowImportModal(false)}
       />
 
       <ManualJobConfirmationModal
