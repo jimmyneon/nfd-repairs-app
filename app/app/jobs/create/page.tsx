@@ -216,13 +216,6 @@ export default function CreateJobPage() {
         </div>
       </header>
 
-      {showImportModal && (
-        <ImportJobDataModal
-          onImport={handleImportData}
-          onClose={() => setShowImportModal(false)}
-        />
-      )}
-
       <main className="p-4 max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
@@ -525,10 +518,12 @@ export default function CreateJobPage() {
         </form>
       </main>
 
-      <ImportJobDataModal
-        onImport={handleImportData}
-        onClose={() => setShowImportModal(false)}
-      />
+      {showImportModal && (
+        <ImportJobDataModal
+          onImport={handleImportData}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
 
       <ManualJobConfirmationModal
         isOpen={showConfirmationModal}
