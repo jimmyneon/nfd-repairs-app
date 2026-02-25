@@ -98,23 +98,31 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setActionLoading(true)
     setShowSimpleConfirm(false)
 
-    const message = `Status changed to ${JOB_STATUS_LABELS[pendingWorkflowStatus]}`
+    // Prepare update object with status and device_in_shop
+    const updateData: any = { status: pendingWorkflowStatus }
+    
+    // Set device_in_shop based on status transition
+    if (pendingWorkflowStatus === 'DROPPED_OFF') {
+      updateData.device_in_shop = true  // Device now in shop
+    } else if (pendingWorkflowStatus === 'COLLECTED') {
+      updateData.device_in_shop = false  // Device no longer in shop
+    }
 
     await supabase
       .from('jobs')
-      .update({ status: pendingWorkflowStatus } as any)
+      .update(updateData)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
-      message,
+      message: `Status changed to ${JOB_STATUS_LABELS[pendingWorkflowStatus]}`,
     })
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
       title: `Job ${job.job_ref} updated`,
-      body: message,
+      body: `Status changed to ${JOB_STATUS_LABELS[pendingWorkflowStatus]}`,
       job_id: job.id,
     })
 
@@ -166,23 +174,33 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     const message = `Status changed to ${JOB_STATUS_LABELS[newStatus]}`
 
+    // Prepare update object with status and device_in_shop
+    const updateData: any = { status: newStatus }
+    
+    // Set device_in_shop based on status transition
+    if (newStatus === 'DROPPED_OFF') {
+      updateData.device_in_shop = true  // Device now in shop
+    } else if (newStatus === 'COLLECTED') {
+      updateData.device_in_shop = false  // Device no longer in shop
+    }
+
     await supabase
       .from('jobs')
-      .update({ status: newStatus } as any)
+      .update(updateData)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
       message,
-    })
+    } as any)
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
       title: `Job ${job.job_ref} updated`,
       body: message,
       job_id: job.id,
-    })
+    } as any)
 
     // Queue SMS for status change
     try {

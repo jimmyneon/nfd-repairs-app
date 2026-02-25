@@ -55,6 +55,9 @@ export interface Job {
   deposit_amount?: number | null
   deposit_received: boolean
   
+  // Device possession tracking
+  device_in_shop: boolean
+  
   // Tracking
   tracking_token: string
   

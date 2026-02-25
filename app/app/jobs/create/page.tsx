@@ -30,6 +30,7 @@ export default function CreateJobPage() {
     device_password: '',
     password_na: false,
     terms_accepted: false,
+    device_left_with_us: false,
   })
 
   // Device type options
@@ -103,6 +104,7 @@ export default function CreateJobPage() {
           customer_signature: null,
           terms_accepted: formData.terms_accepted,
           onboarding_completed: true,
+          device_in_shop: formData.device_left_with_us,
         }),
       })
 
@@ -171,6 +173,7 @@ export default function CreateJobPage() {
       device_password: importedData.device_password || '',
       password_na: importedData.password_na || false,
       terms_accepted: importedData.terms_accepted || false,
+      device_left_with_us: importedData.device_left_with_us || false,
     })
 
     // Handle "Other" selections
@@ -460,6 +463,23 @@ export default function CreateJobPage() {
                   <strong>Customer accepts terms and conditions *</strong>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                     By checking this box, the customer agrees to our repair terms and conditions, including warranty coverage and liability limitations.
+                  </p>
+                </label>
+              </div>
+
+              <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-200 dark:border-green-800">
+                <input
+                  type="checkbox"
+                  name="device_left_with_us"
+                  checked={formData.device_left_with_us}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-green-600 focus:ring-green-500 border-gray-300 rounded mt-0.5"
+                  id="device_left_with_us"
+                />
+                <label htmlFor="device_left_with_us" className="text-sm text-gray-900 dark:text-white cursor-pointer">
+                  <strong>Device left with us</strong>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Check this if the customer is leaving their device with us now. Leave unchecked if they're taking it away (e.g., waiting for parts to arrive).
                   </p>
                 </label>
               </div>

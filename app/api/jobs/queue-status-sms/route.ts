@@ -98,6 +98,15 @@ export async function POST(request: NextRequest) {
     const trackingUrl = `${appUrl}/t/${job.tracking_token}`
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
+    // Fetch Google Maps link from admin settings
+    const { data: mapsSettings } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'google_maps_link')
+      .single()
+    
+    const googleMapsLink = mapsSettings?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
+
     // Replace template variables
     let smsBody = template.body
       .replace('{customer_name}', job.customer_name)
@@ -112,6 +121,20 @@ export async function POST(request: NextRequest) {
       smsBody = smsBody
         .replace('{deposit_amount}', job.deposit_amount?.toString() || '20.00')
         .replace('{deposit_link}', depositUrl)
+    }
+
+    // POSSESSION-AWARE MESSAGING: Only include maps link if device NOT in shop
+    if (job.device_in_shop) {
+      // Device already in shop - remove maps link and drop-off instructions
+      smsBody = smsBody
+        .replace('Find us: {google_maps_link}', '')
+        .replace('{google_maps_link}', '')
+        .replace('Please drop off your device at New Forest Device Repairs.', 'We have your device and will begin work.')
+        .replace('Please drop off your device.', 'We have your device.')
+        .trim()
+    } else {
+      // Device with customer - include maps link
+      smsBody = smsBody.replace('{google_maps_link}', googleMapsLink)
     }
 
     // Queue SMS

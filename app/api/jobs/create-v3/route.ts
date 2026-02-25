@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
       customer_signature,
       terms_accepted,
       onboarding_completed,
+      
+      // Device possession tracking
+      device_in_shop,
     } = body
 
     // Map quote_requests fields to jobs fields
@@ -79,10 +82,15 @@ export async function POST(request: NextRequest) {
       customer_id: customer_id || null,
       quote_request_id: quote_request_id || null,
       
-      // Status - manual entry starts as RECEIVED, API/online starts as QUOTE_APPROVED
+      // Device possession - explicit for manual jobs, inferred for API jobs
+      device_in_shop: source === 'staff_manual' 
+        ? (device_in_shop || false)  // Use explicit value from manual form
+        : false,  // API jobs - customer has device
+      
+      // Status - depends on device possession for manual jobs
       status: source === 'staff_manual' 
-        ? 'RECEIVED'
-        : 'QUOTE_APPROVED',
+        ? (device_in_shop ? 'RECEIVED' : 'QUOTE_APPROVED')  // Manual: RECEIVED if in shop, QUOTE_APPROVED if not
+        : 'QUOTE_APPROVED',  // API: always QUOTE_APPROVED (customer has device)
       
       // Onboarding fields (if provided from manual creation)
       device_password: device_password || null,
