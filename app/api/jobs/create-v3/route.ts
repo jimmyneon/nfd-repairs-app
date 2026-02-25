@@ -150,13 +150,16 @@ export async function POST(request: NextRequest) {
       // Use deposit-specific onboarding template if deposit required
       templateKey = jobData.deposit_required ? 'ONBOARDING_WITH_DEPOSIT' : 'ONBOARDING_REQUIRED'
     } else {
-      // Normal flow - deposit, received (manual), or ready to book in (online)
+      // Normal flow based on source and parts requirement
       if (jobData.deposit_required) {
+        // Parts required - use deposit template regardless of source
         templateKey = 'DEPOSIT_REQUIRED'
       } else if (source === 'staff_manual') {
+        // Manual job (device already in shop) - use RECEIVED
         templateKey = 'RECEIVED'
       } else {
-        templateKey = 'READY_TO_BOOK_IN'
+        // API/online job (customer has device) - use QUOTE_APPROVED
+        templateKey = 'QUOTE_APPROVED'
       }
     }
     
