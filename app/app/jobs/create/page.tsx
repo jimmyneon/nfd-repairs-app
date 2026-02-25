@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Plus, Loader2, FileJson } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
-import ManualJobConfirmationModal from '@/components/ManualJobConfirmationModal'
+import CustomerConfirmationModal from '@/components/CustomerConfirmationModal'
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -84,7 +84,11 @@ export default function CreateJobPage() {
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmJob = async () => {
+  const handleConfirmJob = async (customerData: {
+    device_password: string
+    password_na: boolean
+    terms_accepted: boolean
+  }) => {
     setShowConfirmationModal(false)
     setLoading(true)
 
@@ -105,10 +109,10 @@ export default function CreateJobPage() {
           quoted_price: parseFloat(formData.price_total),
           requires_parts_order: formData.requires_parts_order,
           source: 'staff_manual',
-          device_password: formData.password_na ? null : formData.device_password,
-          password_not_applicable: formData.password_na,
+          device_password: customerData.password_na ? null : customerData.device_password,
+          password_not_applicable: customerData.password_na,
           customer_signature: null,
-          terms_accepted: true,  // Always true after modal confirmation
+          terms_accepted: true,
           onboarding_completed: true,
           device_in_shop: formData.device_left_with_us,
         }),
@@ -176,9 +180,6 @@ export default function CreateJobPage() {
       description: importedData.description || '',
       price_total: priceString,
       requires_parts_order: importedData.requires_parts_order || false,
-      device_password: importedData.device_password || '',
-      password_na: importedData.password_na || false,
-      terms_accepted: importedData.terms_accepted || false,
       device_left_with_us: importedData.device_left_with_us || false,
     })
 
