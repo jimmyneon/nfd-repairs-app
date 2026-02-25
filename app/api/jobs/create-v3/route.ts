@@ -149,9 +149,12 @@ export async function POST(request: NextRequest) {
     } as any)
 
     // Check if onboarding is needed (missing email, password info, or terms)
-    const needsOnboarding = !jobData.customer_email || 
+    // Manual jobs with onboarding_completed=true have already done onboarding in-store
+    const needsOnboarding = !job.onboarding_completed && (
+                           !jobData.customer_email || 
                            (!job.device_password && !job.password_not_applicable) ||
                            !job.terms_accepted
+                           )
 
     // Queue SMS - onboarding link if needed, otherwise regular status SMS
     let templateKey: string
