@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Search, FileText, Phone, User, Loader2, CheckCircle } from 'lucide-react'
 
 interface Quote {
@@ -31,6 +31,33 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+
+  // Auto-load last 5 quotes when modal opens
+  useEffect(() => {
+    if (isOpen && !searched) {
+      loadRecentQuotes()
+    }
+  }, [isOpen])
+
+  const loadRecentQuotes = async () => {
+    setLoading(true)
+    setSearched(true)
+
+    try {
+      const response = await fetch('/api/quotes/search?limit=5')
+      const result = await response.json()
+
+      if (response.ok) {
+        setQuotes(result.quotes || [])
+      } else {
+        console.error('Failed to load quotes:', result.error)
+      }
+    } catch (error) {
+      console.error('Error loading quotes:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -137,19 +164,19 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
           </div>
 
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            💡 Tip: Leave search empty and click Search to see all recent unconverted quotes
+            💡 Showing {quotes.length > 0 ? `${quotes.length} recent` : 'recent'} unconverted quotes. Search to filter.
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 pb-6">
-          {!searched && (
+          {loading && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p>Enter search criteria and click Search to find quotes</p>
+              <Loader2 className="h-16 w-16 mx-auto mb-4 opacity-50 animate-spin" />
+              <p>Loading quotes...</p>
             </div>
           )}
 
-          {searched && quotes.length === 0 && !loading && (
+          {!loading && quotes.length === 0 && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
               <p>No quotes found matching your search</p>

@@ -416,85 +416,127 @@ export default function CreateJobPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Fault Description (Optional)
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Additional details about the fault..."
-                />
-              </div>
-
               {!quickWalkInMode && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Technician Notes (Optional)
-                  </label>
-                  <textarea
-                    name="technician_notes"
-                    value={formData.technician_notes}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Internal notes for staff..."
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Fault Description (Optional)
+                    </label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Additional details about the fault..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Technician Notes (Optional)
+                    </label>
+                    <textarea
+                      name="technician_notes"
+                      value={formData.technician_notes}
+                      onChange={handleChange}
+                      rows={2}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Internal notes for staff..."
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Pricing & Parts</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Total Price (£) *
-                </label>
-                <input
-                  type="number"
-                  name="price_total"
-                  value={formData.price_total}
-                  onChange={handleChange}
-                  required
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="89.99"
-                />
-              </div>
-
-              <div className="flex items-center space-x-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border-2 border-yellow-200 dark:border-yellow-800">
-                <input
-                  type="checkbox"
-                  name="requires_parts_order"
-                  checked={formData.requires_parts_order}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
-                  id="requires_parts"
-                />
-                <label htmlFor="requires_parts" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                  Requires parts order (£20 deposit will be requested)
-                </label>
+          {quickWalkInMode ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Price & Quick Options</h2>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Price (£) *
+                    </label>
+                    <input
+                      type="number"
+                      name="price_total"
+                      value={formData.price_total}
+                      onChange={handleChange}
+                      required
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-semibold"
+                      placeholder="89.99"
+                    />
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="requires_parts_order"
+                        checked={formData.requires_parts_order}
+                        onChange={handleChange}
+                        className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+                      />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">Parts needed?</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Pricing & Parts</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Total Price (£) *
+                  </label>
+                  <input
+                    type="number"
+                    name="price_total"
+                    value={formData.price_total}
+                    onChange={handleChange}
+                    required
+                    step="0.01"
+                    min="0"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="89.99"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border-2 border-yellow-200 dark:border-yellow-800">
+                  <input
+                    type="checkbox"
+                    name="requires_parts_order"
+                    checked={formData.requires_parts_order}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+                    id="requires_parts"
+                  />
+                  <label htmlFor="requires_parts" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+                    Requires parts order (£20 deposit will be requested)
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Passcode Requirement Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Passcode Requirement</h2>
-            
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Does this device require a passcode for testing after repair?
-              </p>
+          {!quickWalkInMode ? (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Passcode Requirement</h2>
               
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Does this device require a passcode for testing after repair?
+                </p>
+                
+                <div className="space-y-2">
                 <label className="flex items-center space-x-3 p-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <input
                     type="radio"
@@ -542,35 +584,44 @@ export default function CreateJobPage() {
               </div>
             </div>
           </div>
+          ) : (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                ⚡ <strong>Quick Mode:</strong> Passcode set to "Recommended" - Customer will choose passcode option on their screen
+              </p>
+            </div>
+          )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Status</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-200 dark:border-green-800">
-                <input
-                  type="checkbox"
-                  name="device_left_with_us"
-                  checked={formData.device_left_with_us}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-green-600 focus:ring-green-500 border-gray-300 rounded mt-0.5"
-                  id="device_left_with_us"
-                />
-                <label htmlFor="device_left_with_us" className="text-sm text-gray-900 dark:text-white cursor-pointer">
-                  <strong>Device left with us</strong>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Check this if the customer is leaving their device with us now. Leave unchecked if they're taking it away (e.g., waiting for parts to arrive).
-                  </p>
-                </label>
-              </div>
+          {!quickWalkInMode && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Status</h2>
               
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Next Step:</strong> After clicking "Switch to Customer Screen", hand the tablet/device to the customer to enter their details, passcode, and accept terms.
-                </p>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-200 dark:border-green-800">
+                  <input
+                    type="checkbox"
+                    name="device_left_with_us"
+                    checked={formData.device_left_with_us}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-green-600 focus:ring-green-500 border-gray-300 rounded mt-0.5"
+                    id="device_left_with_us"
+                  />
+                  <label htmlFor="device_left_with_us" className="text-sm text-gray-900 dark:text-white cursor-pointer">
+                    <strong>Device left with us</strong>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      Check this if the customer is leaving their device with us now. Leave unchecked if they're taking it away (e.g., waiting for parts to arrive).
+                    </p>
+                  </label>
+                </div>
+                
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>Next Step:</strong> After clicking "Switch to Customer Screen", hand the tablet/device to the customer to enter their details, passcode, and accept terms.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex gap-4">
             <button
