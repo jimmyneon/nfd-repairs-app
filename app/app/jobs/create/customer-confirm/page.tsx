@@ -123,20 +123,20 @@ function CustomerConfirmContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 max-w-7xl mx-auto">
           
           {/* Left: Customer Form */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Step 1: Your Details */}
-            <div id="step-1" className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
+            <div id="step-1" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                   1
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Details</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Your Details</h2>
               </div>
 
               <div className="space-y-4">
@@ -244,7 +244,7 @@ function CustomerConfirmContent() {
 
             {/* Step 2: Device Passcode */}
             {jobData.passcode_requirement !== 'not_required' && (
-              <div id="step-2" className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
+              <div id="step-2" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                     2
@@ -322,7 +322,7 @@ function CustomerConfirmContent() {
             )}
 
             {/* Submit Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                   {jobData.passcode_requirement !== 'not_required' ? '3' : '2'}
@@ -330,7 +330,7 @@ function CustomerConfirmContent() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ready to Confirm?</h2>
               </div>
 
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
                 Please review the repair summary and terms on the right, then click below to confirm your booking.
               </p>
 
@@ -339,7 +339,7 @@ function CustomerConfirmContent() {
                 <button
                   onClick={handleSubmit}
                   disabled={loading || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 sm:py-5 px-4 sm:px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md text-base sm:text-lg flex items-center justify-center gap-2 sm:gap-3 touch-manipulation min-h-[56px]"
                 >
                 {loading ? (
                   <>
@@ -367,10 +367,10 @@ function CustomerConfirmContent() {
 
           {/* Right: Device Info Summary (Sticky) */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:sticky lg:top-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:sticky lg:top-4">
               <div className="flex items-center gap-3 mb-6">
-                <Smartphone className="h-8 w-8 text-primary" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Repair Summary</h3>
+                <Smartphone className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Repair Summary</h3>
               </div>
 
               <div className="space-y-4">
