@@ -40,6 +40,17 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
     }
   }, [isOpen])
 
+  // Dynamic search as user types (debounced)
+  useEffect(() => {
+    if (!isOpen) return
+
+    const debounceTimer = setTimeout(() => {
+      handleSearch()
+    }, 300) // Wait 300ms after user stops typing
+
+    return () => clearTimeout(debounceTimer)
+  }, [searchQuery, searchType, isOpen])
+
   const loadRecentQuotes = async () => {
     setLoading(true)
     setSearched(true)
@@ -130,9 +141,9 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search by phone, name, or leave empty for all recent quotes..."
+                placeholder="Start typing to search... (phone, name, or leave empty for recent)"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                autoFocus
               />
             </div>
             <select
