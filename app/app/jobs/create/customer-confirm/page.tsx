@@ -160,9 +160,12 @@ function CustomerConfirmContent() {
 
       const result = await response.json()
 
+      console.log('🔍 API Response:', result)
+
       if (response.ok) {
         // Show success and redirect
-        router.push(`/app/jobs/create/success?job_ref=${result.job.job_ref}`)
+        // API returns job_ref directly, not nested in result.job
+        router.push(`/app/jobs/create/success?job_ref=${result.job_ref}`)
       } else {
         alert(`Failed to create job: ${result.error}`)
         setLoading(false)
