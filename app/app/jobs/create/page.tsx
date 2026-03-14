@@ -59,30 +59,49 @@ export default function CreateJobPage() {
     other: ['Other'],
   }
 
-  // Common issues
+  // Quick device presets for fast intake
+  const quickDevicePresets = [
+    { label: 'iPhone', device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)' },
+    { label: 'Android Phone', device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)' },
+    { label: 'Samsung Phone', device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)' },
+    { label: 'iPad', device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)' },
+    { label: 'MacBook', device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)' },
+    { label: 'Windows Laptop', device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)' },
+  ]
+
+  // Common issues - prioritized for quick walk-in (most common first)
   const commonIssues = [
     'Screen Replacement',
     'Battery Replacement',
     'Charging Port Replacement',
     'Not Charging',
-    'No Power',
     'Water Damage',
+    'No Power',
+    'Black Screen',
     'Data Recovery',
+    'Software Glitches',
+    'Overheating',
+    'Not Loading',
+    'Blue Screen of Death',
     'Windows 10 Installation',
     'Windows 11 Installation',
-    'Software Glitches',
-    'Not Loading',
-    'Black Screen',
-    'Blue Screen of Death',
     'SSD Upgrade',
     'Hard Drive Replacement',
     'RAM Upgrade',
     'HDMI Port Repair',
     'Software Malfunction',
-    'Overheating',
     'Virus Removal',
     'Other',
   ]
+
+  const handleQuickPreset = (preset: typeof quickDevicePresets[0]) => {
+    setFormData({
+      ...formData,
+      device_type: preset.device_type,
+      device_make: preset.device_make,
+      device_model: preset.device_model,
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -130,8 +149,8 @@ export default function CreateJobPage() {
           device_model: formData.device_model,
           issue: formData.issue,
           description: formData.description || null,
-          price_total: parseFloat(formData.price_total),
-          quoted_price: parseFloat(formData.price_total),
+          price_total: formData.price_total ? parseFloat(formData.price_total) : 0,
+          quoted_price: formData.price_total ? parseFloat(formData.price_total) : 0,
           requires_parts_order: formData.requires_parts_order,
           source: 'staff_manual',
           device_password: customerData.password_na ? null : customerData.device_password,
@@ -301,23 +320,51 @@ export default function CreateJobPage() {
 
       <main className="p-4 max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Quick Walk-In Mode Button */}
-          {!quickWalkInMode && (
-            <button
-              type="button"
-              onClick={() => setQuickWalkInMode(true)}
-              className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl font-bold shadow-lg hover:from-orange-600 hover:to-orange-700 transition-all"
-            >
-              <Zap className="h-5 w-5" />
-              Quick Walk-In Mode
-            </button>
-          )}
+          {/* Quick Walk-In Mode Toggle */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-orange-500" />
+                  Quick Walk-In Mode
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Ultra-fast intake for busy periods - minimal fields, generic device info
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickWalkInMode(!quickWalkInMode)}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                  quickWalkInMode ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    quickWalkInMode ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
 
           {quickWalkInMode && (
-            <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
-              <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold">
-                ⚡ Quick Walk-In Mode Active - Simplified intake for busy periods
+            <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
+              <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-3">
+                ⚡ Quick Mode Active - Use presets below for fastest intake
               </p>
+              <div className="grid grid-cols-3 gap-2">
+                {quickDevicePresets.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => handleQuickPreset(preset)}
+                    className="px-3 py-2 bg-white dark:bg-gray-800 border-2 border-orange-300 dark:border-orange-600 rounded-lg text-sm font-semibold text-gray-900 dark:text-white hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -375,16 +422,16 @@ export default function CreateJobPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Model *
+                  Model {!quickWalkInMode && '*'}
                 </label>
                 <input
                   type="text"
                   name="device_model"
                   value={formData.device_model}
                   onChange={handleChange}
-                  required
+                  required={!quickWalkInMode}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"
+                  placeholder={quickWalkInMode ? "Optional - or use preset above" : "e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"}
                 />
               </div>
 
@@ -458,18 +505,18 @@ export default function CreateJobPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Price (£) *
+                      Price (£)
                     </label>
                     <input
                       type="number"
                       name="price_total"
                       value={formData.price_total}
                       onChange={handleChange}
-                      required
+                      required={false}
                       step="0.01"
                       min="0"
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-semibold"
-                      placeholder="89.99"
+                      placeholder="Optional - add later if needed"
                     />
                   </div>
                   <div className="flex items-center">
@@ -494,18 +541,18 @@ export default function CreateJobPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Total Price (£) *
+                    Total Price (£)
                   </label>
                   <input
                     type="number"
                     name="price_total"
                     value={formData.price_total}
                     onChange={handleChange}
-                    required
+                    required={false}
                     step="0.01"
                     min="0"
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="89.99"
+                    placeholder="Optional - can be added later"
                   />
                 </div>
 
