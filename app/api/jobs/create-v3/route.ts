@@ -121,6 +121,43 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    // Duplicate prevention: Check for existing job with same customer/phone/device within last 5 minutes
+    // This prevents multiple jobs being created when errors occur during submission
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const { data: existingJobs } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('customer_phone', jobData.customer_phone)
+      .eq('device_make', jobData.device_make)
+      .eq('device_model', jobData.device_model)
+      .eq('issue', jobData.issue)
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    // If duplicate found, return existing job instead of creating new one
+    if (existingJobs && existingJobs.length > 0) {
+      const existingJob = existingJobs[0]
+      console.log('🔄 Duplicate job detected, returning existing job:', existingJob.job_ref)
+      
+      // Log duplicate prevention event
+      await supabase.from('job_events').insert({
+        job_id: existingJob.id,
+        type: 'SYSTEM',
+        message: 'Duplicate job creation prevented - returned existing job',
+      } as any)
+
+      return NextResponse.json({
+        success: true,
+        job_id: existingJob.id,
+        job_ref: existingJob.job_ref,
+        tracking_token: existingJob.tracking_token,
+        tracking_url: `${process.env.NEXT_PUBLIC_APP_URL}/t/${existingJob.tracking_token}`,
+        status: existingJob.status,
+        duplicate_prevented: true,
+      })
+    }
+
     // Insert job
     const { data: job, error: jobError } = await supabase
       .from('jobs')
