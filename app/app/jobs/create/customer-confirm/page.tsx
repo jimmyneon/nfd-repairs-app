@@ -15,7 +15,6 @@ function CustomerConfirmContent() {
   const [passwordNA, setPasswordNA] = useState(false)
   const [passcodeMethod, setPasscodeMethod] = useState('provided')
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -36,13 +35,7 @@ function CustomerConfirmContent() {
   const isSmallDevice = ['phone', 'tablet', 'watch'].includes(jobData.device_type)
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
 
-  // Auto-scroll to current step
-  useEffect(() => {
-    const element = document.getElementById(`step-${currentStep}`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [currentStep])
+  // No auto-scroll - customer controls their own navigation on tablet
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
@@ -141,10 +134,7 @@ function CustomerConfirmContent() {
                   <input
                     type="text"
                     value={customerName}
-                    onChange={(e) => {
-                      setCustomerName(e.target.value)
-                      if (e.target.value && currentStep === 1) setCurrentStep(2)
-                    }}
+                    onChange={(e) => setCustomerName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && customerName.trim()) {
                         e.preventDefault()
@@ -164,10 +154,7 @@ function CustomerConfirmContent() {
                   <input
                     type="tel"
                     value={customerPhone}
-                    onChange={(e) => {
-                      setCustomerPhone(e.target.value)
-                      if (e.target.value && currentStep === 2) setCurrentStep(3)
-                    }}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && customerPhone.trim()) {
                         e.preventDefault()
@@ -190,8 +177,10 @@ function CustomerConfirmContent() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        const nextStep = document.getElementById('step-2') || document.getElementById('step-3')
-                        nextStep?.scrollIntoView({ behavior: 'smooth' })
+                        // Focus on next section if passcode required
+                        if (jobData.passcode_requirement !== 'not_required') {
+                          document.querySelector<HTMLInputElement>('input[type="radio"]')?.focus()
+                        }
                       }
                     }}
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -215,6 +204,9 @@ function CustomerConfirmContent() {
                   <p className="text-sm text-blue-900 dark:text-blue-100">
                     <strong>Why we need this:</strong> We need your device passcode to test it after repair and ensure everything works properly.
                   </p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200 mt-2">
+                    🔒 <strong>Security:</strong> Your passcode will be stored securely and automatically deleted 7 days after your repair is completed.
+                  </p>
                 </div>
 
                 <div className="space-y-4">
@@ -227,14 +219,13 @@ function CustomerConfirmContent() {
                       onChange={(e) => {
                         setPasscodeMethod(e.target.value)
                         setPasswordNA(false)
-                        if (currentStep === 3) setCurrentStep(4)
                       }}
                       className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
                     />
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Lock className="h-5 w-5" />
-                        I'll provide my passcode now
+                        Provide passcode now
                       </div>
                       {passcodeMethod === 'provided' && (
                         <div className="mt-3 relative">
@@ -242,13 +233,6 @@ function CustomerConfirmContent() {
                             type={showPassword ? "text" : "password"}
                             value={devicePassword}
                             onChange={(e) => setDevicePassword(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && devicePassword.trim()) {
-                                e.preventDefault()
-                                const finalStep = document.getElementById('step-3')
-                                finalStep?.scrollIntoView({ behavior: 'smooth' })
-                              }
-                            }}
                             className="w-full px-4 py-3 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono"
                             placeholder="Enter passcode"
                           />
@@ -268,48 +252,25 @@ function CustomerConfirmContent() {
                     <input
                       type="radio"
                       name="passcode_method"
-                      value="will_provide_later"
-                      checked={passcodeMethod === 'will_provide_later'}
+                      value="send_link"
+                      checked={passcodeMethod === 'send_link'}
                       onChange={(e) => {
                         setPasscodeMethod(e.target.value)
                         setPasswordNA(false)
-                        if (currentStep === 3) setCurrentStep(4)
                       }}
                       className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
                     />
                     <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">I'll provide it when I drop off the device</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">You can give us the passcode when you bring your device in</div>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <input
-                      type="radio"
-                      name="passcode_method"
-                      value="not_applicable"
-                      checked={passcodeMethod === 'not_applicable'}
-                      onChange={(e) => {
-                        setPasscodeMethod(e.target.value)
-                        setPasswordNA(true)
-                        if (currentStep === 3) setCurrentStep(4)
-                      }}
-                      className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Unlock className="h-5 w-5" />
-                        No passcode / Not applicable
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Device has no passcode or it's not needed</div>
+                      <div className="font-semibold text-gray-900 dark:text-white">Send me a link to provide it later</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">We'll text you a secure link to enter your passcode when convenient</div>
                     </div>
                   </label>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Submit */}
-            <div id="step-3" className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
+            {/* Submit Section */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                   {jobData.passcode_requirement !== 'not_required' ? '3' : '2'}
@@ -398,15 +359,6 @@ function CustomerConfirmContent() {
                     </div>
                   </div>
                 )}
-
-                <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-4">
-                  <div className="text-sm font-semibold text-green-900 dark:text-green-100">
-                    Device Status
-                  </div>
-                  <div className="text-sm text-green-800 dark:text-green-200 mt-1">
-                    {jobData.device_left_with_us ? 'Left with us for repair' : 'Taking home (awaiting parts)'}
-                  </div>
-                </div>
 
                 {/* Terms & Conditions */}
                 <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">

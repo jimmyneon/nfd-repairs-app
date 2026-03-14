@@ -450,6 +450,44 @@ export default function CreateJobPage() {
             </div>
           </div>
 
+          {/* Passcode Requirement Toggle */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Passcode</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Does this repair require the device passcode for testing?
+            </p>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center space-x-3 cursor-pointer p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex-1">
+                <input
+                  type="radio"
+                  name="passcode_requirement"
+                  value="required"
+                  checked={formData.passcode_requirement === 'required'}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-primary focus:ring-primary"
+                />
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-white">Yes - Required</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Customer must provide passcode</div>
+                </div>
+              </label>
+              <label className="flex items-center space-x-3 cursor-pointer p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex-1">
+                <input
+                  type="radio"
+                  name="passcode_requirement"
+                  value="not_required"
+                  checked={formData.passcode_requirement === 'not_required'}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-primary focus:ring-primary"
+                />
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-white">No - Not Needed</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Passcode not required for this repair</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
           {quickWalkInMode ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Price & Quick Options</h2>
