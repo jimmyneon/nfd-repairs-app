@@ -15,6 +15,7 @@ function CustomerConfirmContent() {
   const [passwordNA, setPasswordNA] = useState(false)
   const [passcodeMethod, setPasscodeMethod] = useState('provided')
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [repairAgreementAccepted, setRepairAgreementAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [shakeTerms, setShakeTerms] = useState(false)
@@ -53,6 +54,16 @@ function CustomerConfirmContent() {
 
     if (isLandline && !landlineAccepted) {
       alert('Please accept the additional charge for using a landline number, or provide a mobile number instead')
+      return
+    }
+
+    if (!repairAgreementAccepted) {
+      // Trigger shake animation to draw attention to repair agreement checkbox
+      setShakeTerms(true)
+      setTimeout(() => setShakeTerms(false), 600)
+      // Scroll to terms section smoothly
+      const termsSection = document.getElementById('terms-section')
+      termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -338,7 +349,7 @@ function CustomerConfirmContent() {
               <div className="relative group">
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)}
+                  disabled={loading || !repairAgreementAccepted || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)}
                   className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 sm:py-5 px-4 sm:px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md text-base sm:text-lg flex items-center justify-center gap-2 sm:gap-3 touch-manipulation min-h-[56px]"
                 >
                 {loading ? (
@@ -353,12 +364,13 @@ function CustomerConfirmContent() {
                   </>
                 )}
                 </button>
-                {(loading || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)) && (
+                {(loading || !repairAgreementAccepted || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)) && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
                     {!customerName && 'Please enter your name'}
                     {customerName && !customerPhone && 'Please enter your phone number'}
                     {customerName && customerPhone && isLandline && !landlineAccepted && 'Please accept landline charge'}
-                    {customerName && customerPhone && (!isLandline || landlineAccepted) && !termsAccepted && 'Please accept terms & conditions'}
+                    {customerName && customerPhone && (!isLandline || landlineAccepted) && !repairAgreementAccepted && 'Please accept repair agreement'}
+                    {customerName && customerPhone && (!isLandline || landlineAccepted) && repairAgreementAccepted && !termsAccepted && 'Please accept terms & conditions'}
                   </div>
                 )}
               </div>
@@ -446,6 +458,66 @@ function CustomerConfirmContent() {
                       </p>
                     </div>
                   )}
+
+                  {/* Repair Agreement Summary */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
+                    <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-3">
+                      Repair Agreement (Summary)
+                    </h5>
+                    <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100 mb-4">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Diagnostic work may incur a minimum charge even if the device is not repaired.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Additional issues may be identified during diagnosis or repair and will be discussed before further work is carried out.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Please ensure important data is backed up where possible before repair.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Devices supplied without passcodes may receive limited testing after repair.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Replacement parts may affect any remaining manufacturer warranty.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                        <span>Devices not collected within a reasonable period may incur storage fees.</span>
+                      </li>
+                    </ul>
+                    
+                    {/* Repair Agreement Checkbox */}
+                    <label className={`flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-all mb-3 ${
+                      shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={repairAgreementAccepted}
+                        onChange={(e) => setRepairAgreementAccepted(e.target.checked)}
+                        className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
+                      />
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        I agree to the repair terms
+                      </span>
+                    </label>
+                    
+                    {/* Link to Full Terms */}
+                    <div className="text-xs text-blue-800 dark:text-blue-200">
+                      <a 
+                        href="https://www.newforestadvisorrepairs.co.uk/terms-and-conditions" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
+                        View full terms and conditions
+                      </a>
+                    </div>
+                  </div>
 
                   {/* Terms Acceptance */}
                   <label className={`flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all ${
