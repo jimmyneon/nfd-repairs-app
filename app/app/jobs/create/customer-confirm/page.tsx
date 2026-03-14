@@ -17,6 +17,7 @@ function CustomerConfirmContent() {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   // Get job data from URL params
   const jobData = {
@@ -144,6 +145,12 @@ function CustomerConfirmContent() {
                       setCustomerName(e.target.value)
                       if (e.target.value && currentStep === 1) setCurrentStep(2)
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customerName.trim()) {
+                        e.preventDefault()
+                        document.querySelector<HTMLInputElement>('input[type="tel"]')?.focus()
+                      }
+                    }}
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="Enter your full name"
                     autoFocus
@@ -161,6 +168,12 @@ function CustomerConfirmContent() {
                       setCustomerPhone(e.target.value)
                       if (e.target.value && currentStep === 2) setCurrentStep(3)
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customerPhone.trim()) {
+                        e.preventDefault()
+                        document.querySelector<HTMLInputElement>('input[type="email"]')?.focus()
+                      }
+                    }}
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="07410 123 456"
                   />
@@ -174,6 +187,13 @@ function CustomerConfirmContent() {
                     type="email"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        const nextStep = document.getElementById('step-2') || document.getElementById('step-3')
+                        nextStep?.scrollIntoView({ behavior: 'smooth' })
+                      }
+                    }}
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="your@email.com"
                   />
@@ -217,13 +237,29 @@ function CustomerConfirmContent() {
                         I'll provide my passcode now
                       </div>
                       {passcodeMethod === 'provided' && (
-                        <input
-                          type="text"
-                          value={devicePassword}
-                          onChange={(e) => setDevicePassword(e.target.value)}
-                          className="w-full px-4 py-3 mt-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono"
-                          placeholder="Enter passcode"
-                        />
+                        <div className="mt-3 relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={devicePassword}
+                            onChange={(e) => setDevicePassword(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && devicePassword.trim()) {
+                                e.preventDefault()
+                                const finalStep = document.getElementById('step-3')
+                                finalStep?.scrollIntoView({ behavior: 'smooth' })
+                              }
+                            }}
+                            className="w-full px-4 py-3 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono"
+                            placeholder="Enter passcode"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          >
+                            {showPassword ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </label>
@@ -272,59 +308,37 @@ function CustomerConfirmContent() {
               </div>
             )}
 
-            {/* Step 3: Terms & Diagnostic Fee */}
+            {/* Step 3: Submit */}
             <div id="step-3" className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                   {jobData.passcode_requirement !== 'not_required' ? '3' : '2'}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Final Step</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ready to Confirm?</h2>
               </div>
 
-              <div className="space-y-6">
-                {/* Diagnostic Fee */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white mb-2">Diagnostic Fee: {diagnosticFee}</h3>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                        A diagnostic fee of {diagnosticFee} applies if you choose not to proceed with the repair after diagnosis. This fee is waived if you proceed with the repair.
-                      </p>
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={termsAccepted}
-                          onChange={(e) => setTermsAccepted(e.target.checked)}
-                          className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
-                        />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          I understand and accept the diagnostic fee policy and terms & conditions
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Please review the repair summary and terms on the right, then click below to confirm your booking.
+              </p>
 
-                {/* Submit Button */}
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading || !termsAccepted || !customerName || !customerPhone}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                      Creating Booking...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-6 w-6" />
-                      Confirm Booking
-                    </>
-                  )}
-                </button>
-              </div>
+              {/* Submit Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !termsAccepted || !customerName || !customerPhone}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    Creating Booking...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-6 w-6" />
+                    Confirm Booking
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -392,6 +406,37 @@ function CustomerConfirmContent() {
                   <div className="text-sm text-green-800 dark:text-green-200 mt-1">
                     {jobData.device_left_with_us ? 'Left with us for repair' : 'Taking home (awaiting parts)'}
                   </div>
+                </div>
+
+                {/* Terms & Conditions */}
+                <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+                  <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-primary" />
+                    Important Information
+                  </h4>
+                  
+                  {/* Diagnostic Fee */}
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
+                    <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">
+                      Diagnostic Fee: {diagnosticFee}
+                    </h5>
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                      A diagnostic fee of {diagnosticFee} applies if you choose not to proceed with the repair after diagnosis. This fee is waived if you proceed with the repair.
+                    </p>
+                  </div>
+
+                  {/* Terms Acceptance */}
+                  <label className="flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
+                    />
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      I understand and accept the diagnostic fee policy and terms & conditions
+                    </span>
+                  </label>
                 </div>
               </div>
             </div>
