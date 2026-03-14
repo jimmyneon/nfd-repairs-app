@@ -120,11 +120,13 @@ export default function CreateJobPage() {
       device_model: preset.device_model,
     })
     
-    // Auto-scroll to issue selection section
+    // Auto-scroll to device model input so user can adjust the model name
     setTimeout(() => {
-      const issueSection = document.querySelector('select[name="issue"]')
-      if (issueSection) {
-        issueSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const modelInput = document.querySelector('input[name="device_model"]')
+      if (modelInput) {
+        modelInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Focus the input so user can immediately type
+        ;(modelInput as HTMLInputElement).focus()
       }
     }, 100)
   }
