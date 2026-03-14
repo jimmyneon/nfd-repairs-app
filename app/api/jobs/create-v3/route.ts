@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    if (!jobData.customer_name || !jobData.customer_phone || !jobData.price_total) {
+    if (!jobData.customer_name || !jobData.customer_phone || jobData.price_total === undefined || jobData.price_total === null) {
       return NextResponse.json(
         { error: 'Missing required fields: name/customer_name, phone/customer_phone, and price_total are required' },
         { status: 400 }
