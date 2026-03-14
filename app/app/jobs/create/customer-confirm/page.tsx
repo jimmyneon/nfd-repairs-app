@@ -563,7 +563,7 @@ function CustomerConfirmContent() {
                     {/* Link to Full Terms */}
                     <div className="text-xs text-blue-800 dark:text-blue-200">
                       <a 
-                        href="https://www.newforestadvisorrepairs.co.uk/terms-and-conditions" 
+                        href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
