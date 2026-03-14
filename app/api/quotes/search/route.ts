@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-browser'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +8,11 @@ export async function GET(request: NextRequest) {
     const searchType = searchParams.get('type') || 'all'
     const limit = parseInt(searchParams.get('limit') || '50', 10)
 
-    const supabase = createClient()
+    // Create Supabase client with service role for server-side access
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     let dbQuery = supabase
       .from('quotes')
