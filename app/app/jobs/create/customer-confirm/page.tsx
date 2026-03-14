@@ -24,6 +24,25 @@ function CustomerConfirmContent() {
   const [isForeignNumber, setIsForeignNumber] = useState(false)
   const [phoneError, setPhoneError] = useState('')
 
+  // Load customer data from quote conversion if available
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const quoteCustomerData = sessionStorage.getItem('quote_customer_data')
+      if (quoteCustomerData) {
+        try {
+          const data = JSON.parse(quoteCustomerData)
+          setCustomerName(data.customer_name || '')
+          setCustomerPhone(data.customer_phone || '')
+          setCustomerEmail(data.customer_email || '')
+          // Clear the data after loading
+          sessionStorage.removeItem('quote_customer_data')
+        } catch (error) {
+          console.error('Failed to load quote customer data:', error)
+        }
+      }
+    }
+  }, [])
+
   // Get job data from URL params
   const jobData = {
     device_make: searchParams.get('device_make') || '',

@@ -168,9 +168,33 @@ export default function CreateJobPage() {
   }
 
   const handleQuoteSelect = (quote: any) => {
+    // Auto-infer device type from device make if not provided
+    let inferredDeviceType = quote.device_type || ''
+    if (!inferredDeviceType && quote.device_make) {
+      const make = quote.device_make.toLowerCase()
+      if (make.includes('iphone') || make.includes('samsung') || make.includes('pixel') || 
+          make.includes('huawei') || make.includes('xiaomi') || make.includes('motorola') ||
+          make.includes('nokia') || make.includes('oneplus') || make.includes('oppo')) {
+        inferredDeviceType = 'phone'
+      } else if (make.includes('ipad') || make.includes('tablet') || make.includes('tab ')) {
+        inferredDeviceType = 'tablet'
+      } else if (make.includes('macbook') || make.includes('laptop') || make.includes('notebook') ||
+                 make.includes('chromebook') || make.includes('thinkpad') || make.includes('dell') ||
+                 make.includes('hp') || make.includes('lenovo') || make.includes('asus')) {
+        inferredDeviceType = 'laptop'
+      } else if (make.includes('playstation') || make.includes('xbox') || make.includes('nintendo') ||
+                 make.includes('switch') || make.includes('ps4') || make.includes('ps5')) {
+        inferredDeviceType = 'console'
+      } else if (make.includes('watch') || make.includes('fitbit')) {
+        inferredDeviceType = 'watch'
+      } else if (make.includes('imac') || make.includes('desktop') || make.includes('monitor')) {
+        inferredDeviceType = 'desktop'
+      }
+    }
+
     setFormData({
       ...formData,
-      device_type: quote.device_type || '',
+      device_type: inferredDeviceType,
       device_make: quote.device_make,
       device_model: quote.device_model,
       issue: quote.issue,
@@ -178,6 +202,16 @@ export default function CreateJobPage() {
       price_total: quote.quoted_price ? String(quote.quoted_price) : '',
       linked_quote_id: quote.quote_request_id,
     })
+    
+    // Store customer data for confirmation page
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('quote_customer_data', JSON.stringify({
+        customer_name: quote.customer_name,
+        customer_phone: quote.customer_phone,
+        customer_email: quote.customer_email || '',
+      }))
+    }
+    
     setShowQuoteLookup(false)
   }
 
