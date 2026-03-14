@@ -112,20 +112,24 @@ function CustomerConfirmContent() {
     setLoading(true)
 
     try {
+      // Ensure price_total is a valid number
+      const priceValue = parseFloat(jobData.price_total)
+      const finalPrice = isNaN(priceValue) ? 0 : priceValue
+
       const payload = {
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail || null,
-        device_type: jobData.device_type,
-        device_make: jobData.device_make,
-        device_model: jobData.device_model,
-        issue: jobData.issue,
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone.trim(),
+        customer_email: customerEmail.trim() || null,
+        device_type: jobData.device_type || null,
+        device_make: jobData.device_make || 'Unknown',
+        device_model: jobData.device_model || 'Unknown',
+        issue: jobData.issue || 'Repair needed',
         description: jobData.description || null,
-        price_total: parseFloat(jobData.price_total) || 0,
-        quoted_price: parseFloat(jobData.price_total) || 0,
+        price_total: finalPrice,
+        quoted_price: finalPrice,
         requires_parts_order: jobData.requires_parts_order,
         source: 'staff_manual',
-        device_password: (passwordNA || passcodeMethod !== 'provided') ? null : devicePassword,
+        device_password: (passwordNA || passcodeMethod !== 'provided') ? null : devicePassword.trim(),
         password_not_applicable: passwordNA || passcodeMethod === 'not_applicable',
         passcode_requirement: jobData.passcode_requirement,
         passcode_method: passcodeMethod,
