@@ -119,6 +119,14 @@ export default function CreateJobPage() {
       device_make: preset.device_make,
       device_model: preset.device_model,
     })
+    
+    // Auto-scroll to issue selection section
+    setTimeout(() => {
+      const issueSection = document.querySelector('select[name="issue"]')
+      if (issueSection) {
+        issueSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
   }
 
   const handleIssuePreset = (issueValue: string) => {
@@ -127,6 +135,14 @@ export default function CreateJobPage() {
       issue: issueValue,
     })
     setShowIssueOther(false)
+    
+    // Auto-scroll to price/next section
+    setTimeout(() => {
+      const priceSection = document.querySelector('input[name="price_total"]')
+      if (priceSection) {
+        priceSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
