@@ -140,6 +140,18 @@ function CustomerConfirmContent() {
         linked_quote_id: jobData.linked_quote_id,
       }
 
+      console.log('🔍 Submitting job with payload:', payload)
+      console.log('🔍 Required fields check:', {
+        customer_name: payload.customer_name,
+        customer_phone: payload.customer_phone,
+        price_total: payload.price_total,
+        types: {
+          customer_name: typeof payload.customer_name,
+          customer_phone: typeof payload.customer_phone,
+          price_total: typeof payload.price_total,
+        }
+      })
+
       const response = await fetch('/api/jobs/create-v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
