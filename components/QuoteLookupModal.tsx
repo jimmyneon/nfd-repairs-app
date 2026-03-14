@@ -17,6 +17,7 @@ interface Quote {
   quoted_price: number | null
   status: string
   created_at: string
+  original_created_at: string | null
 }
 
 interface QuoteLookupModalProps {
@@ -223,7 +224,7 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
                         )}
                         
                         <div className="col-span-2 text-xs text-gray-500 dark:text-gray-500">
-                          Created: {formatDate(quote.created_at)}
+                          Created: {formatDate(quote.original_created_at || quote.created_at)}
                         </div>
                       </div>
                     </div>

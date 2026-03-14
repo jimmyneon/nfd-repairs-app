@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('quotes')
       .select('*')
       .eq('converted_to_job', false)
-      .order('created_at', { ascending: false })
+      .order('original_created_at', { ascending: false })
       .limit(limit)
 
     if (query && query.trim()) {

@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       status,
       source_page,
       conversation_id,
+      created_at, // Original creation date from AI Responder
     } = body
 
     // Validate required fields
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
         status: status || 'pending',
         source_page: source_page || null,
         conversation_id: conversation_id || null,
+        original_created_at: created_at || new Date().toISOString(), // Original creation date from AI Responder
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'quote_request_id',
