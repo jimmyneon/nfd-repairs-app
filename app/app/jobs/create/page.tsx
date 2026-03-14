@@ -612,11 +612,61 @@ export default function CreateJobPage() {
             </div>
           </div>
           ) : (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
-              <p className="text-sm text-blue-900 dark:text-blue-100 flex items-center gap-2">
-                <Zap className="h-4 w-4" />
-                <strong>Quick Mode:</strong> Passcode set to "Not Required" by default - Customer can provide if needed on their screen
-              </p>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Passcode Requirement</h2>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-3 mb-4">
+                <p className="text-xs text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  <strong>Quick Mode:</strong> Pre-set to "Not Required" - change if needed
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="flex items-center space-x-3 p-3 border-2 border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20 rounded-xl cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                  <input
+                    type="radio"
+                    name="passcode_requirement"
+                    value="not_required"
+                    checked={formData.passcode_requirement === 'not_required'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">Not Required</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Device has no passcode or not needed for testing</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center space-x-3 p-3 border-2 border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 rounded-xl cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                  <input
+                    type="radio"
+                    name="passcode_requirement"
+                    value="recommended"
+                    checked={formData.passcode_requirement === 'recommended'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">Recommended</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Customer should provide passcode for best testing</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center space-x-3 p-3 border-2 border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/20 rounded-xl cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                  <input
+                    type="radio"
+                    name="passcode_requirement"
+                    value="required"
+                    checked={formData.passcode_requirement === 'required'}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-primary focus:ring-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-white">Required</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Must have passcode to complete repair and testing</div>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
 

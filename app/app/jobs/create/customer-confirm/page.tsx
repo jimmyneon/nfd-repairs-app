@@ -18,6 +18,8 @@ function CustomerConfirmContent() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [shakeTerms, setShakeTerms] = useState(false)
+  const [isLandline, setIsLandline] = useState(false)
+  const [landlineAccepted, setLandlineAccepted] = useState(false)
 
   // Get job data from URL params
   const jobData = {
@@ -46,6 +48,11 @@ function CustomerConfirmContent() {
 
     if (!customerPhone.trim()) {
       alert('Please enter your mobile phone number')
+      return
+    }
+
+    if (isLandline && !landlineAccepted) {
+      alert('Please accept the additional charge for using a landline number, or provide a mobile number instead')
       return
     }
 
@@ -160,7 +167,17 @@ function CustomerConfirmContent() {
                   <input
                     type="tel"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) => {
+                      const phone = e.target.value
+                      setCustomerPhone(phone)
+                      // Check if it's a UK landline (starts with 01, 02, or 03)
+                      const cleanPhone = phone.replace(/\s/g, '')
+                      const isLandlineNumber = /^(01|02|03)/.test(cleanPhone)
+                      setIsLandline(isLandlineNumber)
+                      if (!isLandlineNumber) {
+                        setLandlineAccepted(false)
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && customerPhone.trim()) {
                         e.preventDefault()
@@ -170,12 +187,41 @@ function CustomerConfirmContent() {
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="07410 123 456"
                   />
+                  {isLandline && (
+                    <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
+                      <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-2">
+                        Landline Number Detected
+                      </p>
+                      <p className="text-xs text-orange-800 dark:text-orange-200 mb-3">
+                        Our system automatically sends SMS notifications to keep you updated. Landline numbers require manual phone calls from our team, which takes significantly more time.
+                      </p>
+                      <label className="flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={landlineAccepted}
+                          onChange={(e) => setLandlineAccepted(e.target.checked)}
+                          className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
+                        />
+                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                          I understand there is an additional £20 charge for using a landline number due to the extra manual work required by your team.
+                        </span>
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Email (Optional)
                   </label>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-3">
+                    <p className="text-xs text-blue-900 dark:text-blue-100">
+                      <strong>With email:</strong> Receive detailed repair information and updates throughout the entire process.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                      <strong>Without email:</strong> Receive SMS tracking link to check status anytime, plus notification when device is ready for collection.
+                    </p>
+                  </div>
                   <input
                     type="email"
                     value={customerEmail}
@@ -289,11 +335,12 @@ function CustomerConfirmContent() {
               </p>
 
               {/* Submit Button */}
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !termsAccepted || !customerName || !customerPhone}
-                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
-              >
+              <div className="relative group">
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)}
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
+                >
                 {loading ? (
                   <>
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
@@ -305,7 +352,16 @@ function CustomerConfirmContent() {
                     Confirm Booking
                   </>
                 )}
-              </button>
+                </button>
+                {(loading || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)) && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    {!customerName && 'Please enter your name'}
+                    {customerName && !customerPhone && 'Please enter your phone number'}
+                    {customerName && customerPhone && isLandline && !landlineAccepted && 'Please accept landline charge'}
+                    {customerName && customerPhone && (!isLandline || landlineAccepted) && !termsAccepted && 'Please accept terms & conditions'}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
