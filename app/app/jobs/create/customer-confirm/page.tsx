@@ -367,15 +367,23 @@ function CustomerConfirmContent() {
                     Important Information
                   </h4>
                   
-                  {/* Diagnostic Fee */}
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
-                    <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">
-                      Diagnostic Fee: {diagnosticFee}
-                    </h5>
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                      A diagnostic fee of {diagnosticFee} applies if you choose not to proceed with the repair after diagnosis. This fee is waived if you proceed with the repair.
-                    </p>
-                  </div>
+                  {/* Diagnostic Fee - Only for certain repair types */}
+                  {(jobData.issue?.toLowerCase().includes('water') || 
+                    jobData.issue?.toLowerCase().includes('no power') || 
+                    jobData.issue?.toLowerCase().includes('not loading') ||
+                    jobData.issue?.toLowerCase().includes('black screen')) && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
+                      <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">
+                        Diagnostic Fee: {diagnosticFee}
+                      </h5>
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                        In certain cases where diagnostics are required (such as water damage or when the device is not powered on), a diagnostic fee of {diagnosticFee} is applicable should you choose not to proceed with the repair. This fee is waived if you proceed with the repair.
+                      </p>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 italic">
+                        Note: This does not apply to straightforward repairs like screen or battery replacements.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Terms Acceptance */}
                   <label className="flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">

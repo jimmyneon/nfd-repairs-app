@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle } from 'lucide-react'
 import Link from 'next/link'
@@ -17,7 +17,13 @@ export default function CreateJobPage() {
   const [showIssueOther, setShowIssueOther] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showQuoteLookup, setShowQuoteLookup] = useState(false)
-  const [quickWalkInMode, setQuickWalkInMode] = useState(true)
+  const [quickWalkInMode, setQuickWalkInMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('quickWalkInMode')
+      return saved === 'true'
+    }
+    return false
+  })
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -30,9 +36,16 @@ export default function CreateJobPage() {
     price_total: '',
     requires_parts_order: false,
     device_left_with_us: true,
-    passcode_requirement: 'recommended' as 'not_required' | 'recommended' | 'required',
+    passcode_requirement: 'not_required' as 'not_required' | 'recommended' | 'required',
     linked_quote_id: null as string | null,
   })
+
+  // Save quick mode state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quickWalkInMode', String(quickWalkInMode))
+    }
+  }, [quickWalkInMode])
 
   // Device type options
   const deviceTypes = [
@@ -283,29 +296,31 @@ export default function CreateJobPage() {
             </div>
           </div>
 
-          {/* Device Quick Presets - Always visible for fast selection */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Device Selection</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {quickDevicePresets.map((preset) => {
-                const Icon = preset.icon
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => handleQuickPreset(preset)}
-                    className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3`}
-                  >
-                    <Icon className="h-6 w-6" />
-                    <span>{preset.label}</span>
-                  </button>
-                )
-              })}
+          {/* Device Quick Presets - Only visible in Quick Walk-In Mode */}
+          {quickWalkInMode && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Device Selection</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {quickDevicePresets.map((preset) => {
+                  const Icon = preset.icon
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => handleQuickPreset(preset)}
+                      className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3`}
+                    >
+                      <Icon className="h-6 w-6" />
+                      <span>{preset.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
+                Or use the detailed form below for specific devices
+              </p>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
-              Or use the detailed form below for specific devices
-            </p>
-          </div>
+          )}
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Details (Optional - if not using presets)</h2>
@@ -374,32 +389,36 @@ export default function CreateJobPage() {
                 />
               </div>
 
-              {/* Common Issue Presets */}
+              {/* Common Issue Presets - Only in Quick Mode */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Issue * - Quick Select
+                  Issue *{quickWalkInMode ? ' - Quick Select' : ''}
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-                  {commonIssuePresets.map((preset) => {
-                    const Icon = preset.icon
-                    return (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        onClick={() => handleIssuePreset(preset.value)}
-                        className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3 ${
-                          formData.issue === preset.value ? 'ring-4 ring-primary ring-opacity-50' : ''
-                        }`}
-                      >
-                        <Icon className="h-6 w-6" />
-                        <span>{preset.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                  Or select from full list:
-                </label>
+                {quickWalkInMode && (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                      {commonIssuePresets.map((preset) => {
+                        const Icon = preset.icon
+                        return (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => handleIssuePreset(preset.value)}
+                            className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3 ${
+                              formData.issue === preset.value ? 'ring-4 ring-primary ring-opacity-50' : ''
+                            }`}
+                          >
+                            <Icon className="h-6 w-6" />
+                            <span>{preset.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                      Or select from full list:
+                    </label>
+                  </>
+                )}
                 <select
                   name="issue"
                   value={formData.issue}
@@ -596,7 +615,7 @@ export default function CreateJobPage() {
             <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
               <p className="text-sm text-blue-900 dark:text-blue-100 flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                <strong>Quick Mode:</strong> Passcode set to "Recommended" - Customer will choose passcode option on their screen
+                <strong>Quick Mode:</strong> Passcode set to "Not Required" by default - Customer can provide if needed on their screen
               </p>
             </div>
           )}
