@@ -69,12 +69,12 @@ export default function CreateJobPage() {
 
   // Quick device presets for fast intake
   const quickDevicePresets = [
-    { label: 'iPhone', icon: Smartphone, device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)', color: 'bg-blue-600 hover:bg-blue-700' },
-    { label: 'Android', icon: Smartphone, device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)', color: 'bg-green-600 hover:bg-green-700' },
-    { label: 'Samsung', icon: Smartphone, device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)', color: 'bg-purple-600 hover:bg-purple-700' },
-    { label: 'iPad', icon: Tablet, device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)', color: 'bg-indigo-600 hover:bg-indigo-700' },
-    { label: 'MacBook', icon: Laptop, device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)', color: 'bg-gray-700 hover:bg-gray-800' },
-    { label: 'Laptop', icon: Monitor, device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)', color: 'bg-cyan-600 hover:bg-cyan-700' },
+    { label: 'iPhone', icon: Smartphone, device_type: 'phone', device_make: 'Apple', device_model: 'iPhone ', color: 'bg-blue-600 hover:bg-blue-700' },
+    { label: 'Android', icon: Smartphone, device_type: 'phone', device_make: 'Android', device_model: 'Smartphone ', color: 'bg-green-600 hover:bg-green-700' },
+    { label: 'Samsung', icon: Smartphone, device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy ', color: 'bg-purple-600 hover:bg-purple-700' },
+    { label: 'iPad', icon: Tablet, device_type: 'tablet', device_make: 'Apple', device_model: 'iPad ', color: 'bg-indigo-600 hover:bg-indigo-700' },
+    { label: 'MacBook', icon: Laptop, device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook ', color: 'bg-gray-700 hover:bg-gray-800' },
+    { label: 'Laptop', icon: Monitor, device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop ', color: 'bg-cyan-600 hover:bg-cyan-700' },
   ]
 
   // Common issue presets with colors
