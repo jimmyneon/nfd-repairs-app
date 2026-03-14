@@ -356,11 +356,20 @@ function CustomerConfirmContent() {
                   </div>
                 )}
 
-                {parseFloat(jobData.price_total) > 0 && (
+                {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
                   <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
                     <div className="text-sm text-gray-500 dark:text-gray-400">Repair Price</div>
                     <div className="font-bold text-gray-900 dark:text-white text-2xl">
                       £{parseFloat(jobData.price_total).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+
+                {(!jobData.price_total || parseFloat(jobData.price_total) === 0) && (
+                  <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Repair Price</div>
+                    <div className="font-semibold text-gray-600 dark:text-gray-400 text-lg">
+                      To be confirmed after diagnosis
                     </div>
                   </div>
                 )}

@@ -56,12 +56,22 @@ export default function CreateJobPage() {
 
   // Quick device presets for fast intake
   const quickDevicePresets = [
-    { label: 'iPhone', device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)' },
-    { label: 'Android Phone', device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)' },
-    { label: 'Samsung Phone', device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)' },
-    { label: 'iPad', device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)' },
-    { label: 'MacBook', device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)' },
-    { label: 'Windows Laptop', device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)' },
+    { label: '📱 iPhone', device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)', color: 'from-blue-500 to-blue-600' },
+    { label: '🤖 Android', device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)', color: 'from-green-500 to-green-600' },
+    { label: '📱 Samsung', device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)', color: 'from-purple-500 to-purple-600' },
+    { label: '📱 iPad', device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)', color: 'from-indigo-500 to-indigo-600' },
+    { label: '💻 MacBook', device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)', color: 'from-gray-600 to-gray-700' },
+    { label: '💻 Laptop', device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)', color: 'from-cyan-500 to-cyan-600' },
+  ]
+
+  // Common issue presets with colors
+  const commonIssuePresets = [
+    { label: '📱 Screen', value: 'Screen Replacement', color: 'from-red-500 to-red-600' },
+    { label: '🔋 Battery', value: 'Battery Replacement', color: 'from-green-500 to-green-600' },
+    { label: '⚡ Charging Port', value: 'Charging Port Replacement', color: 'from-yellow-500 to-yellow-600' },
+    { label: '💧 Water Damage', value: 'Water Damage', color: 'from-blue-500 to-blue-600' },
+    { label: '🔌 Not Charging', value: 'Not Charging', color: 'from-orange-500 to-orange-600' },
+    { label: '⚫ Black Screen', value: 'Black Screen', color: 'from-gray-700 to-gray-800' },
   ]
 
   // Common issues - prioritized for quick walk-in (most common first)
@@ -96,6 +106,14 @@ export default function CreateJobPage() {
       device_make: preset.device_make,
       device_model: preset.device_model,
     })
+  }
+
+  const handleIssuePreset = (issueValue: string) => {
+    setFormData({
+      ...formData,
+      issue: issueValue,
+    })
+    setShowIssueOther(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -265,33 +283,33 @@ export default function CreateJobPage() {
             </div>
           </div>
 
-          {quickWalkInMode && (
-            <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
-              <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-3">
-                ⚡ Quick Mode Active - Use presets below for fastest intake
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {quickDevicePresets.map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => handleQuickPreset(preset)}
-                    className="px-3 py-2 bg-white dark:bg-gray-800 border-2 border-orange-300 dark:border-orange-600 rounded-lg text-sm font-semibold text-gray-900 dark:text-white hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
+          {/* Device Quick Presets - Always visible for fast selection */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Device Selection</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {quickDevicePresets.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => handleQuickPreset(preset)}
+                  className={`px-6 py-4 bg-gradient-to-r ${preset.color} text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all`}
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
-          )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
+              Or use the detailed form below for specific devices
+            </p>
+          </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Details</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Details (Optional - if not using presets)</h2>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Device Type *
+                  Device Type {!formData.device_type && '*'}
                 </label>
                 <select
                   name="device_type"
@@ -352,9 +370,27 @@ export default function CreateJobPage() {
                 />
               </div>
 
+              {/* Common Issue Presets */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Issue *
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Issue * - Quick Select
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                  {commonIssuePresets.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => handleIssuePreset(preset.value)}
+                      className={`px-4 py-3 bg-gradient-to-r ${preset.color} text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all ${
+                        formData.issue === preset.value ? 'ring-4 ring-white ring-opacity-50' : ''
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                  Or select from full list:
                 </label>
                 <select
                   name="issue"
