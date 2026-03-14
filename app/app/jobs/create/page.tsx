@@ -6,9 +6,7 @@ import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap } from 'lu
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
-import CustomerConfirmationModal from '@/components/CustomerConfirmationModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
-import BookingConfirmationScreen from '@/components/BookingConfirmationScreen'
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -18,11 +16,8 @@ export default function CreateJobPage() {
   const [showMakeOther, setShowMakeOther] = useState(false)
   const [showIssueOther, setShowIssueOther] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
   const [showQuoteLookup, setShowQuoteLookup] = useState(false)
   const [quickWalkInMode, setQuickWalkInMode] = useState(false)
-  const [showBookingConfirmation, setShowBookingConfirmation] = useState(false)
-  const [createdJobRef, setCreatedJobRef] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -106,8 +101,21 @@ export default function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Switch to customer screen (show confirmation modal)
-    setShowConfirmationModal(true)
+    // Navigate to customer confirmation page with job data
+    const params = new URLSearchParams({
+      device_make: formData.device_make,
+      device_model: formData.device_model,
+      device_type: formData.device_type,
+      issue: formData.issue,
+      description: formData.description || '',
+      price_total: formData.price_total || '0',
+      requires_parts_order: String(formData.requires_parts_order),
+      device_left_with_us: String(formData.device_left_with_us),
+      passcode_requirement: formData.passcode_requirement,
+      linked_quote_id: formData.linked_quote_id || '',
+    })
+    
+    router.push(`/app/jobs/create/customer-confirm?${params.toString()}`)
   }
 
   const handleQuoteSelect = (quote: any) => {
@@ -124,97 +132,6 @@ export default function CreateJobPage() {
     setShowQuoteLookup(false)
   }
 
-  const handleConfirmJob = async (customerData: {
-    customer_name: string
-    customer_phone: string
-    customer_email: string
-    device_password: string
-    password_na: boolean
-    passcode_method: string
-    terms_accepted: boolean
-  }) => {
-    setShowConfirmationModal(false)
-    setLoading(true)
-
-    // Check if this is an imported job with custom options
-    // @ts-ignore
-    const importOptions = window.__importOptions || {}
-    
-    const payload = {
-          customer_name: customerData.customer_name,
-          customer_phone: customerData.customer_phone,
-          customer_email: customerData.customer_email || null,
-          device_type: formData.device_type,
-          device_make: formData.device_make,
-          device_model: formData.device_model,
-          issue: formData.issue,
-          description: formData.description || null,
-          price_total: formData.price_total ? parseFloat(formData.price_total) : 0,
-          quoted_price: formData.price_total ? parseFloat(formData.price_total) : 0,
-          requires_parts_order: formData.requires_parts_order,
-          source: 'staff_manual',
-          device_password: customerData.password_na ? null : customerData.device_password,
-          password_not_applicable: customerData.password_na,
-          passcode_requirement: formData.passcode_requirement,
-          passcode_method: customerData.passcode_method,
-          customer_signature: null,
-          terms_accepted: true,
-          onboarding_completed: true,
-          device_in_shop: formData.device_left_with_us,
-          linked_quote_id: formData.linked_quote_id,
-          // Import options (if from JSON import)
-          initial_status: importOptions.initial_status,
-          skip_sms: importOptions.skip_sms,
-        }
-    
-    // Clear import options after use
-    // @ts-ignore
-    delete window.__importOptions
-
-    console.log('Creating job with payload:', payload)
-
-    try {
-      const response = await fetch('/api/jobs/create-v3', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const result = await response.json()
-
-      if (response.ok) {
-        // Show confirmation screen instead of redirecting
-        setCreatedJobRef(result.job_ref || result.job_id)
-        setShowBookingConfirmation(true)
-        setLoading(false)
-        
-        // Reset form for next job
-        setFormData({
-          device_type: '',
-          device_make: '',
-          device_model: '',
-          issue: '',
-          description: '',
-          repair_type: '',
-          technician_notes: '',
-          price_total: '',
-          requires_parts_order: false,
-          device_left_with_us: true,
-          passcode_requirement: 'recommended',
-          linked_quote_id: null,
-        })
-        setQuickWalkInMode(false)
-      } else {
-        console.error('API Error Response:', result)
-        alert(`Error: ${result.error}\n${result.details || ''}`)
-        setLoading(false)
-      }
-    } catch (error) {
-      console.error('Error creating job:', error)
-      alert(`Failed to create job: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      setLoading(false)
-    }
-  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -711,25 +628,6 @@ export default function CreateJobPage() {
         isOpen={showQuoteLookup}
         onClose={() => setShowQuoteLookup(false)}
         onSelectQuote={handleQuoteSelect}
-      />
-
-      {showConfirmationModal && (
-        <CustomerConfirmationModal
-          isOpen={showConfirmationModal}
-          onClose={() => setShowConfirmationModal(false)}
-          onConfirm={handleConfirmJob}
-          jobData={formData}
-          passcodeRequirement={formData.passcode_requirement}
-        />
-      )}
-
-      <BookingConfirmationScreen
-        isOpen={showBookingConfirmation}
-        onClose={() => {
-          setShowBookingConfirmation(false)
-          setCreatedJobRef(null)
-        }}
-        jobRef={createdJobRef || undefined}
       />
     </div>
   )
