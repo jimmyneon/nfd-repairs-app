@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
@@ -56,22 +56,22 @@ export default function CreateJobPage() {
 
   // Quick device presets for fast intake
   const quickDevicePresets = [
-    { label: '📱 iPhone', device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)', color: 'from-blue-500 to-blue-600' },
-    { label: '🤖 Android', device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)', color: 'from-green-500 to-green-600' },
-    { label: '📱 Samsung', device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)', color: 'from-purple-500 to-purple-600' },
-    { label: '📱 iPad', device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)', color: 'from-indigo-500 to-indigo-600' },
-    { label: '💻 MacBook', device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)', color: 'from-gray-600 to-gray-700' },
-    { label: '💻 Laptop', device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)', color: 'from-cyan-500 to-cyan-600' },
+    { label: 'iPhone', icon: Smartphone, device_type: 'phone', device_make: 'Apple', device_model: 'iPhone (Generic)', color: 'bg-blue-600 hover:bg-blue-700' },
+    { label: 'Android', icon: Smartphone, device_type: 'phone', device_make: 'Android', device_model: 'Smartphone (Generic)', color: 'bg-green-600 hover:bg-green-700' },
+    { label: 'Samsung', icon: Smartphone, device_type: 'phone', device_make: 'Samsung', device_model: 'Galaxy (Generic)', color: 'bg-purple-600 hover:bg-purple-700' },
+    { label: 'iPad', icon: Tablet, device_type: 'tablet', device_make: 'Apple', device_model: 'iPad (Generic)', color: 'bg-indigo-600 hover:bg-indigo-700' },
+    { label: 'MacBook', icon: Laptop, device_type: 'laptop', device_make: 'Apple', device_model: 'MacBook (Generic)', color: 'bg-gray-700 hover:bg-gray-800' },
+    { label: 'Laptop', icon: Monitor, device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop (Generic)', color: 'bg-cyan-600 hover:bg-cyan-700' },
   ]
 
   // Common issue presets with colors
   const commonIssuePresets = [
-    { label: '📱 Screen', value: 'Screen Replacement', color: 'from-red-500 to-red-600' },
-    { label: '🔋 Battery', value: 'Battery Replacement', color: 'from-green-500 to-green-600' },
-    { label: '⚡ Charging Port', value: 'Charging Port Replacement', color: 'from-yellow-500 to-yellow-600' },
-    { label: '💧 Water Damage', value: 'Water Damage', color: 'from-blue-500 to-blue-600' },
-    { label: '🔌 Not Charging', value: 'Not Charging', color: 'from-orange-500 to-orange-600' },
-    { label: '⚫ Black Screen', value: 'Black Screen', color: 'from-gray-700 to-gray-800' },
+    { label: 'Screen', icon: Smartphone, value: 'Screen Replacement', color: 'bg-red-600 hover:bg-red-700' },
+    { label: 'Battery', icon: Battery, value: 'Battery Replacement', color: 'bg-green-600 hover:bg-green-700' },
+    { label: 'Charging Port', icon: Lightning, value: 'Charging Port Replacement', color: 'bg-yellow-600 hover:bg-yellow-700' },
+    { label: 'Water Damage', icon: Droplet, value: 'Water Damage', color: 'bg-blue-600 hover:bg-blue-700' },
+    { label: 'Not Charging', icon: Power, value: 'Not Charging', color: 'bg-orange-600 hover:bg-orange-700' },
+    { label: 'Black Screen', icon: Circle, value: 'Black Screen', color: 'bg-gray-700 hover:bg-gray-800' },
   ]
 
   // Common issues - prioritized for quick walk-in (most common first)
@@ -287,16 +287,20 @@ export default function CreateJobPage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Device Selection</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {quickDevicePresets.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => handleQuickPreset(preset)}
-                  className={`px-6 py-4 bg-gradient-to-r ${preset.color} text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              {quickDevicePresets.map((preset) => {
+                const Icon = preset.icon
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => handleQuickPreset(preset)}
+                    className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3`}
+                  >
+                    <Icon className="h-6 w-6" />
+                    <span>{preset.label}</span>
+                  </button>
+                )
+              })}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
               Or use the detailed form below for specific devices
@@ -376,18 +380,22 @@ export default function CreateJobPage() {
                   Issue * - Quick Select
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-                  {commonIssuePresets.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => handleIssuePreset(preset.value)}
-                      className={`px-4 py-3 bg-gradient-to-r ${preset.color} text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all ${
-                        formData.issue === preset.value ? 'ring-4 ring-white ring-opacity-50' : ''
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+                  {commonIssuePresets.map((preset) => {
+                    const Icon = preset.icon
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        onClick={() => handleIssuePreset(preset.value)}
+                        className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3 ${
+                          formData.issue === preset.value ? 'ring-4 ring-primary ring-opacity-50' : ''
+                        }`}
+                      >
+                        <Icon className="h-6 w-6" />
+                        <span>{preset.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
                   Or select from full list:
