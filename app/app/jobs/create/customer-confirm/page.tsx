@@ -17,6 +17,7 @@ function CustomerConfirmContent() {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [shakeTerms, setShakeTerms] = useState(false)
 
   // Get job data from URL params
   const jobData = {
@@ -48,16 +49,21 @@ function CustomerConfirmContent() {
       return
     }
 
+    if (!termsAccepted) {
+      // Trigger shake animation to draw attention to terms checkbox
+      setShakeTerms(true)
+      setTimeout(() => setShakeTerms(false), 600)
+      // Scroll to terms section smoothly
+      const termsSection = document.getElementById('terms-section')
+      termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
     if (jobData.passcode_requirement !== 'not_required') {
       if (passcodeMethod === 'provided' && !passwordNA && !devicePassword.trim()) {
         alert('Please enter your device passcode or select another option')
         return
       }
-    }
-
-    if (!termsAccepted) {
-      alert('Please accept the terms and conditions to proceed')
-      return
     }
 
     setLoading(true)
@@ -361,7 +367,7 @@ function CustomerConfirmContent() {
                 )}
 
                 {/* Terms & Conditions */}
-                <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+                <div id="terms-section" className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
                   <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-primary" />
                     Important Information
@@ -386,7 +392,9 @@ function CustomerConfirmContent() {
                   )}
 
                   {/* Terms Acceptance */}
-                  <label className="flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <label className={`flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all ${
+                    shakeTerms ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
+                  }`}>
                     <input
                       type="checkbox"
                       checked={termsAccepted}
@@ -397,6 +405,11 @@ function CustomerConfirmContent() {
                       I understand and accept the diagnostic fee policy and terms & conditions
                     </span>
                   </label>
+                  {shakeTerms && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-semibold animate-pulse">
+                      Please accept the terms to continue
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
