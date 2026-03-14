@@ -10,10 +10,10 @@ function BookingSuccessContent() {
   const jobRef = searchParams.get('job_ref')
 
   useEffect(() => {
-    // Auto-redirect after 5 seconds
+    // Auto-redirect after 15 seconds
     const timer = setTimeout(() => {
       router.push('/app/jobs/create')
-    }, 5000)
+    }, 15000)
 
     return () => clearTimeout(timer)
   }, [router])
@@ -92,22 +92,10 @@ function BookingSuccessContent() {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-700 rounded-2xl shadow-lg p-6 border-2 border-gray-100 dark:border-gray-700">
-          <button
-            onClick={() => router.push('/app/jobs/create')}
-            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg mb-3"
-          >
-            Create Another Booking
-          </button>
-          <button
-            onClick={() => router.push('/app/jobs')}
-            className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl transition-all"
-          >
-            View All Jobs
-          </button>
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-            Auto-redirecting to new booking in 5 seconds...
+        {/* Auto-redirect notice */}
+        <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-700 rounded-2xl shadow-lg p-6 border-2 border-gray-100 dark:border-gray-700 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            This page will close automatically in a few moments...
           </p>
         </div>
       </main>
