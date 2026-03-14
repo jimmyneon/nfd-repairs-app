@@ -211,10 +211,29 @@ function CustomerConfirmContent() {
                       // Clean phone number (remove spaces, dashes, etc.)
                       const cleanPhone = phone.replace(/[\s\-()]/g, '')
                       
-                      // Check if it's a UK number
-                      const isUKNumber = /^(0|\+44|44)/.test(cleanPhone)
-                      
                       if (cleanPhone.length > 0) {
+                        // Check if it's a UK number
+                        // UK formats: 07..., +447..., 447..., 01..., 02..., 03...
+                        // Foreign formats: +34..., 0034..., +1..., 001..., etc.
+                        let isUKNumber = false
+                        
+                        if (cleanPhone.startsWith('+44')) {
+                          // UK international format: +44...
+                          isUKNumber = true
+                        } else if (cleanPhone.startsWith('0044')) {
+                          // UK international format: 0044...
+                          isUKNumber = true
+                        } else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) {
+                          // UK international format without +: 44...
+                          isUKNumber = true
+                        } else if (cleanPhone.startsWith('0') && !cleanPhone.startsWith('00')) {
+                          // UK national format: 0...
+                          isUKNumber = true
+                        } else if (cleanPhone.startsWith('+') || cleanPhone.startsWith('00')) {
+                          // International format for other countries: +34, 0034, +1, 001, etc.
+                          isUKNumber = false
+                        }
+                        
                         if (!isUKNumber) {
                           // Foreign number detected
                           setIsForeignNumber(true)
@@ -223,11 +242,13 @@ function CustomerConfirmContent() {
                         } else {
                           setIsForeignNumber(false)
                           
-                          // Normalize to standard format (remove +44 or 44, add 0)
+                          // Normalize to standard format (remove +44 or 0044 or 44, add 0)
                           let normalizedPhone = cleanPhone
                           if (cleanPhone.startsWith('+44')) {
                             normalizedPhone = '0' + cleanPhone.substring(3)
-                          } else if (cleanPhone.startsWith('44')) {
+                          } else if (cleanPhone.startsWith('0044')) {
+                            normalizedPhone = '0' + cleanPhone.substring(4)
+                          } else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) {
                             normalizedPhone = '0' + cleanPhone.substring(2)
                           }
                           
