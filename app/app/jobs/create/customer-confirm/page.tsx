@@ -21,6 +21,8 @@ function CustomerConfirmContent() {
   const [shakeTerms, setShakeTerms] = useState(false)
   const [isLandline, setIsLandline] = useState(false)
   const [landlineAccepted, setLandlineAccepted] = useState(false)
+  const [isForeignNumber, setIsForeignNumber] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
 
   // Get job data from URL params
   const jobData = {
@@ -49,6 +51,29 @@ function CustomerConfirmContent() {
 
     if (!customerPhone.trim()) {
       alert('Please enter your mobile phone number')
+      return
+    }
+
+    // Validate UK phone number format
+    const cleanPhone = customerPhone.replace(/[\s\-()]/g, '')
+    const isUKNumber = /^(0|\+44|44)/.test(cleanPhone)
+    
+    if (isUKNumber) {
+      let normalizedPhone = cleanPhone
+      if (cleanPhone.startsWith('+44')) {
+        normalizedPhone = '0' + cleanPhone.substring(3)
+      } else if (cleanPhone.startsWith('44')) {
+        normalizedPhone = '0' + cleanPhone.substring(2)
+      }
+      
+      if (normalizedPhone.length !== 11) {
+        alert('Please enter a valid UK phone number (11 digits)')
+        return
+      }
+    }
+
+    if (isForeignNumber && !customerEmail.trim()) {
+      alert('Foreign phone numbers cannot receive SMS. Please provide an email address for updates.')
       return
     }
 
@@ -181,11 +206,47 @@ function CustomerConfirmContent() {
                     onChange={(e) => {
                       const phone = e.target.value
                       setCustomerPhone(phone)
-                      // Check if it's a UK landline (starts with 01, 02, or 03)
-                      const cleanPhone = phone.replace(/\s/g, '')
-                      const isLandlineNumber = /^(01|02|03)/.test(cleanPhone)
-                      setIsLandline(isLandlineNumber)
-                      if (!isLandlineNumber) {
+                      setPhoneError('')
+                      
+                      // Clean phone number (remove spaces, dashes, etc.)
+                      const cleanPhone = phone.replace(/[\s\-()]/g, '')
+                      
+                      // Check if it's a UK number
+                      const isUKNumber = /^(0|\+44|44)/.test(cleanPhone)
+                      
+                      if (cleanPhone.length > 0) {
+                        if (!isUKNumber) {
+                          // Foreign number detected
+                          setIsForeignNumber(true)
+                          setIsLandline(false)
+                          setLandlineAccepted(false)
+                        } else {
+                          setIsForeignNumber(false)
+                          
+                          // Normalize to standard format (remove +44 or 44, add 0)
+                          let normalizedPhone = cleanPhone
+                          if (cleanPhone.startsWith('+44')) {
+                            normalizedPhone = '0' + cleanPhone.substring(3)
+                          } else if (cleanPhone.startsWith('44')) {
+                            normalizedPhone = '0' + cleanPhone.substring(2)
+                          }
+                          
+                          // Check if it's a UK landline (starts with 01, 02, or 03)
+                          const isLandlineNumber = /^0[123]/.test(normalizedPhone)
+                          setIsLandline(isLandlineNumber)
+                          
+                          if (!isLandlineNumber) {
+                            setLandlineAccepted(false)
+                          }
+                          
+                          // Validate UK number length (should be 11 digits)
+                          if (normalizedPhone.length > 0 && normalizedPhone.length !== 11) {
+                            setPhoneError('UK phone numbers must be 11 digits')
+                          }
+                        }
+                      } else {
+                        setIsForeignNumber(false)
+                        setIsLandline(false)
                         setLandlineAccepted(false)
                       }
                     }}
@@ -198,6 +259,19 @@ function CustomerConfirmContent() {
                     className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="07410 123 456"
                   />
+                  {phoneError && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">{phoneError}</p>
+                  )}
+                  {isForeignNumber && (
+                    <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
+                      <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-2">
+                        Foreign Number Detected
+                      </p>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        We only send SMS updates to UK numbers. Please provide an email address to receive repair updates.
+                      </p>
+                    </div>
+                  )}
                   {isLandline && (
                     <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
                       <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-2">
@@ -223,7 +297,7 @@ function CustomerConfirmContent() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Email (Optional)
+                    Email {isForeignNumber && '*'}{!isForeignNumber && '(Optional)'}
                   </label>
                   <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-3">
                     <p className="text-xs text-blue-900 dark:text-blue-100">
@@ -459,50 +533,30 @@ function CustomerConfirmContent() {
                     </div>
                   )}
 
-                  {/* Repair Agreement Summary */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
-                    <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-3">
-                      Repair Agreement (Summary)
+                  {/* Combined Terms & Repair Agreement */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                    <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-2 text-sm">
+                      Repair Agreement
                     </h5>
-                    <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100 mb-4">
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Diagnostic work may incur a minimum charge even if the device is not repaired.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Additional issues may be identified during diagnosis or repair and will be discussed before further work is carried out.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Please ensure important data is backed up where possible before repair.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Devices supplied without passcodes may receive limited testing after repair.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Replacement parts may affect any remaining manufacturer warranty.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                        <span>Devices not collected within a reasonable period may incur storage fees.</span>
-                      </li>
-                    </ul>
+                    <p className="text-xs text-blue-900 dark:text-blue-100 mb-3 leading-relaxed">
+                      Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.
+                    </p>
                     
-                    {/* Repair Agreement Checkbox */}
+                    {/* Single Combined Checkbox */}
                     <label className={`flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-all mb-3 ${
                       shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
                     }`}>
                       <input
                         type="checkbox"
                         checked={repairAgreementAccepted}
-                        onChange={(e) => setRepairAgreementAccepted(e.target.checked)}
+                        onChange={(e) => {
+                          setRepairAgreementAccepted(e.target.checked)
+                          setTermsAccepted(e.target.checked)
+                        }}
                         className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
                       />
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        I agree to the repair terms
+                        I agree to the repair terms and conditions
                       </span>
                     </label>
                     
@@ -518,21 +572,6 @@ function CustomerConfirmContent() {
                       </a>
                     </div>
                   </div>
-
-                  {/* Terms Acceptance */}
-                  <label className={`flex items-start space-x-3 cursor-pointer p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all ${
-                    shakeTerms ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
-                    />
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                      I understand and accept the diagnostic fee policy and terms & conditions
-                    </span>
-                  </label>
                   {shakeTerms && (
                     <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-semibold animate-pulse">
                       Please accept the terms to continue
