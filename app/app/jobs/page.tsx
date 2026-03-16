@@ -134,7 +134,6 @@ export default function JobsListPage() {
   const statusOptions: (JobStatus | 'ALL')[] = [
     'ALL',
     'QUOTE_APPROVED',
-    'DROPPED_OFF',
     'RECEIVED',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
@@ -214,7 +213,6 @@ export default function JobsListPage() {
           >
             <span>Filter: {statusFilter === 'ALL' ? 'All Jobs' : 
               statusFilter === 'QUOTE_APPROVED' ? 'Approved' :
-              statusFilter === 'DROPPED_OFF' ? 'Dropped Off' :
               statusFilter === 'AWAITING_DEPOSIT' ? 'Deposit' :
               statusFilter === 'PARTS_ORDERED' ? 'Parts' :
               statusFilter === 'PARTS_ARRIVED' ? 'Parts Arrived' :
@@ -257,7 +255,6 @@ export default function JobsListPage() {
                   >
                     {status === 'ALL' ? 'All Jobs' : 
                       status === 'QUOTE_APPROVED' ? 'Approved' :
-                      status === 'DROPPED_OFF' ? 'Dropped Off' :
                       status === 'AWAITING_DEPOSIT' ? 'Deposit' :
                       status === 'PARTS_ORDERED' ? 'Parts' :
                       status === 'PARTS_ARRIVED' ? 'Parts Arrived' :
@@ -305,7 +302,6 @@ export default function JobsListPage() {
                   <div className="text-center mb-2">
                     <p className="font-black text-xs leading-tight uppercase tracking-wide">
                       {job.status === 'QUOTE_APPROVED' ? 'Approved' :
-                       job.status === 'DROPPED_OFF' ? 'Dropped' :
                        job.status === 'AWAITING_DEPOSIT' ? 'Deposit' :
                        job.status === 'PARTS_ORDERED' ? 'Parts' :
                        job.status === 'PARTS_ARRIVED' ? 'Arrived' :

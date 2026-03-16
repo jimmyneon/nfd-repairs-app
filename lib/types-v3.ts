@@ -2,7 +2,6 @@
 
 export type JobStatus =
   | 'QUOTE_APPROVED'
-  | 'DROPPED_OFF'
   | 'RECEIVED'
   | 'AWAITING_DEPOSIT'
   | 'PARTS_ORDERED'
@@ -47,6 +46,12 @@ export interface Job {
   quoted_price?: number | null
   price_total: number
   quoted_at?: string | null
+  
+  // Status reasons
+  delay_reason?: string | null
+  delay_notes?: string | null
+  cancellation_reason?: string | null
+  cancellation_notes?: string | null
   
   // Parts & deposit
   requires_parts_order: boolean

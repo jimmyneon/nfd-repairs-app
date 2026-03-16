@@ -17,7 +17,6 @@ export default function StatusSelectorModal({
 }: StatusSelectorModalProps) {
   const statuses: JobStatus[] = [
     'QUOTE_APPROVED',
-    'DROPPED_OFF',
     'RECEIVED',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
@@ -33,7 +32,6 @@ export default function StatusSelectorModal({
   const getStatusColor = (status: JobStatus) => {
     const colors: Record<JobStatus, string> = {
       QUOTE_APPROVED: 'bg-cyan-600 hover:bg-cyan-700',
-      DROPPED_OFF: 'bg-blue-600 hover:bg-blue-700',
       RECEIVED: 'bg-blue-700 hover:bg-blue-800',
       AWAITING_DEPOSIT: 'bg-yellow-500 hover:bg-yellow-600',
       PARTS_ORDERED: 'bg-purple-600 hover:bg-purple-700',

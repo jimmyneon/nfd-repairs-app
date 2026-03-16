@@ -66,7 +66,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const loadJob = async () => {
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source')
       .eq('tracking_token', params.token)
       .single()
 
@@ -98,7 +98,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const getNextStepMessage = (status: string): string => {
     const messages: Record<string, string> = {
       QUOTE_APPROVED: 'Your repair quote has been approved! Please drop off your device at our shop.',
-      DROPPED_OFF: 'We have received your device and will begin the repair process.',
       RECEIVED: 'We have received your device and will assess it shortly.',
       AWAITING_DEPOSIT: 'We need a deposit to order parts. Check your SMS for payment details.',
       PARTS_ORDERED: 'Parts have been ordered. We\'ll notify you when they arrive.',
@@ -114,39 +113,36 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   }
 
   // Determine status flow based on job source and parts requirement
-  // API/Responder jobs start with QUOTE_APPROVED, manual jobs start with RECEIVED
-  const isApiJob = job.source !== 'staff_manual'
+  // Build dynamic status progression based on actual job data
+  const buildStatusSteps = () => {
+    const steps: string[] = []
+    
+    // API/Responder jobs start with QUOTE_APPROVED (customer needs to drop off)
+    // Manual jobs start with RECEIVED (device already in shop)
+    if (job.source !== 'staff_manual') {
+      steps.push('QUOTE_APPROVED')
+    }
+    
+    // All jobs go through RECEIVED when device is in shop
+    steps.push('RECEIVED')
+    
+    // Only show parts-related steps if parts are actually required
+    if (job.parts_required || job.deposit_required) {
+      steps.push('AWAITING_DEPOSIT')
+      steps.push('PARTS_ORDERED')
+      steps.push('PARTS_ARRIVED')
+    }
+    
+    // All jobs go through these final steps
+    steps.push('IN_REPAIR')
+    steps.push('READY_TO_COLLECT')
+    steps.push('COLLECTED')
+    steps.push('COMPLETED')
+    
+    return steps
+  }
   
-  const apiJobSteps = [
-    'QUOTE_APPROVED',
-    'DROPPED_OFF',
-    'AWAITING_DEPOSIT',
-    'PARTS_ORDERED',
-    'PARTS_ARRIVED',
-    'IN_REPAIR',
-    'READY_TO_COLLECT',
-    'COLLECTED',
-    'COMPLETED',
-  ]
-  
-  const manualJobSteps = [
-    'RECEIVED',
-    'AWAITING_DEPOSIT',
-    'PARTS_ORDERED',
-    'PARTS_ARRIVED',
-    'IN_REPAIR',
-    'READY_TO_COLLECT',
-    'COLLECTED',
-    'COMPLETED',
-  ]
-  
-  // Select base steps based on job source
-  const baseSteps = isApiJob ? apiJobSteps : manualJobSteps
-  
-  // Remove parts-related statuses if parts not required
-  const statusSteps = job.parts_required || job.deposit_required
-    ? baseSteps
-    : baseSteps.filter(s => !['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(s))
+  const statusSteps = buildStatusSteps()
 
   const currentStepIndex = statusSteps.indexOf(job.status)
 

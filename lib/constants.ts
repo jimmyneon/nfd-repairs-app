@@ -2,7 +2,6 @@ import { JobStatus } from './types-v3'
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'Quote Approved',
-  DROPPED_OFF: 'Dropped Off',
   RECEIVED: 'Received',
   AWAITING_DEPOSIT: 'Awaiting Deposit',
   PARTS_ORDERED: 'Parts Ordered',
@@ -17,7 +16,6 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
 
 export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'bg-cyan-600 text-white !text-white',
-  DROPPED_OFF: 'bg-blue-600 text-white !text-white',
   RECEIVED: 'bg-blue-700 text-white !text-white',
   AWAITING_DEPOSIT: 'bg-yellow-500 text-white !text-white',
   PARTS_ORDERED: 'bg-purple-600 text-white !text-white',
@@ -32,7 +30,6 @@ export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
 
 export const JOB_STATUS_BORDER_COLORS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'border-cyan-500',
-  DROPPED_OFF: 'border-blue-500',
   RECEIVED: 'border-blue-700',
   AWAITING_DEPOSIT: 'border-yellow-500',
   PARTS_ORDERED: 'border-purple-500',

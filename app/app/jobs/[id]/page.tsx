@@ -102,7 +102,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const updateData: any = { status: pendingWorkflowStatus }
     
     // Set device_in_shop based on status transition
-    if (pendingWorkflowStatus === 'DROPPED_OFF') {
+    if (pendingWorkflowStatus === 'RECEIVED') {
       updateData.device_in_shop = true  // Device now in shop
     } else if (pendingWorkflowStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
@@ -178,7 +178,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const updateData: any = { status: newStatus }
     
     // Set device_in_shop based on status transition
-    if (newStatus === 'DROPPED_OFF') {
+    if (newStatus === 'RECEIVED') {
       updateData.device_in_shop = true  // Device now in shop
     } else if (newStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
@@ -441,33 +441,33 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             
             {job.status === 'QUOTE_APPROVED' && (
               <button
-                onClick={() => handleWorkflowStatusChange('DROPPED_OFF')}
+                onClick={() => handleWorkflowStatusChange('RECEIVED')}
                 disabled={actionLoading}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
-                <CheckCircle className="h-8 w-8" />
-                <span>Device Dropped Off</span>
+                <CheckCircle className="h-7 w-7" />
+                <span>Mark as Received</span>
               </button>
             )}
             
-            {job.status === 'DROPPED_OFF' && !job.parts_required && (
+            {job.status === 'RECEIVED' && !job.parts_required && (
               <button
                 onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                 disabled={actionLoading}
                 className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
-                <Wrench className="h-8 w-8" />
+                <Wrench className="h-7 w-7" />
                 <span>Start Repair</span>
               </button>
             )}
             
-            {job.status === 'DROPPED_OFF' && job.parts_required && (
+            {job.status === 'RECEIVED' && job.parts_required && (
               <button
                 onClick={() => handleWorkflowStatusChange('AWAITING_DEPOSIT')}
                 disabled={actionLoading}
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
               >
-                <DollarSign className="h-8 w-8" />
+                <Coins className="h-7 w-7" />
                 <span>Request Deposit</span>
               </button>
             )}
