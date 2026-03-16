@@ -85,7 +85,15 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
               .then(res => res.json())
               .then(data => {
                 if (data.job_id) {
-                  router.push(`/app/jobs/${data.job_id}`)
+                  // Check if job is READY_TO_COLLECT - show confirmation modal
+                  if (data.status === 'READY_TO_COLLECT') {
+                    // Pass job data to parent for collection confirmation
+                    onScan(data.job_id)
+                    router.push(`/app/jobs/${data.job_id}?collect=true`)
+                  } else {
+                    // Just open the job page normally
+                    router.push(`/app/jobs/${data.job_id}`)
+                  }
                 } else {
                   // Fallback to customer page if lookup fails
                   router.push(`/t/${token}`)
