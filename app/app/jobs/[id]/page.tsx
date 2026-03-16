@@ -242,24 +242,24 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       } catch (error) {
         console.error('Error queueing notifications:', error)
       }
+
+      // Send email notification
+      if (job.customer_email) {
+        try {
+          await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: job.id,
+              type: 'STATUS_UPDATE',
+            }),
+          })
+        } catch (error) {
+          console.error('Failed to send email:', error)
+        }
+      }
     } else {
       console.log('⏭️ Skipping notifications as requested')
-    }
-
-    // Send email notification
-    if (job.customer_email) {
-      try {
-        await fetch('/api/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId: job.id,
-            type: 'STATUS_UPDATE',
-          }),
-        })
-      } catch (error) {
-        console.error('Failed to send email:', error)
-      }
     }
 
     await loadJobData()
@@ -452,17 +452,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           )}
           <div className="space-y-4">
-            {job.status === 'RECEIVED' && (
-              <button
-                onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
-                disabled={actionLoading || !job.onboarding_completed}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <Wrench className="h-8 w-8" />
-                <span>Start Repair</span>
-              </button>
-            )}
-            
             {job.status === 'QUOTE_APPROVED' && (
               <button
                 onClick={() => handleWorkflowStatusChange('RECEIVED')}
