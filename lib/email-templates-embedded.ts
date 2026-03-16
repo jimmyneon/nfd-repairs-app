@@ -117,59 +117,45 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8f9fa;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; padding: 20px;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 20px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 600px;">
           
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #009B4D 0%, #007A3D 100%); padding: 40px 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; font-family: 'Poppins', sans-serif;">New Forest Device Repairs</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px; font-weight: 300;">Professional Device Repair Services</p>
+            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">New Forest Device Repairs</h1>
+              <p style="color: #e0e7ff; margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? 'We\'ve got your repair' : 'Quick update on your repair'}</p>
             </td>
           </tr>
 
           <!-- Main Content -->
           <tr>
-            <td style="padding: 40px 30px;">
-              <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 24px;">Hi ${job.customer_name},</h2>
+            <td style="padding: 30px;">
+              <h2 style="color: #111827; margin: 0 0 20px 0; font-size: 24px;">
+                ${type === 'JOB_CREATED' ? 'Thanks for choosing us!' : 'Here\'s what\'s happening'}
+              </h2>
               
-              ${type === 'JOB_CREATED' ? `
-                <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                  Thank you for choosing New Forest Device Repairs! We've received your <strong>${job.device_make} ${job.device_model}</strong> and created a repair job for you.
-                </p>
-              ` : `
-                <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                  Your <strong>${job.device_make} ${job.device_model}</strong> repair has been updated.
-                </p>
-                ${statusMessage ? `
-                  <div style="background-color: #E8F5E9; border-left: 4px solid #009B4D; padding: 15px; margin: 20px 0; border-radius: 4px;">
-                    <p style="color: #1B5E20; margin: 0; font-size: 15px; line-height: 1.5;">
-                      ${statusMessage}
-                    </p>
-                  </div>
-                ` : ''}
-              `}
+              ${statusMessage ? `
+              <p style="color: #4B5563; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                ${statusMessage}
+              </p>
+              ` : ''}
 
-              <!-- Embedded Job Tracking -->
               ${embeddedTracking}
 
-              ${job.deposit_required && !job.deposit_received && depositUrl ? `
-                <!-- Deposit Alert -->
-                <div style="background-color: #FFF3CD; border-left: 4px solid #F59E0B; padding: 20px; margin: 20px 0; border-radius: 4px;">
-                  <h3 style="color: #856404; margin: 0 0 10px 0; font-size: 18px;">💳 Deposit Required</h3>
-                  <p style="color: #856404; margin: 0 0 15px 0; font-size: 15px;">
-                    We need a <strong>£${job.deposit_amount?.toFixed(2) || '20.00'}</strong> deposit to order the parts for your repair.
-                  </p>
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td align="center">
-                        <a href="${depositUrl}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">Pay Deposit Now</a>
-                      </td>
-                    </tr>
-                  </table>
+              ${depositUrl && job.deposit_required && !job.deposit_received ? `
+              <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                <p style="color: #92400E; margin: 0 0 10px 0; font-weight: bold;">Quick heads up</p>
+                <p style="color: #78350F; margin: 0 0 15px 0; font-size: 14px;">
+                  We need a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order the parts for your repair.
+                </p>
+                <a href="${depositUrl}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">
+                  Pay Deposit
+                </a>
+              </div>
                 </div>
               ` : ''}
 

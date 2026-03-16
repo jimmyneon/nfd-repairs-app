@@ -14,7 +14,7 @@ Complete booking:
 Deposit: £{deposit_amount}
 
 New Forest Device Repairs'
-WHERE template_key = 'ONBOARDING_WITH_DEPOSIT';
+WHERE key = 'ONBOARDING_WITH_DEPOSIT';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
