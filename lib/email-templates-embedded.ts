@@ -10,6 +10,11 @@ export interface EmbeddedEmailData {
 export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CREATED' | 'STATUS_UPDATE'): { subject: string; html: string; text: string } {
   const { job, trackingUrl, depositUrl, statusMessage } = data
 
+  // Generate QR code for READY_TO_COLLECT status
+  const qrCodeUrl = job.status === 'READY_TO_COLLECT' 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(trackingUrl)}`
+    : null
+
   const statusLabels: Record<string, string> = {
     QUOTE_APPROVED: 'Quote Approved',
     DROPPED_OFF: 'Dropped Off',
@@ -125,9 +130,9 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+            <td style="background: linear-gradient(135deg, #009B4D 0%, #007A3D 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">New Forest Device Repairs</h1>
-              <p style="color: #e0e7ff; margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? 'We\'ve got your repair' : 'Quick update on your repair'}</p>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? 'We\'ve got your repair' : 'Quick update on your repair'}</p>
             </td>
           </tr>
 
@@ -146,6 +151,20 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
 
               ${embeddedTracking}
 
+              ${qrCodeUrl ? `
+              <!-- QR Code for Ready to Collect -->
+              <div style="background-color: #F0FDF4; border: 2px solid #009B4D; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                <h3 style="color: #009B4D; margin: 0 0 15px 0; font-size: 18px;">📱 Quick Access QR Code</h3>
+                <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">
+                  Scan this QR code with your phone to quickly access your tracking page
+                </p>
+                <img src="${qrCodeUrl}" alt="Tracking QR Code" style="width: 200px; height: 200px; border: 2px solid #009B4D; border-radius: 8px;" />
+                <p style="color: #6B7280; margin: 15px 0 0 0; font-size: 12px;">
+                  Or use the button below to view your tracking page
+                </p>
+              </div>
+              ` : ''}
+
               ${depositUrl && job.deposit_required && !job.deposit_received ? `
               <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px;">
                 <p style="color: #92400E; margin: 0 0 10px 0; font-weight: bold;">Quick heads up</p>
@@ -156,7 +175,6 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                   Pay Deposit
                 </a>
               </div>
-                </div>
               ` : ''}
 
               <!-- Action Buttons -->

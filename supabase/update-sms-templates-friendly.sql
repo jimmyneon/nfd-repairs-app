@@ -44,12 +44,13 @@ WHERE key = 'PARTS_ORDERED';
 
 -- RECEIVED template - now dynamic based on whether customer has email
 -- This replaces both RECEIVED and READY_TO_BOOK_IN
+-- Note: The code will append email notification info if customer has email
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
 
 Your {device_make} {device_model} has been booked in at New Forest Device Repairs.
 
-We''ll take a look shortly and update you.
+We''ll assess it and keep you updated.
 
 Track progress:
 {tracking_link}'
