@@ -103,7 +103,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       PARTS_ORDERED: 'Parts have been ordered. We\'ll notify you when they arrive.',
       PARTS_ARRIVED: 'Parts have arrived! We\'re ready to start your repair.',
       IN_REPAIR: 'Your device is currently being repaired by our technicians.',
-      READY_TO_COLLECT: `Your device is ready! Visit us at ${SHOP_INFO.address} during ${SHOP_INFO.opening_times}.`,
+      READY_TO_COLLECT: 'Your device is ready for collection!',
       COLLECTED: 'You have collected your device. Thank you!',
       COMPLETED: 'Your repair is complete. Thank you for choosing New Forest Device Repairs!',
       CANCELLED: 'This repair has been cancelled. Please contact us if you have questions.',
@@ -187,6 +187,22 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
             <p className="text-sm md:text-base text-gray-800 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
           </div>
+          
+          {/* Show directions link for READY_TO_COLLECT status */}
+          {job.status === 'READY_TO_COLLECT' && (
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95 mt-4"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <MapPin className="h-5 w-5" />
+                <span>Get Directions & Opening Hours</span>
+              </div>
+              <p className="text-xs text-white/80 mt-1">{SHOP_INFO.opening_times}</p>
+            </a>
+          )}
         </div>
 
         {/* PRIMARY: Timeline - Third Most Important */}

@@ -48,6 +48,7 @@ export const SHOP_INFO = {
   phone: '07410381247',
   email: 'nfdrepairs@gmail.com',
   opening_times: 'Mon-Fri 9am-5:30pm',
+  google_maps_link: 'https://maps.app.goo.gl/oVczouUePXkRbrKb7',
 }
 
 export const SMS_TEMPLATE_VARIABLES = [
