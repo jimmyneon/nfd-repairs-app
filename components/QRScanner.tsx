@@ -75,10 +75,27 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
           // Extract tracking token from URL or use as job ref
           const url = code.data
           if (url.includes('/t/')) {
-            // It's a tracking URL - extract token and navigate
-            const token = url.split('/t/')[1]
+            // It's a tracking URL - need to get job ID from tracking token
+            // Route to staff job page for collection workflow
+            const token = url.split('/t/')[1].split('?')[0] // Remove any query params
             stopCamera()
-            router.push(`/t/${token}`)
+            
+            // Fetch job ID from tracking token to open staff page
+            fetch(`/api/jobs/get-by-token?token=${token}`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.job_id) {
+                  router.push(`/app/jobs/${data.job_id}`)
+                } else {
+                  // Fallback to customer page if lookup fails
+                  router.push(`/t/${token}`)
+                }
+              })
+              .catch(() => {
+                // Fallback to customer page on error
+                router.push(`/t/${token}`)
+              })
+            
             onClose()
           } else {
             // Treat as job reference
