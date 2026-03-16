@@ -228,7 +228,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 <MapPin className="h-5 w-5" />
                 <span>Get Directions & Opening Hours</span>
               </div>
-              <p className="text-xs text-white/80 mt-1">{SHOP_INFO.opening_times}</p>
             </a>
           )}
         </div>

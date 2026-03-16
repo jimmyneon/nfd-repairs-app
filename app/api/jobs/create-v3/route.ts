@@ -283,6 +283,13 @@ export async function POST(request: NextRequest) {
           .replace('{deposit_link}', depositUrl)
       }
 
+      // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
+      if (templateKey === 'RECEIVED' && jobData.customer_email) {
+        smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
+      } else if (templateKey === 'RECEIVED' && !jobData.customer_email) {
+        smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
+      }
+
       console.log('📝 Creating SMS log...')
       const { data: smsLog, error: smsLogError } = await supabase.from('sms_logs').insert({
         job_id: job.id,
