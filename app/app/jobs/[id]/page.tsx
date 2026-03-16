@@ -179,9 +179,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
 
     // Send email notification
+    console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
     if (job.customer_email) {
       try {
-        await fetch('/api/email/send', {
+        console.log('📧 Calling email API for workflow status change...')
+        const emailResponse = await fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -189,9 +191,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             type: 'STATUS_UPDATE',
           }),
         })
+        const emailResult = await emailResponse.json()
+        console.log('📧 Email API response:', emailResponse.status, emailResult)
       } catch (error) {
-        console.error('Failed to send email:', error)
+        console.error('❌ Failed to send email:', error)
       }
+    } else {
+      console.log('⚠️ No customer email - skipping email notification')
     }
 
     await loadJobData()
