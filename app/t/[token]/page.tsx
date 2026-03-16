@@ -97,19 +97,19 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   const getNextStepMessage = (status: string): string => {
     const messages: Record<string, string> = {
-      QUOTE_APPROVED: 'Your repair quote has been approved! Please drop off your device at our shop.',
-      RECEIVED: 'We have received your device and will assess it shortly.',
-      AWAITING_DEPOSIT: 'We need a deposit to order parts. Check your SMS for payment details.',
-      PARTS_ORDERED: 'Parts have been ordered. We\'ll notify you when they arrive.',
-      PARTS_ARRIVED: 'Parts have arrived! We\'re ready to start your repair.',
-      IN_REPAIR: 'Your device is currently being repaired by our technicians.',
-      READY_TO_COLLECT: 'Your device is ready for collection!',
-      COLLECTED: 'You have collected your device. Thank you!',
-      COMPLETED: 'Your repair is complete. Thank you for choosing New Forest Device Repairs!',
-      CANCELLED: 'This repair has been cancelled. Please contact us if you have questions.',
-      DELAYED: 'Your repair is experiencing a delay. We\'ll contact you with more information.',
+      QUOTE_APPROVED: 'Great! Your quote has been approved. Please bring your device in when it\'s convenient.',
+      RECEIVED: 'We\'ve got your device and will take a look shortly.',
+      AWAITING_DEPOSIT: 'We need a small deposit to order the parts. Check your messages for payment details.',
+      PARTS_ORDERED: 'Parts are on order — we\'ll let you know as soon as they arrive.',
+      PARTS_ARRIVED: 'Good news! The parts have arrived and we\'re ready to get started.',
+      IN_REPAIR: 'Your device is being repaired right now. We\'ll message you when it\'s ready.',
+      READY_TO_COLLECT: 'All done! Your device is ready to collect whenever you\'re free.',
+      COLLECTED: 'Thanks for collecting your device. Hope everything\'s working perfectly!',
+      COMPLETED: 'All finished! Thanks for trusting us with your repair.',
+      CANCELLED: 'This repair has been cancelled. If you have any questions, just give us a shout.',
+      DELAYED: 'There\'s a slight delay with your repair. We\'ll be in touch with more details soon.',
     }
-    return messages[status] || 'We\'ll keep you updated on your repair progress.'
+    return messages[status] || 'We\'ll keep you updated every step of the way.'
   }
 
   // Determine status flow based on job source and parts requirement

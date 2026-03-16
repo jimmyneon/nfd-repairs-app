@@ -123,6 +123,11 @@ export async function POST(request: NextRequest) {
         .replace('{deposit_link}', depositUrl)
     }
 
+    // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
+    if (status === 'RECEIVED' && job.customer_email) {
+      smsBody += '\n\nYou\'ll receive updates by text and email. If you can\'t see our emails please check your junk folder.'
+    }
+
     // POSSESSION-AWARE MESSAGING: Only include maps link if device NOT in shop
     if (job.device_in_shop) {
       // Device already in shop - remove maps link and drop-off instructions
