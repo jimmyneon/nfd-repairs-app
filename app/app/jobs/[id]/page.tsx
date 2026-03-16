@@ -108,9 +108,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setShowStatusModal(true)
   }
 
-  // For workflow status changes - use single confirmation
-  const handleWorkflowStatusChange = (status: JobStatus) => {
+  // For workflow status changes - use single confirmation with notification check
+  const handleWorkflowStatusChange = async (status: JobStatus) => {
     setPendingWorkflowStatus(status)
+    
+    // Check notification config for this status
+    const { data: config } = await supabase
+      .from('notification_config')
+      .select('send_sms, send_email, is_active')
+      .eq('status_key', status)
+      .single()
+    
+    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    setWillSendEmail(config?.send_email && config?.is_active || false)
+    
     setShowSimpleConfirm(true)
   }
 
@@ -600,9 +611,30 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
               <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Status Change</h2>
-              <p className="text-gray-700 mb-6">
+              <p className="text-gray-700 mb-4">
                 Change status to <span className="font-bold text-primary">{JOB_STATUS_LABELS[pendingWorkflowStatus]}</span>?
               </p>
+              
+              {/* Notification Warning */}
+              {(willSendSMS || willSendEmail) && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        {willSendSMS && (
+                          <p>✓ <span className="font-semibold">SMS</span> - Customer will receive a text message</p>
+                        )}
+                        {willSendEmail && (
+                          <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex gap-3">
                 <button
                   onClick={() => {
