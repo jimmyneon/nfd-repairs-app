@@ -152,16 +152,13 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
               ${embeddedTracking}
 
               ${qrCodeUrl ? `
-              <!-- QR Code for Ready to Collect -->
+              <!-- QR Code for Collection -->
               <div style="background-color: #F0FDF4; border: 2px solid #009B4D; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-                <h3 style="color: #009B4D; margin: 0 0 15px 0; font-size: 18px;">📱 Quick Access QR Code</h3>
+                <h3 style="color: #009B4D; margin: 0 0 15px 0; font-size: 18px;">Collection QR Code</h3>
                 <p style="color: #166534; margin: 0 0 15px 0; font-size: 14px;">
-                  Scan this QR code with your phone to quickly access your tracking page
+                  Scan this code when you collect your device to help us find it quickly
                 </p>
-                <img src="${qrCodeUrl}" alt="Tracking QR Code" style="width: 200px; height: 200px; border: 2px solid #009B4D; border-radius: 8px;" />
-                <p style="color: #6B7280; margin: 15px 0 0 0; font-size: 12px;">
-                  Or use the button below to view your tracking page
-                </p>
+                <img src="${qrCodeUrl}" alt="Collection QR Code" style="width: 200px; height: 200px; border: 2px solid #009B4D; border-radius: 8px;" />
               </div>
               ` : ''}
 

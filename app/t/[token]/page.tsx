@@ -61,6 +61,34 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   useEffect(() => {
     loadJob()
+
+    // Set up real-time subscription for job updates
+    const channel = supabase
+      .channel('job-tracking')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `tracking_token=eq.${params.token}`
+        },
+        (payload) => {
+          console.log('Job updated in real-time:', payload)
+          setJob(payload.new)
+        }
+      )
+      .subscribe()
+
+    // Also poll every 30 seconds as backup
+    const interval = setInterval(() => {
+      loadJob()
+    }, 30000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
   }, [params.token])
 
   const loadJob = async () => {
@@ -213,15 +241,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </h2>
           <div className="space-y-4">
             {statusSteps.map((step, index) => {
+              const isCurrent = step === job.status
               const isCompleted = index < currentStepIndex
-              const isCurrent = index === currentStepIndex
-              const isPending = index > currentStepIndex
+              const statusLabel = JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]
 
               return (
                 <div key={step} className="relative">
                   <div className="flex items-center">
                     <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                      isCompleted ? 'bg-green-500 text-white shadow-lg' :
+                      isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
                       isCurrent ? 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110' :
                       'bg-gray-200 text-gray-500 border-2 border-gray-300'
                     }`}>

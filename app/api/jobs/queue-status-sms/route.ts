@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only send SMS for key status changes
-    const smsStatuses = ['QUOTE_APPROVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED', 'CANCELLED', 'DELAYED']
+    const smsStatuses = ['QUOTE_APPROVED', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED', 'CANCELLED', 'DELAYED']
     
     if (!smsStatuses.includes(status)) {
       console.log(`Status ${status} does not trigger SMS notification`)
@@ -125,7 +125,9 @@ export async function POST(request: NextRequest) {
 
     // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
     if (status === 'RECEIVED' && job.customer_email) {
-      smsBody += '\n\nYou\'ll receive updates by text and email. If you can\'t see our emails please check your junk folder.'
+      smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
+    } else if (status === 'RECEIVED' && !job.customer_email) {
+      smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
     }
 
     // POSSESSION-AWARE MESSAGING: Only include maps link if device NOT in shop

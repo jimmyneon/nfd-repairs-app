@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { X, Camera } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import jsQR from 'jsqr'
 
 interface QRScannerProps {
   onClose: () => void
@@ -13,7 +14,9 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
   const [error, setError] = useState<string>('')
   const [scanning, setScanning] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const scanningIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -38,11 +41,10 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
+        
+        // Start scanning for QR codes
+        startScanning()
       }
-
-      // Note: For actual QR scanning, you'd need a library like jsQR or @zxing/library
-      // This is a placeholder that shows the camera
-      setError('Camera ready. QR scanning library needed for full functionality.')
     } catch (err) {
       console.error('Camera error:', err)
       setError('Unable to access camera. Please check permissions.')
@@ -50,7 +52,54 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
     }
   }
 
+  const startScanning = () => {
+    if (!videoRef.current || !canvasRef.current) return
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+
+    if (!ctx) return
+
+    const scan = () => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+        if (code) {
+          console.log('QR Code detected:', code.data)
+          // Extract tracking token from URL or use as job ref
+          const url = code.data
+          if (url.includes('/t/')) {
+            // It's a tracking URL - extract token and navigate
+            const token = url.split('/t/')[1]
+            stopCamera()
+            router.push(`/t/${token}`)
+            onClose()
+          } else {
+            // Treat as job reference
+            onScan(code.data)
+            router.push(`/app/jobs?search=${code.data}`)
+            stopCamera()
+            onClose()
+          }
+        }
+      }
+    }
+
+    // Scan every 100ms
+    scanningIntervalRef.current = setInterval(scan, 100)
+  }
+
   const stopCamera = () => {
+    if (scanningIntervalRef.current) {
+      clearInterval(scanningIntervalRef.current)
+      scanningIntervalRef.current = null
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
@@ -91,6 +140,7 @@ export default function QRScanner({ onClose, onScan }: QRScannerProps) {
           playsInline
           muted
         />
+        <canvas ref={canvasRef} className="hidden" />
 
         {/* Scanning Frame */}
         {scanning && (
