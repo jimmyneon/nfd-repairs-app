@@ -9,9 +9,10 @@ interface StatusChangeModalProps {
   currentStatus: JobStatus
   newStatus: JobStatus
   deviceInfo: string
-  onConfirm: () => void
+  onConfirm: (skipNotifications?: boolean) => void
   onCancel: () => void
   willSendSMS: boolean
+  willSendEmail?: boolean
 }
 
 export default function StatusChangeModal({
@@ -20,10 +21,12 @@ export default function StatusChangeModal({
   deviceInfo,
   onConfirm,
   onCancel,
-  willSendSMS
+  willSendSMS,
+  willSendEmail = false
 }: StatusChangeModalProps) {
   const [step, setStep] = useState<'initial' | 'confirm' | 'final'>('initial')
   const [countdown, setCountdown] = useState(3)
+  const [skipNotifications, setSkipNotifications] = useState(false)
 
   const handleFirstConfirm = () => {
     setStep('confirm')
@@ -38,7 +41,7 @@ export default function StatusChangeModal({
       setCountdown(count)
       if (count === 0) {
         clearInterval(interval)
-        onConfirm()
+        onConfirm(skipNotifications)
       }
     }, 1000)
   }
@@ -81,16 +84,32 @@ export default function StatusChangeModal({
           </div>
         </div>
 
-        {/* SMS Warning */}
-        {willSendSMS && (
+        {/* Notification Warning */}
+        {(willSendSMS || willSendEmail) && (
           <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
             <div className="flex items-start space-x-3">
               <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-bold text-blue-900 mb-1">SMS Will Be Sent</p>
-                <p className="text-xs text-blue-700">
-                  Customer will receive an automated SMS notification about this status change.
-                </p>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
+                <div className="text-xs text-blue-700 space-y-1">
+                  {willSendSMS && (
+                    <p>✓ <span className="font-semibold">SMS</span> - Customer will receive a text message</p>
+                  )}
+                  {willSendEmail && (
+                    <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                  )}
+                </div>
+                <label className="flex items-center mt-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipNotifications}
+                    onChange={(e) => setSkipNotifications(e.target.checked)}
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                  />
+                  <span className="ml-2 text-xs font-semibold text-blue-900">
+                    Skip notifications (do not send SMS/Email)
+                  </span>
+                </label>
               </div>
             </div>
           </div>

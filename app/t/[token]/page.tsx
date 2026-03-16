@@ -137,7 +137,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     steps.push('IN_REPAIR')
     steps.push('READY_TO_COLLECT')
     steps.push('COLLECTED')
-    steps.push('COMPLETED')
+    // COMPLETED is admin-only, not shown to customers
     
     return steps
   }
@@ -218,25 +218,38 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               const isPending = index > currentStepIndex
 
               return (
-                <div key={step} className="flex items-center">
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    isCompleted ? 'bg-primary text-white shadow-md' :
-                    isCurrent ? 'bg-primary text-white shadow-md ring-4 ring-primary/20' :
-                    'bg-gray-200 text-gray-400'
-                  }`}>
-                    {isCompleted ? (
-                      <CheckCircle className="h-6 w-6" />
-                    ) : (
-                      <span className="text-sm font-bold">{index + 1}</span>
-                    )}
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <p className={`font-bold text-base ${
-                      isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                <div key={step} className="relative">
+                  <div className="flex items-center">
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                      isCompleted ? 'bg-green-500 text-white shadow-lg' :
+                      isCurrent ? 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110' :
+                      'bg-gray-200 text-gray-500 border-2 border-gray-300'
                     }`}>
-                      {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                    </p>
+                      {isCompleted ? (
+                        <CheckCircle className="h-7 w-7" />
+                      ) : (
+                        <span className="text-base font-black">{index + 1}</span>
+                      )}
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <p className={`font-bold text-base transition-colors ${
+                        isCompleted ? 'text-green-700' :
+                        isCurrent ? 'text-primary' : 
+                        'text-gray-400'
+                      }`}>
+                        {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                      </p>
+                      {isCurrent && (
+                        <p className="text-xs text-primary/70 font-medium mt-0.5">Current Step</p>
+                      )}
+                    </div>
                   </div>
+                  {/* Connecting line between steps */}
+                  {index < statusSteps.length - 1 && (
+                    <div className={`absolute left-6 top-12 w-0.5 h-4 ${
+                      isCompleted ? 'bg-green-400' : 'bg-gray-300'
+                    }`} />
+                  )}
                 </div>
               )
             })}

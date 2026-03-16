@@ -26,6 +26,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showManualOnboarding, setShowManualOnboarding] = useState(false)
   const [newStatus, setNewStatus] = useState<JobStatus | null>(null)
   const [pendingWorkflowStatus, setPendingWorkflowStatus] = useState<JobStatus | null>(null)
+  const [willSendSMS, setWillSendSMS] = useState(false)
+  const [willSendEmail, setWillSendEmail] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -90,8 +92,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   }
 
   // For manual status changes (from selector modal) - use triple confirmation
-  const handleManualStatusChange = (status: JobStatus) => {
+  const handleManualStatusChange = async (status: JobStatus) => {
     setNewStatus(status)
+    
+    // Check notification config for this status
+    const { data: config } = await supabase
+      .from('notification_config')
+      .select('send_sms, send_email, is_active')
+      .eq('status_key', status)
+      .single()
+    
+    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    setWillSendEmail(config?.send_email && config?.is_active || false)
+    
     setShowStatusModal(true)
   }
 
@@ -175,7 +188,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setPendingWorkflowStatus(null)
   }
 
-  const confirmStatusChange = async () => {
+  const confirmStatusChange = async (skipNotifications?: boolean) => {
     if (!job || !newStatus) return
     setActionLoading(true)
     setShowStatusModal(false)
@@ -210,24 +223,27 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       job_id: job.id,
     } as any)
 
-    // Queue SMS for status change
-    try {
-      console.log('🔔 Queueing SMS for status:', newStatus)
-      const response = await fetch('/api/jobs/queue-status-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId: job.id,
-          status: newStatus,
-        }),
-      })
-      console.log('SMS queue response:', response.status, response.ok)
-      if (!response.ok) {
-        const error = await response.text()
-        console.error('SMS queue failed:', error)
+    // Queue SMS and Email for status change (unless skipped)
+    if (!skipNotifications) {
+      try {
+        console.log('🔔 Queueing notifications for status:', newStatus)
+        const response = await fetch('/api/jobs/queue-status-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            status: newStatus,
+          }),
+        })
+        console.log('Notification queue response:', response.status, response.ok)
+        if (!response.ok) {
+          console.error('Failed to queue notifications')
+        }
+      } catch (error) {
+        console.error('Error queueing notifications:', error)
       }
-    } catch (error) {
-      console.error('Failed to queue status SMS:', error)
+    } else {
+      console.log('⏭️ Skipping notifications as requested')
     }
 
     // Send email notification
@@ -630,7 +646,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               setShowStatusModal(false)
               setNewStatus(null)
             }}
-            willSendSMS={true}
+            willSendSMS={willSendSMS}
+            willSendEmail={willSendEmail}
           />
         )}
 
