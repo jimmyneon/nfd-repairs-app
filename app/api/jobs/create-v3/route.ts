@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       // Customer details
       customer_name: name || customer_name,
       customer_phone: phone || customer_phone,
-      customer_email: email || null,
+      customer_email: email || body.customer_email || null,
       
       // Device details
       device_type: body.device_type || null,

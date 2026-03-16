@@ -27,7 +27,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'DELAY_NOTIFICATION';
+WHERE key = 'DELAY_NOTIFICATION';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -40,7 +40,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'PARTS_ORDERED';
+WHERE key = 'PARTS_ORDERED';
 
 -- RECEIVED template - now dynamic based on whether customer has email
 -- This replaces both RECEIVED and READY_TO_BOOK_IN
@@ -53,7 +53,7 @@ We''ll take a look shortly and update you.
 
 Track progress:
 {tracking_link}'
-WHERE template_key = 'RECEIVED';
+WHERE key = 'RECEIVED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -61,7 +61,7 @@ UPDATE sms_templates SET body =
 Good news — your {device_make} {device_model} is ready to collect from New Forest Device Repairs.
 
 See you when convenient.'
-WHERE template_key = 'READY_TO_COLLECT';
+WHERE key = 'READY_TO_COLLECT';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -71,7 +71,7 @@ Your {device_make} {device_model} repair is complete.
 If you have any issues, please just let us know.
 
 New Forest Device Repairs'
-WHERE template_key = 'COMPLETED';
+WHERE key = 'COMPLETED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -82,7 +82,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'QUOTE_REMINDER';
+WHERE key = 'QUOTE_REMINDER';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -90,7 +90,7 @@ UPDATE sms_templates SET body =
 Thanks for collecting your {device_make} {device_model} from New Forest Device Repairs.
 
 If you need anything else, just let us know.'
-WHERE template_key = 'COLLECTED';
+WHERE key = 'COLLECTED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -103,7 +103,7 @@ Find us:
 {google_maps_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'PARTS_ARRIVED';
+WHERE key = 'PARTS_ARRIVED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -111,7 +111,7 @@ UPDATE sms_templates SET body =
 Your {device_make} {device_model} repair has been cancelled.
 
 If you have any questions please contact New Forest Device Repairs.'
-WHERE template_key = 'CANCELLED';
+WHERE key = 'CANCELLED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -124,7 +124,7 @@ Find us:
 {google_maps_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'QUOTE_APPROVED';
+WHERE key = 'QUOTE_APPROVED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -137,7 +137,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'DEPOSIT_RECEIVED';
+WHERE key = 'DEPOSIT_RECEIVED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -148,7 +148,7 @@ We''ll message when it''s ready.
 
 Track progress:
 {tracking_link}'
-WHERE template_key = 'IN_REPAIR';
+WHERE key = 'IN_REPAIR';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -162,7 +162,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'DEPOSIT_REQUIRED' OR template_key = 'AWAITING_DEPOSIT';
+WHERE key = 'DEPOSIT_REQUIRED' OR key = 'AWAITING_DEPOSIT';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -173,7 +173,7 @@ Please complete booking here:
 {onboarding_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'ONBOARDING_REQUIRED';
+WHERE key = 'ONBOARDING_REQUIRED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},
@@ -187,7 +187,7 @@ Track progress:
 {tracking_link}
 
 New Forest Device Repairs'
-WHERE template_key = 'DELAYED';
+WHERE key = 'DELAYED';
 
 -- Add note about the dynamic RECEIVED message
 -- The SMS sending logic should append this line if customer has email:
