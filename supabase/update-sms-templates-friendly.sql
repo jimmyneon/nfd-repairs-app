@@ -90,13 +90,10 @@ Track progress:
 New Forest Device Repairs'
 WHERE key = 'QUOTE_REMINDER';
 
-UPDATE sms_templates SET body = 
-'Hi {customer_name},
-
-Thanks for collecting your {device_make} {device_model} from New Forest Device Repairs.
-
-If you need anything else, just let us know.'
-WHERE key = 'COLLECTED';
+-- COLLECTED SMS removed - only send email on collection
+-- The delayed post-collection SMS (send-collection-sms) handles the review request
+-- This prevents sending multiple SMS messages on collection
+DELETE FROM sms_templates WHERE key = 'COLLECTED';
 
 UPDATE sms_templates SET body = 
 'Hi {customer_name},

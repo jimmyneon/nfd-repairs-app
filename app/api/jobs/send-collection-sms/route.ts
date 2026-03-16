@@ -58,16 +58,26 @@ export async function POST(request: NextRequest) {
     // Get first name from customer name
     const firstName = job.customer_name.split(' ')[0]
 
-    // Build SMS message (exact template as specified)
-    const smsBody = `Hi ${firstName}, thanks again for choosing New Forest Device Repairs today.
+    // Get warranty form link from settings (optional)
+    const { data: warrantyLinkSetting } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'warranty_form_link')
+      .single()
 
-Your repair is covered by our warranty, so if you notice anything you're unsure about just reply to this message and we'll sort it.
+    const warrantyFormLink = warrantyLinkSetting?.value
 
-If everything's working well, we'd really appreciate a quick review — it helps other local customers know they can rely on us:
+    // Build SMS message
+    let smsBody = `Hi ${firstName}, thanks again for choosing New Forest Device Repairs.
 
-${googleReviewLink}
+Your repair is covered by our warranty. If you notice anything you're unsure about, just reply to this message and we'll sort it.`
 
-Thanks again for supporting a local business.`
+    // Add warranty form link if configured
+    if (warrantyFormLink) {
+      smsBody += `\n\nWarranty claim form:\n${warrantyFormLink}`
+    }
+
+    smsBody += `\n\nIf everything's working well, we'd really appreciate a quick 5-star review — it helps other local customers know they can rely on us:\n\n${googleReviewLink}\n\nThanks for supporting a local business!`
 
     // Send SMS via MacroDroid
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
