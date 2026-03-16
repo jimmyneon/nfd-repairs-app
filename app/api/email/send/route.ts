@@ -45,19 +45,23 @@ export async function POST(request: NextRequest) {
 
     // Check notification config to see if email should be sent for this status
     if (type === 'STATUS_UPDATE') {
+      console.log('🔍 Checking notification config for status:', job.status)
       const { data: config } = await supabase
         .from('notification_config')
         .select('send_email, is_active')
         .eq('status_key', job.status)
         .single()
 
+      console.log('📋 Notification config:', config)
+
       if (config && (!config.send_email || !config.is_active)) {
-        console.log(`Email disabled for status: ${job.status}`)
+        console.log(`⚠️ Email disabled for status: ${job.status}`)
         return NextResponse.json({ 
           success: true, 
           message: `Email notifications disabled for ${job.status}` 
         })
       }
+      console.log('✓ Email enabled for this status')
     }
 
     const appUrl = 'https://nfd-repairs-app.vercel.app'
@@ -90,7 +94,8 @@ export async function POST(request: NextRequest) {
     )
 
     // Log email attempt
-    const { data: emailLog } = await supabase
+    console.log('📝 Creating email log entry...')
+    const { data: emailLog, error: logError } = await supabase
       .from('email_logs')
       .insert({
         job_id: jobId,
@@ -104,12 +109,20 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+    if (logError) {
+      console.error('❌ Failed to create email log:', logError)
+    } else {
+      console.log('✓ Email log created:', emailLog?.id)
+    }
+
+    console.log('📤 Calling sendEmail function...')
     const result = await sendEmail(
       job.customer_email,
       emailTemplate.subject,
       emailTemplate.html,
       emailTemplate.text
     )
+    console.log('📬 sendEmail result:', result)
 
     if (result.success) {
       // Update email log as sent
@@ -153,10 +166,6 @@ export async function POST(request: NextRequest) {
     console.error('Error in email send:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
       { status: 500 }
     )
   }
