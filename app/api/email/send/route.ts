@@ -85,6 +85,21 @@ export async function POST(request: NextRequest) {
       type as 'JOB_CREATED' | 'STATUS_UPDATE'
     )
 
+    // Log email attempt
+    const { data: emailLog } = await supabase
+      .from('email_logs')
+      .insert({
+        job_id: jobId,
+        template_key: type,
+        subject: emailTemplate.subject,
+        body_html: emailTemplate.html,
+        body_text: emailTemplate.text,
+        recipient_email: job.customer_email,
+        status: 'PENDING',
+      })
+      .select()
+      .single()
+
     const result = await sendEmail(
       job.customer_email,
       emailTemplate.subject,
@@ -93,6 +108,18 @@ export async function POST(request: NextRequest) {
     )
 
     if (result.success) {
+      // Update email log as sent
+      if (emailLog) {
+        await supabase
+          .from('email_logs')
+          .update({
+            status: 'SENT',
+            sent_at: new Date().toISOString(),
+            resend_id: result.data?.id || null,
+          })
+          .eq('id', emailLog.id)
+      }
+
       await supabase.from('job_events').insert({
         job_id: jobId,
         type: 'SYSTEM',
@@ -101,6 +128,17 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true })
     } else {
+      // Update email log as failed
+      if (emailLog) {
+        await supabase
+          .from('email_logs')
+          .update({
+            status: 'FAILED',
+            error_message: JSON.stringify(result.error),
+          })
+          .eq('id', emailLog.id)
+      }
+
       console.error('Failed to send email:', result.error)
       return NextResponse.json(
         { error: 'Failed to send email', details: result.error },

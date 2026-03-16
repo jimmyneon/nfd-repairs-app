@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Job, JobEvent, SMSLog, JobStatus } from '@/lib/types-v3'
+import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
 import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit } from 'lucide-react'
 import Link from 'next/link'
@@ -17,6 +17,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
   const [events, setEvents] = useState<JobEvent[]>([])
   const [smsLogs, setSmsLogs] = useState<SMSLog[]>([])
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
@@ -75,9 +76,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('job_id', params.id)
       .order('created_at', { ascending: false })
 
+    const { data: emailData } = await supabase
+      .from('email_logs')
+      .select('*')
+      .eq('job_id', params.id)
+      .order('created_at', { ascending: false })
+
     if (jobData) setJob(jobData)
     if (eventsData) setEvents(eventsData)
     if (smsData) setSmsLogs(smsData)
+    if (emailData) setEmailLogs(emailData)
     setLoading(false)
   }
 
@@ -639,6 +647,36 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             ))}
           </div>
         </div>
+
+        {emailLogs.length > 0 && (
+          <div className="card">
+            <h2 className="font-semibold text-gray-900 mb-3">Email History</h2>
+            <div className="space-y-2">
+              {emailLogs.map((email) => (
+                <div key={email.id} className="bg-gray-50 rounded p-2 text-sm overflow-hidden">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-gray-700">{email.template_key}</span>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      email.status === 'SENT' ? 'bg-green-100 text-green-800' :
+                      email.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {email.status}
+                    </span>
+                  </div>
+                  <p className="text-gray-700 font-medium text-xs mb-1">{email.subject}</p>
+                  <p className="text-gray-600 text-xs">To: {email.recipient_email}</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    {new Date(email.created_at).toLocaleString('en-GB')}
+                  </p>
+                  {email.error_message && (
+                    <p className="text-red-600 text-xs mt-1">Error: {email.error_message}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {smsLogs.length > 0 && (
           <div className="card">

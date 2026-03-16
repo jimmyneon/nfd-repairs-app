@@ -104,6 +104,21 @@ export interface SMSLog {
   created_at: string
 }
 
+export interface EmailLog {
+  id: string
+  job_id: string
+  template_key?: string | null
+  subject: string
+  body_html: string
+  body_text?: string | null
+  recipient_email: string
+  status: 'PENDING' | 'SENT' | 'FAILED'
+  sent_at?: string | null
+  error_message?: string | null
+  resend_id?: string | null
+  created_at: string
+}
+
 export interface Notification {
   id: string
   type: string
