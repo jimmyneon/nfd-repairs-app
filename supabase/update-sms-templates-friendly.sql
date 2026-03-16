@@ -61,8 +61,6 @@ UPDATE sms_templates SET body =
 
 Good news - your {device_make} {device_model} is ready to collect from New Forest Device Repairs.
 
-We''re open Mon-Fri 9am-5:30pm.
-
 Find us:
 {google_maps_link}
 
