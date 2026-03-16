@@ -27,17 +27,21 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (jobError || !job) {
+      console.log('❌ Job not found:', jobError)
       return NextResponse.json(
         { error: 'Job not found' },
         { status: 404 }
       )
     }
+    console.log('✓ Job found:', job.job_ref, 'Status:', job.status)
 
     if (!job.customer_email) {
+      console.log('⚠️ No customer email on job')
       return NextResponse.json(
         { success: true, message: 'No email address on file' }
       )
     }
+    console.log('✓ Customer email:', job.customer_email)
 
     // Check notification config to see if email should be sent for this status
     if (type === 'STATUS_UPDATE') {
@@ -149,6 +153,10 @@ export async function POST(request: NextRequest) {
     console.error('Error in email send:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
       { status: 500 }
     )
   }

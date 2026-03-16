@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit } from 'lucide-react'
+import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -257,7 +257,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       // Send email notification
       if (job.customer_email) {
         try {
-          await fetch('/api/email/send', {
+          console.log('📧 Calling email API for job:', job.job_ref, 'email:', job.customer_email)
+          const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -265,9 +266,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               type: 'STATUS_UPDATE',
             }),
           })
+          const emailResult = await emailResponse.json()
+          console.log('📧 Email API response:', emailResponse.status, emailResult)
         } catch (error) {
-          console.error('Failed to send email:', error)
+          console.error('❌ Failed to send email:', error)
         }
+      } else {
+        console.log('⚠️ No customer email on job:', job.job_ref)
       }
     } else {
       console.log('⏭️ Skipping notifications as requested')
