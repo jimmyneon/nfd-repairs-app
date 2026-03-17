@@ -13,6 +13,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [showQRCode, setShowQRCode] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [showStatusInfo, setShowStatusInfo] = useState(false)
+  const [statusChangedAt, setStatusChangedAt] = useState<Date | null>(null)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -112,12 +114,28 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     if (data) {
       setJob(data)
       setLastUpdated(new Date())
+      
+      // Get most recent status change event
+      const { data: events } = await supabase
+        .from('job_events')
+        .select('created_at')
+        .eq('job_id', data.id)
+        .eq('type', 'STATUS_CHANGE')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      
+      if (events && events.length > 0) {
+        setStatusChangedAt(new Date(events[0].created_at))
+      } else {
+        // If no status change events, use job creation date
+        setStatusChangedAt(new Date(data.created_at))
+      }
     }
     setLoading(false)
     
     if (showSpinner) {
-      // Keep spinner visible for at least 500ms for visual feedback
-      setTimeout(() => setIsRefreshing(false), 500)
+      // Keep spinner visible for at least 800ms for visual feedback
+      setTimeout(() => setIsRefreshing(false), 800)
     }
   }
 
@@ -140,6 +158,44 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       hour: '2-digit', 
       minute: '2-digit'
     })
+  }
+
+  const formatTimeSince = (date: Date | null) => {
+    if (!date) return 'Unknown'
+    
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 1000 / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+    
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
+    if (diffDays === 1) return '1 day ago'
+    return `${diffDays} days ago`
+  }
+
+  const getStatusExpectation = (status: string, timeInStatus: number) => {
+    // timeInStatus in hours
+    const expectations: Record<string, { typical: number; message: string; urgentMessage: string }> = {
+      QUOTE_APPROVED: { typical: 48, message: 'Waiting for you to drop off your device', urgentMessage: 'Please bring your device in when convenient' },
+      RECEIVED: { typical: 24, message: 'We\'re assessing your device and will update you soon', urgentMessage: 'Assessment in progress - update coming soon' },
+      AWAITING_DEPOSIT: { typical: 48, message: 'Waiting for deposit payment to order parts', urgentMessage: 'Please pay deposit so we can order parts' },
+      PARTS_ORDERED: { typical: 72, message: 'Parts typically arrive within 2-3 days', urgentMessage: 'Parts should arrive soon' },
+      PARTS_ARRIVED: { typical: 12, message: 'Parts have arrived, repair will begin shortly', urgentMessage: 'Ready to start repair' },
+      IN_REPAIR: { typical: 48, message: 'Repair in progress - typical time is 1-2 days', urgentMessage: 'Complex repair in progress' },
+      READY_TO_COLLECT: { typical: 168, message: 'Your device is ready! Collect at your convenience', urgentMessage: 'Ready for collection' },
+      COLLECTED: { typical: 0, message: 'Thanks for collecting your device!', urgentMessage: 'Completed' },
+      COMPLETED: { typical: 0, message: 'Repair completed successfully', urgentMessage: 'Completed' },
+    }
+    
+    const expectation = expectations[status]
+    if (!expectation) return null
+    
+    if (timeInStatus > expectation.typical) {
+      return { type: 'urgent', message: expectation.urgentMessage }
+    }
+    return { type: 'normal', message: expectation.message }
   }
 
   if (loading) {
@@ -243,20 +299,20 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         </div>
 
         {/* PRIMARY: Current Status - Second Most Important */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Updated {formatLastUpdated()}
-              </p>
-              <button
-                onClick={handleManualRefresh}
-                disabled={isRefreshing}
-                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-                title="Refresh status"
-              >
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
+          {/* Clickable refresh area */}
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="w-full p-5 md:p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors disabled:cursor-wait"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Updated {formatLastUpdated()}
+                </p>
                 <svg 
                   className={`h-4 w-4 text-gray-500 dark:text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`}
                   fill="none" 
@@ -265,17 +321,108 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-              </button>
+              </div>
             </div>
-          </div>
-          <div className="mb-4">
-            <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
-              {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
+            
+            {/* Refreshing overlay */}
+            {isRefreshing && (
+              <div className="mb-3 flex items-center justify-center gap-2 text-primary animate-pulse">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-sm font-medium">Checking for updates...</span>
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
+                {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
+              </div>
             </div>
-          </div>
-          <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
-            <p className="text-sm md:text-base text-gray-800 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
-          </div>
+            
+            {/* Timeline info */}
+            <div className="flex items-center justify-center gap-4 mb-3 text-xs text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <Package className="h-3 w-3" />
+                Received {formatTimeSince(job.created_at ? new Date(job.created_at) : null)}
+              </span>
+              <span className="text-gray-300 dark:text-gray-600">•</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                In this status {formatTimeSince(statusChangedAt)}
+              </span>
+            </div>
+            
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
+              <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
+            </div>
+          </button>
+          
+          {/* Expandable info section */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowStatusInfo(!showStatusInfo)
+            }}
+            className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+          >
+            <span className="text-sm font-medium text-primary">What does this mean?</span>
+            {showStatusInfo ? (
+              <ChevronUp className="h-4 w-4 text-primary" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-primary" />
+            )}
+          </button>
+          
+          {showStatusInfo && (
+            <div className="px-5 md:px-6 pb-5 pt-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+              <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                {(() => {
+                  const hoursInStatus = statusChangedAt 
+                    ? (new Date().getTime() - statusChangedAt.getTime()) / (1000 * 60 * 60)
+                    : 0
+                  const expectation = getStatusExpectation(job.status, hoursInStatus)
+                  
+                  return (
+                    <>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <p>{expectation?.message || "We're working on your repair and will keep you updated."}</p>
+                      </div>
+                      
+                      {job.status === 'RECEIVED' && hoursInStatus < 48 && (
+                        <div className="flex items-start gap-2">
+                          <Clock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                          <p>Initial assessment typically takes 12-24 hours. You're well within our normal timeframe.</p>
+                        </div>
+                      )}
+                      
+                      {job.status === 'IN_REPAIR' && hoursInStatus < 72 && (
+                        <div className="flex items-start gap-2">
+                          <Clock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                          <p>Most repairs are completed within 1-3 days. Complex repairs may take longer - we'll let you know if there are any delays.</p>
+                        </div>
+                      )}
+                      
+                      {job.status === 'READY_TO_COLLECT' && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                          <p>Your device is ready! Collect at your convenience during our opening hours. Check Google Maps for live opening times.</p>
+                        </div>
+                      )}
+                      
+                      <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <strong>Tip:</strong> This page updates automatically. Click anywhere in the status area to refresh manually.
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
           
           {/* Show directions link for READY_TO_COLLECT status */}
           {job.status === 'READY_TO_COLLECT' && (
