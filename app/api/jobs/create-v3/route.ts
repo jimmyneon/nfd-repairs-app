@@ -205,8 +205,14 @@ export async function POST(request: NextRequest) {
     } else {
       // Normal flow based on source and parts requirement
       if (jobData.deposit_required) {
-        // Parts required - use deposit template regardless of source
-        templateKey = 'DEPOSIT_REQUIRED'
+        // Check if manual job with device NOT in shop (customer took device home)
+        if (source === 'staff_manual' && !jobData.device_in_shop) {
+          // Manual booking, parts needed, device with customer - use special template
+          templateKey = 'MANUAL_BOOKING_PARTS_NEEDED'
+        } else {
+          // Parts required - use deposit template (API jobs or manual with device in shop)
+          templateKey = 'DEPOSIT_REQUIRED'
+        }
       } else if (source === 'staff_manual') {
         // Manual job (device already in shop) - use RECEIVED
         templateKey = 'RECEIVED'
