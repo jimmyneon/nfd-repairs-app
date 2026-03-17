@@ -308,20 +308,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           >
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Updated {formatLastUpdated()}
-                </p>
-                <svg 
-                  className={`h-4 w-4 text-gray-500 dark:text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </div>
+              <svg 
+                className={`h-4 w-4 text-gray-500 dark:text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </div>
             
             {/* Refreshing overlay */}
@@ -335,23 +329,11 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </div>
             )}
             
+            {/* Status Badge - Clean and Simple */}
             <div className="mb-4">
               <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
                 {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
               </div>
-            </div>
-            
-            {/* Timeline info */}
-            <div className="flex items-center justify-center gap-4 mb-3 text-xs text-gray-500 dark:text-gray-400">
-              <span className="flex items-center gap-1">
-                <Package className="h-3 w-3" />
-                Received {formatTimeSince(job.created_at ? new Date(job.created_at) : null)}
-              </span>
-              <span className="text-gray-300 dark:text-gray-600">•</span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                In this status {formatTimeSince(statusChangedAt)}
-              </span>
             </div>
             
             <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
@@ -359,24 +341,42 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </div>
           </button>
           
-          {/* Expandable info section */}
+          {/* Timeline & Info Section */}
           <button
             onClick={(e) => {
               e.stopPropagation()
               setShowStatusInfo(!showStatusInfo)
             }}
-            className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <span className="text-sm font-medium text-primary">What does this mean?</span>
-            {showStatusInfo ? (
-              <ChevronUp className="h-4 w-4 text-primary" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-primary" />
-            )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Received {formatTimeSince(job.created_at ? new Date(job.created_at) : null)}
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  In status {formatTimeSince(statusChangedAt)}
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Updated {formatLastUpdated()}
+                </span>
+              </div>
+              {showStatusInfo ? (
+                <ChevronUp className="h-4 w-4 text-primary" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-primary" />
+              )}
+            </div>
           </button>
           
           {showStatusInfo && (
-            <div className="px-5 md:px-6 pb-5 pt-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+            <div className="px-5 md:px-6 pb-5 pt-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">What does this mean?</h4>
               <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
                 {(() => {
                   const hoursInStatus = statusChangedAt 
