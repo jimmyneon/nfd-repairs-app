@@ -26,8 +26,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showSimpleConfirm, setShowSimpleConfirm] = useState(false)
   const [showManualOnboarding, setShowManualOnboarding] = useState(false)
   const [showDelayModal, setShowDelayModal] = useState(false)
+  const [showDelayConfirm, setShowDelayConfirm] = useState(false)
   const [newStatus, setNewStatus] = useState<JobStatus | null>(null)
   const [pendingWorkflowStatus, setPendingWorkflowStatus] = useState<JobStatus | null>(null)
+  const [pendingDelayReason, setPendingDelayReason] = useState<string>('')
+  const [pendingDelayNotes, setPendingDelayNotes] = useState<string>('')
   const [willSendSMS, setWillSendSMS] = useState(false)
   const [willSendEmail, setWillSendEmail] = useState(false)
   const router = useRouter()
@@ -224,31 +227,51 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setPendingWorkflowStatus(null)
   }
 
-  const handleDelayConfirm = async (reason: string, notes: string) => {
+  const handleDelayReasonSubmit = async (reason: string, notes: string) => {
+    // Store delay reason and notes, then check notification config
+    setPendingDelayReason(reason)
+    setPendingDelayNotes(notes)
+    setShowDelayModal(false)
+    
+    // Check notification config for DELAYED status
+    const { data: config } = await supabase
+      .from('notification_config')
+      .select('send_sms, send_email, is_active')
+      .eq('status_key', 'DELAYED')
+      .single()
+    
+    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    setWillSendEmail(config?.send_email && config?.is_active || false)
+    
+    // Show confirmation modal
+    setShowDelayConfirm(true)
+  }
+
+  const confirmDelayStatusChange = async () => {
     if (!job) return
     setActionLoading(true)
-    setShowDelayModal(false)
+    setShowDelayConfirm(false)
 
     // Update job with DELAYED status and delay reason/notes
     await supabase
       .from('jobs')
       .update({
-        status: 'DELAYED',
-        delay_reason: reason,
-        delay_notes: notes,
-      })
+        status: 'DELAYED' as JobStatus,
+        delay_reason: pendingDelayReason,
+        delay_notes: pendingDelayNotes,
+      } as any)
       .eq('id', job.id)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
-      message: `Status changed to Delayed - ${reason}`,
+      message: `Status changed to Delayed - ${pendingDelayReason}`,
     } as any)
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
       title: `Job ${job.job_ref} delayed`,
-      body: `Delay reason: ${reason}`,
+      body: `Delay reason: ${pendingDelayReason}`,
       job_id: job.id,
     } as any)
 
@@ -284,6 +307,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     await loadJobData()
     setActionLoading(false)
+    setPendingDelayReason('')
+    setPendingDelayNotes('')
   }
 
   const confirmStatusChange = async (skipNotifications?: boolean) => {
@@ -752,9 +777,64 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {showDelayModal && job && (
           <DelayReasonModal
             deviceInfo={`${job.device_make} ${job.device_model}`}
-            onConfirm={handleDelayConfirm}
+            onConfirm={handleDelayReasonSubmit}
             onCancel={() => setShowDelayModal(false)}
           />
+        )}
+
+        {/* Delay Confirmation Modal (shows SMS/Email notification info) */}
+        {showDelayConfirm && job && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Delay Status</h2>
+              <p className="text-gray-700 mb-2">
+                Mark <span className="font-bold">{job.device_make} {job.device_model}</span> as <span className="font-bold text-red-600">Delayed</span>?
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Reason: <span className="font-semibold">{pendingDelayReason.replace(/_/g, ' ')}</span>
+              </p>
+              
+              {/* Notification Warning */}
+              {(willSendSMS || willSendEmail) && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        {willSendSMS && (
+                          <p>✓ <span className="font-semibold">SMS</span> - Customer will receive delay reason and notes</p>
+                        )}
+                        {willSendEmail && (
+                          <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                        )}
+                      </div>
+                      <p className="text-xs text-blue-600 mt-2">To: {job.customer_phone}{job.customer_email ? ` / ${job.customer_email}` : ''}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDelayConfirm(false)
+                    setPendingDelayReason('')
+                    setPendingDelayNotes('')
+                  }}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-4 px-6 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelayStatusChange}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-xl transition-colors"
+                >
+                  Confirm Delay
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Triple Confirmation Modal (for manual status changes) */}

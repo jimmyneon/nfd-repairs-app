@@ -123,6 +123,13 @@ export async function POST(request: NextRequest) {
         .replace('{deposit_link}', depositUrl)
     }
 
+    // Add delay-specific replacements if needed
+    if (status === 'DELAYED') {
+      smsBody = smsBody
+        .replace('{delay_reason}', job.delay_reason || '')
+        .replace('{delay_notes}', job.delay_notes || '')
+    }
+
     // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
     if (status === 'RECEIVED' && job.customer_email) {
       smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
