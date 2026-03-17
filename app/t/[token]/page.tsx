@@ -8,7 +8,7 @@ import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, 
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 
 export default function TrackingPage({ params }: { params: { token: string } }) {
-  const [job, setJob] = useState<Job | null>(null)
+  const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showQRCode, setShowQRCode] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
@@ -107,7 +107,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes')
       .eq('tracking_token', params.token)
       .single()
 
@@ -267,7 +267,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       COLLECTED: () => "Thanks for collecting your device! Hope everything's working perfectly.",
       COMPLETED: () => "Your repair is complete! Thanks for choosing New Forest Device Repairs.",
       DELAYED: () => job.delay_notes || "Your repair is experiencing a delay. We'll update you as soon as possible.",
-      CANCELLED: () => "This repair has been cancelled. Contact us if you have any questions."
+      CANCELLED: () => job.cancellation_notes || "This repair has been cancelled. Contact us if you have any questions."
     }
 
     const messageFn = statusMessages[status]
@@ -304,8 +304,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       READY_TO_COLLECT: 'All done! Your device is ready to collect whenever you\'re free.',
       COLLECTED: 'Thanks for collecting your device. Hope everything\'s working perfectly!',
       COMPLETED: 'All finished! Thanks for trusting us with your repair.',
-      CANCELLED: 'This repair has been cancelled. If you have any questions, just give us a shout.',
       DELAYED: job.delay_notes || 'There\'s a slight delay with your repair. We\'ll be in touch with more details soon.',
+      CANCELLED: job.cancellation_notes || 'This repair has been cancelled. If you have any questions, just give us a shout.',
     }
     return messages[status] || 'We\'ll keep you updated every step of the way.'
   }
@@ -531,15 +531,33 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                         <p>{dynamicMessage}</p>
                       </div>
                       
-                      {job.status === 'DELAYED' && job.delay_reason && (
+                      {job.status === 'DELAYED' && (job.delay_reason || job.delay_notes) && (
                         <div className="flex items-start gap-2 mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded">
                           <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="font-semibold text-red-900 dark:text-red-200 text-sm mb-1">
-                              Delay Reason: {job.delay_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                            </p>
+                            {job.delay_reason && (
+                              <p className="font-semibold text-red-900 dark:text-red-200 text-sm mb-1">
+                                Delay Reason: {job.delay_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                              </p>
+                            )}
                             {job.delay_notes && (
                               <p className="text-red-800 dark:text-red-300 text-sm">{job.delay_notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {job.status === 'CANCELLED' && (job.cancellation_reason || job.cancellation_notes) && (
+                        <div className="flex items-start gap-2 mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 border-l-4 border-gray-500 rounded">
+                          <AlertCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            {job.cancellation_reason && (
+                              <p className="font-semibold text-gray-900 dark:text-gray-200 text-sm mb-1">
+                                Cancellation Reason: {job.cancellation_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                              </p>
+                            )}
+                            {job.cancellation_notes && (
+                              <p className="text-gray-800 dark:text-gray-300 text-sm">{job.cancellation_notes}</p>
                             )}
                           </div>
                         </div>
