@@ -434,85 +434,106 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
         {/* PRIMARY: Repair Progress with Timeline & Info */}
         <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-5 md:p-6">
-            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 md:mb-5 flex items-center">
-              <Clock className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
-              Repair Progress
-            </h2>
-            <div className="space-y-4">
-              {statusSteps.map((step, index) => {
-                const isCurrent = step === displayStatus
-                const isCompleted = index < currentStepIndex
-                const isDelayed = job.status === 'DELAYED' && step === 'IN_REPAIR'
-
-                return (
-                  <div key={step} className="relative">
-                    <div className="flex items-center">
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                        isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
-                        isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/30 scale-110' : 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110') :
-                        'bg-gray-200 text-gray-500 border-2 border-gray-300'
-                      }`}>
-                        {isCompleted ? (
-                          <CheckCircle className="h-7 w-7" />
-                        ) : (
-                          <span className="text-base font-black">{index + 1}</span>
-                        )}
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <p className={`text-sm font-semibold ${
-                          isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
-                          isCompleted ? 'text-green-600' :
-                          'text-gray-400'
-                        }`}>
-                          {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                          {isDelayed && (
-                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    {index < statusSteps.length - 1 && (
-                      <div className={`absolute left-6 top-12 w-0.5 h-4 ${
-                        isCompleted ? 'bg-green-400' : 'bg-gray-300'
-                      }`} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          
-          {/* Timeline Info & Expandable Section */}
           <button
             onClick={() => setShowStatusInfo(!showStatusInfo)}
-            className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            className="w-full p-5 md:p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                <span className="flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  Received {formatTimeSince(job.created_at ? new Date(job.created_at) : null)}
-                </span>
-                <span className="text-gray-300 dark:text-gray-600">•</span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  In status {formatTimeSince(statusChangedAt)}
-                </span>
-                <span className="text-gray-300 dark:text-gray-600">•</span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Updated {formatLastUpdated()}
-                </span>
+            <div className="flex items-start justify-between gap-4">
+              {/* LEFT: Repair Progress Timeline */}
+              <div className="flex-1">
+                <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 md:mb-5 flex items-center">
+                  <Clock className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
+                  Repair Progress
+                </h2>
+                <div className="space-y-4">
+                  {statusSteps.map((step, index) => {
+                    const isCurrent = step === displayStatus
+                    const isCompleted = index < currentStepIndex
+                    const isDelayed = job.status === 'DELAYED' && step === 'IN_REPAIR'
+
+                    return (
+                      <div key={step} className="relative">
+                        <div className="flex items-center">
+                          <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                            isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
+                            isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/30 scale-110' : 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110') :
+                            'bg-gray-200 text-gray-500 border-2 border-gray-300'
+                          }`}>
+                            {isCompleted ? (
+                              <CheckCircle className="h-7 w-7" />
+                            ) : (
+                              <span className="text-base font-black">{index + 1}</span>
+                            )}
+                          </div>
+                          <div className="ml-4 flex-1">
+                            <p className={`text-sm font-semibold ${
+                              isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
+                              isCompleted ? 'text-green-600' :
+                              'text-gray-400'
+                            }`}>
+                              {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                              {isDelayed && (
+                                <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        {index < statusSteps.length - 1 && (
+                          <div className={`absolute left-6 top-12 w-0.5 h-4 ${
+                            isCompleted ? 'bg-green-400' : 'bg-gray-300'
+                          }`} />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                
+                {/* Timeline Info - Inline with Progress */}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Package className="h-3 w-3" />
+                      Received {formatTimeSince(job.created_at ? new Date(job.created_at) : null)}
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      In status {formatTimeSince(statusChangedAt)}
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Updated {formatLastUpdated()}
+                    </span>
+                  </div>
+                </div>
               </div>
-              {showStatusInfo ? (
-                <ChevronUp className="h-4 w-4 text-primary" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-primary" />
-              )}
+              
+              {/* RIGHT: Order Info */}
+              <div className="flex-shrink-0 text-right">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-600 min-w-[140px]">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Job Reference</p>
+                  <p className="text-lg font-black text-gray-900 dark:text-white">{job.job_ref}</p>
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Issue</p>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">{job.issue}</p>
+                  </div>
+                </div>
+                
+                {/* Expand Indicator */}
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs text-primary font-semibold">
+                  <span>What does this mean?</span>
+                  {showStatusInfo ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </div>
+              </div>
             </div>
           </button>
           
+          {/* Expandable Info Section */}
           {showStatusInfo && (
             <div className="px-5 md:px-6 pb-5 pt-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
               <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">What does this mean?</h4>
