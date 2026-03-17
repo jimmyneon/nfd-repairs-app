@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
-import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch } from 'lucide-react'
+import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 
 export default function TrackingPage({ params }: { params: { token: string } }) {
-  const [job, setJob] = useState<any>(null)
+  const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [showQRCode, setShowQRCode] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
@@ -107,7 +107,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes')
       .eq('tracking_token', params.token)
       .single()
 
@@ -266,7 +266,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       READY_TO_COLLECT: (h) => h < 24 ? "Your device is ready! Collect at your convenience during opening hours." : h < 72 ? "Your device is still ready for collection whenever you're free." : h < 168 ? "We're holding your device ready for collection. Pick up when convenient." : "Your device is ready for collection. We'll hold it safely until you can pick it up.",
       COLLECTED: () => "Thanks for collecting your device! Hope everything's working perfectly.",
       COMPLETED: () => "Your repair is complete! Thanks for choosing New Forest Device Repairs.",
-      DELAYED: () => "Your repair is experiencing a delay. We'll update you as soon as possible.",
+      DELAYED: () => job.delay_notes || "Your repair is experiencing a delay. We'll update you as soon as possible.",
       CANCELLED: () => "This repair has been cancelled. Contact us if you have any questions."
     }
 
@@ -305,7 +305,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       COLLECTED: 'Thanks for collecting your device. Hope everything\'s working perfectly!',
       COMPLETED: 'All finished! Thanks for trusting us with your repair.',
       CANCELLED: 'This repair has been cancelled. If you have any questions, just give us a shout.',
-      DELAYED: 'There\'s a slight delay with your repair. We\'ll be in touch with more details soon.',
+      DELAYED: job.delay_notes || 'There\'s a slight delay with your repair. We\'ll be in touch with more details soon.',
     }
     return messages[status] || 'We\'ll keep you updated every step of the way.'
   }
@@ -342,7 +342,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   
   const statusSteps = buildStatusSteps()
 
-  const currentStepIndex = statusSteps.indexOf(job.status)
+  // If status is DELAYED, show IN_REPAIR as current step (DELAYED is a modifier, not a separate step)
+  const displayStatus = job.status === 'DELAYED' ? 'IN_REPAIR' : job.status
+  const currentStepIndex = statusSteps.indexOf(displayStatus)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
@@ -439,15 +441,16 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </h2>
             <div className="space-y-4">
               {statusSteps.map((step, index) => {
-                const isCurrent = step === job.status
+                const isCurrent = step === displayStatus
                 const isCompleted = index < currentStepIndex
+                const isDelayed = job.status === 'DELAYED' && step === 'IN_REPAIR'
 
                 return (
                   <div key={step} className="relative">
                     <div className="flex items-center">
                       <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                         isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
-                        isCurrent ? 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110' :
+                        isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/30 scale-110' : 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110') :
                         'bg-gray-200 text-gray-500 border-2 border-gray-300'
                       }`}>
                         {isCompleted ? (
@@ -458,11 +461,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       </div>
                       <div className="ml-4 flex-1">
                         <p className={`text-sm font-semibold ${
-                          isCurrent ? 'text-primary' :
+                          isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
                           isCompleted ? 'text-green-600' :
                           'text-gray-400'
                         }`}>
                           {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                          {isDelayed && (
+                            <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -524,6 +530,20 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                         <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                         <p>{dynamicMessage}</p>
                       </div>
+                      
+                      {job.status === 'DELAYED' && job.delay_reason && (
+                        <div className="flex items-start gap-2 mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded">
+                          <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-red-900 dark:text-red-200 text-sm mb-1">
+                              Delay Reason: {job.delay_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                            </p>
+                            {job.delay_notes && (
+                              <p className="text-red-800 dark:text-red-300 text-sm">{job.delay_notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       {job.status === 'READY_TO_COLLECT' && (
                         <div className="flex items-start gap-2">
