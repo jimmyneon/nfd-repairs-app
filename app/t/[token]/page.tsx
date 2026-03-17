@@ -175,27 +175,103 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     return `${diffDays} days ago`
   }
 
-  const getStatusExpectation = (status: string, timeInStatus: number) => {
-    // timeInStatus in hours
-    const expectations: Record<string, { typical: number; message: string; urgentMessage: string }> = {
-      QUOTE_APPROVED: { typical: 48, message: 'Waiting for you to drop off your device', urgentMessage: 'Please bring your device in when convenient' },
-      RECEIVED: { typical: 24, message: 'We\'re assessing your device and will update you soon', urgentMessage: 'Assessment in progress - update coming soon' },
-      AWAITING_DEPOSIT: { typical: 48, message: 'Waiting for deposit payment to order parts', urgentMessage: 'Please pay deposit so we can order parts' },
-      PARTS_ORDERED: { typical: 72, message: 'Parts typically arrive within 2-3 days', urgentMessage: 'Parts should arrive soon' },
-      PARTS_ARRIVED: { typical: 12, message: 'Parts have arrived, repair will begin shortly', urgentMessage: 'Ready to start repair' },
-      IN_REPAIR: { typical: 48, message: 'Repair in progress - typical time is 1-2 days', urgentMessage: 'Complex repair in progress' },
-      READY_TO_COLLECT: { typical: 168, message: 'Your device is ready! Collect at your convenience', urgentMessage: 'Ready for collection' },
-      COLLECTED: { typical: 0, message: 'Thanks for collecting your device!', urgentMessage: 'Completed' },
-      COMPLETED: { typical: 0, message: 'Repair completed successfully', urgentMessage: 'Completed' },
-    }
+  const getDeviceType = (deviceMake: string, deviceModel: string): 'phone' | 'tablet' | 'laptop' | 'console' | 'watch' | 'desktop' => {
+    const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
     
-    const expectation = expectations[status]
-    if (!expectation) return null
-    
-    if (timeInStatus > expectation.typical) {
-      return { type: 'urgent', message: expectation.urgentMessage }
+    if (combined.includes('iphone') || combined.includes('samsung') || combined.includes('pixel') || 
+        combined.includes('oneplus') || combined.includes('huawei') || combined.includes('xiaomi') || 
+        combined.includes('motorola') || combined.includes('nokia') || combined.includes('phone')) {
+      return 'phone'
     }
-    return { type: 'normal', message: expectation.message }
+    if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
+      return 'tablet'
+    }
+    if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
+      return 'laptop'
+    }
+    if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') || 
+        combined.includes('switch') || combined.includes('ps4') || combined.includes('ps5')) {
+      return 'console'
+    }
+    if (combined.includes('watch') || combined.includes('fitbit')) {
+      return 'watch'
+    }
+    return 'desktop'
+  }
+
+  const getDynamicMessage = (status: string, deviceType: 'phone' | 'tablet' | 'laptop' | 'console' | 'watch' | 'desktop', hoursInStatus: number): string => {
+    // RECEIVED status - device-aware and time-sensitive
+    if (status === 'RECEIVED') {
+      if (deviceType === 'phone' || deviceType === 'watch') {
+        if (hoursInStatus < 2) return "Quick assessment in progress. Most phone/watch repairs are assessed within a few hours."
+        if (hoursInStatus < 4) return "We're assessing your device. Update coming soon."
+        if (hoursInStatus < 8) return "Assessment still in progress. We're working through our queue."
+        if (hoursInStatus < 12) return "We're still working on your assessment. Complex issues sometimes need more time."
+        return "We haven't forgotten about you! Detailed diagnostics in progress - update coming soon."
+      }
+      if (deviceType === 'tablet') {
+        if (hoursInStatus < 4) return "Assessment in progress. Tablets typically assessed within 4-6 hours."
+        if (hoursInStatus < 8) return "We're working on your assessment. Update coming soon."
+        if (hoursInStatus < 12) return "Assessment still in progress. We're working through our queue."
+        return "Detailed diagnostics needed. Update coming soon."
+      }
+      if (deviceType === 'laptop' || deviceType === 'desktop') {
+        if (hoursInStatus < 6) return "Thorough assessment in progress. Laptops need detailed diagnostics."
+        if (hoursInStatus < 12) return "We're working on your assessment. Complex devices take longer to diagnose."
+        if (hoursInStatus < 24) return "Detailed diagnostics still in progress. Update coming soon."
+        return "Complex assessment in progress. We'll update you as soon as we have more information."
+      }
+      if (deviceType === 'console') {
+        if (hoursInStatus < 8) return "Detailed diagnostics in progress. Consoles require thorough testing."
+        if (hoursInStatus < 16) return "We're working on your assessment. Complex devices need more detailed testing."
+        if (hoursInStatus < 24) return "Thorough diagnostics still in progress. Update coming soon."
+        return "Complex assessment in progress. We'll update you as soon as we have more information."
+      }
+    }
+
+    // IN_REPAIR status - device-aware and time-sensitive
+    if (status === 'IN_REPAIR') {
+      if (deviceType === 'phone' || deviceType === 'watch') {
+        if (hoursInStatus < 4) return "Repair in progress. Most phone/watch repairs completed within a few hours."
+        if (hoursInStatus < 12) return "We're working on your repair. Should be ready soon."
+        if (hoursInStatus < 24) return "Repair still in progress. Some issues take longer than expected."
+        if (hoursInStatus < 48) return "Complex repair in progress. We'll notify you when it's ready."
+        return "Your repair is taking longer than usual. We're working on it and will update you soon."
+      }
+      if (deviceType === 'tablet') {
+        if (hoursInStatus < 8) return "Repair in progress. Tablet repairs typically take 6-12 hours."
+        if (hoursInStatus < 24) return "We're working on your repair. Should be ready within a day."
+        if (hoursInStatus < 48) return "Repair still in progress. Complex issues sometimes take longer."
+        return "Complex repair in progress. We'll notify you when it's ready."
+      }
+      if (deviceType === 'laptop' || deviceType === 'desktop') {
+        if (hoursInStatus < 12) return "Repair in progress. Laptop repairs typically take 1-2 days."
+        if (hoursInStatus < 48) return "We're working on your repair. Complex devices need more time."
+        if (hoursInStatus < 72) return "Repair still in progress. We'll notify you when it's ready."
+        return "Complex repair in progress. We'll update you as soon as we have more information."
+      }
+      if (deviceType === 'console') {
+        if (hoursInStatus < 24) return "Repair in progress. Console repairs typically take 1-3 days."
+        if (hoursInStatus < 72) return "We're working on your repair. Complex devices need thorough work."
+        return "Complex repair in progress. We'll notify you when it's ready."
+      }
+    }
+
+    // Other statuses - time-sensitive only
+    const statusMessages: Record<string, (hours: number) => string> = {
+      QUOTE_APPROVED: (h) => h < 24 ? "Waiting for you to drop off your device. Bring it in when convenient." : h < 48 ? "We're ready for your device whenever you can drop it off." : "Still waiting for your device. Drop off at your convenience - we're ready!",
+      AWAITING_DEPOSIT: (h) => h < 12 ? "We need a deposit to order parts for your repair. Check your messages for payment details." : h < 24 ? "Still waiting for deposit payment. We can order parts as soon as we receive it." : h < 48 ? "Deposit payment pending. We're ready to order parts once payment is received." : "We're still waiting for your deposit payment to proceed with ordering parts.",
+      PARTS_ORDERED: (h) => h < 24 ? "Parts ordered! Delivery typically takes 2-3 days." : h < 48 ? "Parts are on their way. Should arrive within 1-2 days." : h < 72 ? "Parts should arrive soon. We'll notify you when they're here." : h < 96 ? "Parts delivery taking a bit longer than usual. We'll update you when they arrive." : "Parts are delayed but on their way. We'll start your repair as soon as they arrive.",
+      PARTS_ARRIVED: (h) => h < 6 ? "Good news! Parts have arrived and we're ready to start your repair." : h < 12 ? "Parts are here. Your repair will begin shortly." : "Parts arrived. We're working through our queue - your repair will start soon.",
+      READY_TO_COLLECT: (h) => h < 24 ? "Your device is ready! Collect at your convenience during opening hours." : h < 72 ? "Your device is still ready for collection whenever you're free." : h < 168 ? "We're holding your device ready for collection. Pick up when convenient." : "Your device is ready for collection. We'll hold it safely until you can pick it up.",
+      COLLECTED: () => "Thanks for collecting your device! Hope everything's working perfectly.",
+      COMPLETED: () => "Your repair is complete! Thanks for choosing New Forest Device Repairs.",
+      DELAYED: () => "Your repair is experiencing a delay. We'll update you as soon as possible.",
+      CANCELLED: () => "This repair has been cancelled. Contact us if you have any questions."
+    }
+
+    const messageFn = statusMessages[status]
+    return messageFn ? messageFn(hoursInStatus) : "We're working on your repair and will keep you updated."
   }
 
   if (loading) {
@@ -298,9 +374,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         </div>
 
-        {/* PRIMARY: Current Status - Second Most Important */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
-          {/* Clickable refresh area */}
+        {/* PRIMARY: Current Status - Clean and Simple */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700">
           <button
             onClick={handleManualRefresh}
             disabled={isRefreshing}
@@ -318,7 +393,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </svg>
             </div>
             
-            {/* Refreshing overlay */}
             {isRefreshing && (
               <div className="mb-3 flex items-center justify-center gap-2 text-primary animate-pulse">
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -329,7 +403,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </div>
             )}
             
-            {/* Status Badge - Clean and Simple */}
             <div className="mb-4">
               <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
                 {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
@@ -341,12 +414,72 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </div>
           </button>
           
-          {/* Timeline & Info Section */}
+          {/* Show directions link for READY_TO_COLLECT status */}
+          {job.status === 'READY_TO_COLLECT' && (
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95 mt-4"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <MapPin className="h-5 w-5" />
+                <span>Get Directions & Opening Hours</span>
+              </div>
+            </a>
+          )}
+        </div>
+
+        {/* PRIMARY: Repair Progress with Timeline & Info */}
+        <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="p-5 md:p-6">
+            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 md:mb-5 flex items-center">
+              <Clock className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
+              Repair Progress
+            </h2>
+            <div className="space-y-4">
+              {statusSteps.map((step, index) => {
+                const isCurrent = step === job.status
+                const isCompleted = index < currentStepIndex
+
+                return (
+                  <div key={step} className="relative">
+                    <div className="flex items-center">
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
+                        isCurrent ? 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110' :
+                        'bg-gray-200 text-gray-500 border-2 border-gray-300'
+                      }`}>
+                        {isCompleted ? (
+                          <CheckCircle className="h-7 w-7" />
+                        ) : (
+                          <span className="text-base font-black">{index + 1}</span>
+                        )}
+                      </div>
+                      <div className="ml-4 flex-1">
+                        <p className={`text-sm font-semibold ${
+                          isCurrent ? 'text-primary' :
+                          isCompleted ? 'text-green-600' :
+                          'text-gray-400'
+                        }`}>
+                          {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                        </p>
+                      </div>
+                    </div>
+                    {index < statusSteps.length - 1 && (
+                      <div className={`absolute left-6 top-12 w-0.5 h-4 ${
+                        isCompleted ? 'bg-green-400' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          
+          {/* Timeline Info & Expandable Section */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowStatusInfo(!showStatusInfo)
-            }}
+            onClick={() => setShowStatusInfo(!showStatusInfo)}
             className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
             <div className="flex items-center justify-between">
@@ -382,39 +515,26 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                   const hoursInStatus = statusChangedAt 
                     ? (new Date().getTime() - statusChangedAt.getTime()) / (1000 * 60 * 60)
                     : 0
-                  const expectation = getStatusExpectation(job.status, hoursInStatus)
+                  const deviceType = getDeviceType(job.device_make, job.device_model)
+                  const dynamicMessage = getDynamicMessage(job.status, deviceType, hoursInStatus)
                   
                   return (
                     <>
                       <div className="flex items-start gap-2">
                         <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        <p>{expectation?.message || "We're working on your repair and will keep you updated."}</p>
+                        <p>{dynamicMessage}</p>
                       </div>
-                      
-                      {job.status === 'RECEIVED' && hoursInStatus < 48 && (
-                        <div className="flex items-start gap-2">
-                          <Clock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p>Initial assessment typically takes 12-24 hours. You're well within our normal timeframe.</p>
-                        </div>
-                      )}
-                      
-                      {job.status === 'IN_REPAIR' && hoursInStatus < 72 && (
-                        <div className="flex items-start gap-2">
-                          <Clock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p>Most repairs are completed within 1-3 days. Complex repairs may take longer - we'll let you know if there are any delays.</p>
-                        </div>
-                      )}
                       
                       {job.status === 'READY_TO_COLLECT' && (
                         <div className="flex items-start gap-2">
                           <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p>Your device is ready! Collect at your convenience during our opening hours. Check Google Maps for live opening times.</p>
+                          <p>Check Google Maps for live opening times.</p>
                         </div>
                       )}
                       
                       <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          <strong>Tip:</strong> This page updates automatically. Click anywhere in the status area to refresh manually.
+                          <strong>Tip:</strong> This page updates automatically. Click the status area above to refresh manually.
                         </p>
                       </div>
                     </>
@@ -423,69 +543,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </div>
             </div>
           )}
-          
-          {/* Show directions link for READY_TO_COLLECT status */}
-          {job.status === 'READY_TO_COLLECT' && (
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95 mt-4"
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <MapPin className="h-5 w-5" />
-                <span>Get Directions & Opening Hours</span>
-              </div>
-            </a>
-          )}
-        </div>
-
-        {/* PRIMARY: Timeline - Third Most Important */}
-        <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
-          <h2 className="font-black text-lg md:text-xl text-gray-900 mb-4 md:mb-5 flex items-center">
-            <Clock className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
-            Repair Progress
-          </h2>
-          <div className="space-y-4">
-            {statusSteps.map((step, index) => {
-              const isCurrent = step === job.status
-              const isCompleted = index < currentStepIndex
-              const statusLabel = JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]
-
-              return (
-                <div key={step} className="relative">
-                  <div className="flex items-center">
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                      isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
-                      isCurrent ? 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110' :
-                      'bg-gray-200 text-gray-500 border-2 border-gray-300'
-                    }`}>
-                      {isCompleted ? (
-                        <CheckCircle className="h-7 w-7" />
-                      ) : (
-                        <span className="text-base font-black">{index + 1}</span>
-                      )}
-                    </div>
-                    <div className="ml-4 flex-1">
-                      <p className={`text-sm font-semibold ${
-                        isCurrent ? 'text-primary' :
-                        isCompleted ? 'text-green-600' :
-                        'text-gray-400'
-                      }`}>
-                        {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                      </p>
-                    </div>
-                  </div>
-                  {/* Connecting line between steps */}
-                  {index < statusSteps.length - 1 && (
-                    <div className={`absolute left-6 top-12 w-0.5 h-4 ${
-                      isCompleted ? 'bg-green-400' : 'bg-gray-300'
-                    }`} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
         </div>
 
         {/* SECONDARY: QR Code - Expandable */}
