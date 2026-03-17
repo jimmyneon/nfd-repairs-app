@@ -26,7 +26,7 @@ function BookingSuccessContent() {
             <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">New Forest Device Repairs</h1>
-          <p className="text-gray-600 dark:text-gray-400">Booking Confirmed</p>
+          <p className="text-gray-600 dark:text-gray-400">Your Repair is Booked</p>
         </div>
       </header>
 
@@ -38,11 +38,16 @@ function BookingSuccessContent() {
               <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
             <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">
-              Repair Booked Successfully!
+              We've Got Your Repair!
             </h2>
             <p className="text-lg text-gray-700 dark:text-gray-300">
-              Your device has been logged into our repair system
+              Your device is now in our queue and we'll get started as soon as possible
             </p>
+            {jobRef && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Reference: <span className="font-mono font-bold">{jobRef}</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -53,15 +58,15 @@ function BookingSuccessContent() {
             What Happens Next?
           </h3>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-start gap-4">
               <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
                 <MessageSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-1">SMS Confirmation Sent</h4>
+                <h4 className="font-bold text-gray-900 dark:text-white mb-1">1. You'll Receive a Tracking Link</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Customer receives a text with a tracking link to check repair status anytime
+                  We've sent you a text message with a link to track your repair. You can check the status anytime, 24/7.
                 </p>
               </div>
             </div>
@@ -71,9 +76,23 @@ function BookingSuccessContent() {
                 <Bell className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-1">Status Updates</h4>
+                <h4 className="font-bold text-gray-900 dark:text-white mb-1">2. We'll Keep You Updated</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Customer receives SMS notifications at key stages of the repair
+                  You'll receive text notifications at each stage of the repair process. If you provided an email, you'll get detailed updates there too.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
+                <svg className="h-6 w-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-gray-900 dark:text-white mb-1">3. We'll Work to Your Timescale</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  We'll complete your repair based on the timescales discussed. If anything changes, we'll let you know immediately.
                 </p>
               </div>
             </div>
@@ -83,9 +102,9 @@ function BookingSuccessContent() {
                 <MapPin className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-1">Collection Notification</h4>
+                <h4 className="font-bold text-gray-900 dark:text-white mb-1">4. Collection Time</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  When the repair is complete, the customer will be notified to collect their device
+                  When your repair is complete, we'll send you a notification. You can then collect your device at your convenience.
                 </p>
               </div>
             </div>
