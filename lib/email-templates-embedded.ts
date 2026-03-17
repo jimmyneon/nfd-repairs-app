@@ -149,6 +149,81 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
               </p>
               ` : ''}
 
+              ${type === 'JOB_CREATED' ? `
+              <!-- What Happens Next Section -->
+              <div style="background-color: #F0FDF4; border-left: 4px solid #009B4D; border-radius: 8px; padding: 25px; margin: 25px 0;">
+                <h3 style="color: #009B4D; margin: 0 0 20px 0; font-size: 20px; font-weight: bold;">📋 What Happens Next?</h3>
+                
+                <!-- Step 1: Tracking Link -->
+                <div style="margin-bottom: 20px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td width="40" valign="top">
+                        <div style="width: 36px; height: 36px; background-color: #DBEAFE; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">💬</div>
+                      </td>
+                      <td style="padding-left: 15px;">
+                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">1. You'll Receive a Tracking Link</h4>
+                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
+                          We've sent you a text message with a link to track your repair. You can check the status anytime, 24/7.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- Step 2: Updates -->
+                <div style="margin-bottom: 20px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td width="40" valign="top">
+                        <div style="width: 36px; height: 36px; background-color: #E9D5FF; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">🔔</div>
+                      </td>
+                      <td style="padding-left: 15px;">
+                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">2. We'll Keep You Updated</h4>
+                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
+                          Use the tracking link to check progress anytime. We'll send you detailed email updates at each stage of the repair. You'll also get a text when your repair is ready for collection.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- Step 3: Timescale -->
+                <div style="margin-bottom: 20px;">
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td width="40" valign="top">
+                        <div style="width: 36px; height: 36px; background-color: #FED7AA; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">⏰</div>
+                      </td>
+                      <td style="padding-left: 15px;">
+                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">3. We'll Work to Your Timescale</h4>
+                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
+                          We'll complete your repair based on the timescales discussed. If anything changes, we'll let you know immediately.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- Step 4: Collection -->
+                <div>
+                  <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td width="40" valign="top">
+                        <div style="width: 36px; height: 36px; background-color: #BBF7D0; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">📍</div>
+                      </td>
+                      <td style="padding-left: 15px;">
+                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">4. Collection Time</h4>
+                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
+                          When your repair is complete, we'll send you a notification. You can then collect your device at your convenience.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              ` : ''}
+
               ${embeddedTracking}
 
               ${qrCodeUrl ? `
