@@ -12,6 +12,7 @@ import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
 import ManualOnboardingModal from '@/components/ManualOnboardingModal'
+import DelayReasonModal from '@/components/DelayReasonModal'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -24,6 +25,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showStatusSelector, setShowStatusSelector] = useState(false)
   const [showSimpleConfirm, setShowSimpleConfirm] = useState(false)
   const [showManualOnboarding, setShowManualOnboarding] = useState(false)
+  const [showDelayModal, setShowDelayModal] = useState(false)
   const [newStatus, setNewStatus] = useState<JobStatus | null>(null)
   const [pendingWorkflowStatus, setPendingWorkflowStatus] = useState<JobStatus | null>(null)
   const [willSendSMS, setWillSendSMS] = useState(false)
@@ -105,6 +107,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   // For manual status changes (from selector modal) - use triple confirmation
   const handleManualStatusChange = async (status: JobStatus) => {
     setNewStatus(status)
+    
+    // Special handling for DELAYED status - show delay reason modal
+    if (status === 'DELAYED') {
+      setShowDelayModal(true)
+      return
+    }
     
     // Check notification config for this status
     const { data: config } = await supabase
@@ -214,6 +222,68 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     await loadJobData()
     setActionLoading(false)
     setPendingWorkflowStatus(null)
+  }
+
+  const handleDelayConfirm = async (reason: string, notes: string) => {
+    if (!job) return
+    setActionLoading(true)
+    setShowDelayModal(false)
+
+    // Update job with DELAYED status and delay reason/notes
+    await supabase
+      .from('jobs')
+      .update({
+        status: 'DELAYED',
+        delay_reason: reason,
+        delay_notes: notes,
+      })
+      .eq('id', job.id)
+
+    await supabase.from('job_events').insert({
+      job_id: job.id,
+      type: 'STATUS_CHANGE',
+      message: `Status changed to Delayed - ${reason}`,
+    } as any)
+
+    await supabase.from('notifications').insert({
+      type: 'STATUS_UPDATE',
+      title: `Job ${job.job_ref} delayed`,
+      body: `Delay reason: ${reason}`,
+      job_id: job.id,
+    } as any)
+
+    // Queue SMS for DELAYED status (will include delay_reason and delay_notes)
+    try {
+      await fetch('/api/jobs/queue-status-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          status: 'DELAYED',
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to queue delay SMS:', error)
+    }
+
+    // Send email notification
+    if (job.customer_email) {
+      try {
+        await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            type: 'STATUS_UPDATE',
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to send delay email:', error)
+      }
+    }
+
+    await loadJobData()
+    setActionLoading(false)
   }
 
   const confirmStatusChange = async (skipNotifications?: boolean) => {
@@ -676,6 +746,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Delay Reason Modal */}
+        {showDelayModal && job && (
+          <DelayReasonModal
+            deviceInfo={`${job.device_make} ${job.device_model}`}
+            onConfirm={handleDelayConfirm}
+            onCancel={() => setShowDelayModal(false)}
+          />
         )}
 
         {/* Triple Confirmation Modal (for manual status changes) */}
