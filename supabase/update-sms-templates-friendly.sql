@@ -50,7 +50,7 @@ UPDATE sms_templates SET body =
 
 Your {device_make} {device_model} has been booked in at New Forest Device Repairs.
 
-We''ll get it fixed and ready for you.
+We''ll get that sorted for you as soon as possible.
 
 Track progress:
 {tracking_link}'

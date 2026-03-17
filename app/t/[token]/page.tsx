@@ -11,6 +11,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showQRCode, setShowQRCode] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -76,18 +77,25 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         (payload) => {
           console.log('Job updated in real-time:', payload)
           setJob(payload.new)
+          setLastUpdated(new Date())
         }
       )
       .subscribe()
 
     // Also poll every 30 seconds as backup
-    const interval = setInterval(() => {
+    const pollInterval = setInterval(() => {
       loadJob()
     }, 30000)
 
+    // Re-render every second to update "Last Updated" timestamp
+    const renderInterval = setInterval(() => {
+      setLastUpdated(prev => prev) // Trigger re-render
+    }, 1000)
+
     return () => {
       supabase.removeChannel(channel)
-      clearInterval(interval)
+      clearInterval(pollInterval)
+      clearInterval(renderInterval)
     }
   }, [params.token])
 
@@ -100,8 +108,26 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
     if (data) {
       setJob(data)
+      setLastUpdated(new Date())
     }
     setLoading(false)
+  }
+
+  const formatLastUpdated = () => {
+    const now = new Date()
+    const diffMs = now.getTime() - lastUpdated.getTime()
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    
+    if (diffSecs < 10) return 'Just now'
+    if (diffSecs < 60) return `${diffSecs} seconds ago`
+    if (diffMins === 1) return '1 minute ago'
+    if (diffMins < 60) return `${diffMins} minutes ago`
+    
+    return lastUpdated.toLocaleTimeString('en-GB', { 
+      hour: '2-digit', 
+      minute: '2-digit'
+    })
   }
 
   if (loading) {
@@ -206,7 +232,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
         {/* PRIMARY: Current Status - Second Most Important */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
-          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-3 text-center">Current Status</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Updated {formatLastUpdated()}
+            </p>
+          </div>
           <div className="flex items-center justify-center mb-4">
             <span className={`px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black text-lg md:text-xl ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md`}>
               {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
