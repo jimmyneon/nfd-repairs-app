@@ -15,7 +15,15 @@ function BookingSuccessContent() {
       router.push('/app/jobs/create')
     }, 15000)
 
-    return () => clearTimeout(timer)
+    // Auto-scroll to show all content
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }, 2000)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(scrollTimer)
+    }
   }, [router])
 
   return (
@@ -78,7 +86,7 @@ function BookingSuccessContent() {
               <div className="flex-1">
                 <h4 className="font-bold text-gray-900 dark:text-white mb-1">2. We'll Keep You Updated</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  You'll receive text notifications at each stage of the repair process. If you provided an email, you'll get detailed updates there too.
+                  Use the tracking link to check progress anytime. If you provided an email, we'll send detailed updates at each stage. You'll get a text when your repair is ready for collection.
                 </p>
               </div>
             </div>
