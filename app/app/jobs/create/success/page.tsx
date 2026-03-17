@@ -61,7 +61,7 @@ function BookingSuccessContent() {
               <div className="flex-1">
                 <h4 className="font-bold text-gray-900 dark:text-white mb-1">SMS Confirmation Sent</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  The customer will receive a text message with a tracking link to monitor their repair progress
+                  Customer receives a text with a tracking link to check repair status anytime
                 </p>
               </div>
             </div>
@@ -71,9 +71,9 @@ function BookingSuccessContent() {
                 <Bell className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-gray-900 dark:text-white mb-1">Automatic Updates</h4>
+                <h4 className="font-bold text-gray-900 dark:text-white mb-1">Status Updates</h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  The customer will receive SMS notifications as the repair progresses through each stage
+                  Customer receives SMS notifications at key stages of the repair
                 </p>
               </div>
             </div>
@@ -97,6 +97,16 @@ function BookingSuccessContent() {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             This page will close automatically in a few moments...
           </p>
+        </div>
+
+        {/* Scroll indicator - subtle */}
+        <div className="flex justify-center pb-4">
+          <div className="flex flex-col items-center gap-1 text-gray-400 dark:text-gray-600 animate-bounce">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            <span className="text-xs">Scroll for more</span>
+          </div>
         </div>
       </main>
     </div>

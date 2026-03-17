@@ -259,16 +259,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       )}
                     </div>
                     <div className="ml-4 flex-1">
-                      <p className={`font-bold text-base transition-colors ${
-                        isCompleted ? 'text-green-700' :
-                        isCurrent ? 'text-primary' : 
+                      <p className={`text-sm font-semibold ${
+                        isCurrent ? 'text-primary' :
+                        isCompleted ? 'text-green-600' :
                         'text-gray-400'
                       }`}>
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
                       </p>
-                      {isCurrent && (
-                        <p className="text-xs text-primary/70 font-medium mt-0.5">Current Step</p>
-                      )}
                     </div>
                   </div>
                   {/* Connecting line between steps */}

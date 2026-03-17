@@ -131,7 +131,8 @@ export async function POST(request: NextRequest) {
     }
 
     // POSSESSION-AWARE MESSAGING: Only include maps link if device NOT in shop
-    if (job.device_in_shop) {
+    // EXCEPTION: READY_TO_COLLECT always needs maps link (customer needs to collect)
+    if (job.device_in_shop && status !== 'READY_TO_COLLECT') {
       // Device already in shop - remove maps link and drop-off instructions
       smsBody = smsBody
         .replace('Find us: {google_maps_link}', '')
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
         .replace('Please drop off your device.', 'We have your device.')
         .trim()
     } else {
-      // Device with customer - include maps link
+      // Device with customer OR READY_TO_COLLECT - include maps link
       smsBody = smsBody.replace('{google_maps_link}', googleMapsLink)
     }
 

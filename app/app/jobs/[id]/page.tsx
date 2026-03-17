@@ -60,6 +60,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     loadJobData()
   }, [params.id])
 
+  // Auto-show collection confirmation modal if ?collect=true and status is READY_TO_COLLECT
+  useEffect(() => {
+    if (job && searchParams.get('collect') === 'true' && job.status === 'READY_TO_COLLECT') {
+      setNewStatus('COLLECTED')
+      setShowStatusModal(true)
+      // Remove query param from URL
+      router.replace(`/app/jobs/${params.id}`)
+    }
+  }, [job, searchParams])
+
   const loadJobData = async () => {
     const { data: jobData } = await supabase
       .from('jobs')
