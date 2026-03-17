@@ -12,6 +12,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [loading, setLoading] = useState(true)
   const [showQRCode, setShowQRCode] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -99,7 +100,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     }
   }, [params.token])
 
-  const loadJob = async () => {
+  const loadJob = async (showSpinner = false) => {
+    if (showSpinner) setIsRefreshing(true)
+    
     const { data } = await supabase
       .from('jobs')
       .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source')
@@ -111,6 +114,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       setLastUpdated(new Date())
     }
     setLoading(false)
+    
+    if (showSpinner) {
+      // Keep spinner visible for at least 500ms for visual feedback
+      setTimeout(() => setIsRefreshing(false), 500)
+    }
+  }
+
+  const handleManualRefresh = () => {
+    loadJob(true)
   }
 
   const formatLastUpdated = () => {
@@ -234,15 +246,32 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Updated {formatLastUpdated()}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Updated {formatLastUpdated()}
+              </p>
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                title="Refresh status"
+              >
+                <svg 
+                  className={`h-4 w-4 text-gray-500 dark:text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center justify-center mb-4">
-            <span className={`px-5 md:px-6 py-2.5 md:py-3 rounded-xl font-black text-lg md:text-xl ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md`}>
+          <div className="mb-4">
+            <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
               {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
-            </span>
+            </div>
           </div>
           <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
             <p className="text-sm md:text-base text-gray-800 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
