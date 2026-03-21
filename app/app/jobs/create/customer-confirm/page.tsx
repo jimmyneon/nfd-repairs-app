@@ -110,27 +110,22 @@ function CustomerConfirmContent() {
       termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-
-    if (!termsAccepted) {
-      // Trigger shake animation to draw attention to terms checkbox
-      setShakeTerms(true)
-      setTimeout(() => setShakeTerms(false), 600)
-      // Scroll to terms section smoothly
-      const termsSection = document.getElementById('terms-section')
-      termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      return
-    }
-
-    if (jobData.passcode_requirement !== 'not_required') {
-      if (passcodeMethod === 'provided' && !passwordNA && !devicePassword.trim()) {
-        alert('Please enter your device passcode or select another option')
-        return
-      }
     }
 
     setLoading(true)
 
     try {
+      // Get override options from sessionStorage (from advanced options on create page)
+      let overrideOptions = null
+      if (typeof window !== 'undefined') {
+        const storedOverrides = sessionStorage.getItem('job_creation_overrides')
+        if (storedOverrides) {
+          overrideOptions = JSON.parse(storedOverrides)
+          // Clear after reading
+          sessionStorage.removeItem('job_creation_overrides')
+        }
+      }
+
       // Ensure price_total is a valid number
       const priceValue = parseFloat(jobData.price_total)
       const finalPrice = isNaN(priceValue) ? 0 : priceValue
@@ -157,6 +152,9 @@ function CustomerConfirmContent() {
         onboarding_completed: true,
         device_in_shop: jobData.device_left_with_us,
         linked_quote_id: jobData.linked_quote_id,
+        // Advanced overrides for importing old jobs
+        initial_status: overrideOptions?.initial_status || null,
+        skip_sms: overrideOptions?.skip_initial_sms || false,
       }
 
       console.log('🔍 Submitting job with payload:', payload)

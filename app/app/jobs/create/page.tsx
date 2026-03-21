@@ -39,6 +39,12 @@ export default function CreateJobPage() {
     passcode_requirement: 'not_required' as 'not_required' | 'recommended' | 'required',
     linked_quote_id: null as string | null,
   })
+  
+  // Advanced override options for importing old jobs
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
+  const [overrideInitialStatus, setOverrideInitialStatus] = useState(false)
+  const [initialStatus, setInitialStatus] = useState('RECEIVED')
+  const [skipInitialSMS, setSkipInitialSMS] = useState(false)
 
   // Save quick mode state to localStorage whenever it changes
   useEffect(() => {
@@ -150,11 +156,21 @@ export default function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Store advanced options in sessionStorage for customer-confirm page
+    if (overrideInitialStatus || skipInitialSMS) {
+      sessionStorage.setItem('job_creation_overrides', JSON.stringify({
+        initial_status: overrideInitialStatus ? initialStatus : null,
+        skip_initial_sms: skipInitialSMS,
+      }))
+    } else {
+      sessionStorage.removeItem('job_creation_overrides')
+    }
+    
     // Navigate to customer confirmation page with job data
     const params = new URLSearchParams({
+      device_type: formData.device_type,
       device_make: formData.device_make,
       device_model: formData.device_model,
-      device_type: formData.device_type,
       issue: formData.issue,
       description: formData.description || '',
       price_total: formData.price_total || '0',
@@ -752,6 +768,88 @@ export default function CreateJobPage() {
               </div>
             </div>
           )}
+
+          {/* Advanced Options - For importing old jobs */}
+          <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-2xl shadow-lg border-2 border-orange-200 dark:border-orange-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="w-full p-4 flex items-center justify-between hover:bg-orange-100/50 dark:hover:bg-orange-900/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Wrench className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                <h3 className="font-bold text-gray-900 dark:text-white">Advanced Options</h3>
+                <span className="text-xs bg-orange-200 dark:bg-orange-800 text-orange-900 dark:text-orange-100 px-2 py-1 rounded-full">For importing old jobs</span>
+              </div>
+              <svg className={`h-5 w-5 text-gray-600 dark:text-gray-400 transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showAdvancedOptions && (
+              <div className="p-6 pt-0 space-y-4 border-t-2 border-orange-200 dark:border-orange-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200 dark:border-orange-700">
+                  <strong>Use these options when adding old jobs to the system.</strong> This prevents confusing customers with notifications about jobs they already know about.
+                </p>
+                
+                {/* Override Initial Status */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start space-x-3 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={overrideInitialStatus}
+                      onChange={(e) => setOverrideInitialStatus(e.target.checked)}
+                      className="w-5 h-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mt-0.5"
+                      id="override_status"
+                    />
+                    <label htmlFor="override_status" className="text-sm text-gray-900 dark:text-white cursor-pointer flex-1">
+                      <strong>Override Initial Status</strong>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Set a custom starting status instead of automatic RECEIVED/QUOTE_APPROVED
+                      </p>
+                    </label>
+                  </div>
+                  
+                  {overrideInitialStatus && (
+                    <select
+                      value={initialStatus}
+                      onChange={(e) => setInitialStatus(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="QUOTE_APPROVED">Quote Approved</option>
+                      <option value="RECEIVED">Received</option>
+                      <option value="AWAITING_DEPOSIT">Awaiting Deposit</option>
+                      <option value="PARTS_ORDERED">Parts Ordered</option>
+                      <option value="PARTS_ARRIVED">Parts Arrived</option>
+                      <option value="IN_REPAIR">In Repair</option>
+                      <option value="READY_TO_COLLECT">Ready to Collect</option>
+                      <option value="COLLECTED">Collected</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  )}
+                </div>
+                
+                {/* Skip Initial SMS */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={skipInitialSMS}
+                      onChange={(e) => setSkipInitialSMS(e.target.checked)}
+                      className="w-5 h-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mt-0.5"
+                      id="skip_sms"
+                    />
+                    <label htmlFor="skip_sms" className="text-sm text-gray-900 dark:text-white cursor-pointer">
+                      <strong>Skip Initial SMS Notification</strong>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Don't send SMS when creating this job (prevents confusing customers about old jobs). <strong className="text-orange-600 dark:text-orange-400">Future status updates will still send notifications normally.</strong>
+                      </p>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-4">
             <button
