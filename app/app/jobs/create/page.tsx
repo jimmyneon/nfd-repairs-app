@@ -829,7 +829,7 @@ export default function CreateJobPage() {
                   )}
                 </div>
                 
-                {/* Skip Initial SMS */}
+                {/* Skip Initial Notifications */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-600">
                   <div className="flex items-start space-x-3">
                     <input
@@ -840,9 +840,9 @@ export default function CreateJobPage() {
                       id="skip_sms"
                     />
                     <label htmlFor="skip_sms" className="text-sm text-gray-900 dark:text-white cursor-pointer">
-                      <strong>Skip Initial SMS Notification</strong>
+                      <strong>Skip Initial Notifications (SMS & Email)</strong>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        Don't send SMS when creating this job (prevents confusing customers about old jobs). <strong className="text-orange-600 dark:text-orange-400">Future status updates will still send notifications normally.</strong>
+                        Don't send SMS or email when creating this job (prevents confusing customers about old jobs). <strong className="text-orange-600 dark:text-orange-400">Future status updates will still send both SMS and email notifications normally.</strong>
                       </p>
                     </label>
                   </div>

@@ -250,13 +250,13 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('✅ Template found:', template.key)
       
-      // Skip SMS if requested (e.g., from batch import)
+      // Skip SMS and Email if requested (e.g., from batch import or old job import)
       if (skip_sms) {
-        console.log('⏭️ Skipping SMS (skip_sms flag set)')
+        console.log('⏭️ Skipping initial notifications (skip_sms flag set)')
         await supabase.from('job_events').insert({
           job_id: job.id,
           type: 'SYSTEM',
-          message: 'SMS notification skipped (imported job)',
+          message: 'Initial SMS and email notifications skipped (imported job)',
         } as any)
         
         return NextResponse.json({ 
@@ -264,6 +264,7 @@ export async function POST(request: NextRequest) {
           job_id: job.id,
           job_ref: job.job_ref,
           sms_skipped: true,
+          email_skipped: true,
         })
       }
       
@@ -344,8 +345,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send email notification if customer has email
-    if (jobData.customer_email) {
+    // Send email notification if customer has email (already handled by skip_sms check above)
+    // Note: skip_sms flag now skips both SMS and email for initial notification
+    if (jobData.customer_email && !skip_sms) {
       try {
         const appUrl = 'https://nfd-repairs-app.vercel.app'
         await fetch(`${appUrl}/api/email/send`, {
