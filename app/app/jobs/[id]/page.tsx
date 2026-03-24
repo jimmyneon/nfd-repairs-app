@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -33,6 +33,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [pendingDelayNotes, setPendingDelayNotes] = useState<string>('')
   const [willSendSMS, setWillSendSMS] = useState(false)
   const [willSendEmail, setWillSendEmail] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -482,6 +483,162 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </Link>
         </div>
 
+        {/* Device Password & Additional Info Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            Device Access & Details
+          </h2>
+          
+          <div className="space-y-4">
+            {/* Device Password */}
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Device Password/Passcode</p>
+              {job.password_not_applicable ? (
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <ShieldCheck className="h-5 w-5 text-gray-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">No password set on device</span>
+                </div>
+              ) : job.device_password ? (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 p-4 rounded-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Lock className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                        <span className="text-xs font-bold text-blue-900 dark:text-blue-300">CONFIDENTIAL</span>
+                      </div>
+                      <p className="text-lg font-mono font-bold text-gray-900 dark:text-white break-all">
+                        {showPassword ? job.device_password : '••••••••'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="flex-shrink-0 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors active:scale-95"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                  {job.passcode_deletion_scheduled_at && (
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Auto-delete scheduled: {new Date(job.passcode_deletion_scheduled_at).toLocaleString('en-GB')}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">Password not provided yet</span>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {job.description && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Additional Description</p>
+                <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded-lg break-words">{job.description}</p>
+              </div>
+            )}
+
+            {/* Additional Issues */}
+            {job.additional_issues && job.additional_issues.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Additional Issues</p>
+                <div className="space-y-2">
+                  {job.additional_issues.map((additionalIssue, index) => (
+                    <div key={index} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">{additionalIssue.issue}</p>
+                      {additionalIssue.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{additionalIssue.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Device In Shop Status */}
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Device Location</p>
+              <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                job.device_in_shop 
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                  : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
+              }`}>
+                {job.device_in_shop ? (
+                  <>
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-bold text-green-900 dark:text-green-300">Device is in shop</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Device not yet received</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Onboarding Status */}
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Onboarding Status</p>
+              <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                job.onboarding_completed 
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                  : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+              }`}>
+                {job.onboarding_completed ? (
+                  <>
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <span className="text-sm font-bold text-green-900 dark:text-green-300">Onboarding completed</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Onboarding pending</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Terms Accepted */}
+            {job.terms_accepted && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Terms & Conditions</p>
+                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-bold text-green-900 dark:text-green-300">Accepted by customer</span>
+                </div>
+              </div>
+            )}
+
+            {/* Source & Page Info */}
+            {(job.source || job.page) && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Job Source</p>
+                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  {job.source && (
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      <span className="font-semibold">Source:</span> {job.source}
+                    </p>
+                  )}
+                  {job.page && (
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      <span className="font-semibold">Page:</span> {job.page}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Price Card */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
           <div className="space-y-3">
@@ -532,13 +689,67 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         <div className="card">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Customer Contact</h2>
-          <p className="text-sm text-gray-600 mb-3">Tap to call, text, or message</p>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Customer Contact</h2>
+          <div className="space-y-3 mb-4">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Name</p>
+              <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Phone</p>
+              <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_phone}</p>
+            </div>
+            {job.customer_email && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Email</p>
+                <p className="text-base text-gray-900 dark:text-white font-medium break-all">{job.customer_email}</p>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Tap to call, text, or message</p>
           <ContactActions 
             phone={job.customer_phone} 
             name={job.customer_name}
           />
         </div>
+
+        {/* Delay/Cancellation Reasons */}
+        {(job.delay_reason || job.cancellation_reason) && (
+          <div className="card bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
+            <h2 className="text-lg font-bold text-red-900 dark:text-red-300 mb-4 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              {job.delay_reason ? 'Delay Information' : 'Cancellation Information'}
+            </h2>
+            {job.delay_reason && (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-red-700 dark:text-red-400 mb-1 font-semibold">Delay Reason</p>
+                  <p className="text-sm text-red-900 dark:text-red-200 font-bold">{job.delay_reason.replace(/_/g, ' ')}</p>
+                </div>
+                {job.delay_notes && (
+                  <div>
+                    <p className="text-xs text-red-700 dark:text-red-400 mb-1 font-semibold">Additional Notes</p>
+                    <p className="text-sm text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/30 p-3 rounded-lg">{job.delay_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {job.cancellation_reason && (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-red-700 dark:text-red-400 mb-1 font-semibold">Cancellation Reason</p>
+                  <p className="text-sm text-red-900 dark:text-red-200 font-bold">{job.cancellation_reason.replace(/_/g, ' ')}</p>
+                </div>
+                {job.cancellation_notes && (
+                  <div>
+                    <p className="text-xs text-red-700 dark:text-red-400 mb-1 font-semibold">Additional Notes</p>
+                    <p className="text-sm text-red-900 dark:text-red-200 bg-red-100 dark:bg-red-900/30 p-3 rounded-lg">{job.cancellation_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {job.deposit_required && !job.deposit_received && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">

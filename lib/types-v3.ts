@@ -35,6 +35,8 @@ export interface Job {
   issue: string
   description?: string | null
   additional_issues: AdditionalIssue[]
+  device_password?: string | null
+  password_not_applicable?: boolean
   
   // Type & source
   type: JobType
@@ -65,6 +67,12 @@ export interface Job {
   
   // Tracking
   tracking_token: string
+  
+  // Onboarding
+  onboarding_completed?: boolean
+  customer_signature?: string | null
+  terms_accepted?: boolean
+  passcode_deletion_scheduled_at?: string | null
   
   // Relationships
   conversation_id?: string | null
