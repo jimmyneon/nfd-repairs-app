@@ -110,7 +110,6 @@ function CustomerConfirmContent() {
       termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-    }
 
     setLoading(true)
 
