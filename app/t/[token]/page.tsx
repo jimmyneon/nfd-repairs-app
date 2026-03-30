@@ -407,6 +407,17 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   console.log('Display status:', displayStatus)
   console.log('Current step index:', currentStepIndex)
   console.log('Status steps:', statusSteps)
+  
+  // Safety check: if displayStatus is not in statusSteps, something is wrong
+  if (currentStepIndex === -1) {
+    console.error('❌ TIMELINE ERROR: displayStatus not found in statusSteps!')
+    console.error('This means the job status is:', job.status)
+    console.error('And we tried to display:', displayStatus)
+    console.error('But statusSteps only contains:', statusSteps)
+    console.error('Parts required:', job.parts_required)
+    console.error('Deposit required:', job.deposit_required)
+    console.error('Source:', job.source)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
@@ -504,7 +515,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <div className="space-y-4">
               {statusSteps.map((step, index) => {
                 const isCurrent = step === displayStatus
-                const isCompleted = index < currentStepIndex
+                // If currentStepIndex is -1, nothing is completed yet
+                const isCompleted = currentStepIndex >= 0 ? index < currentStepIndex : false
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
 
                 return (
