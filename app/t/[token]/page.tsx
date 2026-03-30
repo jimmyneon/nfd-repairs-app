@@ -15,6 +15,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showStatusInfo, setShowStatusInfo] = useState(false)
   const [statusChangedAt, setStatusChangedAt] = useState<Date | null>(null)
+  const [previousStatus, setPreviousStatus] = useState<string | null>(null)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -118,17 +119,44 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       // Get most recent status change event
       const { data: events } = await supabase
         .from('job_events')
-        .select('created_at')
+        .select('created_at, message')
         .eq('job_id', data.id)
         .eq('type', 'STATUS_CHANGE')
         .order('created_at', { ascending: false })
-        .limit(1)
+        .limit(10)
       
       if (events && events.length > 0) {
         setStatusChangedAt(new Date(events[0].created_at))
+        
+        // If current status is DELAYED, find the previous non-DELAYED status from events
+        if (data.status === 'DELAYED' && events.length > 1) {
+          // Look through events to find the last non-DELAYED status
+          for (let i = 0; i < events.length; i++) {
+            const message = events[i].message
+            // Extract status from message like "Status changed to Parts Ordered"
+            if (message && !message.includes('Delayed')) {
+              // Try to extract the status from the message
+              const statusMatch = message.match(/Status changed to (.+?)(?:\s*-|$)/)
+              if (statusMatch) {
+                const statusLabel = statusMatch[1].trim()
+                // Convert label back to status key
+                const statusKey = Object.entries(JOB_STATUS_LABELS).find(
+                  ([key, label]) => label === statusLabel
+                )?.[0]
+                if (statusKey && statusKey !== 'DELAYED') {
+                  setPreviousStatus(statusKey)
+                  break
+                }
+              }
+            }
+          }
+        } else {
+          setPreviousStatus(null)
+        }
       } else {
         // If no status change events, use job creation date
         setStatusChangedAt(new Date(data.created_at))
+        setPreviousStatus(null)
       }
     }
     setLoading(false)
@@ -342,8 +370,24 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   
   const statusSteps = buildStatusSteps()
 
-  // If status is DELAYED, show IN_REPAIR as current step (DELAYED is a modifier, not a separate step)
-  const displayStatus = job.status === 'DELAYED' ? 'IN_REPAIR' : job.status
+  // If status is DELAYED, use the previousStatus from job_events history
+  // DELAYED is a modifier status, not a separate step in the timeline
+  const getActualStepForDelayed = (): string => {
+    // Use the previousStatus if we found it from job_events
+    if (previousStatus && statusSteps.includes(previousStatus)) {
+      return previousStatus
+    }
+    
+    // Fallback: infer from job data if we couldn't get it from events
+    if (job.parts_required || job.deposit_required) {
+      // Most common delay point is during parts ordering
+      return 'PARTS_ORDERED'
+    }
+    // If no parts required, we're likely in the repair phase
+    return 'IN_REPAIR'
+  }
+
+  const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed() : job.status
   const currentStepIndex = statusSteps.indexOf(displayStatus)
 
   return (
@@ -443,7 +487,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               {statusSteps.map((step, index) => {
                 const isCurrent = step === displayStatus
                 const isCompleted = index < currentStepIndex
-                const isDelayed = job.status === 'DELAYED' && step === 'IN_REPAIR'
+                const isDelayed = job.status === 'DELAYED' && step === displayStatus
 
                 return (
                   <div key={step} className="relative">
