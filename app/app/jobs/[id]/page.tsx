@@ -34,6 +34,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [willSendSMS, setWillSendSMS] = useState(false)
   const [willSendEmail, setWillSendEmail] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -1163,29 +1165,59 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <div className="card">
           <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Tracking Link</h2>
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Share this link with the customer:</p>
-          <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-xs break-all text-gray-900 dark:text-white mb-3">
+          <button
+            onClick={() => setShowTrackingLinkModal(true)}
+            className="w-full bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-left text-primary hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer border border-gray-200 dark:border-gray-600"
+          >
             https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`)
-                alert('Link copied to clipboard!')
-              }}
-              className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded transition-colors text-sm"
-            >
-              📋 Copy Link
-            </button>
-            <button
-              onClick={() => {
-                window.open(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`, '_blank')
-              }}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors text-sm"
-            >
-              🔗 Open in New Tab
-            </button>
-          </div>
+          </button>
         </div>
+
+        {/* Tracking Link Modal */}
+        {showTrackingLinkModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-xl">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer Tracking Link</h3>
+              
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-gray-900 dark:text-white mb-4 border border-gray-200 dark:border-gray-600">
+                https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
+              </div>
+
+              <div className="space-y-2 mb-4">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`)
+                    setLinkCopied(true)
+                    setTimeout(() => setLinkCopied(false), 2000)
+                  }}
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-4 rounded transition-colors"
+                >
+                  {linkCopied ? 'Copied!' : 'Copy to Clipboard'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    window.open(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`, '_blank')
+                    setShowTrackingLinkModal(false)
+                  }}
+                  className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-4 rounded transition-colors"
+                >
+                  Open in New Tab
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowTrackingLinkModal(false)
+                  setLinkCopied(false)
+                }}
+                className="w-full text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm py-2"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
