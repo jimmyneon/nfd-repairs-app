@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       repair_summary,
       price_total,
       parts_required,
+      deposit_required,
       deposit_amount,
       
       // Onboarding fields (from manual job creation)
@@ -75,19 +76,19 @@ export async function POST(request: NextRequest) {
       price_total: price_total || quoted_price || 0,
       quoted_at: quoted_price ? new Date().toISOString() : null,
       
-      // Parts & deposit (always £20 for parts)
-      // Auto-infer from initial_status if status implies parts are needed
+      // Parts & deposit (always £20 for parts when deposit required)
+      // Auto-infer parts_required from initial_status if status implies parts are needed
+      // But deposit_required is ONLY set if explicitly requested or status is AWAITING_DEPOSIT
       requires_parts_order: requires_parts_order || parts_required || 
-                           (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+                           (initial_status && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
                            false,
       parts_required: parts_required || requires_parts_order || 
-                     (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+                     (initial_status && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
                      false,
-      deposit_required: requires_parts_order || parts_required || 
-                       (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+      deposit_required: deposit_required || 
+                       (initial_status && initial_status === 'AWAITING_DEPOSIT') || 
                        false,
-      deposit_amount: (requires_parts_order || parts_required || 
-                      (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status))) 
+      deposit_amount: (deposit_required || (initial_status && initial_status === 'AWAITING_DEPOSIT')) 
                       ? 20.00 : null,
       deposit_received: false,
       
