@@ -357,8 +357,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     // All jobs go through RECEIVED when device is in shop
     steps.push('RECEIVED')
     
+    // Infer if parts are needed from either the flag OR the current status
+    // This handles data inconsistencies where status is PARTS_ORDERED but parts_required=false
+    const needsPartsSteps = job.parts_required || 
+                           job.deposit_required || 
+                           ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(job.status) ||
+                           (job.status === 'DELAYED' && previousStatus && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(previousStatus))
+    
     // Only show parts-related steps if parts are actually required
-    if (job.parts_required || job.deposit_required) {
+    if (needsPartsSteps) {
       steps.push('AWAITING_DEPOSIT')
       steps.push('PARTS_ORDERED')
       steps.push('PARTS_ARRIVED')

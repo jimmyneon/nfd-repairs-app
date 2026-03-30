@@ -1163,8 +1163,27 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <div className="card">
           <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Tracking Link</h2>
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Share this link with the customer:</p>
-          <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-xs break-all text-gray-900 dark:text-white">
+          <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded text-xs break-all text-gray-900 dark:text-white mb-3">
             https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`)
+                alert('Link copied to clipboard!')
+              }}
+              className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-2 px-4 rounded transition-colors text-sm"
+            >
+              📋 Copy Link
+            </button>
+            <button
+              onClick={() => {
+                window.open(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`, '_blank')
+              }}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors text-sm"
+            >
+              🔗 Open in New Tab
+            </button>
           </div>
         </div>
       </main>
