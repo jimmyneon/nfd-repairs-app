@@ -130,21 +130,26 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         
         // If current status is DELAYED, find the previous non-DELAYED status from events
         if (data.status === 'DELAYED' && events.length > 1) {
+          console.log('🔍 Job is DELAYED, searching for previous status in events:', events)
           // Look through events to find the last non-DELAYED status
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
+            console.log(`Event ${i}:`, message)
             // Extract status from message like "Status changed to Parts Ordered"
             if (message && !message.includes('Delayed')) {
               // Try to extract the status from the message
               const statusMatch = message.match(/Status changed to (.+?)(?:\s*-|$)/)
               if (statusMatch) {
                 const statusLabel = statusMatch[1].trim()
+                console.log('Found status label:', statusLabel)
                 // Convert label back to status key
                 const statusKey = Object.entries(JOB_STATUS_LABELS).find(
                   ([key, label]) => label === statusLabel
                 )?.[0]
+                console.log('Converted to status key:', statusKey)
                 if (statusKey && statusKey !== 'DELAYED') {
                   setPreviousStatus(statusKey)
+                  console.log('✅ Set previousStatus to:', statusKey)
                   break
                 }
               }
@@ -373,22 +378,35 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   // If status is DELAYED, use the previousStatus from job_events history
   // DELAYED is a modifier status, not a separate step in the timeline
   const getActualStepForDelayed = (): string => {
+    console.log('🔄 getActualStepForDelayed called')
+    console.log('previousStatus:', previousStatus)
+    console.log('statusSteps:', statusSteps)
+    
     // Use the previousStatus if we found it from job_events
     if (previousStatus && statusSteps.includes(previousStatus)) {
+      console.log('✅ Using previousStatus:', previousStatus)
       return previousStatus
     }
     
     // Fallback: infer from job data if we couldn't get it from events
     if (job.parts_required || job.deposit_required) {
+      console.log('⚠️ Fallback to PARTS_ORDERED (parts required)')
       // Most common delay point is during parts ordering
       return 'PARTS_ORDERED'
     }
+    console.log('⚠️ Fallback to IN_REPAIR (no parts)')
     // If no parts required, we're likely in the repair phase
     return 'IN_REPAIR'
   }
 
   const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed() : job.status
   const currentStepIndex = statusSteps.indexOf(displayStatus)
+  
+  console.log('📊 Timeline Debug:')
+  console.log('Job status:', job.status)
+  console.log('Display status:', displayStatus)
+  console.log('Current step index:', currentStepIndex)
+  console.log('Status steps:', statusSteps)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
