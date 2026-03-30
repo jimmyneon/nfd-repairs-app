@@ -180,6 +180,91 @@ export async function POST(request: NextRequest) {
       message: `Job created via API from ${jobData.source}`,
     } as any)
 
+    // If initial_status was provided (imported/manual job with skipped statuses),
+    // create synthetic STATUS_CHANGE events for the logical steps that must have occurred
+    if (initial_status && initial_status !== 'QUOTE_APPROVED' && initial_status !== 'RECEIVED') {
+      const syntheticEvents: any[] = []
+      const now = new Date()
+      
+      // All jobs must go through RECEIVED if they're past that point
+      if (source === 'staff_manual' || ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: 'Status changed to Received',
+          created_at: new Date(now.getTime() - 60000 * syntheticEvents.length).toISOString(), // Stagger by 1 minute each
+        })
+      }
+      
+      // If parts required and status is past AWAITING_DEPOSIT
+      if (jobData.parts_required && ['PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: 'Status changed to Awaiting Deposit',
+          created_at: new Date(now.getTime() - 60000 * syntheticEvents.length).toISOString(),
+        })
+      }
+      
+      // If status is PARTS_ORDERED or beyond
+      if (jobData.parts_required && ['PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: 'Status changed to Parts Ordered',
+          created_at: new Date(now.getTime() - 60000 * syntheticEvents.length).toISOString(),
+        })
+      }
+      
+      // If status is PARTS_ARRIVED or beyond
+      if (jobData.parts_required && ['PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: 'Status changed to Parts Arrived',
+          created_at: new Date(now.getTime() - 60000 * syntheticEvents.length).toISOString(),
+        })
+      }
+      
+      // If status is IN_REPAIR or DELAYED or beyond
+      if (['IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: 'Status changed to In Repair',
+          created_at: new Date(now.getTime() - 60000 * syntheticEvents.length).toISOString(),
+        })
+      }
+      
+      // Finally, add the actual initial_status event (unless it's DELAYED, which is handled separately)
+      if (initial_status !== 'DELAYED') {
+        const statusLabels: Record<string, string> = {
+          'QUOTE_APPROVED': 'Quote Approved',
+          'RECEIVED': 'Received',
+          'AWAITING_DEPOSIT': 'Awaiting Deposit',
+          'PARTS_ORDERED': 'Parts Ordered',
+          'PARTS_ARRIVED': 'Parts Arrived',
+          'IN_REPAIR': 'In Repair',
+          'READY_TO_COLLECT': 'Ready to Collect',
+          'COLLECTED': 'Collected',
+          'COMPLETED': 'Completed',
+        }
+        
+        syntheticEvents.push({
+          job_id: job.id,
+          type: 'STATUS_CHANGE',
+          message: `Status changed to ${statusLabels[initial_status] || initial_status}`,
+          created_at: now.toISOString(),
+        })
+      }
+      
+      // Insert all synthetic events
+      if (syntheticEvents.length > 0) {
+        await supabase.from('job_events').insert(syntheticEvents)
+        console.log(`✅ Created ${syntheticEvents.length} synthetic status events for imported job`)
+      }
+    }
+
     // Create staff notification
     await supabase.from('notifications').insert({
       type: 'NEW_JOB',
