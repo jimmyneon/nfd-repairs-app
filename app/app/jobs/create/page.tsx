@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle } from 'lucide-react'
+import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
@@ -45,6 +45,10 @@ export default function CreateJobPage() {
   const [overrideInitialStatus, setOverrideInitialStatus] = useState(false)
   const [initialStatus, setInitialStatus] = useState('RECEIVED')
   const [skipInitialSMS, setSkipInitialSMS] = useState(false)
+  
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [showValidationSummary, setShowValidationSummary] = useState(false)
 
   // Save quick mode state to localStorage whenever it changes
   useEffect(() => {
@@ -156,6 +160,53 @@ export default function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validate required fields
+    const errors: Record<string, string> = {}
+    
+    if (!formData.device_type) {
+      errors.device_type = 'Device type is required'
+    }
+    
+    if (!formData.device_make) {
+      errors.device_make = 'Device make is required'
+    }
+    
+    if (!quickWalkInMode && !formData.device_model) {
+      errors.device_model = 'Device model is required'
+    }
+    
+    if (!formData.issue) {
+      errors.issue = 'Issue is required'
+    }
+    
+    // If there are validation errors, show them and prevent submission
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      setShowValidationSummary(true)
+      
+      // Scroll to the first error field
+      const firstErrorField = Object.keys(errors)[0]
+      const errorElement = document.querySelector(`[name="${firstErrorField}"]`)
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Focus the field after scrolling
+        setTimeout(() => {
+          (errorElement as HTMLElement).focus()
+        }, 500)
+      }
+      
+      // Hide validation summary after 10 seconds
+      setTimeout(() => {
+        setShowValidationSummary(false)
+      }, 10000)
+      
+      return
+    }
+    
+    // Clear any previous validation errors
+    setValidationErrors({})
+    setShowValidationSummary(false)
+    
     // Store advanced options in sessionStorage for customer-confirm page
     if (overrideInitialStatus || skipInitialSMS) {
       sessionStorage.setItem('job_creation_overrides', JSON.stringify({
@@ -235,6 +286,19 @@ export default function CreateJobPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
+    
+    // Clear validation error for this field when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[name]
+        return newErrors
+      })
+      // Hide summary if no more errors
+      if (Object.keys(validationErrors).length === 1) {
+        setShowValidationSummary(false)
+      }
+    }
     
     // Reset make when device type changes
     if (name === 'device_type') {
@@ -396,39 +460,59 @@ export default function CreateJobPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Device Type {!formData.device_type && '*'}
+                  Device Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="device_type"
                   value={formData.device_type}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                    validationErrors.device_type 
+                      ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                  }`}
                 >
                   <option value="">Select device type...</option>
                   {deviceTypes.map(type => (
                     <option key={type.value} value={type.value}>{type.label}</option>
                   ))}
                 </select>
+                {validationErrors.device_type && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {validationErrors.device_type}
+                  </p>
+                )}
               </div>
 
               {formData.device_type && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Make *
+                    Make <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="device_make"
                     value={formData.device_make}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.device_make 
+                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
                   >
                     <option value="">Select make...</option>
                     {makesByType[formData.device_type]?.map(make => (
                       <option key={make} value={make}>{make}</option>
                     ))}
                   </select>
+                  {validationErrors.device_make && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.device_make}
+                    </p>
+                  )}
                   {showMakeOther && (
                     <input
                       type="text"
@@ -444,7 +528,7 @@ export default function CreateJobPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Model {!quickWalkInMode && '*'}
+                  Model {!quickWalkInMode && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
@@ -452,15 +536,25 @@ export default function CreateJobPage() {
                   value={formData.device_model}
                   onChange={handleChange}
                   required={!quickWalkInMode}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                    validationErrors.device_model 
+                      ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                  }`}
                   placeholder={quickWalkInMode ? "Optional - or use preset above" : "e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"}
                 />
+                {validationErrors.device_model && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {validationErrors.device_model}
+                  </p>
+                )}
               </div>
 
               {/* Common Issue Presets - Only in Quick Mode */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Issue *{quickWalkInMode ? ' - Quick Select' : ''}
+                  Issue <span className="text-red-500">*</span>{quickWalkInMode ? ' - Quick Select' : ''}
                 </label>
                 {quickWalkInMode && (
                   <>
@@ -492,13 +586,23 @@ export default function CreateJobPage() {
                   value={formData.issue}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                    validationErrors.issue 
+                      ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                  }`}
                 >
                   <option value="">Select issue...</option>
                   {commonIssues.map(issue => (
                     <option key={issue} value={issue}>{issue}</option>
                   ))}
                 </select>
+                {validationErrors.issue && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {validationErrors.issue}
+                  </p>
+                )}
                 {showIssueOther && (
                   <input
                     type="text"
@@ -850,6 +954,35 @@ export default function CreateJobPage() {
               </div>
             )}
           </div>
+
+          {/* Validation Error Summary - Shown at bottom near submit button */}
+          {showValidationSummary && Object.keys(validationErrors).length > 0 && (
+            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-900 dark:text-red-100 text-lg mb-2">Please complete the following required fields:</h3>
+                  <ul className="space-y-1">
+                    {Object.entries(validationErrors).map(([field, message]) => (
+                      <li key={field} className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
+                        <strong>{message}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowValidationSummary(false)}
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-4">
             <button

@@ -33,6 +33,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [pendingDelayNotes, setPendingDelayNotes] = useState<string>('')
   const [willSendSMS, setWillSendSMS] = useState(false)
   const [willSendEmail, setWillSendEmail] = useState(false)
+  const [overrideSMS, setOverrideSMS] = useState(false)
+  const [overrideEmail, setOverrideEmail] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -127,8 +129,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', status)
       .single()
     
-    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    // Special handling for PARTS_ARRIVED: Don't send SMS if device already in shop
+    let shouldSendSMS = config?.send_sms && config?.is_active || false
+    if (status === 'PARTS_ARRIVED' && job?.device_in_shop) {
+      shouldSendSMS = false
+    }
+    
+    setWillSendSMS(shouldSendSMS)
     setWillSendEmail(config?.send_email && config?.is_active || false)
+    setOverrideSMS(false)
+    setOverrideEmail(false)
     
     setShowStatusModal(true)
   }
@@ -144,8 +154,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', status)
       .single()
     
-    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    // Special handling for PARTS_ARRIVED: Don't send SMS if device already in shop
+    let shouldSendSMS = config?.send_sms && config?.is_active || false
+    if (status === 'PARTS_ARRIVED' && job?.device_in_shop) {
+      shouldSendSMS = false
+    }
+    
+    setWillSendSMS(shouldSendSMS)
     setWillSendEmail(config?.send_email && config?.is_active || false)
+    setOverrideSMS(false)
+    setOverrideEmail(false)
     
     setShowSimpleConfirm(true)
   }
@@ -183,46 +201,54 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       job_id: job.id,
     })
 
-    // Queue SMS for status change
-    try {
-      console.log('🔔 Queueing SMS for status:', pendingWorkflowStatus)
-      const response = await fetch('/api/jobs/queue-status-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId: job.id,
-          status: pendingWorkflowStatus,
-        }),
-      })
-      console.log('SMS queue response:', response.status, response.ok)
-      if (!response.ok) {
-        const error = await response.text()
-        console.error('SMS queue failed:', error)
-      }
-    } catch (error) {
-      console.error('Failed to queue status SMS:', error)
-    }
-
-    // Send email notification
-    console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
-    if (job.customer_email) {
+    // Queue SMS for status change (unless overridden)
+    if (!overrideSMS) {
       try {
-        console.log('📧 Calling email API for workflow status change...')
-        const emailResponse = await fetch('/api/email/send', {
+        console.log('🔔 Queueing SMS for status:', pendingWorkflowStatus)
+        const response = await fetch('/api/jobs/queue-status-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jobId: job.id,
-            type: 'STATUS_UPDATE',
+            status: pendingWorkflowStatus,
           }),
         })
-        const emailResult = await emailResponse.json()
-        console.log('📧 Email API response:', emailResponse.status, emailResult)
+        console.log('SMS queue response:', response.status, response.ok)
+        if (!response.ok) {
+          const error = await response.text()
+          console.error('SMS queue failed:', error)
+        }
       } catch (error) {
-        console.error('❌ Failed to send email:', error)
+        console.error('Failed to queue status SMS:', error)
       }
     } else {
-      console.log('⚠️ No customer email - skipping email notification')
+      console.log('⏭️ SMS skipped by user override')
+    }
+
+    // Send email notification (unless overridden)
+    if (!overrideEmail) {
+      console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
+      if (job.customer_email) {
+        try {
+          console.log('📧 Calling email API for workflow status change...')
+          const emailResponse = await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: job.id,
+              type: 'STATUS_UPDATE',
+            }),
+          })
+          const emailResult = await emailResponse.json()
+          console.log('📧 Email API response:', emailResponse.status, emailResult)
+        } catch (error) {
+          console.error('❌ Failed to send email:', error)
+        }
+      } else {
+        console.log('⚠️ No customer email - skipping email notification')
+      }
+    } else {
+      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -245,6 +271,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     
     setWillSendSMS(config?.send_sms && config?.is_active || false)
     setWillSendEmail(config?.send_email && config?.is_active || false)
+    setOverrideSMS(false)
+    setOverrideEmail(false)
     
     // Show confirmation modal
     setShowDelayConfirm(true)
@@ -278,34 +306,42 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       job_id: job.id,
     } as any)
 
-    // Queue SMS for DELAYED status (will include delay_reason and delay_notes)
-    try {
-      await fetch('/api/jobs/queue-status-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId: job.id,
-          status: 'DELAYED',
-        }),
-      })
-    } catch (error) {
-      console.error('Failed to queue delay SMS:', error)
-    }
-
-    // Send email notification
-    if (job.customer_email) {
+    // Queue SMS for DELAYED status (will include delay_reason and delay_notes) - unless overridden
+    if (!overrideSMS) {
       try {
-        await fetch('/api/email/send', {
+        await fetch('/api/jobs/queue-status-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jobId: job.id,
-            type: 'STATUS_UPDATE',
+            status: 'DELAYED',
           }),
         })
       } catch (error) {
-        console.error('Failed to send delay email:', error)
+        console.error('Failed to queue delay SMS:', error)
       }
+    } else {
+      console.log('⏭️ SMS skipped by user override')
+    }
+
+    // Send email notification (unless overridden)
+    if (!overrideEmail) {
+      if (job.customer_email) {
+        try {
+          await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: job.id,
+              type: 'STATUS_UPDATE',
+            }),
+          })
+        } catch (error) {
+          console.error('Failed to send delay email:', error)
+        }
+      }
+    } else {
+      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -951,15 +987,36 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   <div className="flex items-start space-x-3">
                     <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
-                      <div className="text-xs text-blue-700 space-y-1">
+                      <p className="text-sm font-bold text-blue-900 mb-2">Notifications Will Be Sent</p>
+                      <div className="space-y-2">
                         {willSendSMS && (
-                          <p>✓ <span className="font-semibold">SMS</span> - Customer will receive a text message</p>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideSMS}
+                              onChange={(e) => setOverrideSMS(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">SMS</span> - Customer will receive a text message
+                            </span>
+                          </label>
                         )}
                         {willSendEmail && (
-                          <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideEmail}
+                              onChange={(e) => setOverrideEmail(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">Email</span> - Customer will receive an email
+                            </span>
+                          </label>
                         )}
                       </div>
+                      <p className="text-xs text-blue-600 mt-2">Uncheck to skip sending that notification</p>
                     </div>
                   </div>
                 </div>
@@ -1013,16 +1070,37 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   <div className="flex items-start space-x-3">
                     <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
-                      <div className="text-xs text-blue-700 space-y-1">
+                      <p className="text-sm font-bold text-blue-900 mb-2">Notifications Will Be Sent</p>
+                      <div className="space-y-2">
                         {willSendSMS && (
-                          <p>✓ <span className="font-semibold">SMS</span> - Customer will receive delay reason and notes</p>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideSMS}
+                              onChange={(e) => setOverrideSMS(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">SMS</span> - Customer will receive delay reason and notes
+                            </span>
+                          </label>
                         )}
                         {willSendEmail && (
-                          <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideEmail}
+                              onChange={(e) => setOverrideEmail(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">Email</span> - Customer will receive an email
+                            </span>
+                          </label>
                         )}
                       </div>
                       <p className="text-xs text-blue-600 mt-2">To: {job.customer_phone}{job.customer_email ? ` / ${job.customer_email}` : ''}</p>
+                      <p className="text-xs text-blue-600 mt-1">Uncheck to skip sending that notification</p>
                     </div>
                   </div>
                 </div>

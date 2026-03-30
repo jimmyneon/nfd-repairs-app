@@ -38,6 +38,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Special handling for PARTS_ARRIVED: Don't send SMS if device already in shop
+    if (status === 'PARTS_ARRIVED' && job.device_in_shop) {
+      console.log(`PARTS_ARRIVED: Device already in shop for job ${job.job_ref} - skipping SMS`)
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Device already in shop - no need to notify customer to bring device in' 
+      })
+    }
+
     // Check notification config to see if SMS should be sent for this status
     const { data: config } = await supabase
       .from('notification_config')

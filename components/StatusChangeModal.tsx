@@ -27,6 +27,8 @@ export default function StatusChangeModal({
   const [step, setStep] = useState<'initial' | 'confirm' | 'final'>('initial')
   const [countdown, setCountdown] = useState(3)
   const [skipNotifications, setSkipNotifications] = useState(false)
+  const [sendSMS, setSendSMS] = useState(willSendSMS)
+  const [sendEmail, setSendEmail] = useState(willSendEmail)
 
   const handleFirstConfirm = () => {
     setStep('confirm')
@@ -41,7 +43,9 @@ export default function StatusChangeModal({
       setCountdown(count)
       if (count === 0) {
         clearInterval(interval)
-        onConfirm(skipNotifications)
+        // Skip notifications if both SMS and Email are unchecked
+        const shouldSkip = !sendSMS && !sendEmail
+        onConfirm(shouldSkip)
       }
     }, 1000)
   }
@@ -90,26 +94,36 @@ export default function StatusChangeModal({
             <div className="flex items-start space-x-3">
               <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-bold text-blue-900 mb-1">Notifications Will Be Sent</p>
-                <div className="text-xs text-blue-700 space-y-1">
+                <p className="text-sm font-bold text-blue-900 mb-2">Notifications Will Be Sent</p>
+                <div className="space-y-2">
                   {willSendSMS && (
-                    <p>✓ <span className="font-semibold">SMS</span> - Customer will receive a text message</p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sendSMS}
+                        onChange={(e) => setSendSMS(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-blue-900">
+                        <span className="font-semibold">SMS</span> - Customer will receive a text message
+                      </span>
+                    </label>
                   )}
                   {willSendEmail && (
-                    <p>✓ <span className="font-semibold">Email</span> - Customer will receive an email</p>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sendEmail}
+                        onChange={(e) => setSendEmail(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-blue-900">
+                        <span className="font-semibold">Email</span> - Customer will receive an email
+                      </span>
+                    </label>
                   )}
                 </div>
-                <label className="flex items-center mt-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={skipNotifications}
-                    onChange={(e) => setSkipNotifications(e.target.checked)}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  />
-                  <span className="ml-2 text-xs font-semibold text-blue-900">
-                    Skip notifications (do not send SMS/Email)
-                  </span>
-                </label>
+                <p className="text-xs text-blue-600 mt-2">Uncheck to skip sending that notification</p>
               </div>
             </div>
           </div>
