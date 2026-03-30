@@ -76,10 +76,19 @@ export async function POST(request: NextRequest) {
       quoted_at: quoted_price ? new Date().toISOString() : null,
       
       // Parts & deposit (always £20 for parts)
-      requires_parts_order: requires_parts_order || parts_required || false,
-      parts_required: parts_required || requires_parts_order || false,
-      deposit_required: requires_parts_order || parts_required || false,
-      deposit_amount: (requires_parts_order || parts_required) ? 20.00 : null,
+      // Auto-infer from initial_status if status implies parts are needed
+      requires_parts_order: requires_parts_order || parts_required || 
+                           (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+                           false,
+      parts_required: parts_required || requires_parts_order || 
+                     (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+                     false,
+      deposit_required: requires_parts_order || parts_required || 
+                       (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
+                       false,
+      deposit_amount: (requires_parts_order || parts_required || 
+                      (initial_status && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status))) 
+                      ? 20.00 : null,
       deposit_received: false,
       
       // Relationships
@@ -196,8 +205,8 @@ export async function POST(request: NextRequest) {
         })
       }
       
-      // If parts required and status is past AWAITING_DEPOSIT
-      if (jobData.parts_required && ['PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
+      // If deposit required and status is past AWAITING_DEPOSIT
+      if (jobData.deposit_required && ['AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED'].includes(initial_status)) {
         syntheticEvents.push({
           job_id: job.id,
           type: 'STATUS_CHANGE',
