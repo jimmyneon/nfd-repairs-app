@@ -292,7 +292,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
     // Other statuses - time-sensitive only
     const statusMessages: Record<string, (hours: number) => string> = {
-      QUOTE_APPROVED: (h) => h < 24 ? "Waiting for you to drop off your device. Bring it in when convenient." : h < 48 ? "We're ready for your device whenever you can drop it off." : "Still waiting for your device. Drop off at your convenience - we're ready!",
+      QUOTE_APPROVED: (h) => h < 24 ? "Waiting for you to drop off your device at your convenience. See location and hours below." : h < 48 ? "We're ready for your device whenever you can drop it off. Location and hours below." : "Still waiting for your device. Drop off at your convenience - location and hours below.",
       AWAITING_DEPOSIT: (h) => h < 12 ? "We need a deposit to order parts for your repair. Check your messages for payment details." : h < 24 ? "Still waiting for deposit payment. We can order parts as soon as we receive it." : h < 48 ? "Deposit payment pending. We're ready to order parts once payment is received." : "We're still waiting for your deposit payment to proceed with ordering parts.",
       PARTS_ORDERED: (h) => h < 24 ? "Parts ordered! Delivery typically takes 2-3 days." : h < 48 ? "Parts are on their way. Should arrive within 1-2 days." : h < 72 ? "Parts should arrive soon. We'll notify you when they're here." : h < 96 ? "Parts delivery taking a bit longer than usual. We'll update you when they arrive." : "Parts are delayed but on their way. We'll start your repair as soon as they arrive.",
       PARTS_ARRIVED: (h) => h < 6 ? "Good news! Parts have arrived and we're ready to start your repair." : h < 12 ? "Parts are here. Your repair will begin shortly." : "Parts arrived. We're working through our queue - your repair will start soon.",
@@ -328,7 +328,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   const getNextStepMessage = (status: string): string => {
     const messages: Record<string, string> = {
-      QUOTE_APPROVED: 'Great! Your quote has been approved. Please bring your device in when it\'s convenient.',
+      QUOTE_APPROVED: 'Great! Your quote has been approved. Drop off your device at your convenience - we\'ll complete the details when you arrive.',
       RECEIVED: 'We\'ve got your device and will take a look shortly.',
       AWAITING_DEPOSIT: 'We need a small deposit to order the parts. Check your messages for payment details.',
       PARTS_ORDERED: 'Parts are on order — we\'ll let you know as soon as they arrive.',
@@ -518,6 +518,64 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </a>
           )}
         </div>
+
+        {/* Location & Hours for QUOTE_APPROVED - Waiting for Drop-off */}
+        {job.status === 'QUOTE_APPROVED' && !job.device_in_shop && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-primary/30 dark:border-gray-700 p-5 md:p-6">
+            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 flex items-center">
+              <MapPin className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
+              Drop Off Your Device
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">📍 Location</p>
+                <p className="text-base font-bold text-gray-900 dark:text-white">NFD Repairs</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Unit 4, Newfield Drive Industrial Estate</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Newfield Drive, Stonehouse</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">Larkhall ML9 2YR</p>
+              </div>
+
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🕐 Opening Hours</p>
+                <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                  <p><span className="font-semibold">Mon-Fri:</span> 9am-5pm</p>
+                  <p><span className="font-semibold">Sat:</span> 10am-2pm</p>
+                  <p><span className="font-semibold">Sun:</span> Closed</p>
+                </div>
+              </div>
+
+              <a
+                href={SHOP_INFO.google_maps_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <MapPin className="h-5 w-5" />
+                  <span>Get Directions</span>
+                </div>
+              </a>
+
+              {!job.onboarding_completed && job.onboarding_token && (
+                <div className="mt-4 pt-4 border-t-2 border-gray-200 dark:border-gray-600">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">
+                    Optional: Complete details now to speed up drop-off
+                  </p>
+                  <a
+                    href={`/onboard/${job.onboarding_token}`}
+                    className="block bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-xl text-center transition-all"
+                  >
+                    Complete Details Online
+                  </a>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                    (Or we'll do this together when you drop off)
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* PRIMARY: Repair Progress with Timeline & Info */}
         <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">

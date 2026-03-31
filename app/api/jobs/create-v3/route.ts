@@ -284,41 +284,25 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Check if onboarding is needed (missing email, password info, or terms)
-    // Manual jobs with onboarding_completed=true have already done onboarding in-store
-    const needsOnboarding = !job.onboarding_completed && (
-                           !jobData.customer_email || 
-                           (!job.device_password && !job.password_not_applicable) ||
-                           !job.terms_accepted
-                           )
-
-    // Queue SMS - onboarding link if needed, otherwise regular status SMS
+    // Determine SMS template based on job source and status
+    // API jobs (quote approvals) no longer require onboarding before drop-off
+    // Onboarding will be completed in-store or via tracking page when customer is ready
     let templateKey: string
-    if (needsOnboarding) {
-      // Use deposit-specific onboarding template if deposit required
-      templateKey = jobData.deposit_required ? 'ONBOARDING_WITH_DEPOSIT' : 'ONBOARDING_REQUIRED'
-    } else {
-      // Normal flow based on source and parts requirement
+    
+    if (source === 'staff_manual') {
+      // Manual job - device already in shop
       if (jobData.deposit_required) {
-        // Check if manual job with device NOT in shop (customer took device home)
-        if (source === 'staff_manual' && !jobData.device_in_shop) {
-          // Manual booking, parts needed, device with customer - use special template
-          templateKey = 'MANUAL_BOOKING_PARTS_NEEDED'
-        } else {
-          // Parts required - use deposit template (API jobs or manual with device in shop)
-          templateKey = 'DEPOSIT_REQUIRED'
-        }
-      } else if (source === 'staff_manual') {
-        // Manual job (device already in shop) - use RECEIVED
-        templateKey = 'RECEIVED'
+        templateKey = 'DEPOSIT_REQUIRED'
       } else {
-        // API/online job (customer has device) - use QUOTE_APPROVED
-        templateKey = 'QUOTE_APPROVED'
+        templateKey = 'RECEIVED'
       }
+    } else {
+      // API/online job - customer has device, needs to drop off
+      // Send simple acceptance message with location/hours
+      templateKey = 'QUOTE_APPROVED'
     }
     
     console.log('🔍 SMS DEBUG - Job:', job.id, job.job_ref)
-    console.log('🔍 Needs onboarding:', needsOnboarding)
     console.log('🔍 Deposit required:', jobData.deposit_required)
     console.log('🔍 Source:', source)
     console.log('🔍 Template key:', templateKey)
