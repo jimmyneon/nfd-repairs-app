@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 
-export default function CreateJobPage() {
+function CreateJobContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -1069,5 +1069,17 @@ export default function CreateJobPage() {
         onSelectQuote={handleQuoteSelect}
       />
     </div>
+  )
+}
+
+export default function CreateJobPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <CreateJobContent />
+    </Suspense>
   )
 }
