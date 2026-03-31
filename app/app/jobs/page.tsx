@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, JOB_STATUS_BORDER_COLORS } from '@/lib/constants'
-import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown, Plus, Shield } from 'lucide-react'
+import { Search, Bell, LogOut, QrCode, MessageSquare, Settings, ChevronDown, Plus, Shield, History } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -100,6 +100,8 @@ export default function JobsListPage() {
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
+      .not('status', 'in', '("COMPLETED","CANCELLED")')
+      .order('priority_score', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
 
     if (!error && data) {
@@ -161,6 +163,9 @@ export default function JobsListPage() {
             <div className="flex items-center space-x-3">
               <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
                 <Plus className="h-6 w-6" />
+              </Link>
+              <Link href="/app/history" className="text-gray-600 hover:text-primary" title="Job History">
+                <History className="h-6 w-6" />
               </Link>
               <Link href="/app/warranty" className="relative text-gray-600 hover:text-primary" title="Warranty Tickets">
                 <Shield className="h-6 w-6" />

@@ -74,6 +74,22 @@ export interface Job {
   terms_accepted?: boolean
   passcode_deletion_scheduled_at?: string | null
   
+  // Priority & Customer Management
+  collected_at?: string | null
+  closed_at?: string | null
+  priority_score?: number
+  customer_flag?: 'sensitive' | 'awkward' | 'vip' | 'normal' | null
+  customer_flag_notes?: string | null
+  skip_review_request?: boolean
+  repair_type?: string | null
+  device_type?: string | null
+  
+  // Post-collection SMS tracking
+  post_collection_sms_scheduled_at?: string | null
+  post_collection_sms_sent_at?: string | null
+  post_collection_sms_delivery_status?: string | null
+  post_collection_sms_body?: string | null
+  
   // Relationships
   conversation_id?: string | null
   customer_id?: string | null

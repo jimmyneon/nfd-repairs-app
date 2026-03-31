@@ -13,6 +13,7 @@ import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
 import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 import DelayReasonModal from '@/components/DelayReasonModal'
+import CustomerFlagControls from '@/components/CustomerFlagControls'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -750,6 +751,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             name={job.customer_name}
           />
         </div>
+
+        {/* Customer Flag Controls */}
+        <CustomerFlagControls job={job} onUpdate={loadJobData} />
 
         {/* Delay/Cancellation Reasons */}
         {(job.delay_reason || job.cancellation_reason) && (

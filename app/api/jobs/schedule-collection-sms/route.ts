@@ -45,6 +45,34 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Check if review request should be skipped
+    if (job.skip_review_request) {
+      console.log(`Review request disabled for job ${job.job_ref}`)
+      return NextResponse.json({
+        success: true,
+        message: 'Review request disabled for this job',
+        skipped: true
+      })
+    }
+
+    // Check if customer is flagged as sensitive/awkward
+    if (job.customer_flag === 'sensitive' || job.customer_flag === 'awkward') {
+      console.log(`Review request skipped for ${job.customer_flag} customer: ${job.job_ref}`)
+      await supabase
+        .from('job_events')
+        .insert({
+          job_id: jobId,
+          type: 'SYSTEM',
+          message: `Post-collection SMS skipped - customer flagged as ${job.customer_flag}`
+        })
+      
+      return NextResponse.json({
+        success: true,
+        message: `Review request skipped - customer flagged as ${job.customer_flag}`,
+        skipped: true
+      })
+    }
+
     // Calculate scheduled time
     const scheduledTime = calculateScheduledTime()
 
@@ -91,23 +119,29 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate when to send post-collection SMS
- * - If collected before 16:00, send 3 hours later
- * - If collected after 16:00, send at 10:00 next day
+ * Calculate when to send post-collection SMS with randomized delay
+ * - If collected before 16:00, send 1-3 hours later (randomized)
+ * - If collected after 16:00, send at 10:00-12:00 next day (randomized)
+ * This prevents all review requests from going out at exactly the same time
  */
 function calculateScheduledTime(): Date {
   const now = new Date()
   const currentHour = now.getHours()
 
   if (currentHour < 16) {
-    // Send 3 hours from now
-    const scheduledTime = new Date(now.getTime() + (3 * 60 * 60 * 1000))
+    // Send 1-3 hours from now (randomized)
+    const minDelay = 60 * 60 * 1000 // 1 hour in ms
+    const maxDelay = 3 * 60 * 60 * 1000 // 3 hours in ms
+    const randomDelay = minDelay + Math.random() * (maxDelay - minDelay)
+    const scheduledTime = new Date(now.getTime() + randomDelay)
     return scheduledTime
   } else {
-    // Send at 10:00 next day
+    // Send at 10:00-12:00 next day (randomized)
     const tomorrow = new Date(now)
     tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(10, 0, 0, 0)
+    const randomHour = 10 + Math.floor(Math.random() * 2) // 10 or 11
+    const randomMinute = Math.floor(Math.random() * 60) // 0-59
+    tomorrow.setHours(randomHour, randomMinute, 0, 0)
     return tomorrow
   }
 }
