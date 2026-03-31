@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 
 export default function CreateJobPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const jobId = searchParams.get('jobId')
   
   const [loading, setLoading] = useState(false)
   const [showMakeOther, setShowMakeOther] = useState(false)
@@ -56,6 +58,41 @@ export default function CreateJobPage() {
       localStorage.setItem('quickWalkInMode', String(quickWalkInMode))
     }
   }, [quickWalkInMode])
+
+  // Load existing job data if jobId is provided (for completing onboarding)
+  useEffect(() => {
+    if (jobId) {
+      loadExistingJob(jobId)
+    }
+  }, [jobId])
+
+  const loadExistingJob = async (id: string) => {
+    setLoading(true)
+    const { data: job, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!error && job) {
+      // Pre-fill form with existing job data
+      setFormData({
+        device_type: job.device_type || '',
+        device_make: job.device_make || '',
+        device_model: job.device_model || '',
+        issue: job.issue || '',
+        description: job.description || '',
+        repair_type: job.repair_type || '',
+        technician_notes: job.technician_notes || '',
+        price_total: job.price_total?.toString() || '',
+        requires_parts_order: job.parts_required || false,
+        device_left_with_us: true, // They're completing onboarding in-shop
+        passcode_requirement: 'not_required',
+        linked_quote_id: job.quote_request_id || null,
+      })
+    }
+    setLoading(false)
+  }
 
   // Device type options
   const deviceTypes = [
@@ -230,6 +267,11 @@ export default function CreateJobPage() {
       passcode_requirement: formData.passcode_requirement,
       linked_quote_id: formData.linked_quote_id || '',
     })
+    
+    // If completing onboarding for existing job, pass jobId
+    if (jobId) {
+      params.set('jobId', jobId)
+    }
     
     router.push(`/app/jobs/create/customer-confirm?${params.toString()}`)
   }

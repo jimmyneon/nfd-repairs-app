@@ -44,6 +44,7 @@ function CustomerConfirmContent() {
   }, [])
 
   // Get job data from URL params
+  const jobId = searchParams.get('jobId') // For completing onboarding on existing job
   const jobData = {
     device_make: searchParams.get('device_make') || '',
     device_model: searchParams.get('device_model') || '',
@@ -168,6 +169,49 @@ function CustomerConfirmContent() {
         }
       })
 
+      // If jobId is present, update existing job instead of creating new one
+      if (jobId) {
+        // Update existing job with onboarding data
+        const { createClient } = await import('@/lib/supabase-browser')
+        const supabase = createClient()
+        
+        const { error: updateError } = await supabase
+          .from('jobs')
+          .update({
+            customer_name: payload.customer_name,
+            customer_phone: payload.customer_phone,
+            customer_email: payload.customer_email,
+            device_password: payload.device_password,
+            password_not_applicable: payload.password_not_applicable,
+            passcode_method: payload.passcode_method,
+            terms_accepted: true,
+            terms_accepted_at: new Date().toISOString(),
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString(),
+            device_in_shop: true,
+            status: 'RECEIVED', // Update status to RECEIVED now that device is in shop
+          } as any)
+          .eq('id', jobId)
+
+        if (updateError) {
+          alert(`Failed to complete onboarding: ${updateError.message}`)
+          setLoading(false)
+          return
+        }
+
+        // Log event
+        await supabase.from('job_events').insert({
+          job_id: jobId,
+          type: 'SYSTEM',
+          message: 'Onboarding completed in-shop by staff',
+        } as any)
+
+        // Redirect back to job detail page
+        router.push(`/app/jobs/${jobId}`)
+        return
+      }
+
+      // Otherwise create new job
       const response = await fetch('/api/jobs/create-v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

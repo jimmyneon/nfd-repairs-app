@@ -718,12 +718,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               onboardingCompleted={false}
               jobRef={job.job_ref}
             />
-            <button
-              onClick={() => setShowManualOnboarding(true)}
-              className="w-full mt-4 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all"
+            <Link
+              href={`/app/jobs/create?jobId=${job.id}`}
+              className="block w-full mt-4 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all text-center"
             >
               Complete Onboarding In-Shop
-            </button>
+            </Link>
           </div>
         )}
 
