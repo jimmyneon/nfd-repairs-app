@@ -78,10 +78,10 @@ SELECT
     rr.created_at,
     rr.status,
     EXTRACT(EPOCH FROM (NOW() - rr.created_at))/3600 as hours_pending,
-    (SELECT setting_value::integer FROM admin_settings WHERE setting_key = 'review_request_delay_hours') as delay_hours_setting,
+    (SELECT value::integer FROM admin_settings WHERE key = 'review_request_delay_hours') as delay_hours_setting,
     CASE 
         WHEN EXTRACT(EPOCH FROM (NOW() - rr.created_at))/3600 >= 
-             COALESCE((SELECT setting_value::integer FROM admin_settings WHERE setting_key = 'review_request_delay_hours'), 24)
+             COALESCE((SELECT value::integer FROM admin_settings WHERE key = 'review_request_delay_hours'), 24)
         THEN '✓ READY TO SEND'
         ELSE '⏳ WAITING'
     END as send_status
@@ -127,7 +127,7 @@ SELECT
         THEN '✓ Has review request'
         ELSE '✗ MISSING review request'
     END as review_status,
-    (SELECT setting_value FROM admin_settings WHERE setting_key = 'auto_review_request_enabled') as auto_enabled
+    (SELECT value FROM admin_settings WHERE key = 'auto_review_request_enabled') as auto_enabled
 FROM jobs j
 WHERE j.status = 'completed'
     AND j.completed_at > NOW() - INTERVAL '7 days'

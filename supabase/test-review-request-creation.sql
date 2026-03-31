@@ -28,10 +28,10 @@ LIMIT 10;
 -- ============================================
 SELECT 
     'CURRENT SETTINGS' as info,
-    setting_key,
-    setting_value
+    key,
+    value
 FROM admin_settings
-WHERE setting_key IN (
+WHERE key IN (
     'google_review_enabled',
     'google_review_link',
     'auto_review_request_enabled',
@@ -78,9 +78,9 @@ SELECT
     rr.id as review_request_id,
     rr.job_id,
     j.job_number,
-    (SELECT setting_value FROM admin_settings WHERE setting_key = 'google_review_link') as google_review_link,
+    (SELECT value FROM admin_settings WHERE key = 'google_review_link') as google_review_link,
     CONCAT(
-        (SELECT setting_value FROM admin_settings WHERE setting_key = 'google_review_link'),
+        (SELECT value FROM admin_settings WHERE key = 'google_review_link'),
         '?review_request_id=',
         rr.id
     ) as full_review_link

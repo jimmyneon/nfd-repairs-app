@@ -7,27 +7,27 @@
 -- ============================================
 SELECT 
     'ADMIN SETTINGS - Review Configuration' as check_type,
-    setting_key,
-    setting_value,
+    key,
+    value,
     CASE 
-        WHEN setting_key = 'google_review_enabled' THEN 
-            CASE WHEN setting_value = 'true' THEN '✓ ENABLED' ELSE '✗ DISABLED' END
-        WHEN setting_key = 'google_review_link' THEN 
-            CASE WHEN setting_value IS NOT NULL AND setting_value != '' THEN '✓ CONFIGURED' ELSE '✗ MISSING' END
-        WHEN setting_key = 'auto_review_request_enabled' THEN 
-            CASE WHEN setting_value = 'true' THEN '✓ ENABLED' ELSE '✗ DISABLED' END
-        WHEN setting_key = 'review_request_delay_hours' THEN 
-            '⏱ Delay: ' || setting_value || ' hours'
+        WHEN key = 'google_review_enabled' THEN 
+            CASE WHEN value = 'true' THEN '✓ ENABLED' ELSE '✗ DISABLED' END
+        WHEN key = 'google_review_link' THEN 
+            CASE WHEN value IS NOT NULL AND value != '' THEN '✓ CONFIGURED' ELSE '✗ MISSING' END
+        WHEN key = 'auto_review_request_enabled' THEN 
+            CASE WHEN value = 'true' THEN '✓ ENABLED' ELSE '✗ DISABLED' END
+        WHEN key = 'review_request_delay_hours' THEN 
+            '⏱ Delay: ' || value || ' hours'
         ELSE 'INFO'
     END as status
 FROM admin_settings
-WHERE setting_key IN (
+WHERE key IN (
     'google_review_enabled',
     'google_review_link',
     'auto_review_request_enabled',
     'review_request_delay_hours'
 )
-ORDER BY setting_key;
+ORDER BY key;
 
 -- 2. CHECK IF REVIEW_REQUESTS TABLE EXISTS AND HAS DATA
 -- ============================================
@@ -73,19 +73,19 @@ LIMIT 10;
 -- ============================================
 SELECT 
     'SMS TEMPLATES - Review Request' as check_type,
-    template_key,
-    template_text,
+    key as template_key,
+    body as template_text,
     is_active,
     CASE 
         WHEN is_active = true THEN '✓ ACTIVE'
         ELSE '✗ INACTIVE'
     END as status,
     CASE 
-        WHEN template_text LIKE '%{review_link}%' THEN '✓ Has review link placeholder'
+        WHEN body LIKE '%{review_link}%' THEN '✓ Has review link placeholder'
         ELSE '✗ Missing review link placeholder'
     END as link_check
 FROM sms_templates
-WHERE template_key = 'review_request';
+WHERE key = 'review_request';
 
 -- 5. CHECK JOBS ELIGIBLE FOR REVIEW REQUESTS
 -- ============================================
@@ -149,11 +149,11 @@ ORDER BY t.tgname;
 -- ============================================
 SELECT 
     'SUMMARY REPORT' as check_type,
-    (SELECT setting_value FROM admin_settings WHERE setting_key = 'google_review_enabled') as review_enabled,
-    (SELECT setting_value FROM admin_settings WHERE setting_key = 'google_review_link') as review_link,
-    (SELECT setting_value FROM admin_settings WHERE setting_key = 'auto_review_request_enabled') as auto_request_enabled,
+    (SELECT value FROM admin_settings WHERE key = 'google_review_enabled') as review_enabled,
+    (SELECT value FROM admin_settings WHERE key = 'google_review_link') as review_link,
+    (SELECT value FROM admin_settings WHERE key = 'auto_review_request_enabled') as auto_request_enabled,
     (SELECT COUNT(*) FROM review_requests) as total_review_requests,
     (SELECT COUNT(*) FROM review_requests WHERE status = 'sent') as sent_count,
     (SELECT COUNT(*) FROM review_requests WHERE status = 'clicked') as clicked_count,
-    (SELECT is_active FROM sms_templates WHERE template_key = 'review_request') as sms_template_active,
+    (SELECT is_active FROM sms_templates WHERE key = 'review_request') as sms_template_active,
     (SELECT COUNT(*) FROM cron.job WHERE jobname LIKE '%review%' AND active = true) as active_cron_jobs;
