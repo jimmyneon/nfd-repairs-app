@@ -1,5 +1,5 @@
 -- Update QUOTE_APPROVED SMS template to be simple acceptance message
--- Uses google_maps_link from admin_settings
+-- Uses google_maps_link from admin_settings (shows location & hours on business profile)
 -- Customer will drop off device at their convenience
 
 -- First, check if template exists and update it
@@ -9,7 +9,7 @@ SET
 
 Drop off your device at your convenience.
 
-📍 Find us: {google_maps_link}
+📍 Location & hours: {google_maps_link}
 
 Job ref: {job_ref}',
   updated_at = NOW()
@@ -23,7 +23,7 @@ SELECT
 
 Drop off your device at your convenience.
 
-📍 Find us: {google_maps_link}
+📍 Location & hours: {google_maps_link}
 
 Job ref: {job_ref}',
   true
