@@ -1,25 +1,18 @@
 -- Update QUOTE_APPROVED SMS template to be simple acceptance message
--- No tracking link, just location and opening hours
+-- Uses links from admin_settings for location and hours
 -- Customer will drop off device at their convenience
 
 -- First, check if template exists and update it
 UPDATE sms_templates
 SET 
-  body = 'Hi {customer_name}, great news! Your {device_make} {device_model} repair quote (£{price_total}) has been approved. Please drop off your device at your convenience.
+  body = 'Hi {customer_name}, great news! Your {device_make} {device_model} repair quote (£{price_total}) has been approved. 
 
-📍 NFD Repairs
-Unit 4, Newfield Drive Industrial Estate
-Newfield Drive, Stonehouse
-Larkhall ML9 2YR
+Drop off your device at your convenience.
 
-🕐 Opening Hours:
-Mon-Fri: 9am-5pm
-Sat: 10am-2pm
-Sun: Closed
+📍 Location: {location_link}
+🕐 Hours: {hours_link}
 
-Job ref: {job_ref}
-
-We''ll complete the details when you drop it off. See you soon!',
+Job ref: {job_ref}',
   updated_at = NOW()
 WHERE key = 'QUOTE_APPROVED';
 
@@ -28,21 +21,14 @@ INSERT INTO sms_templates (key, name, body, is_active, category)
 SELECT 
   'QUOTE_APPROVED',
   'Quote Approved - Drop Off Instructions',
-  'Hi {customer_name}, great news! Your {device_make} {device_model} repair quote (£{price_total}) has been approved. Please drop off your device at your convenience.
+  'Hi {customer_name}, great news! Your {device_make} {device_model} repair quote (£{price_total}) has been approved. 
 
-📍 NFD Repairs
-Unit 4, Newfield Drive Industrial Estate
-Newfield Drive, Stonehouse
-Larkhall ML9 2YR
+Drop off your device at your convenience.
 
-🕐 Opening Hours:
-Mon-Fri: 9am-5pm
-Sat: 10am-2pm
-Sun: Closed
+📍 Location: {location_link}
+🕐 Hours: {hours_link}
 
-Job ref: {job_ref}
-
-We''ll complete the details when you drop it off. See you soon!',
+Job ref: {job_ref}',
   true,
   'STATUS_UPDATE'
 WHERE NOT EXISTS (

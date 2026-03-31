@@ -353,6 +353,22 @@ export async function POST(request: NextRequest) {
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
       const onboardingUrl = `${appUrl}/onboard/${job.onboarding_token}`
       
+      // Fetch location and hours links from admin_settings
+      const { data: locationSetting } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'google_maps_link')
+        .single()
+      
+      const { data: hoursSetting } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'opening_hours_link')
+        .single()
+      
+      const locationLink = locationSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
+      const hoursLink = hoursSetting?.value || locationLink // Fallback to location link if hours link not set
+      
       let smsBody = template.body
         .replace('{customer_name}', jobData.customer_name)
         .replace('{device_make}', jobData.device_make)
@@ -361,6 +377,9 @@ export async function POST(request: NextRequest) {
         .replace('{tracking_link}', trackingUrl)
         .replace('{job_ref}', job.job_ref)
         .replace('{onboarding_link}', onboardingUrl)
+        .replace('{location_link}', locationLink)
+        .replace('{hours_link}', hoursLink)
+        .replace('{google_maps_link}', locationLink)
 
       // Add deposit-specific replacements if needed
       if (jobData.deposit_required) {
