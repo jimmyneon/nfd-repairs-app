@@ -9,7 +9,7 @@ interface StatusChangeModalProps {
   currentStatus: JobStatus
   newStatus: JobStatus
   deviceInfo: string
-  onConfirm: (skipNotifications?: boolean) => void
+  onConfirm: (overrideSMS: boolean, overrideEmail: boolean) => void
   onCancel: () => void
   willSendSMS: boolean
   willSendEmail?: boolean
@@ -43,9 +43,8 @@ export default function StatusChangeModal({
       setCountdown(count)
       if (count === 0) {
         clearInterval(interval)
-        // Skip notifications if both SMS and Email are unchecked
-        const shouldSkip = !sendSMS && !sendEmail
-        onConfirm(shouldSkip)
+        // Pass individual override flags (true = skip, false = send)
+        onConfirm(!sendSMS, !sendEmail)
       }
     }, 1000)
   }

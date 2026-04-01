@@ -11,11 +11,13 @@ interface CancellationReasonModalProps {
 
 const CANCELLATION_REASONS = [
   { value: 'CUSTOMER_CANCELLED', label: 'Customer Requested Cancellation' },
+  { value: 'UNECONOMICAL', label: 'Uneconomical to Repair' },
   { value: 'UNREPAIRABLE', label: 'Device Unrepairable' },
-  { value: 'TOO_EXPENSIVE', label: 'Repair Cost Too High' },
+  { value: 'TOO_EXPENSIVE', label: 'Repair Cost Too High for Customer' },
   { value: 'NO_RESPONSE', label: 'No Customer Response' },
   { value: 'PARTS_UNAVAILABLE', label: 'Parts Unavailable' },
-  { value: 'CUSTOMER_FOUND_ALTERNATIVE', label: 'Customer Found Alternative' },
+  { value: 'CUSTOMER_FOUND_ALTERNATIVE', label: 'Customer Found Alternative Solution' },
+  { value: 'CUSTOMER_DECLINED_QUOTE', label: 'Customer Declined Quote' },
   { value: 'OTHER', label: 'Other Reason' },
 ]
 

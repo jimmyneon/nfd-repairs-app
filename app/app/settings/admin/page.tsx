@@ -46,11 +46,11 @@ export default function AdminSettingsPage() {
       if (apiKey) setWarrantyApiKey(apiKey.value)
     }
 
-    // Load GPS coordinates
+    // Load GPS coordinates from the first (and only) admin_settings record
     const { data: gpsData } = await supabase
       .from('admin_settings')
-      .select('shop_latitude, shop_longitude, gps_radius_meters')
-      .eq('id', 1)
+      .select('id, shop_latitude, shop_longitude, gps_radius_meters')
+      .limit(1)
       .single()
 
     if (gpsData) {
@@ -121,6 +121,20 @@ export default function AdminSettingsPage() {
 
   const saveGpsCoordinates = async () => {
     setSaving(true)
+    
+    // Get the first admin_settings record ID
+    const { data: settingsRecord } = await supabase
+      .from('admin_settings')
+      .select('id')
+      .limit(1)
+      .single()
+    
+    if (!settingsRecord) {
+      alert('Failed to find admin settings record')
+      setSaving(false)
+      return
+    }
+    
     const { error } = await supabase
       .from('admin_settings')
       .update({
@@ -128,7 +142,7 @@ export default function AdminSettingsPage() {
         shop_longitude: parseFloat(shopLongitude) || null,
         gps_radius_meters: parseInt(gpsRadius) || 100
       })
-      .eq('id', 1)
+      .eq('id', settingsRecord.id)
 
     if (!error) {
       await loadSettings()

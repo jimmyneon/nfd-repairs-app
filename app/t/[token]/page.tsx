@@ -112,7 +112,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     const { data } = await supabase
       .from('admin_settings')
       .select('shop_latitude, shop_longitude, gps_radius_meters')
-      .eq('id', 1)
+      .limit(1)
       .single()
 
     if (data) {

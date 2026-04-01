@@ -355,12 +355,22 @@ function CreateJobContent() {
 
     // Show "Other" input for make
     if (name === 'device_make') {
-      setShowMakeOther(value === 'Other')
+      // Keep the field visible if 'Other' is selected OR if we're already showing it and user is typing
+      if (value === 'Other') {
+        setShowMakeOther(true)
+      } else if (!showMakeOther) {
+        setShowMakeOther(false)
+      }
     }
 
     // Show "Other" input for issue
     if (name === 'issue') {
-      setShowIssueOther(value === 'Other')
+      // Keep the field visible if 'Other' is selected OR if we're already showing it and user is typing
+      if (value === 'Other') {
+        setShowIssueOther(true)
+      } else if (!showIssueOther) {
+        setShowIssueOther(false)
+      }
     }
     
     setFormData(prev => ({
@@ -533,37 +543,52 @@ function CreateJobContent() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Make <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    name="device_make"
-                    value={formData.device_make}
-                    onChange={handleChange}
-                    required
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      validationErrors.device_make 
-                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
-                    }`}
-                  >
-                    <option value="">Select make...</option>
-                    {makesByType[formData.device_type]?.map(make => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                  </select>
+                  {!showMakeOther ? (
+                    <select
+                      name="device_make"
+                      value={formData.device_make}
+                      onChange={handleChange}
+                      required
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                        validationErrors.device_make 
+                          ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                      }`}
+                    >
+                      <option value="">Select make...</option>
+                      {makesByType[formData.device_type]?.map(make => (
+                        <option key={make} value={make}>{make}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        name="device_make"
+                        value={formData.device_make === 'Other' ? '' : formData.device_make}
+                        onChange={handleChange}
+                        placeholder="Enter make..."
+                        required
+                        autoFocus
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMakeOther(false)
+                          setFormData(prev => ({ ...prev, device_make: '' }))
+                        }}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        ← Back to dropdown
+                      </button>
+                    </div>
+                  )}
                   {validationErrors.device_make && (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                       <AlertCircle className="h-4 w-4" />
                       {validationErrors.device_make}
                     </p>
-                  )}
-                  {showMakeOther && (
-                    <input
-                      type="text"
-                      name="device_make"
-                      value={formData.device_make === 'Other' ? '' : formData.device_make}
-                      onChange={handleChange}
-                      placeholder="Enter make..."
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
-                    />
                   )}
                 </div>
               )}
@@ -623,37 +648,52 @@ function CreateJobContent() {
                     </label>
                   </>
                 )}
-                <select
-                  name="issue"
-                  value={formData.issue}
-                  onChange={handleChange}
-                  required
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                    validationErrors.issue 
-                      ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
-                      : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
-                  }`}
-                >
-                  <option value="">Select issue...</option>
-                  {commonIssues.map(issue => (
-                    <option key={issue} value={issue}>{issue}</option>
-                  ))}
-                </select>
+                {!showIssueOther ? (
+                  <select
+                    name="issue"
+                    value={formData.issue}
+                    onChange={handleChange}
+                    required
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.issue 
+                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
+                  >
+                    <option value="">Select issue...</option>
+                    {commonIssues.map(issue => (
+                      <option key={issue} value={issue}>{issue}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      name="issue"
+                      value={formData.issue === 'Other' ? '' : formData.issue}
+                      onChange={handleChange}
+                      placeholder="Describe the issue..."
+                      required
+                      autoFocus
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowIssueOther(false)
+                        setFormData(prev => ({ ...prev, issue: '' }))
+                      }}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      ← Back to dropdown
+                    </button>
+                  </div>
+                )}
                 {validationErrors.issue && (
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
                     {validationErrors.issue}
                   </p>
-                )}
-                {showIssueOther && (
-                  <input
-                    type="text"
-                    name="issue"
-                    value={formData.issue === 'Other' ? '' : formData.issue}
-                    onChange={handleChange}
-                    placeholder="Describe the issue..."
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
-                  />
                 )}
               </div>
 

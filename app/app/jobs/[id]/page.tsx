@@ -13,6 +13,7 @@ import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
 import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 import DelayReasonModal from '@/components/DelayReasonModal'
+import CancellationReasonModal from '@/components/CancellationReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
 import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
 
@@ -29,10 +30,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showManualOnboarding, setShowManualOnboarding] = useState(false)
   const [showDelayModal, setShowDelayModal] = useState(false)
   const [showDelayConfirm, setShowDelayConfirm] = useState(false)
+  const [showCancellationModal, setShowCancellationModal] = useState(false)
+  const [showCancellationConfirm, setShowCancellationConfirm] = useState(false)
   const [newStatus, setNewStatus] = useState<JobStatus | null>(null)
   const [pendingWorkflowStatus, setPendingWorkflowStatus] = useState<JobStatus | null>(null)
   const [pendingDelayReason, setPendingDelayReason] = useState<string>('')
   const [pendingDelayNotes, setPendingDelayNotes] = useState<string>('')
+  const [pendingCancellationReason, setPendingCancellationReason] = useState<string>('')
+  const [pendingCancellationNotes, setPendingCancellationNotes] = useState<string>('')
   const [willSendSMS, setWillSendSMS] = useState(false)
   const [willSendEmail, setWillSendEmail] = useState(false)
   const [overrideSMS, setOverrideSMS] = useState(false)
@@ -128,6 +133,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     // Special handling for DELAYED status - show delay reason modal
     if (status === 'DELAYED') {
       setShowDelayModal(true)
+      return
+    }
+    
+    // Special handling for CANCELLED status - show cancellation reason modal
+    if (status === 'CANCELLED') {
+      setShowCancellationModal(true)
       return
     }
     
@@ -359,8 +370,103 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setPendingDelayNotes('')
   }
 
-  const confirmStatusChange = async (skipNotifications?: boolean) => {
+  const handleCancellationReasonSubmit = async (reason: string, notes: string) => {
+    // Store cancellation reason and notes, then check notification config
+    setPendingCancellationReason(reason)
+    setPendingCancellationNotes(notes)
+    setShowCancellationModal(false)
+    
+    // Check notification config for CANCELLED status
+    const { data: config } = await supabase
+      .from('notification_config')
+      .select('send_sms, send_email, is_active')
+      .eq('status_key', 'CANCELLED')
+      .single()
+    
+    setWillSendSMS(config?.send_sms && config?.is_active || false)
+    setWillSendEmail(config?.send_email && config?.is_active || false)
+    setOverrideSMS(false)
+    setOverrideEmail(false)
+    
+    // Show confirmation modal
+    setShowCancellationConfirm(true)
+  }
+
+  const confirmCancellationStatusChange = async () => {
+    if (!job) return
+    setActionLoading(true)
+    setShowCancellationConfirm(false)
+
+    // Update job with CANCELLED status and cancellation reason/notes
+    await supabase
+      .from('jobs')
+      .update({
+        status: 'CANCELLED' as JobStatus,
+        cancellation_reason: pendingCancellationReason,
+        cancellation_notes: pendingCancellationNotes,
+      } as any)
+      .eq('id', job.id)
+
+    await supabase.from('job_events').insert({
+      job_id: job.id,
+      type: 'STATUS_CHANGE',
+      message: `Status changed to Cancelled - ${pendingCancellationReason}`,
+    } as any)
+
+    await supabase.from('notifications').insert({
+      type: 'STATUS_UPDATE',
+      title: `Job ${job.job_ref} cancelled`,
+      body: `Cancellation reason: ${pendingCancellationReason}`,
+      job_id: job.id,
+    } as any)
+
+    // Queue SMS for CANCELLED status (will include cancellation_reason and cancellation_notes) - unless overridden
+    if (!overrideSMS) {
+      try {
+        await fetch('/api/jobs/queue-status-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            status: 'CANCELLED',
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to queue cancellation SMS:', error)
+      }
+    } else {
+      console.log('⏭️ SMS skipped by user override')
+    }
+
+    // Send email notification (unless overridden)
+    if (!overrideEmail) {
+      if (job.customer_email) {
+        try {
+          await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: job.id,
+              type: 'STATUS_UPDATE',
+            }),
+          })
+        } catch (error) {
+          console.error('Failed to send cancellation email:', error)
+        }
+      }
+    } else {
+      console.log('⏭️ Email skipped by user override')
+    }
+
+    await loadJobData()
+    setActionLoading(false)
+    setPendingCancellationReason('')
+    setPendingCancellationNotes('')
+  }
+
+  const confirmStatusChange = async (overrideSMSParam: boolean, overrideEmailParam: boolean) => {
     if (!job || !newStatus) return
+    
     setActionLoading(true)
     setShowStatusModal(false)
 
@@ -394,10 +500,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       job_id: job.id,
     } as any)
 
-    // Queue SMS and Email for status change (unless skipped)
-    if (!skipNotifications) {
+    // Queue SMS for status change (unless overridden) - use parameter directly
+    if (!overrideSMSParam) {
       try {
-        console.log('🔔 Queueing notifications for status:', newStatus)
+        console.log('🔔 Queueing SMS for status:', newStatus)
         const response = await fetch('/api/jobs/queue-status-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -406,18 +512,24 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             status: newStatus,
           }),
         })
-        console.log('Notification queue response:', response.status, response.ok)
+        console.log('SMS queue response:', response.status, response.ok)
         if (!response.ok) {
-          console.error('Failed to queue notifications')
+          const error = await response.text()
+          console.error('SMS queue failed:', error)
         }
       } catch (error) {
-        console.error('Error queueing notifications:', error)
+        console.error('Failed to queue status SMS:', error)
       }
+    } else {
+      console.log('⏭️ SMS skipped by user override')
+    }
 
-      // Send email notification
+    // Send email notification (unless overridden) - use parameter directly
+    if (!overrideEmailParam) {
+      console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
       if (job.customer_email) {
         try {
-          console.log('📧 Calling email API for job:', job.job_ref, 'email:', job.customer_email)
+          console.log('📧 Calling email API for manual status change...')
           const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -432,10 +544,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           console.error('❌ Failed to send email:', error)
         }
       } else {
-        console.log('⚠️ No customer email on job:', job.job_ref)
+        console.log('⚠️ No customer email - skipping email notification')
       }
     } else {
-      console.log('⏭️ Skipping notifications as requested')
+      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -1149,6 +1261,91 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-xl transition-colors"
                 >
                   Confirm Delay
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cancellation Reason Modal */}
+        {showCancellationModal && job && (
+          <CancellationReasonModal
+            deviceInfo={`${job.device_make} ${job.device_model}`}
+            onConfirm={handleCancellationReasonSubmit}
+            onCancel={() => setShowCancellationModal(false)}
+          />
+        )}
+
+        {/* Cancellation Confirmation Modal (shows SMS/Email notification info) */}
+        {showCancellationConfirm && job && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Cancellation</h2>
+              <p className="text-gray-700 mb-2">
+                Cancel job for <span className="font-bold">{job.device_make} {job.device_model}</span>?
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Reason: <span className="font-semibold">{pendingCancellationReason.replace(/_/g, ' ')}</span>
+              </p>
+              
+              {/* Notification Warning */}
+              {(willSendSMS || willSendEmail) && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-blue-900 mb-2">Notifications Will Be Sent</p>
+                      <div className="space-y-2">
+                        {willSendSMS && (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideSMS}
+                              onChange={(e) => setOverrideSMS(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">SMS</span> - Customer will receive cancellation reason and notes
+                            </span>
+                          </label>
+                        )}
+                        {willSendEmail && (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!overrideEmail}
+                              onChange={(e) => setOverrideEmail(!e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-blue-900">
+                              <span className="font-semibold">Email</span> - Customer will receive an email
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                      <p className="text-xs text-blue-600 mt-2">To: {job.customer_phone}{job.customer_email ? ` / ${job.customer_email}` : ''}</p>
+                      <p className="text-xs text-blue-600 mt-1">Uncheck to skip sending that notification</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowCancellationConfirm(false)
+                    setPendingCancellationReason('')
+                    setPendingCancellationNotes('')
+                  }}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-4 px-6 rounded-xl transition-colors"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={confirmCancellationStatusChange}
+                  className="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-4 px-6 rounded-xl transition-colors"
+                >
+                  Confirm Cancellation
                 </button>
               </div>
             </div>
