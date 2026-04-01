@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Update job with customer arrival timestamp
+    await supabase
+      .from('jobs')
+      .update({ customer_arrived_at: new Date().toISOString() })
+      .eq('id', jobId)
+
     // Create notification in database
     await supabase.from('notifications').insert({
       type: 'CUSTOMER_ARRIVED',

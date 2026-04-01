@@ -89,6 +89,7 @@ export interface Job {
   tracking_link_expires_at?: string | null
   parts_ordered_at?: string | null
   parts_expected_at?: string | null
+  customer_arrived_at?: string | null
   
   // Post-collection SMS tracking
   post_collection_sms_scheduled_at?: string | null

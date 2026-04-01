@@ -9,6 +9,7 @@ import {
   getCustomerFlagEmoji, 
   getPriorityEmoji 
 } from '@/lib/job-utils'
+import { MapPin } from 'lucide-react'
 
 interface EnhancedJobTileProps {
   job: JobWithMetrics
@@ -19,6 +20,10 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
   const flagEmoji = getCustomerFlagEmoji(job.customer_flag)
   const blockerText = getBlockerText(job.blockerType, job)
   const timeText = formatTimeInStatus(job.status_changed_at)
+  
+  // Check if customer has arrived (within last 30 minutes)
+  const customerArrived = job.customer_arrived_at && 
+    (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
   
   // Determine if time should show warning (>3 days)
   const timeWarning = job.isOverdue
@@ -44,11 +49,22 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
   return (
     <Link
       href={`/app/jobs/${job.id}`}
-      className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all aspect-square ${JOB_STATUS_COLORS[job.status]}`}
+      className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all aspect-square ${
+        customerArrived ? 'ring-4 ring-yellow-400 ring-offset-2 animate-pulse' : ''
+      } ${JOB_STATUS_COLORS[job.status]}`}
     >
       <div className="p-3 h-full flex flex-col relative text-white">
+        {/* Customer Arrived Banner */}
+        {customerArrived && (
+          <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-gray-900 px-2 py-1 text-center z-10">
+            <div className="flex items-center justify-center gap-1 text-xs font-black">
+              <MapPin className="h-3 w-3" />
+              <span>CUSTOMER HERE</span>
+            </div>
+          </div>
+        )}
         {/* Top Row: Status + Priority Icon */}
-        <div className="text-center mb-2 flex items-center justify-center gap-1">
+        <div className={`text-center mb-2 flex items-center justify-center gap-1 ${customerArrived ? 'mt-6' : ''}`}>
           {priorityEmoji && (
             <span className="text-base" title="High Priority">{priorityEmoji}</span>
           )}

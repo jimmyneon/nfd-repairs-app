@@ -201,6 +201,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       updateData.device_in_shop = true  // Device now in shop
     } else if (pendingWorkflowStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
+      updateData.customer_arrived_at = null  // Clear arrival indicator
     }
 
     await supabase
@@ -480,6 +481,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       updateData.device_in_shop = true  // Device now in shop
     } else if (newStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
+      updateData.customer_arrived_at = null  // Clear arrival indicator
     }
 
     await supabase
