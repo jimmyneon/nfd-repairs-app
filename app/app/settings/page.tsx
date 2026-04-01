@@ -16,8 +16,37 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setMounted(true)
-    setNotificationsEnabled(Notification.permission === 'granted')
+    checkNotificationStatus()
   }, [])
+
+  const checkNotificationStatus = async () => {
+    // Check both browser permission AND database subscription
+    const hasPermission = 'Notification' in window && Notification.permission === 'granted'
+    
+    if (!hasPermission) {
+      setNotificationsEnabled(false)
+      return
+    }
+
+    // Check if user has an active subscription in the database
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('push_subscriptions')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
+        
+        setNotificationsEnabled(!!data)
+      } else {
+        setNotificationsEnabled(false)
+      }
+    } catch (error) {
+      console.error('Error checking subscription:', error)
+      setNotificationsEnabled(false)
+    }
+  }
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'

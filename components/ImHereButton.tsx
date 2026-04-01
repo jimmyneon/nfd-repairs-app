@@ -103,9 +103,9 @@ export default function ImHereButton({
     return (
       <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
         <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-green-900 mb-2">We know you're here! 👋</h3>
+        <h3 className="text-lg font-bold text-green-900 mb-2">Perfect! 👋</h3>
         <p className="text-sm text-green-700">
-          We've notified the team. Someone will be with you shortly.
+          We've linked your arrival to your repair job. This helps us identify which device is yours.
         </p>
       </div>
     )
@@ -162,7 +162,7 @@ export default function ImHereButton({
         ) : (
           <>
             <MapPin className="h-5 w-5" />
-            <span>I'm Here - Notify Team</span>
+            <span>I'm Here for Collection</span>
           </>
         )}
       </div>
