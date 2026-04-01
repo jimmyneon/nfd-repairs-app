@@ -84,6 +84,12 @@ export interface Job {
   repair_type?: string | null
   device_type?: string | null
   
+  // Action-oriented enhancements
+  status_changed_at?: string | null
+  tracking_link_expires_at?: string | null
+  parts_ordered_at?: string | null
+  parts_expected_at?: string | null
+  
   // Post-collection SMS tracking
   post_collection_sms_scheduled_at?: string | null
   post_collection_sms_sent_at?: string | null

@@ -6,6 +6,8 @@ import { Job } from '@/lib/types'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
 import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
+import ImHereButton from '@/components/ImHereButton'
+import { isTrackingLinkExpired } from '@/lib/job-utils'
 
 export default function TrackingPage({ params }: { params: { token: string } }) {
   const [job, setJob] = useState<any>(null)
@@ -16,6 +18,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [showStatusInfo, setShowStatusInfo] = useState(false)
   const [statusChangedAt, setStatusChangedAt] = useState<Date | null>(null)
   const [previousStatus, setPreviousStatus] = useState<string | null>(null)
+  const [isExpired, setIsExpired] = useState(false)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -108,11 +111,18 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, tracking_link_expires_at, closed_at')
       .eq('tracking_token', params.token)
-      .single()
+      .maybeSingle()
 
     if (data) {
+      // Check if tracking link is expired
+      if (isTrackingLinkExpired(data.tracking_link_expires_at)) {
+        setIsExpired(true)
+        setLoading(false)
+        return
+      }
+      
       setJob(data)
       setLastUpdated(new Date())
       
@@ -315,6 +325,25 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     )
   }
 
+  if (isExpired) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center bg-white rounded-2xl shadow-lg p-8">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Package className="h-8 w-8 text-gray-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Tracking Link Expired</h1>
+          <p className="text-gray-600 mb-4">
+            This repair has been completed and the tracking link has expired for privacy and security.
+          </p>
+          <p className="text-sm text-gray-500">
+            If you need assistance, please contact us directly.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (!job) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -503,19 +532,28 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </div>
           </button>
           
-          {/* Show directions link for READY_TO_COLLECT status */}
+          {/* Show GPS "I'm Here" button and directions for READY_TO_COLLECT status */}
           {job.status === 'READY_TO_COLLECT' && (
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95 mt-4"
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <MapPin className="h-5 w-5" />
-                <span>Get Directions & Opening Hours</span>
-              </div>
-            </a>
+            <div className="mt-4 space-y-3">
+              <ImHereButton
+                jobId={job.id}
+                jobRef={job.job_ref}
+                shopLatitude={55.7558}
+                shopLongitude={-3.9626}
+                radiusMeters={100}
+              />
+              <a
+                href={SHOP_INFO.google_maps_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <MapPin className="h-5 w-5" />
+                  <span>Get Directions & Opening Hours</span>
+                </div>
+              </a>
+            </div>
           )}
         </div>
 
