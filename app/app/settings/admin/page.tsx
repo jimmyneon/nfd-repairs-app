@@ -20,6 +20,9 @@ export default function AdminSettingsPage() {
   const [googleReviewLink, setGoogleReviewLink] = useState('')
   const [googleMapsLink, setGoogleMapsLink] = useState('')
   const [warrantyApiKey, setWarrantyApiKey] = useState('')
+  const [shopLatitude, setShopLatitude] = useState('')
+  const [shopLongitude, setShopLongitude] = useState('')
+  const [gpsRadius, setGpsRadius] = useState('100')
   const supabase = createClient()
 
   useEffect(() => {
@@ -42,6 +45,20 @@ export default function AdminSettingsPage() {
       if (mapsLink) setGoogleMapsLink(mapsLink.value)
       if (apiKey) setWarrantyApiKey(apiKey.value)
     }
+
+    // Load GPS coordinates
+    const { data: gpsData } = await supabase
+      .from('admin_settings')
+      .select('shop_latitude, shop_longitude, gps_radius_meters')
+      .eq('id', 1)
+      .single()
+
+    if (gpsData) {
+      setShopLatitude(gpsData.shop_latitude?.toString() || '')
+      setShopLongitude(gpsData.shop_longitude?.toString() || '')
+      setGpsRadius(gpsData.gps_radius_meters?.toString() || '100')
+    }
+
     setLoading(false)
   }
 
@@ -98,6 +115,26 @@ export default function AdminSettingsPage() {
       alert('New API key generated! Make sure to update your website.')
     } else {
       alert('Failed to regenerate: ' + error.message)
+    }
+    setSaving(false)
+  }
+
+  const saveGpsCoordinates = async () => {
+    setSaving(true)
+    const { error } = await supabase
+      .from('admin_settings')
+      .update({
+        shop_latitude: parseFloat(shopLatitude) || null,
+        shop_longitude: parseFloat(shopLongitude) || null,
+        gps_radius_meters: parseInt(gpsRadius) || 100
+      })
+      .eq('id', 1)
+
+    if (!error) {
+      await loadSettings()
+      alert('GPS coordinates saved successfully!')
+    } else {
+      alert('Failed to save: ' + error.message)
     }
     setSaving(false)
   }
@@ -200,8 +237,86 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
+        {/* GPS Coordinates */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <div className="flex items-center mb-4">
+            <LinkIcon className="h-6 w-6 text-primary mr-3" />
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">GPS Coordinates</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Used for the customer "I'm Here" button to verify they're at your shop
+          </p>
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Latitude
+              </label>
+              <input
+                type="text"
+                value={shopLatitude}
+                onChange={(e) => setShopLatitude(e.target.value)}
+                placeholder="e.g., 55.7558"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Longitude
+              </label>
+              <input
+                type="text"
+                value={shopLongitude}
+                onChange={(e) => setShopLongitude(e.target.value)}
+                placeholder="e.g., -3.9626"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Radius (meters)
+              </label>
+              <input
+                type="number"
+                value={gpsRadius}
+                onChange={(e) => setGpsRadius(e.target.value)}
+                placeholder="100"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                How close the customer needs to be (default: 100m)
+              </p>
+            </div>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>How to find your coordinates:</strong><br/>
+              1. Go to Google Maps<br/>
+              2. Right-click on your shop location<br/>
+              3. Click the coordinates (they'll copy automatically)<br/>
+              4. Paste them here (format: latitude, longitude)
+            </p>
+          </div>
+          <button
+            onClick={saveGpsCoordinates}
+            disabled={saving}
+            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5 mr-2" />
+                Save GPS Coordinates
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Warranty API Key */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
           <div className="flex items-center mb-4">
             <LinkIcon className="h-6 w-6 text-blue-500 mr-2" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Warranty API Key</h2>

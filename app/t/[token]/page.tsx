@@ -19,6 +19,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [statusChangedAt, setStatusChangedAt] = useState<Date | null>(null)
   const [previousStatus, setPreviousStatus] = useState<string | null>(null)
   const [isExpired, setIsExpired] = useState(false)
+  const [shopCoordinates, setShopCoordinates] = useState({ latitude: 55.7558, longitude: -3.9626, radius: 100 })
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -69,7 +70,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   useEffect(() => {
     loadJob()
-
+    loadShopCoordinates()
+    
     // Set up real-time subscription for job updates
     const channel = supabase
       .channel('job-tracking')
@@ -105,6 +107,22 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       clearInterval(renderInterval)
     }
   }, [params.token])
+
+  const loadShopCoordinates = async () => {
+    const { data } = await supabase
+      .from('admin_settings')
+      .select('shop_latitude, shop_longitude, gps_radius_meters')
+      .eq('id', 1)
+      .single()
+
+    if (data) {
+      setShopCoordinates({
+        latitude: data.shop_latitude || 55.7558,
+        longitude: data.shop_longitude || -3.9626,
+        radius: data.gps_radius_meters || 100
+      })
+    }
+  }
 
   const loadJob = async (showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true)
@@ -538,9 +556,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               <ImHereButton
                 jobId={job.id}
                 jobRef={job.job_ref}
-                shopLatitude={55.7558}
-                shopLongitude={-3.9626}
-                radiusMeters={100}
+                shopLatitude={shopCoordinates.latitude}
+                shopLongitude={shopCoordinates.longitude}
+                radiusMeters={shopCoordinates.radius}
               />
               <a
                 href={SHOP_INFO.google_maps_link}
