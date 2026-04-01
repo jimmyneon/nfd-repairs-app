@@ -76,11 +76,12 @@ export async function POST(request: NextRequest) {
     // Calculate scheduled time
     const scheduledTime = calculateScheduledTime()
 
-    // Update job with scheduled time
+    // Update job with scheduled time for both SMS and email
     const { error: updateError } = await supabase
       .from('jobs')
       .update({
-        post_collection_sms_scheduled_at: scheduledTime.toISOString()
+        post_collection_sms_scheduled_at: scheduledTime.toISOString(),
+        post_collection_email_scheduled_at: scheduledTime.toISOString()
       })
       .eq('id', jobId)
 
@@ -98,15 +99,15 @@ export async function POST(request: NextRequest) {
       .insert({
         job_id: jobId,
         type: 'SYSTEM',
-        message: `Post-collection SMS scheduled for ${scheduledTime.toLocaleString()}`
+        message: `Post-collection notifications (SMS + Email) scheduled for ${scheduledTime.toLocaleString()}`
       })
 
-    console.log(`Post-collection SMS scheduled for job ${job.job_ref} at ${scheduledTime.toISOString()}`)
+    console.log(`Post-collection notifications scheduled for job ${job.job_ref} at ${scheduledTime.toISOString()}`)
 
     return NextResponse.json({
       success: true,
       scheduledAt: scheduledTime.toISOString(),
-      message: 'Post-collection SMS scheduled'
+      message: 'Post-collection notifications (SMS + Email) scheduled'
     })
 
   } catch (error) {
@@ -120,21 +121,24 @@ export async function POST(request: NextRequest) {
 
 /**
  * Calculate when to send post-collection SMS with randomized delay
+ * GUARDRAILS: Only schedule between 8am-8pm
  * - If collected before 16:00, send 1-3 hours later (randomized)
  * - If collected after 16:00, send at 10:00-12:00 next day (randomized)
+ * - If scheduled time would be outside 8am-8pm, adjust to next available window
  * This prevents all review requests from going out at exactly the same time
  */
 function calculateScheduledTime(): Date {
   const now = new Date()
   const currentHour = now.getHours()
 
+  let scheduledTime: Date
+
   if (currentHour < 16) {
     // Send 1-3 hours from now (randomized)
     const minDelay = 60 * 60 * 1000 // 1 hour in ms
     const maxDelay = 3 * 60 * 60 * 1000 // 3 hours in ms
     const randomDelay = minDelay + Math.random() * (maxDelay - minDelay)
-    const scheduledTime = new Date(now.getTime() + randomDelay)
-    return scheduledTime
+    scheduledTime = new Date(now.getTime() + randomDelay)
   } else {
     // Send at 10:00-12:00 next day (randomized)
     const tomorrow = new Date(now)
@@ -142,6 +146,20 @@ function calculateScheduledTime(): Date {
     const randomHour = 10 + Math.floor(Math.random() * 2) // 10 or 11
     const randomMinute = Math.floor(Math.random() * 60) // 0-59
     tomorrow.setHours(randomHour, randomMinute, 0, 0)
-    return tomorrow
+    scheduledTime = tomorrow
   }
+
+  // GUARDRAIL: Ensure scheduled time is within allowed hours (8am-8pm)
+  const scheduledHour = scheduledTime.getHours()
+  
+  if (scheduledHour < 8) {
+    // Too early - move to 8am same day
+    scheduledTime.setHours(8, 0, 0, 0)
+  } else if (scheduledHour >= 20) {
+    // Too late - move to 10am next day
+    scheduledTime.setDate(scheduledTime.getDate() + 1)
+    scheduledTime.setHours(10, 0, 0, 0)
+  }
+
+  return scheduledTime
 }

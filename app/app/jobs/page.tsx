@@ -13,6 +13,7 @@ import QRScanner from '@/components/QRScanner'
 export default function JobsListPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([])
+  const [collectedJobs, setCollectedJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'ALL'>('ALL')
@@ -20,6 +21,7 @@ export default function JobsListPage() {
   const [warrantyCount, setWarrantyCount] = useState(0)
   const [showScanner, setShowScanner] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
+  const [showCollected, setShowCollected] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -74,10 +76,18 @@ export default function JobsListPage() {
   }, [])
 
   useEffect(() => {
-    let filtered = jobs
+    // Separate active jobs from collected jobs
+    const active = jobs.filter(job => job.status !== 'COLLECTED')
+    const collected = jobs.filter(job => job.status === 'COLLECTED')
+    
+    let filtered = active
 
     if (statusFilter !== 'ALL') {
-      filtered = filtered.filter(job => job.status === statusFilter)
+      if (statusFilter === 'COLLECTED') {
+        filtered = collected
+      } else {
+        filtered = active.filter(job => job.status === statusFilter)
+      }
     }
 
     if (searchTerm) {
@@ -94,6 +104,7 @@ export default function JobsListPage() {
     }
 
     setFilteredJobs(filtered)
+    setCollectedJobs(collected)
   }, [jobs, statusFilter, searchTerm])
 
   const loadJobs = async () => {
@@ -101,11 +112,26 @@ export default function JobsListPage() {
       .from('jobs')
       .select('*')
       .not('status', 'in', '("COMPLETED","CANCELLED")')
-      .order('priority_score', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
 
     if (!error && data) {
-      setJobs(data)
+      // Sort with COLLECTED at bottom, others by priority and time
+      const sorted = data.sort((a, b) => {
+        // COLLECTED jobs always go to bottom
+        if (a.status === 'COLLECTED' && b.status !== 'COLLECTED') return 1
+        if (a.status !== 'COLLECTED' && b.status === 'COLLECTED') return -1
+        
+        // For non-collected jobs, sort by priority_score (desc) then created_at (desc)
+        if (a.status !== 'COLLECTED' && b.status !== 'COLLECTED') {
+          const priorityDiff = (b.priority_score || 50) - (a.priority_score || 50)
+          if (priorityDiff !== 0) return priorityDiff
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        }
+        
+        // For collected jobs, sort by collected_at (most recent first)
+        return new Date(b.collected_at || b.updated_at).getTime() - new Date(a.collected_at || a.updated_at).getTime()
+      })
+      
+      setJobs(sorted)
     }
     setLoading(false)
   }
@@ -334,6 +360,41 @@ export default function JobsListPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Collected Jobs Section - Collapsed at bottom */}
+        {!loading && statusFilter === 'ALL' && collectedJobs.length > 0 && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowCollected(!showCollected)}
+              className="w-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center justify-between"
+            >
+              <span>Collected Jobs ({collectedJobs.length})</span>
+              <ChevronDown className={`h-5 w-5 transition-transform ${showCollected ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {showCollected && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                {collectedJobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/app/jobs/${job.id}`}
+                    className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all aspect-square ${JOB_STATUS_COLORS[job.status]}`}
+                  >
+                    <div className="p-3 h-full flex flex-col relative text-white">
+                      <div className="text-center mb-2">
+                        <p className="font-black text-xs leading-tight uppercase tracking-wide">Collected</p>
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center text-center">
+                        <p className="text-sm font-black leading-tight mb-1 truncate">{job.device_make} {job.device_model}</p>
+                        <p className="text-xs font-semibold truncate">{job.issue}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
