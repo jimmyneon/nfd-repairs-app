@@ -84,6 +84,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
   }, [params.id])
 
+  // Auto-show customer arrived prompt if customer is waiting (within last 30 minutes)
+  useEffect(() => {
+    if (job && job.customer_arrived_at && job.status === 'READY_TO_COLLECT') {
+      const arrivedAt = new Date(job.customer_arrived_at)
+      const now = new Date()
+      const minutesSinceArrival = (now.getTime() - arrivedAt.getTime()) / (1000 * 60)
+      
+      // Show prompt if customer arrived within last 30 minutes
+      if (minutesSinceArrival < 30) {
+        setShowCustomerArrivedPrompt(true)
+      }
+    }
+  }, [job])
+
   // Auto-show collection confirmation modal if ?collect=true and status is READY_TO_COLLECT
   useEffect(() => {
     if (job && searchParams.get('collect') === 'true' && job.status === 'READY_TO_COLLECT') {

@@ -172,18 +172,47 @@ export function enrichJobWithMetrics(job: Job): JobWithMetrics {
 }
 
 /**
- * Group jobs by action group
+ * Check if customer has arrived (within last 30 minutes)
+ */
+export function hasCustomerArrived(job: Job): boolean {
+  if (!job.customer_arrived_at) return false
+  const arrivedAt = new Date(job.customer_arrived_at)
+  const now = new Date()
+  const minutesSinceArrival = (now.getTime() - arrivedAt.getTime()) / (1000 * 60)
+  return minutesSinceArrival < 30
+}
+
+/**
+ * Group jobs by action group and sort with customer arrivals first
  */
 export function groupJobsByAction(jobs: Job[]): Record<ActionGroup, JobWithMetrics[]> {
   const enrichedJobs = jobs.map(enrichJobWithMetrics)
   
+  // Sort function: customer arrived jobs first, then by priority score, then by time in status
+  const sortJobs = (a: JobWithMetrics, b: JobWithMetrics) => {
+    const aArrived = hasCustomerArrived(a)
+    const bArrived = hasCustomerArrived(b)
+    
+    // Customer arrived jobs always come first
+    if (aArrived && !bArrived) return -1
+    if (!aArrived && bArrived) return 1
+    
+    // Then by priority score (higher first)
+    const aPriority = a.priority_score || 50
+    const bPriority = b.priority_score || 50
+    if (aPriority !== bPriority) return bPriority - aPriority
+    
+    // Then by time in status (longer first)
+    return b.hoursInStatus - a.hoursInStatus
+  }
+  
   return {
-    URGENT: enrichedJobs.filter(j => j.actionGroup === 'URGENT'),
-    READY_TO_WORK: enrichedJobs.filter(j => j.actionGroup === 'READY_TO_WORK'),
-    WAITING: enrichedJobs.filter(j => j.actionGroup === 'WAITING'),
-    READY_TO_COLLECT: enrichedJobs.filter(j => j.actionGroup === 'READY_TO_COLLECT'),
-    COLLECTED: enrichedJobs.filter(j => j.actionGroup === 'COLLECTED'),
-    OTHER: enrichedJobs.filter(j => j.actionGroup === 'OTHER'),
+    URGENT: enrichedJobs.filter(j => j.actionGroup === 'URGENT').sort(sortJobs),
+    READY_TO_WORK: enrichedJobs.filter(j => j.actionGroup === 'READY_TO_WORK').sort(sortJobs),
+    WAITING: enrichedJobs.filter(j => j.actionGroup === 'WAITING').sort(sortJobs),
+    READY_TO_COLLECT: enrichedJobs.filter(j => j.actionGroup === 'READY_TO_COLLECT').sort(sortJobs),
+    COLLECTED: enrichedJobs.filter(j => j.actionGroup === 'COLLECTED').sort(sortJobs),
+    OTHER: enrichedJobs.filter(j => j.actionGroup === 'OTHER').sort(sortJobs),
   }
 }
 
