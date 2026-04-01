@@ -14,6 +14,7 @@ import OnboardingGate from '@/components/OnboardingGate'
 import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 import DelayReasonModal from '@/components/DelayReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
+import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -39,6 +40,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -69,6 +71,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     loadJobData()
+    
+    // Check if arrived from customer arrival notification
+    const arrivedParam = searchParams.get('customer_arrived')
+    if (arrivedParam === 'true') {
+      setShowCustomerArrivedPrompt(true)
+    }
   }, [params.id])
 
   // Auto-show collection confirmation modal if ?collect=true and status is READY_TO_COLLECT
@@ -473,8 +481,23 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     )
   }
 
+  const handleCustomerArrivedConfirm = () => {
+    setShowCustomerArrivedPrompt(false)
+    setPendingWorkflowStatus('COLLECTED')
+    setShowStatusModal(true)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
+      {/* Customer Arrived Prompt */}
+      {showCustomerArrivedPrompt && job && (
+        <CustomerArrivedPrompt
+          jobRef={job.job_ref}
+          onConfirm={handleCustomerArrivedConfirm}
+          onDismiss={() => setShowCustomerArrivedPrompt(false)}
+        />
+      )}
+
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
           <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">

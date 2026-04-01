@@ -55,10 +55,21 @@ export async function POST(request: NextRequest) {
           badge: '/badge-72.png',
           tag: `customer-arrived-${jobId}`,
           data: {
-            url: `/app/jobs/${jobId}`,
+            url: `/app/jobs/${jobId}?customer_arrived=true`,
             jobId,
-            jobRef
-          }
+            jobRef,
+            action: 'mark_collected'
+          },
+          actions: [
+            {
+              action: 'mark_collected',
+              title: 'Mark as Collected'
+            },
+            {
+              action: 'view_job',
+              title: 'View Job'
+            }
+          ]
         })
 
         // Send to all subscriptions
