@@ -12,11 +12,10 @@ COMMENT ON COLUMN admin_settings.shop_latitude IS 'Shop GPS latitude for custome
 COMMENT ON COLUMN admin_settings.shop_longitude IS 'Shop GPS longitude for customer arrival verification';
 COMMENT ON COLUMN admin_settings.gps_radius_meters IS 'Acceptable radius in meters for "I''m Here" button (default 100m)';
 
--- Set default values (you can update these in the admin panel)
--- Example coordinates - UPDATE THESE with your actual shop location from Google Maps
+-- Set shop GPS coordinates
 UPDATE admin_settings 
 SET 
-    shop_latitude = 55.7558,
-    shop_longitude = -3.9626,
+    shop_latitude = 50.75885792306448,
+    shop_longitude = -1.542417216414494,
     gps_radius_meters = 100
 WHERE id = 1;
