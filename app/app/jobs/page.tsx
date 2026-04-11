@@ -27,6 +27,7 @@ export default function JobsListPageV2() {
   const [warrantyCount, setWarrantyCount] = useState(0)
   const [showScanner, setShowScanner] = useState(false)
   const [showCollected, setShowCollected] = useState(false)
+  const [showAllJobs, setShowAllJobs] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -39,7 +40,7 @@ export default function JobsListPageV2() {
     loadJobs()
     loadUnreadNotifications()
     loadWarrantyTickets()
-    
+
     const jobsSubscription = supabase
       .channel('jobs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
@@ -69,6 +70,10 @@ export default function JobsListPageV2() {
   }, [])
 
   useEffect(() => {
+    loadJobs()
+  }, [showAllJobs])
+
+  useEffect(() => {
     // Filter jobs by search term
     let filtered = jobs
     
@@ -91,10 +96,15 @@ export default function JobsListPageV2() {
   }, [jobs, searchTerm])
 
   const loadJobs = async () => {
-    const { data, error } = await supabase
+    const query = supabase
       .from('jobs')
       .select('*')
-      .not('status', 'in', '("COMPLETED","CANCELLED")')
+
+    if (!showAllJobs) {
+      query.not('status', 'in', '("COMPLETED","CANCELLED")')
+    }
+
+    const { data, error } = await query
 
     if (!error && data) {
       setJobs(data)
@@ -184,6 +194,17 @@ export default function JobsListPageV2() {
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Repair Jobs</h1>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAllJobs(!showAllJobs)}
+                className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
+                  showAllJobs
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                }`}
+                title={showAllJobs ? 'Show active jobs only' : 'Show all jobs including completed/cancelled'}
+              >
+                {showAllJobs ? 'All Jobs' : 'Active Only'}
+              </button>
               <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
                 <Plus className="h-6 w-6" />
               </Link>
