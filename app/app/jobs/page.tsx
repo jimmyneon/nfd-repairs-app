@@ -28,6 +28,7 @@ export default function JobsListPageV2() {
   const [showScanner, setShowScanner] = useState(false)
   const [showCollected, setShowCollected] = useState(false)
   const [showAllJobs, setShowAllJobs] = useState(false)
+  const [showAllJobsFlat, setShowAllJobsFlat] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -396,6 +397,34 @@ export default function JobsListPageV2() {
                 </div>
               </section>
             )}
+
+            {/* ALL JOBS Fallback - Always available at bottom */}
+            <section className="border-t-2 border-gray-300 dark:border-gray-600 pt-6 mt-6">
+              <button
+                onClick={() => setShowAllJobsFlat(!showAllJobsFlat)}
+                className="w-full bg-gray-800 dark:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  <span>All Jobs ({jobs.length}) - Fallback View</span>
+                </div>
+                <ChevronDown className={`h-5 w-5 transition-transform ${showAllJobsFlat ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAllJobsFlat && (
+                <div className="mt-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Shows all jobs regardless of status or grouping
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {jobs.map(job => {
+                      const enriched = enrichJobWithMetrics(job)
+                      return <EnhancedJobTile key={job.id} job={enriched} />
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
 
             {/* Empty state */}
             {Object.values(groupedJobs).every(group => group.length === 0) && (
