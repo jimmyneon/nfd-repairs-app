@@ -187,6 +187,20 @@ export async function POST(request: NextRequest) {
         console.log('📤 Triggering SMS send for job:', job.job_ref)
         // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
         const appUrl = 'https://nfd-repairs-app.vercel.app'
+
+        // Special handling for COLLECTED status - schedule post-collection SMS
+        if (status === 'COLLECTED') {
+          try {
+            await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobId })
+            })
+            console.log('Post-collection SMS scheduled for job:', job.job_ref)
+          } catch (error) {
+            console.error('Failed to schedule post-collection SMS:', error)
+          }
+        }
         const response = await fetch(`${appUrl}/api/sms/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

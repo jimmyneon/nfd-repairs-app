@@ -14,8 +14,8 @@ DECLARE
   v_cron_secret TEXT;
   v_response TEXT;
 BEGIN
-  -- Get CRON_SECRET from environment (you'll set this in Supabase dashboard)
-  -- For now, we'll use the hardcoded secret
+  -- CRON_SECRET must match your Vercel environment variable
+  -- For external cron services (cron-job.org, EasyCron), use this secret in the Authorization header
   v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
   
   -- Call the API endpoint using http extension
