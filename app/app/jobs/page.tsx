@@ -176,6 +176,14 @@ export default function JobsListPageV2() {
       bgColor: 'bg-gray-50',
       borderColor: 'border-gray-200',
       description: 'Waiting for auto-close'
+    },
+    OTHER: {
+      title: 'Other',
+      icon: ChevronDown,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      description: 'Jobs in other statuses'
     }
   }
 
@@ -358,7 +366,7 @@ export default function JobsListPageV2() {
                   </div>
                   <ChevronDown className={`h-5 w-5 transition-transform ${showCollected ? 'rotate-180' : ''}`} />
                 </button>
-                
+
                 {showCollected && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                     {groupedJobs.COLLECTED.map(job => (
@@ -366,6 +374,26 @@ export default function JobsListPageV2() {
                     ))}
                   </div>
                 )}
+              </section>
+            )}
+
+            {/* OTHER Section */}
+            {groupedJobs.OTHER.length > 0 && (
+              <section>
+                <div className={`flex items-center gap-2 mb-3 p-3 rounded-xl ${actionGroupConfig.OTHER.bgColor} border-2 ${actionGroupConfig.OTHER.borderColor}`}>
+                  <actionGroupConfig.OTHER.icon className={`h-6 w-6 ${actionGroupConfig.OTHER.color}`} />
+                  <div className="flex-1">
+                    <h2 className={`font-black text-lg ${actionGroupConfig.OTHER.color}`}>
+                      {actionGroupConfig.OTHER.title} ({groupedJobs.OTHER.length})
+                    </h2>
+                    <p className="text-xs text-gray-600">{actionGroupConfig.OTHER.description}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {groupedJobs.OTHER.map(job => (
+                    <EnhancedJobTile key={job.id} job={job} />
+                  ))}
+                </div>
               </section>
             )}
 
