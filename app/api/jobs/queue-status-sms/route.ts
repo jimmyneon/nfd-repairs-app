@@ -78,8 +78,30 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Special handling for COLLECTED status - schedule post-collection SMS FIRST
+    // This must run before template check since there's no immediate COLLECTED SMS template
+    if (status === 'COLLECTED') {
+      try {
+        const appUrl = 'https://nfd-repairs-app.vercel.app'
+        await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId })
+        })
+        console.log('Post-collection SMS scheduled for job:', job.job_ref)
+      } catch (error) {
+        console.error('Failed to schedule post-collection SMS:', error)
+      }
+      
+      // COLLECTED status doesn't send immediate SMS, only schedules future review SMS
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Post-collection SMS scheduled' 
+      })
+    }
+
     // Only send SMS for key status changes
-    const smsStatuses = ['QUOTE_APPROVED', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COLLECTED', 'COMPLETED', 'CANCELLED', 'DELAYED']
+    const smsStatuses = ['QUOTE_APPROVED', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED', 'DELAYED']
     
     if (!smsStatuses.includes(status)) {
       console.log(`Status ${status} does not trigger SMS notification`)
@@ -187,20 +209,6 @@ export async function POST(request: NextRequest) {
         console.log('📤 Triggering SMS send for job:', job.job_ref)
         // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
         const appUrl = 'https://nfd-repairs-app.vercel.app'
-
-        // Special handling for COLLECTED status - schedule post-collection SMS
-        if (status === 'COLLECTED') {
-          try {
-            await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ jobId })
-            })
-            console.log('Post-collection SMS scheduled for job:', job.job_ref)
-          } catch (error) {
-            console.error('Failed to schedule post-collection SMS:', error)
-          }
-        }
         const response = await fetch(`${appUrl}/api/sms/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
