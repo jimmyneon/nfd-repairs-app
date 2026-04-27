@@ -16,6 +16,7 @@ import DelayReasonModal from '@/components/DelayReasonModal'
 import CancellationReasonModal from '@/components/CancellationReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
 import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
+import CustomerNotesEditor from '@/components/CustomerNotesEditor'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -905,6 +906,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         {/* Customer Flag Controls */}
         <CustomerFlagControls job={job} onUpdate={loadJobData} />
+
+        {/* Customer Notes Editor */}
+        <CustomerNotesEditor job={job} onUpdate={loadJobData} />
 
         {/* Delay/Cancellation Reasons */}
         {(job.delay_reason || job.cancellation_reason) && (

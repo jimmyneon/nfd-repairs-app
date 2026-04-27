@@ -129,7 +129,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, tracking_link_expires_at, closed_at')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
@@ -755,6 +755,16 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                             {job.cancellation_notes && (
                               <p className="text-gray-800 dark:text-gray-300 text-sm">{job.cancellation_notes}</p>
                             )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {job.customer_notes && (
+                        <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
+                          <MessageSquare className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">Update from us:</p>
+                            <p className="text-blue-800 dark:text-blue-300 text-sm whitespace-pre-wrap">{job.customer_notes}</p>
                           </div>
                         </div>
                       )}

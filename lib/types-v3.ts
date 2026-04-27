@@ -54,6 +54,7 @@ export interface Job {
   delay_notes?: string | null
   cancellation_reason?: string | null
   cancellation_notes?: string | null
+  customer_notes?: string | null
   
   // Parts & deposit
   requires_parts_order: boolean
