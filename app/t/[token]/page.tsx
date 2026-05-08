@@ -548,6 +548,19 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
             </div>
+
+            {/* Customer Notes - Display prominently at top */}
+            {job.customer_notes && (
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <MessageSquare className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">Update from us:</p>
+                    <p className="text-blue-800 dark:text-blue-300 text-sm whitespace-pre-wrap">{job.customer_notes}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </button>
           
           {/* Show GPS "I'm Here" button and directions for READY_TO_COLLECT status */}
@@ -749,22 +762,12 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                           <div>
                             {job.cancellation_reason && (
                               <p className="font-semibold text-gray-900 dark:text-gray-200 text-sm mb-1">
-                                Cancellation Reason: {job.cancellation_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                Cancellation Reason: {job.cancellation_reason?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
                               </p>
                             )}
                             {job.cancellation_notes && (
                               <p className="text-gray-800 dark:text-gray-300 text-sm">{job.cancellation_notes}</p>
                             )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {job.customer_notes && (
-                        <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
-                          <MessageSquare className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">Update from us:</p>
-                            <p className="text-blue-800 dark:text-blue-300 text-sm whitespace-pre-wrap">{job.customer_notes}</p>
                           </div>
                         </div>
                       )}
