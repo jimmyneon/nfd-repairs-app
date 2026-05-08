@@ -53,7 +53,11 @@ export function formatTimeInStatus(statusChangedAt: string | null | undefined): 
   if (days < 7) return `${days}d`
   
   const weeks = Math.floor(days / 7)
-  return `${weeks}w`
+  if (weeks === 1) return '1w'
+  if (weeks < 4) return `${weeks}w`
+  
+  const months = Math.floor(weeks / 4)
+  return `${months}mo`
 }
 
 /**
