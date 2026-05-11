@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
+import CustomerSearchModal from '@/components/CustomerSearchModal'
 
 function CreateJobContent() {
   const router = useRouter()
@@ -19,6 +20,7 @@ function CreateJobContent() {
   const [showIssueOther, setShowIssueOther] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showQuoteLookup, setShowQuoteLookup] = useState(false)
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [quickWalkInMode, setQuickWalkInMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('quickWalkInMode')
@@ -324,6 +326,55 @@ function CreateJobContent() {
     setShowQuoteLookup(false)
   }
 
+  const handleCustomerSelect = (customerData: any) => {
+    // Auto-infer device type from device make if provided
+    let inferredDeviceType = customerData.device_type || ''
+    if (!inferredDeviceType && customerData.device_make) {
+      const make = customerData.device_make.toLowerCase()
+      if (make.includes('iphone') || make.includes('samsung') || make.includes('pixel') || 
+          make.includes('huawei') || make.includes('xiaomi') || make.includes('motorola') ||
+          make.includes('nokia') || make.includes('oneplus') || make.includes('oppo')) {
+        inferredDeviceType = 'phone'
+      } else if (make.includes('ipad') || make.includes('tablet') || make.includes('tab ')) {
+        inferredDeviceType = 'tablet'
+      } else if (make.includes('macbook') || make.includes('laptop') || make.includes('notebook') ||
+                 make.includes('chromebook') || make.includes('thinkpad') || make.includes('dell') ||
+                 make.includes('hp') || make.includes('lenovo') || make.includes('asus')) {
+        inferredDeviceType = 'laptop'
+      } else if (make.includes('playstation') || make.includes('xbox') || make.includes('nintendo') ||
+                 make.includes('switch') || make.includes('ps4') || make.includes('ps5')) {
+        inferredDeviceType = 'console'
+      } else if (make.includes('watch') || make.includes('fitbit')) {
+        inferredDeviceType = 'watch'
+      } else if (make.includes('imac') || make.includes('desktop') || make.includes('monitor')) {
+        inferredDeviceType = 'desktop'
+      }
+    }
+
+    // Update form data with customer data
+    setFormData({
+      ...formData,
+      device_type: inferredDeviceType || formData.device_type,
+      device_make: customerData.device_make || formData.device_make,
+      device_model: customerData.device_model || formData.device_model,
+      issue: customerData.issue || formData.issue,
+      description: customerData.description || formData.description,
+      price_total: customerData.price_total || formData.price_total,
+      requires_parts_order: customerData.requires_parts_order ?? formData.requires_parts_order,
+    })
+    
+    // Store customer data for confirmation page
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('quote_customer_data', JSON.stringify({
+        customer_name: customerData.customer_name,
+        customer_phone: customerData.customer_phone,
+        customer_email: customerData.customer_email || '',
+      }))
+    }
+    
+    setShowCustomerSearch(false)
+  }
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -429,6 +480,14 @@ function CreateJobContent() {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Job</h1>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCustomerSearch(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
+              >
+                <Search className="h-4 w-4" />
+                Search Customers
+              </button>
               <button
                 type="button"
                 onClick={() => setShowQuoteLookup(true)}
@@ -1107,6 +1166,12 @@ function CreateJobContent() {
         isOpen={showQuoteLookup}
         onClose={() => setShowQuoteLookup(false)}
         onSelectQuote={handleQuoteSelect}
+      />
+
+      <CustomerSearchModal
+        isOpen={showCustomerSearch}
+        onClose={() => setShowCustomerSearch(false)}
+        onSelectCustomer={handleCustomerSelect}
       />
     </div>
   )
