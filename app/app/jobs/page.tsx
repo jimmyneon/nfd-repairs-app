@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
 import QRScanner from '@/components/QRScanner'
 import EnhancedJobTile from '@/components/EnhancedJobTile'
+import CustomerWaitingBanner from '@/components/CustomerWaitingBanner'
 import { groupJobsByAction, enrichJobWithMetrics, JobWithMetrics, ActionGroup } from '@/lib/job-utils'
 
 export default function JobsListPageV2() {
@@ -197,6 +198,9 @@ export default function JobsListPageV2() {
           onScan={handleQRScan}
         />
       )}
+      
+      {/* Customer Waiting Banner - Shows when customer has arrived */}
+      <CustomerWaitingBanner jobs={jobs} />
       
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
