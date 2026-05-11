@@ -145,7 +145,7 @@ export default function JobsListPageV2() {
       color: 'text-red-600',
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
-      description: 'High priority or overdue jobs'
+      description: 'Customer arrivals, high priority, or overdue jobs'
     },
     READY_TO_WORK: {
       title: 'Ready to Work',

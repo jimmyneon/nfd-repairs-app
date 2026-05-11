@@ -73,6 +73,9 @@ export function isJobOverdue(statusChangedAt: string | null | undefined): boolea
 export function getActionGroup(job: Job): ActionGroup {
   const hoursInStatus = getHoursInStatus(job.status_changed_at)
   
+  // URGENT: Customer has arrived - HIGHEST PRIORITY
+  if (hasCustomerArrived(job)) return 'URGENT'
+  
   // URGENT: Delayed >24hrs, high priority ready to work, or deposit overdue >48hrs
   if (job.status === 'DELAYED' && hoursInStatus > 24) return 'URGENT'
   

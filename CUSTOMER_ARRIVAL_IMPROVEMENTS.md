@@ -47,14 +47,22 @@ Previously, when customers clicked "I'm Here":
 - Graceful fallback if file missing
 - Catches and logs audio playback errors
 
-### 3. **Enhanced Job Tile Indicators**
+### 3. **Job Jumps to URGENT Category**
+
+When customer arrives:
+- Job **automatically moves to URGENT section** at the top
+- Appears in the red "Urgent / Today" category
+- Sorted to the very top within that category
+- No longer hidden in "Ready to Collect" at bottom
+
+### 4. **Enhanced Job Tile Indicators**
 
 Already existed but worth noting:
 - 🟡 **Yellow "CUSTOMER HERE" badge** on job tile
 - 💫 **Pulsing ring animation** around tile
 - ⏰ **Time since arrival** displayed
 
-### 4. **Acknowledgment System**
+### 5. **Acknowledgment System**
 
 Staff can acknowledge customer arrival:
 - Hides the banner for that specific job
