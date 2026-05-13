@@ -28,6 +28,16 @@ function CreateJobContent() {
     }
     return false
   })
+  const [superQuickMode, setSuperQuickMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('superQuickMode')
+      return saved === 'true'
+    }
+    return false
+  })
+  
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -60,6 +70,12 @@ function CreateJobContent() {
       localStorage.setItem('quickWalkInMode', String(quickWalkInMode))
     }
   }, [quickWalkInMode])
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('superQuickMode', String(superQuickMode))
+    }
+  }, [superQuickMode])
 
   // Load existing job data if jobId is provided (for completing onboarding)
   useEffect(() => {
@@ -202,20 +218,31 @@ function CreateJobContent() {
     // Validate required fields
     const errors: Record<string, string> = {}
     
-    if (!formData.device_type) {
-      errors.device_type = 'Device type is required'
-    }
-    
-    if (!formData.device_make) {
-      errors.device_make = 'Device make is required'
-    }
-    
-    if (!quickWalkInMode && !formData.device_model) {
-      errors.device_model = 'Device model is required'
-    }
-    
-    if (!formData.issue) {
-      errors.issue = 'Issue is required'
+    // Super Quick Mode: Only validate name and phone
+    if (superQuickMode) {
+      if (!customerName.trim()) {
+        errors.customerName = 'Customer name is required'
+      }
+      if (!customerPhone.trim()) {
+        errors.customerPhone = 'Customer phone is required'
+      }
+    } else {
+      // Normal validation
+      if (!formData.device_type) {
+        errors.device_type = 'Device type is required'
+      }
+      
+      if (!formData.device_make) {
+        errors.device_make = 'Device make is required'
+      }
+      
+      if (!quickWalkInMode && !formData.device_model) {
+        errors.device_model = 'Device model is required'
+      }
+      
+      if (!formData.issue) {
+        errors.issue = 'Issue is required'
+      }
     }
     
     // If there are validation errors, show them and prevent submission
@@ -245,6 +272,59 @@ function CreateJobContent() {
     // Clear any previous validation errors
     setValidationErrors({})
     setShowValidationSummary(false)
+    
+    // Super Quick Mode: Create job immediately with minimal data
+    if (superQuickMode) {
+      setLoading(true)
+      try {
+        const response = await fetch('/api/jobs/create-v3', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: customerName.trim(),
+            customer_phone: customerPhone.trim(),
+            customer_email: null,
+            device_make: 'TBD',
+            device_model: 'TBD',
+            issue: 'To be determined',
+            description: 'Quick intake - details to be added later',
+            price_total: 0,
+            quoted_price: 0,
+            requires_parts_order: false,
+            source: 'staff_manual',
+            device_password: null,
+            password_not_applicable: true,
+            passcode_requirement: 'not_required',
+            passcode_method: 'not_applicable',
+            customer_signature: null,
+            terms_accepted: true,
+            onboarding_completed: false,
+            device_in_shop: true,
+            linked_quote_id: null,
+            skip_sms: true,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (response.ok) {
+          // Clear form
+          setCustomerName('')
+          setCustomerPhone('')
+          // Show success and stay on page for next customer
+          alert(`Job created! Ref: ${result.job_ref}\n\nYou can add device details later from the job page.`)
+          setLoading(false)
+        } else {
+          alert(`Failed to create job: ${result.error}`)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error creating job:', error)
+        alert('Failed to create job. Please try again.')
+        setLoading(false)
+      }
+      return
+    }
     
     // Store advanced options in sessionStorage for customer-confirm page
     if (overrideInitialStatus || skipInitialSMS) {
@@ -511,36 +591,152 @@ function CreateJobContent() {
 
       <main className="p-4 max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Quick Walk-In Mode Toggle */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+          {/* Super Quick Mode Toggle */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl shadow-lg p-4 border-2 border-green-300 dark:border-green-700">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-orange-500" />
-                  Quick Walk-In Mode
+                  <Zap className="h-5 w-5 text-green-600" />
+                  Super Quick Mode
                 </h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Ultra-fast intake for busy periods - minimal fields, generic device info
+                  <strong>Fastest option:</strong> Just grab name & phone - fill in device details later
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setQuickWalkInMode(!quickWalkInMode)}
+                onClick={() => {
+                  setSuperQuickMode(!superQuickMode)
+                  if (!superQuickMode) {
+                    setQuickWalkInMode(false)
+                  }
+                }}
                 className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  quickWalkInMode ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                  superQuickMode ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
                 }`}
               >
                 <span
                   className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                    quickWalkInMode ? 'translate-x-7' : 'translate-x-1'
+                    superQuickMode ? 'translate-x-7' : 'translate-x-1'
                   }`}
                 />
               </button>
             </div>
           </div>
 
+          {/* Quick Walk-In Mode Toggle */}
+          {!superQuickMode && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border-2 border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-orange-500" />
+                    Quick Walk-In Mode
+                  </h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Ultra-fast intake for busy periods - minimal fields, generic device info
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuickWalkInMode(!quickWalkInMode)}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                    quickWalkInMode ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      quickWalkInMode ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Super Quick Mode - Name & Phone Only */}
+          {superQuickMode && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Customer Details</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Customer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="customerName"
+                    value={customerName}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value)
+                      if (validationErrors.customerName) {
+                        setValidationErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.customerName
+                          return newErrors
+                        })
+                      }
+                    }}
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg ${
+                      validationErrors.customerName
+                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
+                    placeholder="Enter customer name"
+                    autoFocus
+                  />
+                  {validationErrors.customerName && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerName}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    name="customerPhone"
+                    value={customerPhone}
+                    onChange={(e) => {
+                      setCustomerPhone(e.target.value)
+                      if (validationErrors.customerPhone) {
+                        setValidationErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.customerPhone
+                          return newErrors
+                        })
+                      }
+                    }}
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg ${
+                      validationErrors.customerPhone
+                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
+                    placeholder="07410 123 456"
+                  />
+                  {validationErrors.customerPhone && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerPhone}
+                    </p>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>Quick Intake:</strong> Device details will be marked as "TBD". You can add them later from the job page.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Device Quick Presets - Only visible in Quick Walk-In Mode */}
-          {quickWalkInMode && (
+          {quickWalkInMode && !superQuickMode && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Device Selection</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -565,8 +761,9 @@ function CreateJobContent() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Details (Optional - if not using presets)</h2>
+          {!superQuickMode && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Details (Optional - if not using presets)</h2>
             
             <div className="space-y-4">
               <div>
@@ -788,9 +985,10 @@ function CreateJobContent() {
                 </>
               )}
             </div>
-          </div>
+            </div>
+          )}
 
-          {quickWalkInMode ? (
+          {!superQuickMode && (quickWalkInMode ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Price & Quick Options</h2>
               
@@ -864,10 +1062,10 @@ function CreateJobContent() {
                 </div>
               </div>
             </div>
-          )}
+          ))}
 
           {/* Passcode Requirement Section */}
-          {!quickWalkInMode ? (
+          {!superQuickMode && (!quickWalkInMode ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Passcode Requirement</h2>
               
@@ -981,9 +1179,9 @@ function CreateJobContent() {
                 </label>
               </div>
             </div>
-          )}
+          ))}
 
-          {!quickWalkInMode && (
+          {!superQuickMode && !quickWalkInMode && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Device Status</h2>
               
@@ -1015,7 +1213,8 @@ function CreateJobContent() {
           )}
 
           {/* Advanced Options - For importing old jobs */}
-          <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-2xl shadow-lg border-2 border-orange-200 dark:border-orange-700 overflow-hidden">
+          {!superQuickMode && (
+            <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-2xl shadow-lg border-2 border-orange-200 dark:border-orange-700 overflow-hidden">
             <button
               type="button"
               onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
@@ -1094,7 +1293,8 @@ function CreateJobContent() {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Validation Error Summary - Shown at bottom near submit button */}
           {showValidationSummary && Object.keys(validationErrors).length > 0 && (
@@ -1135,6 +1335,11 @@ function CreateJobContent() {
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Creating...</span>
+                </>
+              ) : superQuickMode ? (
+                <>
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Create Job</span>
                 </>
               ) : (
                 <>
