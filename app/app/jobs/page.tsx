@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, Bell, QrCode, MessageSquare, Settings, Plus, Shield, History, ChevronDown, Flame, Zap, Clock, CheckCircle, Package } from 'lucide-react'
+import { Search, Bell, QrCode, MessageSquare, Settings, Plus, Shield, History, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -223,6 +223,9 @@ export default function JobsListPageV2() {
               </Link>
               <Link href="/app/history" className="text-gray-600 hover:text-primary" title="Job History">
                 <History className="h-6 w-6" />
+              </Link>
+              <Link href="/app/enquiries" className="text-gray-600 hover:text-primary" title="Enquiries">
+                <Mail className="h-6 w-6" />
               </Link>
               <Link href="/app/warranty" className="relative text-gray-600 hover:text-primary" title="Warranty Tickets">
                 <Shield className="h-6 w-6" />
