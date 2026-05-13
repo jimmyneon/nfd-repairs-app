@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -35,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (!enquiry_type || !customer_name || !customer_email) {
       return NextResponse.json(
         { error: 'Missing required fields: enquiry_type, customer_name, customer_email' },
-        { status: 400 }
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       )
     }
 
@@ -43,14 +54,14 @@ export async function POST(request: NextRequest) {
       if (!project_type || !sector || !number_pages || !goals || !project_description) {
         return NextResponse.json(
           { error: 'Missing required web services fields' },
-          { status: 400 }
+          { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
         )
       }
     } else if (enquiry_type === 'home_services') {
       if (!service_type || !address || !description) {
         return NextResponse.json(
           { error: 'Missing required home services fields' },
-          { status: 400 }
+          { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
         )
       }
     }
@@ -91,7 +102,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to create enquiry:', enquiryError)
       return NextResponse.json(
         { error: 'Failed to create enquiry' },
-        { status: 500 }
+        { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
       )
     }
 
@@ -107,12 +118,16 @@ export async function POST(request: NextRequest) {
       success: true,
       enquiry_ref: enquiry.enquiry_ref,
       message: 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
     })
   } catch (error) {
     console.error('Error processing enquiry submission:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
     )
   }
 }

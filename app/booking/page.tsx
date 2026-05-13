@@ -20,28 +20,76 @@ export default function CustomerBookingPage() {
     customerName: '',
     customerPhone: '',
     customerEmail: '',
+    deviceType: 'phone' as 'phone' | 'tablet' | 'laptop' | 'macbook' | 'console' | 'other',
     deviceMake: '',
     deviceModel: '',
     issue: '',
     description: '',
-    devicePassword: '',
-    passwordNA: false,
-    passcodeMethod: 'provided' as 'provided' | 'send_link' | 'not_applicable',
-    termsAccepted: false,
+    notSure: false,
   })
 
-  const commonIssues = [
-    'Screen Replacement',
-    'Battery Replacement',
-    'Charging Port Replacement',
-    'Not Charging',
-    'Water Damage',
-    'No Power',
-    'Black Screen',
-    'Data Recovery',
-    'Software Issues',
-    'Other',
-  ]
+  const issueOptions = {
+    phone: [
+      'Screen Replacement',
+      'Battery Replacement',
+      'Charging Port Replacement',
+      'Not Charging',
+      'Water Damage',
+      'No Power',
+      'Black Screen',
+      'Data Recovery',
+      'Software Issues',
+      'Other',
+    ],
+    tablet: [
+      'Screen Replacement',
+      'Battery Replacement',
+      'Charging Port Replacement',
+      'Not Charging',
+      'Water Damage',
+      'No Power',
+      'Black Screen',
+      'Software Issues',
+      'Other',
+    ],
+    laptop: [
+      'Screen Replacement',
+      'Keyboard Replacement',
+      'Battery Replacement',
+      'Charging Issues',
+      'Windows Reinstall',
+      'Software Issues',
+      'Hardware Diagnostics',
+      'Data Recovery',
+      'Other',
+    ],
+    macbook: [
+      'Screen Replacement',
+      'Battery Replacement',
+      'Keyboard Replacement',
+      'Charging Issues',
+      'macOS Reinstall',
+      'Software Issues',
+      'Hardware Diagnostics',
+      'Data Recovery',
+      'Other',
+    ],
+    console: [
+      'HDMI Port Replacement',
+      'Disc Drive Issues',
+      'Overheating',
+      'No Power',
+      'Software Issues',
+      'Controller Issues',
+      'Other',
+    ],
+    other: [
+      'Hardware Issue',
+      'Software Issue',
+      'Data Recovery',
+      'Other',
+    ],
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -160,14 +208,8 @@ export default function CustomerBookingPage() {
       errors.deviceModel = 'Device model is required'
     }
 
-    if (!formData.issue.trim()) {
-      errors.issue = 'Issue description is required'
-    }
-
-    if (!formData.termsAccepted) {
-      errors.termsAccepted = 'You must accept the terms and conditions'
-      setShakeTerms(true)
-      setTimeout(() => setShakeTerms(false), 600)
+    if (!formData.notSure && !formData.issue.trim()) {
+      errors.issue = 'Please select an issue or check "Not sure what the problem is"'
     }
 
     if (Object.keys(errors).length > 0) {
@@ -201,21 +243,24 @@ export default function CustomerBookingPage() {
         customer_email: formData.customerEmail.trim() || null,
         device_make: formData.deviceMake.trim(),
         device_model: formData.deviceModel.trim(),
-        issue: formData.issue.trim(),
+        device_type: formData.deviceType,
+        issue: formData.notSure ? 'To be assessed' : formData.issue.trim(),
         description: formData.description.trim() || null,
         price_total: 0,
         quoted_price: 0,
         requires_parts_order: false,
         source: 'customer_online',
-        device_password: (formData.passwordNA || formData.passcodeMethod !== 'provided') ? null : formData.devicePassword.trim(),
-        password_not_applicable: formData.passwordNA || formData.passcodeMethod === 'not_applicable',
-        passcode_requirement: 'recommended',
-        passcode_method: formData.passcodeMethod,
+        device_password: null,
+        password_not_applicable: true,
+        passcode_requirement: 'not_required',
+        passcode_method: 'not_applicable',
         customer_signature: null,
         terms_accepted: true,
-        onboarding_completed: true,
+        onboarding_completed: false,
         device_in_shop: false,
         linked_quote_id: null,
+        skip_sms: false,
+        initial_status: 'QUOTE_REQUESTED',
       }
 
       const response = await fetch('/api/jobs/create-v3', {
@@ -382,6 +427,25 @@ export default function CustomerBookingPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Device Type *
+                  </label>
+                  <select
+                    name="deviceType"
+                    value={formData.deviceType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="phone">Phone</option>
+                    <option value="tablet">Tablet</option>
+                    <option value="laptop">Laptop (Windows)</option>
+                    <option value="macbook">MacBook (Apple)</option>
+                    <option value="console">Games Console</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Device Make *
                   </label>
                   <input
@@ -429,31 +493,48 @@ export default function CustomerBookingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    What's the issue? *
+                  <label className="flex items-center space-x-3 cursor-pointer mb-3">
+                    <input
+                      type="checkbox"
+                      name="notSure"
+                      checked={formData.notSure}
+                      onChange={handleChange}
+                      className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      I'm not sure what the problem is
+                    </span>
                   </label>
-                  <select
-                    name="issue"
-                    value={formData.issue}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      validationErrors.issue
-                        ? 'border-red-500 dark:border-red-500 focus:ring-red-500'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary focus:border-transparent'
-                    }`}
-                  >
-                    <option value="">Select an issue...</option>
-                    {commonIssues.map(issue => (
-                      <option key={issue} value={issue}>{issue}</option>
-                    ))}
-                  </select>
-                  {validationErrors.issue && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      {validationErrors.issue}
-                    </p>
-                  )}
                 </div>
+
+                {!formData.notSure && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      What's the issue? *
+                    </label>
+                    <select
+                      name="issue"
+                      value={formData.issue}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                        validationErrors.issue
+                          ? 'border-red-500 dark:border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 dark:border-gray-600 focus:ring-primary focus:border-transparent'
+                      }`}
+                    >
+                      <option value="">Select an issue...</option>
+                      {issueOptions[formData.deviceType].map(issue => (
+                        <option key={issue} value={issue}>{issue}</option>
+                      ))}
+                    </select>
+                    {validationErrors.issue && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        {validationErrors.issue}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
