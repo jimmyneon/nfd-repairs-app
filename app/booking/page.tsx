@@ -552,155 +552,23 @@ export default function CustomerBookingPage() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
-                  3
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Device Passcode (Optional)</h2>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Why we need this:</strong> We need your device passcode to test it after repair and ensure everything works properly.
-                </p>
-                <p className="text-xs text-blue-800 dark:text-blue-200 mt-2">
-                  🔒 <strong>Security:</strong> Your passcode will be stored securely and automatically deleted 7 days after your repair is completed.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  <input
-                    type="radio"
-                    name="passcodeMethod"
-                    value="provided"
-                    checked={formData.passcodeMethod === 'provided'}
-                    onChange={(e) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        passcodeMethod: e.target.value as any,
-                        passwordNA: false
-                      }))
-                    }}
-                    className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                      <Lock className="h-5 w-5" />
-                      Provide passcode now
-                    </div>
-                    {formData.passcodeMethod === 'provided' && (
-                      <div className="mt-3 relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="devicePassword"
-                          value={formData.devicePassword}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono"
-                          placeholder="Enter passcode"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        >
-                          {showPassword ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </label>
-
-                <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  <input
-                    type="radio"
-                    name="passcodeMethod"
-                    value="send_link"
-                    checked={formData.passcodeMethod === 'send_link'}
-                    onChange={(e) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        passcodeMethod: e.target.value as any,
-                        passwordNA: false
-                      }))
-                    }}
-                    className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">I'll provide it later</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">We'll send you a secure link to enter your passcode when convenient</div>
-                  </div>
-                </label>
-
-                <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  <input
-                    type="radio"
-                    name="passcodeMethod"
-                    value="not_applicable"
-                    checked={formData.passcodeMethod === 'not_applicable'}
-                    onChange={(e) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        passcodeMethod: e.target.value as any,
-                        passwordNA: true
-                      }))
-                    }}
-                    className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">No passcode needed</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">My device doesn't have a passcode</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
-                <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-2 text-sm">
-                  Terms & Conditions
-                </h5>
-                <p className="text-xs text-blue-900 dark:text-blue-100 mb-3 leading-relaxed">
-                  Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.
-                </p>
-                
-                <label className={`flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-all ${
-                  shakeTerms && !formData.termsAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
-                }`}>
-                  <input
-                    type="checkbox"
-                    name="termsAccepted"
-                    checked={formData.termsAccepted}
-                    onChange={handleChange}
-                    className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
-                  />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                    I agree to the repair terms and conditions
-                  </span>
-                </label>
-                {validationErrors.termsAccepted && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {validationErrors.termsAccepted}
-                  </p>
-                )}
-                
-                <div className="text-xs text-blue-800 dark:text-blue-200 mt-3">
-                  <a 
-                    href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                  >
-                    View full terms and conditions
-                  </a>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-6">
+              <div className="flex items-start gap-3">
+                <Smartphone className="h-6 w-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg mb-2">What happens next?</h3>
+                  <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
+                    <li>1. We'll review your request and assess the repair</li>
+                    <li>2. You'll receive a quote via SMS with a link to approve</li>
+                    <li>3. Once approved, you can bring in your device</li>
+                    <li>4. No commitment until you approve the quote</li>
+                  </ul>
                 </div>
               </div>
             </div>
 
             {showValidationSummary && Object.keys(validationErrors).length > 0 && (
-              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake">
+              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake mb-6">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -735,12 +603,12 @@ export default function CustomerBookingPage() {
               {loading ? (
                 <>
                   <Loader2 className="h-6 w-6 animate-spin" />
-                  Submitting Booking...
+                  Submitting Quote Request...
                 </>
               ) : (
                 <>
                   <CheckCircle className="h-6 w-6" />
-                  Submit Booking Request
+                  Request Quote
                 </>
               )}
             </button>

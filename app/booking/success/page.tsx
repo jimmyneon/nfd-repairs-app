@@ -18,11 +18,11 @@ function SuccessContent() {
           </div>
           
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            Booking Received!
+            Quote Request Received!
           </h1>
           
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-            Thank you for your booking request. We've received your details and will get back to you shortly with a quote.
+            Thank you for your quote request. We'll review your device details and send you a quote via SMS.
           </p>
 
           {jobRef && (
@@ -47,19 +47,19 @@ function SuccessContent() {
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>You'll receive an SMS confirmation shortly</span>
+                <span>We'll review your device details and assess the repair</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>We'll review your device details and provide a quote</span>
+                <span>You'll receive a quote via SMS with a link to approve</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>Once approved, you can drop off your device at our shop</span>
+                <span>Once you approve the quote, you can bring in your device</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>We'll keep you updated via SMS throughout the repair process</span>
+                <span>No commitment until you approve the quote</span>
               </li>
             </ul>
           </div>

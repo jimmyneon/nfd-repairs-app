@@ -988,15 +988,127 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           )}
           <div className="space-y-4">
+            {job.status === 'QUOTE_REQUESTED' && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Add Quote Price
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Quote Price (£)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      id="quotePrice"
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="requiresParts"
+                      className="w-5 h-5 text-blue-600 rounded"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">
+                      Parts Required
+                    </span>
+                  </label>
+                  <button
+                    onClick={async () => {
+                      const priceInput = document.getElementById('quotePrice') as HTMLInputElement
+                      const partsCheckbox = document.getElementById('requiresParts') as HTMLInputElement
+                      const price = parseFloat(priceInput.value)
+                      
+                      if (!price || price <= 0) {
+                        alert('Please enter a valid quote price')
+                        return
+                      }
+                      
+                      setActionLoading(true)
+                      try {
+                        const response = await fetch(`/api/jobs/${params.id}/send-quote`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            quoted_price: price,
+                            requires_parts_order: partsCheckbox.checked,
+                          }),
+                        })
+                        
+                        if (!response.ok) {
+                          const data = await response.json()
+                          throw new Error(data.error || 'Failed to send quote')
+                        }
+                        
+                        loadJobData()
+                      } catch (err: any) {
+                        alert(err.message || 'Failed to send quote')
+                      } finally {
+                        setActionLoading(false)
+                      }
+                    }}
+                    disabled={actionLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    {actionLoading ? (
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-5 w-5" />
+                    )}
+                    <span>Send Quote to Customer</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {job.status === 'QUOTE_APPROVED' && (
-              <button
-                onClick={() => handleWorkflowStatusChange('RECEIVED')}
-                disabled={actionLoading}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <CheckCircle className="h-7 w-7" />
-                <span>Mark as Received</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleWorkflowStatusChange('RECEIVED')}
+                  disabled={actionLoading}
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <CheckCircle className="h-7 w-7" />
+                  <span>Mark as Received</span>
+                </button>
+                {job.requires_parts_order && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        setActionLoading(true)
+                        const response = await fetch(`/api/jobs/${params.id}/request-deposit`, { method: 'POST' })
+                        if (response.ok) loadJobData()
+                        else alert('Failed to request deposit')
+                        setActionLoading(false)
+                      }}
+                      disabled={actionLoading}
+                      className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Coins className="h-5 w-5" />
+                      <span>Request Deposit</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setActionLoading(true)
+                        const response = await fetch(`/api/jobs/${params.id}/notify-parts`, { method: 'POST' })
+                        if (response.ok) alert('Parts notification sent')
+                        else alert('Failed to send notification')
+                        setActionLoading(false)
+                      }}
+                      disabled={actionLoading}
+                      className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="h-5 w-5" />
+                      <span>Notify About Parts</span>
+                    </button>
+                  </>
+                )}
+              </>
             )}
             
             {job.status === 'RECEIVED' && !job.parts_required && (
