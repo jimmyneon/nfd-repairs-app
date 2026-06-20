@@ -121,7 +121,7 @@ BEGIN
     LOOP
         ref := 'ENQ' || prefix || LPAD((FLOOR(RANDOM() * 9000) + 1000)::TEXT, 4, '0');
         
-        -- Check if this reference already exists
+        -- Check if this reference   already exists
         IF NOT EXISTS (SELECT 1 FROM enquiries WHERE enquiry_ref = ref) THEN
             NEW.enquiry_ref := ref;
             RETURN NEW;

@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 import CustomerSearchModal from '@/components/CustomerSearchModal'
+import { getIssuesForDeviceType, saveCustomIssue, getCustomIssues } from '@/lib/device-issues'
 
 function CreateJobContent() {
   const router = useRouter()
@@ -142,7 +143,7 @@ function CreateJobContent() {
     { label: 'Laptop', icon: Monitor, device_type: 'laptop', device_make: 'Generic', device_model: 'Laptop ', color: 'bg-cyan-600 hover:bg-cyan-700' },
   ]
 
-  // Common issue presets with colors
+  // Common issue presets with colors - used for quick walk-in mode buttons
   const commonIssuePresets = [
     { label: 'Screen', icon: Smartphone, value: 'Screen Replacement', color: 'bg-red-600 hover:bg-red-700' },
     { label: 'Battery', icon: Battery, value: 'Battery Replacement', color: 'bg-green-600 hover:bg-green-700' },
@@ -152,30 +153,9 @@ function CreateJobContent() {
     { label: 'Black Screen', icon: Circle, value: 'Black Screen', color: 'bg-gray-700 hover:bg-gray-800' },
   ]
 
-  // Common issues - prioritized for quick walk-in (most common first)
-  const commonIssues = [
-    'Screen Replacement',
-    'Battery Replacement',
-    'Charging Port Replacement',
-    'Not Charging',
-    'Water Damage',
-    'No Power',
-    'Black Screen',
-    'Data Recovery',
-    'Software Glitches',
-    'Overheating',
-    'Not Loading',
-    'Blue Screen of Death',
-    'Windows 10 Installation',
-    'Windows 11 Installation',
-    'SSD Upgrade',
-    'Hard Drive Replacement',
-    'RAM Upgrade',
-    'HDMI Port Repair',
-    'Software Malfunction',
-    'Virus Removal',
-    'Other',
-  ]
+  // Dynamic issue list based on selected device type
+  // Falls back to default list when no device type selected
+  const currentIssues = getIssuesForDeviceType(formData.device_type || 'other')
 
   const handleQuickPreset = (preset: typeof quickDevicePresets[0]) => {
     setFormData({
@@ -272,6 +252,11 @@ function CreateJobContent() {
     // Clear any previous validation errors
     setValidationErrors({})
     setShowValidationSummary(false)
+    
+    // Save custom issue for future suggestions if user typed one under "Other"
+    if (showIssueOther && formData.issue && formData.issue !== 'Other') {
+      saveCustomIssue(formData.device_type || 'other', formData.issue)
+    }
     
     // Super Quick Mode: Create job immediately with minimal data
     if (superQuickMode) {
@@ -917,7 +902,7 @@ function CreateJobContent() {
                     }`}
                   >
                     <option value="">Select issue...</option>
-                    {commonIssues.map(issue => (
+                    {currentIssues.map(issue => (
                       <option key={issue} value={issue}>{issue}</option>
                     ))}
                   </select>
@@ -931,8 +916,19 @@ function CreateJobContent() {
                       placeholder="Describe the issue..."
                       required
                       autoFocus
+                      list="custom-issue-suggestions"
                       className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
+                    <datalist id="custom-issue-suggestions">
+                      {getCustomIssues(formData.device_type || 'other').map((suggestion, idx) => (
+                        <option key={idx} value={suggestion} />
+                      ))}
+                    </datalist>
+                    {getCustomIssues(formData.device_type || 'other').length > 0 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Suggestions shown from previous entries
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

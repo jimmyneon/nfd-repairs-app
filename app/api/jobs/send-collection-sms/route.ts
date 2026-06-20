@@ -63,17 +63,15 @@ export async function POST(request: NextRequest) {
     // Get first name from customer name
     const firstName = job.customer_name.split(' ')[0]
 
-    // Build SMS message
-    const smsBody = `Hi ${firstName}, thanks again for choosing New Forest Device Repairs - your ${job.device_model} is all sorted.
+    // Build SMS message - aftercare-first, then review link
+    const smsBody = `Hi ${firstName}, just checking in — how's your ${job.device_model}? Everything working okay?
 
-If everything's working well, we'd really appreciate a quick 5-star review - it helps other local customers find us:
+If there are any issues at all, just reply here and we'll get it sorted straight away.
+
+If all's good, a quick review would mean a lot — it helps other local people find us:
 ${googleReviewLink}
 
-If you do have any issues at all, just reply to this message and we'll sort it quickly.
-
-We also repair phones, laptops, tablets and more - so feel free to reach out anytime.
-
-Thanks for supporting a local business!`
+Cheers, New Forest Device Repairs`
 
     // Send SMS via MacroDroid
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL

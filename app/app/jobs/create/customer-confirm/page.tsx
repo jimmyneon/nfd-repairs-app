@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone } from 'lucide-react'
+import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown, ArrowDown } from 'lucide-react'
 
 function CustomerConfirmContent() {
   const router = useRouter()
@@ -62,6 +62,13 @@ function CustomerConfirmContent() {
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
 
   // No auto-scroll - customer controls their own navigation on tablet
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
@@ -273,6 +280,18 @@ function CustomerConfirmContent() {
                     placeholder="Enter your full name"
                     autoFocus
                   />
+                </div>
+
+                {/* Scroll-down hint after Step 1 */}
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection(jobData.passcode_requirement !== 'not_required' ? 'step-2' : 'submit-section')}
+                    className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors"
+                  >
+                    <span className="text-xs font-medium">Continue</span>
+                    <ArrowDown className="h-5 w-5 animate-bounce" />
+                  </button>
                 </div>
 
                 <div>
@@ -503,11 +522,23 @@ function CustomerConfirmContent() {
                     </div>
                   </label>
                 </div>
+
+                {/* Scroll-down hint after Step 2 */}
+                <div className="flex justify-center pt-4">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('submit-section')}
+                    className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors"
+                  >
+                    <span className="text-xs font-medium">Continue</span>
+                    <ArrowDown className="h-5 w-5 animate-bounce" />
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Submit Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
+            <div id="submit-section" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
                   {jobData.passcode_requirement !== 'not_required' ? '3' : '2'}
@@ -518,6 +549,18 @@ function CustomerConfirmContent() {
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
                 Please review the repair summary and terms on the right, then click below to confirm your booking.
               </p>
+
+              {/* Hint to scroll to terms if not accepted */}
+              {!repairAgreementAccepted && customerName && customerPhone && (!isLandline || landlineAccepted) && (
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('terms-section')}
+                  className="w-full mb-4 flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors py-2"
+                >
+                  <span>Please scroll down to accept the terms first</span>
+                  <ArrowDown className="h-4 w-4 animate-bounce" />
+                </button>
+              )}
 
               {/* Submit Button */}
               <div className="relative group">
@@ -625,7 +668,11 @@ function CustomerConfirmContent() {
                   )}
 
                   {/* Combined Terms & Repair Agreement */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                  <div className={`bg-blue-50 dark:bg-blue-900/20 border-2 rounded-xl p-4 transition-all ${
+                    repairAgreementAccepted 
+                      ? 'border-green-300 dark:border-green-700' 
+                      : 'border-blue-200 dark:border-blue-800'
+                  }`}>
                     <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-2 text-sm">
                       Repair Agreement
                     </h5>
@@ -633,8 +680,12 @@ function CustomerConfirmContent() {
                       Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.
                     </p>
                     
-                    {/* Single Combined Checkbox */}
-                    <label className={`flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-all mb-3 ${
+                    {/* Single Combined Checkbox - Made more prominent */}
+                    <label className={`flex items-start space-x-3 cursor-pointer p-4 rounded-lg transition-all mb-3 ${
+                      repairAgreementAccepted
+                        ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
+                        : 'bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-gray-700'
+                    } ${
                       shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
                     }`}>
                       <input
@@ -644,10 +695,20 @@ function CustomerConfirmContent() {
                           setRepairAgreementAccepted(e.target.checked)
                           setTermsAccepted(e.target.checked)
                         }}
-                        className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
+                        className="w-6 h-6 text-primary focus:ring-primary border-2 border-gray-300 rounded mt-0.5 flex-shrink-0"
                       />
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
                         I agree to the repair terms and conditions
+                        {!repairAgreementAccepted && (
+                          <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
+                            Please tick this box to continue
+                          </span>
+                        )}
+                        {repairAgreementAccepted && (
+                          <span className="block text-xs text-green-600 dark:text-green-400 mt-1 font-normal">
+                            Thank you!
+                          </span>
+                        )}
                       </span>
                     </label>
                     

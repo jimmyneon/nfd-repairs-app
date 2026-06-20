@@ -53,6 +53,8 @@ export const SHOP_INFO = {
 
 export const SMS_TEMPLATE_VARIABLES = [
   '{job_ref}',
+  '{customer_name}',
+  '{first_name}',
   '{device_summary}',
   '{repair_summary}',
   '{price_total}',

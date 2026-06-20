@@ -9,7 +9,19 @@ import {
   getCustomerFlagEmoji, 
   getPriorityEmoji 
 } from '@/lib/job-utils'
-import { MapPin } from 'lucide-react'
+import { MapPin, Clock } from 'lucide-react'
+
+function formatStatusTimestamp(dateStr: string | null | undefined): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  
+  if (isToday) {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  }
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 interface EnhancedJobTileProps {
   job: JobWithMetrics
@@ -83,9 +95,17 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
 
         {/* Bottom Row: Time + Flags */}
         <div className="flex items-center justify-between text-xs mt-2">
-          <span className={`font-bold ${timeWarning ? 'text-yellow-300' : 'text-white/80'}`}>
-            {timeWarning && '⚠️ '}{timeText}
-          </span>
+          <div className="flex flex-col">
+            <span className={`font-bold ${timeWarning ? 'text-yellow-300' : 'text-white/80'}`}>
+              {timeWarning && '⚠️ '}{timeText}
+            </span>
+            {job.status_changed_at && (
+              <span className="text-[10px] text-white/60 flex items-center gap-0.5">
+                <Clock className="h-2.5 w-2.5" />
+                {formatStatusTimestamp(job.status_changed_at)}
+              </span>
+            )}
+          </div>
           {flagEmoji && (
             <span className="text-base" title={job.customer_flag || undefined}>
               {flagEmoji}

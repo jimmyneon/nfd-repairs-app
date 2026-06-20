@@ -139,8 +139,10 @@ export async function POST(request: NextRequest) {
     const googleMapsLink = mapsSettings?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
 
     // Replace template variables
+    const firstName = job.customer_name?.split(' ')[0] || job.customer_name
     let smsBody = template.body
       .replace('{customer_name}', job.customer_name)
+      .replace('{first_name}', firstName)
       .replace('{device_make}', job.device_make)
       .replace('{device_model}', job.device_model)
       .replace('{price_total}', job.price_total?.toString() || '0')
