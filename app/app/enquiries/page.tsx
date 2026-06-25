@@ -315,7 +315,7 @@ export default function EnquiriesPage() {
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                   <p><strong>Name:</strong> {selectedEnquiry.customer_name}</p>
                   <p><strong>Email:</strong> {selectedEnquiry.customer_email}</p>
-                  {selectedEnquiry.customer_phone && <p><strong>Phone:</strong> {selectedEnquiry.customer_phone}</p>
+                  {selectedEnquiry.customer_phone && <p><strong>Phone:</strong> {selectedEnquiry.customer_phone}</p>}
                 </div>
               </div>
 
@@ -334,7 +334,7 @@ export default function EnquiriesPage() {
                       <p><strong>Budget:</strong> {selectedEnquiry.budget}</p>
                       <p><strong>Timeline:</strong> {selectedEnquiry.timeline}</p>
                       <p><strong>Existing Website:</strong> {selectedEnquiry.existing_website}</p>
-                      {selectedEnquiry.existing_url && <p><strong>URL:</strong> {selectedEnquiry.existing_url}</p>
+                      {selectedEnquiry.existing_url && <p><strong>URL:</strong> {selectedEnquiry.existing_url}</p>}
                     </>
                   ) : (
                     <>
