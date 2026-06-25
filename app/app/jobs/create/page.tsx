@@ -54,6 +54,25 @@ function CreateJobContent() {
     passcode_requirement: 'not_required' as 'not_required' | 'recommended' | 'required',
     linked_quote_id: null as string | null,
   })
+
+  // Restore form state from sessionStorage on mount (survives back navigation)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !jobId) {
+      const savedForm = sessionStorage.getItem('job_create_form_state')
+      if (savedForm) {
+        try {
+          const saved = JSON.parse(savedForm)
+          if (saved.formData) setFormData(saved.formData)
+          if (saved.customerName) setCustomerName(saved.customerName)
+          if (saved.customerPhone) setCustomerPhone(saved.customerPhone)
+          if (saved.quickWalkInMode !== undefined) setQuickWalkInMode(saved.quickWalkInMode)
+          if (saved.superQuickMode !== undefined) setSuperQuickMode(saved.superQuickMode)
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+  }, [])
   
   // Advanced override options for importing old jobs
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
@@ -321,6 +340,17 @@ function CreateJobContent() {
       sessionStorage.removeItem('job_creation_overrides')
     }
     
+    // Save form state to sessionStorage so back button doesn't lose data
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('job_create_form_state', JSON.stringify({
+        formData,
+        customerName,
+        customerPhone,
+        quickWalkInMode,
+        superQuickMode,
+      }))
+    }
+
     // Navigate to customer confirmation page with job data
     const params = new URLSearchParams({
       device_type: formData.device_type,
@@ -343,41 +373,53 @@ function CreateJobContent() {
     router.push(`/app/jobs/create/customer-confirm?${params.toString()}`)
   }
 
-  const handleQuoteSelect = (quote: any) => {
-    // Auto-infer device type from device make if not provided
-    let inferredDeviceType = quote.device_type || ''
-    if (!inferredDeviceType && quote.device_make) {
-      const make = quote.device_make.toLowerCase()
-      if (make.includes('iphone') || make.includes('samsung') || make.includes('pixel') || 
-          make.includes('huawei') || make.includes('xiaomi') || make.includes('motorola') ||
-          make.includes('nokia') || make.includes('oneplus') || make.includes('oppo')) {
-        inferredDeviceType = 'phone'
-      } else if (make.includes('ipad') || make.includes('tablet') || make.includes('tab ')) {
-        inferredDeviceType = 'tablet'
-      } else if (make.includes('macbook') || make.includes('laptop') || make.includes('notebook') ||
-                 make.includes('chromebook') || make.includes('thinkpad') || make.includes('dell') ||
-                 make.includes('hp') || make.includes('lenovo') || make.includes('asus')) {
-        inferredDeviceType = 'laptop'
-      } else if (make.includes('playstation') || make.includes('xbox') || make.includes('nintendo') ||
-                 make.includes('switch') || make.includes('ps4') || make.includes('ps5')) {
-        inferredDeviceType = 'console'
-      } else if (make.includes('watch') || make.includes('fitbit')) {
-        inferredDeviceType = 'watch'
-      } else if (make.includes('imac') || make.includes('desktop') || make.includes('monitor')) {
-        inferredDeviceType = 'desktop'
-      }
+  const inferDeviceType = (make: string, model: string): string => {
+    const combined = `${make} ${model}`.toLowerCase().trim()
+    if (!combined) return ''
+    
+    if (combined.includes('iphone') || combined.includes('samsung') || combined.includes('pixel') || 
+        combined.includes('huawei') || combined.includes('xiaomi') || combined.includes('motorola') ||
+        combined.includes('nokia') || combined.includes('oneplus') || combined.includes('oppo') ||
+        combined.includes('phone') || combined.includes('galaxy')) {
+      return 'phone'
+    } else if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
+      return 'tablet'
+    } else if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') ||
+               combined.includes('chromebook') || combined.includes('thinkpad') || combined.includes('dell') ||
+               combined.includes('hp ') || combined.includes('lenovo') || combined.includes('asus') ||
+               combined.includes('laptop')) {
+      return 'laptop'
+    } else if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') ||
+               combined.includes('switch') || combined.includes('ps4') || combined.includes('ps5') ||
+               combined.includes('console')) {
+      return 'console'
+    } else if (combined.includes('watch') || combined.includes('fitbit')) {
+      return 'watch'
+    } else if (combined.includes('imac') || combined.includes('desktop') || combined.includes('monitor') ||
+               combined.includes('pc ')) {
+      return 'desktop'
     }
+    return ''
+  }
+
+  const handleQuoteSelect = (quote: any) => {
+    // Auto-infer device type from device make AND model if not provided
+    const inferredDeviceType = quote.device_type || inferDeviceType(quote.device_make || '', quote.device_model || '')
 
     setFormData({
       ...formData,
       device_type: inferredDeviceType,
-      device_make: quote.device_make,
-      device_model: quote.device_model,
-      issue: quote.issue,
+      device_make: quote.device_make || '',
+      device_model: quote.device_model || '',
+      issue: quote.issue || '',
       description: quote.description || '',
-      price_total: quote.quoted_price ? String(quote.quoted_price) : '',
+      price_total: quote.quoted_price ? String(quote.quoted_price) : (quote.price_total ? String(quote.price_total) : ''),
       linked_quote_id: quote.quote_request_id,
     })
+
+    // Set customer name and phone so they're visible on the form
+    setCustomerName(quote.customer_name || '')
+    setCustomerPhone(quote.customer_phone || '')
     
     // Store customer data for confirmation page
     if (typeof window !== 'undefined') {
@@ -392,29 +434,8 @@ function CreateJobContent() {
   }
 
   const handleCustomerSelect = (customerData: any) => {
-    // Auto-infer device type from device make if provided
-    let inferredDeviceType = customerData.device_type || ''
-    if (!inferredDeviceType && customerData.device_make) {
-      const make = customerData.device_make.toLowerCase()
-      if (make.includes('iphone') || make.includes('samsung') || make.includes('pixel') || 
-          make.includes('huawei') || make.includes('xiaomi') || make.includes('motorola') ||
-          make.includes('nokia') || make.includes('oneplus') || make.includes('oppo')) {
-        inferredDeviceType = 'phone'
-      } else if (make.includes('ipad') || make.includes('tablet') || make.includes('tab ')) {
-        inferredDeviceType = 'tablet'
-      } else if (make.includes('macbook') || make.includes('laptop') || make.includes('notebook') ||
-                 make.includes('chromebook') || make.includes('thinkpad') || make.includes('dell') ||
-                 make.includes('hp') || make.includes('lenovo') || make.includes('asus')) {
-        inferredDeviceType = 'laptop'
-      } else if (make.includes('playstation') || make.includes('xbox') || make.includes('nintendo') ||
-                 make.includes('switch') || make.includes('ps4') || make.includes('ps5')) {
-        inferredDeviceType = 'console'
-      } else if (make.includes('watch') || make.includes('fitbit')) {
-        inferredDeviceType = 'watch'
-      } else if (make.includes('imac') || make.includes('desktop') || make.includes('monitor')) {
-        inferredDeviceType = 'desktop'
-      }
-    }
+    // Auto-infer device type from device make AND model if provided
+    const inferredDeviceType = customerData.device_type || inferDeviceType(customerData.device_make || '', customerData.device_model || '')
 
     // Update form data with customer data
     setFormData({
@@ -427,6 +448,10 @@ function CreateJobContent() {
       price_total: customerData.price_total || formData.price_total,
       requires_parts_order: customerData.requires_parts_order ?? formData.requires_parts_order,
     })
+
+    // Set customer name and phone so they're visible on the form
+    setCustomerName(customerData.customer_name || '')
+    setCustomerPhone(customerData.customer_phone || '')
     
     // Store customer data for confirmation page
     if (typeof window !== 'undefined') {

@@ -83,6 +83,27 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (arrivedParam === 'true') {
       setShowCustomerArrivedPrompt(true)
     }
+
+    // Real-time subscription for this job
+    const jobSubscription = supabase
+      .channel(`job-${params.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: `id=eq.${params.id}` }, () => {
+        loadJobData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_events', filter: `job_id=eq.${params.id}` }, () => {
+        loadJobData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sms_logs', filter: `job_id=eq.${params.id}` }, () => {
+        loadJobData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'email_logs', filter: `job_id=eq.${params.id}` }, () => {
+        loadJobData()
+      })
+      .subscribe()
+
+    return () => {
+      jobSubscription.unsubscribe()
+    }
   }, [params.id])
 
   // Auto-show customer arrived prompt if customer is waiting (within last 30 minutes)
@@ -223,6 +244,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .from('jobs')
       .update(updateData)
       .eq('id', job.id)
+
+    // Optimistic update - update local state immediately
+    setJob({ ...job, ...updateData, status_changed_at: new Date().toISOString() } as Job)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
@@ -503,6 +527,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .from('jobs')
       .update(updateData)
       .eq('id', job.id)
+
+    // Optimistic update - update local state immediately
+    setJob({ ...job, ...updateData, status_changed_at: new Date().toISOString() } as Job)
 
     await supabase.from('job_events').insert({
       job_id: job.id,

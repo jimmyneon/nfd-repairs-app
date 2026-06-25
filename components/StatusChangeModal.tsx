@@ -24,29 +24,11 @@ export default function StatusChangeModal({
   willSendSMS,
   willSendEmail = false
 }: StatusChangeModalProps) {
-  const [step, setStep] = useState<'initial' | 'confirm' | 'final'>('initial')
-  const [countdown, setCountdown] = useState(3)
-  const [skipNotifications, setSkipNotifications] = useState(false)
   const [sendSMS, setSendSMS] = useState(willSendSMS)
   const [sendEmail, setSendEmail] = useState(willSendEmail)
 
-  const handleFirstConfirm = () => {
-    setStep('confirm')
-  }
-
-  const handleSecondConfirm = () => {
-    setStep('final')
-    // Start countdown
-    let count = 3
-    const interval = setInterval(() => {
-      count--
-      setCountdown(count)
-      if (count === 0) {
-        clearInterval(interval)
-        // Pass individual override flags (true = skip, false = send)
-        onConfirm(!sendSMS, !sendEmail)
-      }
-    }, 1000)
+  const handleConfirm = () => {
+    onConfirm(!sendSMS, !sendEmail)
   }
 
   return (
@@ -66,7 +48,6 @@ export default function StatusChangeModal({
           <button
             onClick={onCancel}
             className="text-gray-400 hover:text-gray-600"
-            disabled={step === 'final'}
           >
             <X className="h-6 w-6" />
           </button>
@@ -128,63 +109,24 @@ export default function StatusChangeModal({
           </div>
         )}
 
-        {/* Step-based Content */}
-        {step === 'initial' && (
-          <>
-            <p className="text-gray-700 mb-6">
-              Are you sure you want to change the status? This action will update the job and may trigger notifications.
-            </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={onCancel}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-4 px-6 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleFirstConfirm}
-                className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-4 px-6 rounded-xl transition-colors"
-              >
-                Yes, Continue
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === 'confirm' && (
-          <>
-            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-6">
-              <p className="text-red-900 font-bold mb-2">⚠️ Final Confirmation</p>
-              <p className="text-sm text-red-700">
-                This is your last chance to cancel. Click "Definitely Sure" to proceed with the status change.
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={onCancel}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-4 px-6 rounded-xl transition-colors"
-              >
-                No, Go Back
-              </button>
-              <button
-                onClick={handleSecondConfirm}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors"
-              >
-                Definitely Sure
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === 'final' && (
-          <div className="text-center py-8">
-            <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl font-bold text-white">{countdown}</span>
-            </div>
-            <p className="text-gray-700 font-medium">Processing status change...</p>
-            <p className="text-sm text-gray-500 mt-2">Please wait</p>
-          </div>
-        )}
+        {/* Single Confirm */}
+        <p className="text-gray-700 mb-6">
+          Change status to <span className="font-bold text-primary">{JOB_STATUS_LABELS[newStatus]}</span>?
+        </p>
+        <div className="flex space-x-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-4 px-6 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-1 bg-primary hover:bg-primary-dark text-white font-semibold py-4 px-6 rounded-xl transition-colors"
+          >
+            Confirm
+          </button>
+        </div>
       </div>
     </div>
   )

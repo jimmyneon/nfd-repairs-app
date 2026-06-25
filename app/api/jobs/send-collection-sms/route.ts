@@ -64,14 +64,10 @@ export async function POST(request: NextRequest) {
     const firstName = job.customer_name.split(' ')[0]
 
     // Build SMS message - aftercare-first, then review link
-    const smsBody = `Hi ${firstName}, just checking in — how's your ${job.device_model}? Everything working okay?
+    const smsBody = `Hi ${firstName}, how's your ${job.device_model} getting on? Any issues, just reply here and we'll sort it.
 
-If there are any issues at all, just reply here and we'll get it sorted straight away.
-
-If all's good, a quick review would mean a lot — it helps other local people find us:
-${googleReviewLink}
-
-Cheers, New Forest Device Repairs`
+If all's good, a quick review would mean a lot:
+${googleReviewLink}`
 
     // Send SMS via MacroDroid
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
