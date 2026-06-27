@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 export async function POST(request: NextRequest) {
   try {
@@ -129,38 +130,52 @@ export async function POST(request: NextRequest) {
     const trackingUrl = `${appUrl}/t/${job.tracking_token}`
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
-    // Fetch Google Maps link from admin settings
+    // Fetch links from admin settings (never hardcode location or hours)
     const { data: mapsSettings } = await supabase
       .from('admin_settings')
       .select('value')
       .eq('key', 'google_maps_link')
       .single()
-    
+
+    const { data: hoursSettings } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'opening_hours_link')
+      .single()
+
     const googleMapsLink = mapsSettings?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
+    const hoursLink = hoursSettings?.value || googleMapsLink
 
-    // Replace template variables
-    const firstName = job.customer_name?.split(' ')[0] || job.customer_name
-    let smsBody = template.body
-      .replace('{customer_name}', job.customer_name)
-      .replace('{first_name}', firstName)
-      .replace('{device_make}', job.device_make)
-      .replace('{device_model}', job.device_model)
-      .replace('{price_total}', job.price_total?.toString() || '0')
-      .replace('{tracking_link}', trackingUrl)
-      .replace('{job_ref}', job.job_ref)
-    
-    // Add deposit-specific replacements if needed
-    if (job.deposit_required) {
-      smsBody = smsBody
-        .replace('{deposit_amount}', job.deposit_amount?.toString() || '20.00')
-        .replace('{deposit_link}', depositUrl)
-    }
+    // Only show the maps link when the customer actually needs to travel
+    // (device not in shop, or it's ready to collect)
+    const includeMapsLink = !job.device_in_shop || status === 'READY_TO_COLLECT'
+    const mapsLink = includeMapsLink ? googleMapsLink : ''
 
-    // Add delay-specific replacements if needed
-    if (status === 'DELAYED') {
+    let smsBody = renderSmsTemplate(template.body, {
+      customer_name: job.customer_name,
+      first_name: getFirstName(job.customer_name),
+      device_make: job.device_make,
+      device_model: job.device_model,
+      price_total: job.price_total?.toString() || '0',
+      tracking_link: trackingUrl,
+      job_ref: job.job_ref,
+      google_maps_link: mapsLink,
+      hours_link: includeMapsLink ? hoursLink : '',
+      deposit_amount: job.deposit_required ? (job.deposit_amount?.toString() || '20.00') : '',
+      deposit_link: job.deposit_required ? depositUrl : '',
+      delay_reason: status === 'DELAYED' ? (job.delay_reason || '') : '',
+      delay_notes: status === 'DELAYED' ? (job.delay_notes || '') : '',
+    })
+
+    // Clean up any dangling labels if the maps link was intentionally omitted
+    if (!includeMapsLink) {
       smsBody = smsBody
-        .replace('{delay_reason}', job.delay_reason || '')
-        .replace('{delay_notes}', job.delay_notes || '')
+        .replace(/^Find us: ?$/gim, '')
+        .replace(/^Find us and check our hours: ?$/gim, '')
+        .replace(/^Check our opening times before coming: ?$/gim, '')
+        .replace(/^Drop it in whenever you're ready: ?$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
     }
 
     // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
@@ -168,21 +183,6 @@ export async function POST(request: NextRequest) {
       smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
     } else if (status === 'RECEIVED' && !job.customer_email) {
       smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
-    }
-
-    // POSSESSION-AWARE MESSAGING: Only include maps link if device NOT in shop
-    // EXCEPTION: READY_TO_COLLECT always needs maps link (customer needs to collect)
-    if (job.device_in_shop && status !== 'READY_TO_COLLECT') {
-      // Device already in shop - remove maps link and drop-off instructions
-      smsBody = smsBody
-        .replace('Find us: {google_maps_link}', '')
-        .replace('{google_maps_link}', '')
-        .replace('Please drop off your device at New Forest Device Repairs.', 'We have your device and will begin work.')
-        .replace('Please drop off your device.', 'We have your device.')
-        .trim()
-    } else {
-      // Device with customer OR READY_TO_COLLECT - include maps link
-      smsBody = smsBody.replace('{google_maps_link}', googleMapsLink)
     }
 
     // Queue SMS

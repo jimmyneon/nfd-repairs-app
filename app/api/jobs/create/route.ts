@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,14 +78,18 @@ export async function POST(request: NextRequest) {
       if (template) {
         const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
         const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.example.com'
-        
-        const smsBody = template.body
-          .replace('{device_summary}', device_summary)
-          .replace('{price_total}', price_total.toString())
-          .replace('{deposit_amount}', deposit_amount.toString())
-          .replace('{tracking_link}', trackingUrl)
-          .replace('{deposit_link}', depositUrl)
-          .replace('{job_ref}', job.job_ref)
+
+        const smsBody = renderSmsTemplate(template.body, {
+          first_name: getFirstName(customer_name),
+          customer_name: customer_name,
+          device_model: device_summary,
+          device_make: 'Unknown',
+          price_total: price_total.toString(),
+          deposit_amount: final_deposit_amount.toString(),
+          tracking_link: trackingUrl,
+          deposit_link: depositUrl,
+          job_ref: job.job_ref,
+        })
 
         await supabase.from('sms_logs').insert({
           job_id: job.id,

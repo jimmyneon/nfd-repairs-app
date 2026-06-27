@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName } from '@/lib/sms-template'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
     // Replace variables in template
     const smsBody = template.body
       .replace('{customer_name}', job.customer_name)
+      .replace('{first_name}', getFirstName(job.customer_name))
       .replace('{tracking_link}', trackingUrl)
       .replace('{device_make}', job.device_make)
       .replace('{device_model}', job.device_model)

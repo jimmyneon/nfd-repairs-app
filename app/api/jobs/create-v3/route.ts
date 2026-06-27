@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
@@ -369,24 +370,21 @@ export async function POST(request: NextRequest) {
       const locationLink = locationSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
       const hoursLink = hoursSetting?.value || locationLink // Fallback to location link if hours link not set
       
-      let smsBody = template.body
-        .replace('{customer_name}', jobData.customer_name)
-        .replace('{device_make}', jobData.device_make)
-        .replace('{device_model}', jobData.device_model)
-        .replace('{price_total}', jobData.price_total.toString())
-        .replace('{tracking_link}', trackingUrl)
-        .replace('{job_ref}', job.job_ref)
-        .replace('{onboarding_link}', onboardingUrl)
-        .replace('{location_link}', locationLink)
-        .replace('{hours_link}', hoursLink)
-        .replace('{google_maps_link}', locationLink)
-
-      // Add deposit-specific replacements if needed
-      if (jobData.deposit_required) {
-        smsBody = smsBody
-          .replace('{deposit_amount}', jobData.deposit_amount?.toString() || '20')
-          .replace('{deposit_link}', depositUrl)
-      }
+      let smsBody = renderSmsTemplate(template.body, {
+        customer_name: jobData.customer_name,
+        first_name: getFirstName(jobData.customer_name),
+        device_make: jobData.device_make,
+        device_model: jobData.device_model,
+        price_total: jobData.price_total.toString(),
+        tracking_link: trackingUrl,
+        job_ref: job.job_ref,
+        onboarding_link: onboardingUrl,
+        location_link: locationLink,
+        hours_link: hoursLink,
+        google_maps_link: locationLink,
+        deposit_amount: jobData.deposit_required ? (jobData.deposit_amount?.toString() || '20') : '',
+        deposit_link: jobData.deposit_required ? depositUrl : '',
+      })
 
       // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
       if (templateKey === 'RECEIVED' && jobData.customer_email) {

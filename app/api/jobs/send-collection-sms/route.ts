@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
+import { getFirstName } from '@/lib/sms-template'
 
 /**
  * POST /api/jobs/send-collection-sms
@@ -60,8 +61,8 @@ export async function POST(request: NextRequest) {
 
     const googleReviewLink = reviewLinkSetting?.value || 'https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review'
 
-    // Get first name from customer name
-    const firstName = job.customer_name.split(' ')[0]
+    // Get first name from customer name, with a safe fallback
+    const firstName = getFirstName(job.customer_name)
 
     // Build SMS message - aftercare-first, then review link
     const smsBody = `Hi ${firstName}, how's your ${job.device_model} getting on? Any issues, just reply here and we'll sort it.
