@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins } from 'lucide-react'
+import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -18,6 +18,8 @@ import CustomerFlagControls from '@/components/CustomerFlagControls'
 import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
 import CustomerNotesEditor from '@/components/CustomerNotesEditor'
 import EditCustomerDetails from '@/components/EditCustomerDetails'
+import SlideUpPanel from '@/components/SlideUpPanel'
+import DiagnosticReportEditor from '@/components/DiagnosticReportEditor'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -48,6 +50,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
+  const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -664,231 +667,86 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         </div>
       </header>
 
-      <main className="p-4 space-y-4 max-w-2xl mx-auto">
-        {/* Device Info Card - Mobile First */}
-        <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
-          <div className="flex items-center gap-4 md:gap-5 mb-4">
-            <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-primary/10 rounded-2xl flex items-center justify-center">
+      <main className="p-4 space-y-3 max-w-2xl mx-auto">
+        {/* Compact Device Info Card */}
+        <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-4 border-2 border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-shrink-0 w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
               {getDeviceIcon(job.device_make || '', job.device_model || '')}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs md:text-sm text-gray-500 mb-1">Job Reference</p>
-              <h1 className="text-xl md:text-2xl font-black text-gray-900 mb-1 leading-tight">{job.job_ref}</h1>
-              <span className={`inline-block px-3 py-1 rounded-lg font-bold text-xs ${JOB_STATUS_COLORS[job.status]}`}>
+              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight truncate">{job.job_ref}</h1>
+              <span className={`inline-block px-2.5 py-0.5 rounded-lg font-bold text-xs mt-1 ${JOB_STATUS_COLORS[job.status]}`}>
                 {JOB_STATUS_LABELS[job.status]}
               </span>
             </div>
-          </div>
-          
-          {/* Device Details */}
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</p>
-              <p className="text-base text-gray-900 dark:text-white break-words">{job.device_make} {job.device_model}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Issue</p>
-              <p className="text-base text-gray-900 dark:text-white break-words">{job.issue}</p>
-            </div>
-          </div>
-
-          {/* Edit Button */}
-          <Link
-            href={`/app/jobs/${job.id}/edit`}
-            className="mt-4 flex items-center justify-center gap-2 w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl transition-colors font-medium"
-          >
-            <Edit className="h-4 w-4" />
-            <span>Edit Job Details</span>
-          </Link>
-        </div>
-
-        {/* Device Password & Additional Info Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
-            Device Access & Details
-          </h2>
-          
-          <div className="space-y-4">
-            {/* Device Password */}
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Device Password/Passcode</p>
-              {job.password_not_applicable ? (
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  <ShieldCheck className="h-5 w-5 text-gray-500" />
-                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">No password set on device</span>
-                </div>
-              ) : job.device_password ? (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 p-4 rounded-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Lock className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                        <span className="text-xs font-bold text-blue-900 dark:text-blue-300">CONFIDENTIAL</span>
-                      </div>
-                      <p className="text-lg font-mono font-bold text-gray-900 dark:text-white break-all">
-                        {showPassword ? job.device_password : '••••••••'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="flex-shrink-0 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors active:scale-95"
-                      title={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                  {job.passcode_deletion_scheduled_at && (
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Auto-delete scheduled: {new Date(job.passcode_deletion_scheduled_at).toLocaleString('en-GB')}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  <span className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">Password not provided yet</span>
-                </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
+              <p className="text-xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
+              {job.deposit_required && !job.deposit_received && (
+                <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
+              )}
+              {job.deposit_required && job.deposit_received && (
+                <p className="text-xs text-green-600 font-bold">Deposit paid</p>
               )}
             </div>
-
-            {/* Description */}
-            {job.description && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Additional Description</p>
-                <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded-lg break-words">{job.description}</p>
-              </div>
+          </div>
+          <div className="text-sm">
+            <p className="text-gray-900 dark:text-white font-medium truncate">{job.device_make} {job.device_model}</p>
+            <p className="text-gray-500 dark:text-gray-400 text-xs truncate">{job.issue}</p>
+          </div>
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {job.device_password && !job.password_not_applicable && (
+              <span className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Passcode set
+              </span>
             )}
-
-            {/* Additional Issues */}
-            {job.additional_issues && job.additional_issues.length > 0 && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Additional Issues</p>
-                <div className="space-y-2">
-                  {job.additional_issues.map((additionalIssue, index) => (
-                    <div key={index} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                      <p className="text-sm font-bold text-gray-900 dark:text-white">{additionalIssue.issue}</p>
-                      {additionalIssue.description && (
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{additionalIssue.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {job.diagnostic_report && (
+              <span className="text-xs px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg font-medium flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                Diagnostic
+              </span>
             )}
-
-            {/* Device In Shop Status */}
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Device Location</p>
-              <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                job.device_in_shop 
-                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                  : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
-              }`}>
-                {job.device_in_shop ? (
-                  <>
-                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-bold text-green-900 dark:text-green-300">Device is in shop</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-5 w-5 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Device not yet received</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Onboarding Status */}
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Onboarding Status</p>
-              <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                job.onboarding_completed 
-                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                  : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-              }`}>
-                {job.onboarding_completed ? (
-                  <>
-                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-bold text-green-900 dark:text-green-300">Onboarding completed</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                    <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Onboarding pending</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Terms Accepted */}
-            {job.terms_accepted && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Terms & Conditions</p>
-                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-bold text-green-900 dark:text-green-300">Accepted by customer</span>
-                </div>
-              </div>
-            )}
-
-            {/* Source & Page Info */}
-            {(job.source || job.page) && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Job Source</p>
-                <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  {job.source && (
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      <span className="font-semibold">Source:</span> {job.source}
-                    </p>
-                  )}
-                  {job.page && (
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      <span className="font-semibold">Page:</span> {job.page}
-                    </p>
-                  )}
-                </div>
-              </div>
+            {job.device_in_shop && (
+              <span className="text-xs px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg font-medium flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                In shop
+              </span>
             )}
           </div>
         </div>
 
-        {/* Price Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Total Price</span>
-              <span className="text-3xl font-black text-primary">£{job.price_total.toFixed(2)}</span>
-            </div>
-            
-            {job.deposit_required && (
-              <>
-                <div className="flex items-center justify-between pt-3 border-t-2 border-gray-100">
-                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex items-center gap-2">
-                    Deposit (Parts Required)
-                    {job.deposit_received && (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    )}
-                  </span>
-                  <span className="text-xl font-bold text-gray-900 dark:text-white">
-                    £20.00
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">Remaining Balance</span>
-                  <span className="text-2xl font-black text-gray-900 dark:text-white">
-                    £{(job.price_total - 20).toFixed(2)}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+        {/* Quick Action Buttons - open slide-up panels */}
+        <div className="grid grid-cols-4 gap-2">
+          <button
+            onClick={() => setActivePanel('device')}
+            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+          >
+            <Smartphone className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Device</span>
+          </button>
+          <button
+            onClick={() => setActivePanel('customer')}
+            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+          >
+            <MessageSquare className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Contact</span>
+          </button>
+          <button
+            onClick={() => setActivePanel('diagnostic')}
+            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded:border-primary transition-colors"
+          >
+            <FileText className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Diagnostic</span>
+          </button>
+          <button
+            onClick={() => setActivePanel('history')}
+            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+          >
+            <Clock className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">History</span>
+          </button>
         </div>
 
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
@@ -906,42 +764,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </Link>
           </div>
         )}
-
-        <div className="card">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Customer Contact</h2>
-          <div className="space-y-3 mb-4">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Name</p>
-              <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Phone</p>
-              <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_phone}</p>
-            </div>
-            {job.customer_email && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Email</p>
-                <p className="text-base text-gray-900 dark:text-white font-medium break-all">{job.customer_email}</p>
-              </div>
-            )}
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Tap to call, text, or message</p>
-          <ContactActions 
-            phone={job.customer_phone} 
-            name={job.customer_name}
-            job={job}
-            onMessageSent={loadJobData}
-          />
-          <div className="mt-3">
-            <EditCustomerDetails job={job} onUpdate={loadJobData} />
-          </div>
-        </div>
-
-        {/* Customer Flag Controls */}
-        <CustomerFlagControls job={job} onUpdate={loadJobData} />
-
-        {/* Customer Notes Editor */}
-        <CustomerNotesEditor job={job} onUpdate={loadJobData} />
 
         {/* Delay/Cancellation Reasons */}
         {(job.delay_reason || job.cancellation_reason) && (
@@ -1533,113 +1355,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           />
         )}
 
-        <div className="card">
-          <h2 className="font-semibold text-gray-900 mb-3">Timeline</h2>
-          <div className="space-y-3">
-            {events.map((event) => (
-              <div key={event.id} className="border-l-2 border-primary pl-3 py-1">
-                <p className="text-sm font-medium text-gray-900">{event.message}</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(event.created_at).toLocaleString('en-GB')}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {emailLogs.length > 0 && (
-          <div className="card">
-            <h2 className="font-semibold text-gray-900 mb-3">Email History</h2>
-            <div className="space-y-2">
-              {emailLogs.map((email) => (
-                <div key={email.id} className="bg-gray-50 rounded p-2 text-sm overflow-hidden">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-700">{email.template_key}</span>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      email.status === 'SENT' ? 'bg-green-100 text-green-800' :
-                      email.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {email.status}
-                    </span>
-                  </div>
-                  <p className="text-gray-700 font-medium text-xs mb-1">{email.subject}</p>
-                  <p className="text-gray-600 text-xs">To: {email.recipient_email}</p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    {new Date(email.created_at).toLocaleString('en-GB')}
-                  </p>
-                  {email.error_message && (
-                    <p className="text-red-600 text-xs mt-1">Error: {email.error_message}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {smsLogs.length > 0 && (
-          <div className="card">
-            <h2 className="font-semibold text-gray-900 mb-3">SMS History</h2>
-            <div className="space-y-2">
-              {smsLogs.map((sms) => (
-                <div key={sms.id} className="bg-gray-50 rounded p-2 text-sm overflow-hidden">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-700">{sms.template_key}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        sms.status === 'SENT' ? 'bg-green-100 text-green-800' :
-                        sms.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {sms.status}
-                      </span>
-                      {(sms.status === 'FAILED' || sms.status === 'PENDING') && (
-                        <button
-                          onClick={async () => {
-                            setActionLoading(true)
-                            try {
-                              const response = await fetch('/api/sms/send', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                              })
-                              if (response.ok) {
-                                await loadJobData()
-                              }
-                            } catch (error) {
-                              console.error('Failed to retry SMS:', error)
-                            }
-                            setActionLoading(false)
-                          }}
-                          disabled={actionLoading}
-                          className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
-                          title="Send SMS Again"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-gray-600 text-xs break-words">{sms.body_rendered}</p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    {new Date(sms.created_at).toLocaleString('en-GB')}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="card">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Customer Tracking Link</h2>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Share this link with the customer:</p>
-          <button
-            onClick={() => setShowTrackingLinkModal(true)}
-            className="w-full bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-left text-primary hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer border border-gray-200 dark:border-gray-600"
-          >
-            https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
-          </button>
-        </div>
-
         {/* Tracking Link Modal */}
         {showTrackingLinkModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1686,6 +1401,335 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
       </main>
+
+      {/* Slide-Up Panel: Device Details */}
+      <SlideUpPanel
+        isOpen={activePanel === 'device'}
+        onClose={() => setActivePanel(null)}
+        title="Device Details"
+        icon={<Smartphone className="h-5 w-5 text-primary" />}
+        minHeight="60vh"
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Device</p>
+            <p className="text-base text-gray-900 dark:text-white break-words">{job.device_make} {job.device_model}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Issue</p>
+            <p className="text-base text-gray-900 dark:text-white break-words">{job.issue}</p>
+          </div>
+
+          {/* Device Password */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Device Password/Passcode</p>
+            {job.password_not_applicable ? (
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <ShieldCheck className="h-5 w-5 text-gray-500" />
+                <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">No password set on device</span>
+              </div>
+            ) : job.device_password ? (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 p-4 rounded-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                      <span className="text-xs font-bold text-blue-900 dark:text-blue-300">CONFIDENTIAL</span>
+                    </div>
+                    <p className="text-lg font-mono font-bold text-gray-900 dark:text-white break-all">
+                      {showPassword ? job.device_password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="flex-shrink-0 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors active:scale-95"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                {job.passcode_deletion_scheduled_at && (
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-2 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Auto-delete scheduled: {new Date(job.passcode_deletion_scheduled_at).toLocaleString('en-GB')}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">Password not provided yet</span>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {job.description && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Additional Description</p>
+              <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded-lg break-words">{job.description}</p>
+            </div>
+          )}
+
+          {/* Additional Issues */}
+          {job.additional_issues && job.additional_issues.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Additional Issues</p>
+              <div className="space-y-2">
+                {job.additional_issues.map((additionalIssue, index) => (
+                  <div key={index} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{additionalIssue.issue}</p>
+                    {additionalIssue.description && (
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{additionalIssue.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Device Location */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Device Location</p>
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${
+              job.device_in_shop
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
+            }`}>
+              {job.device_in_shop ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-bold text-green-900 dark:text-green-300">Device is in shop</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 text-gray-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Device not yet received</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Onboarding & Terms */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Onboarding Status</p>
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${
+              job.onboarding_completed
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+            }`}>
+              {job.onboarding_completed ? (
+                <>
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-bold text-green-900 dark:text-green-300">Onboarding completed</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Onboarding pending</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {job.terms_accepted && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Terms & Conditions</p>
+              <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-bold text-green-900 dark:text-green-300">Accepted by customer</span>
+              </div>
+            </div>
+          )}
+
+          {(job.source || job.page) && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Job Source</p>
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                {job.source && <p className="text-sm text-gray-900 dark:text-white"><span className="font-semibold">Source:</span> {job.source}</p>}
+                {job.page && <p className="text-sm text-gray-900 dark:text-white"><span className="font-semibold">Page:</span> {job.page}</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Edit button */}
+          <Link
+            href={`/app/jobs/${job.id}/edit`}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl transition-colors font-medium"
+          >
+            <Edit className="h-4 w-4" />
+            <span>Edit Job Details</span>
+          </Link>
+        </div>
+      </SlideUpPanel>
+
+      {/* Slide-Up Panel: Customer Contact */}
+      <SlideUpPanel
+        isOpen={activePanel === 'customer'}
+        onClose={() => setActivePanel(null)}
+        title="Customer Contact"
+        icon={<MessageSquare className="h-5 w-5 text-primary" />}
+        minHeight="60vh"
+      >
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Name</p>
+            <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_name}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Phone</p>
+            <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_phone}</p>
+          </div>
+          {job.customer_email && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Email</p>
+              <p className="text-base text-gray-900 dark:text-white font-medium break-all">{job.customer_email}</p>
+            </div>
+          )}
+
+          <p className="text-sm text-gray-600 dark:text-gray-400">Tap to call, text, or message</p>
+          <ContactActions
+            phone={job.customer_phone}
+            name={job.customer_name}
+            job={job}
+            onMessageSent={loadJobData}
+          />
+
+          <div>
+            <EditCustomerDetails job={job} onUpdate={loadJobData} />
+          </div>
+
+          <CustomerFlagControls job={job} onUpdate={loadJobData} />
+
+          <CustomerNotesEditor job={job} onUpdate={loadJobData} />
+
+          {/* Tracking link */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Customer Tracking Link</p>
+            <button
+              onClick={() => setShowTrackingLinkModal(true)}
+              className="w-full bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-left text-primary hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer border border-gray-200 dark:border-gray-600"
+            >
+              https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
+            </button>
+          </div>
+        </div>
+      </SlideUpPanel>
+
+      {/* Slide-Up Panel: Diagnostic Report */}
+      <SlideUpPanel
+        isOpen={activePanel === 'diagnostic'}
+        onClose={() => setActivePanel(null)}
+        title="Diagnostic Report"
+        icon={<FileText className="h-5 w-5 text-primary" />}
+        minHeight="60vh"
+      >
+        <DiagnosticReportEditor job={job} onUpdate={loadJobData} />
+      </SlideUpPanel>
+
+      {/* Slide-Up Panel: History */}
+      <SlideUpPanel
+        isOpen={activePanel === 'history'}
+        onClose={() => setActivePanel(null)}
+        title="Job History"
+        icon={<Clock className="h-5 w-5 text-primary" />}
+        minHeight="60vh"
+      >
+        <div className="space-y-6">
+          {/* Timeline */}
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Timeline</h3>
+            <div className="space-y-3">
+              {events.map((event) => (
+                <div key={event.id} className="border-l-2 border-primary pl-3 py-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{event.message}</p>
+                  <p className="text-xs text-gray-500">{new Date(event.created_at).toLocaleString('en-GB')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SMS History */}
+          {smsLogs.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">SMS History</h3>
+              <div className="space-y-2">
+                {smsLogs.map((sms) => (
+                  <div key={sms.id} className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm overflow-hidden">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{sms.template_key}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          sms.status === 'SENT' ? 'bg-green-100 text-green-800' :
+                          sms.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {sms.status}
+                        </span>
+                        {(sms.status === 'FAILED' || sms.status === 'PENDING') && (
+                          <button
+                            onClick={async () => {
+                              setActionLoading(true)
+                              try {
+                                const response = await fetch('/api/sms/send', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                })
+                                if (response.ok) {
+                                  await loadJobData()
+                                }
+                              } catch (error) {
+                                console.error('Failed to retry SMS:', error)
+                              }
+                              setActionLoading(false)
+                            }}
+                            disabled={actionLoading}
+                            className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
+                            title="Send SMS Again"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 text-xs break-words">{sms.body_rendered}</p>
+                    <p className="text-gray-400 text-xs mt-1">{new Date(sms.created_at).toLocaleString('en-GB')}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Email History */}
+          {emailLogs.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Email History</h3>
+              <div className="space-y-2">
+                {emailLogs.map((email) => (
+                  <div key={email.id} className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm overflow-hidden">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{email.template_key}</span>
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        email.status === 'SENT' ? 'bg-green-100 text-green-800' :
+                        email.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {email.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 font-medium text-xs mb-1">{email.subject}</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs">To: {email.recipient_email}</p>
+                    <p className="text-gray-400 text-xs mt-1">{new Date(email.created_at).toLocaleString('en-GB')}</p>
+                    {email.error_message && (
+                      <p className="text-red-600 text-xs mt-1">Error: {email.error_message}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </SlideUpPanel>
     </div>
   )
 }
