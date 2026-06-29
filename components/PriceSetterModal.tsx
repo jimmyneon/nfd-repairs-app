@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { DollarSign, RefreshCw } from 'lucide-react'
+import { PoundSterling, RefreshCw } from 'lucide-react'
 import SlideUpPanel from './SlideUpPanel'
 
 interface PriceSetterModalProps {
@@ -51,7 +51,7 @@ export default function PriceSetterModal({ jobId, currentPrice, onClose, onSaved
       isOpen={true}
       onClose={onClose}
       title="Set Price"
-      icon={<DollarSign className="h-5 w-5 text-primary" />}
+      icon={<PoundSterling className="h-5 w-5 text-primary" />}
       minHeight="50vh"
     >
       <div className="space-y-4">
@@ -90,7 +90,7 @@ export default function PriceSetterModal({ jobId, currentPrice, onClose, onSaved
             {saving ? (
               <RefreshCw className="h-5 w-5 animate-spin" />
             ) : (
-              <DollarSign className="h-5 w-5" />
+              <PoundSterling className="h-5 w-5" />
             )}
             Save Price
           </button>
