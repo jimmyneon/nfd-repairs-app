@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send } from 'lucide-react'
+import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -21,6 +21,8 @@ import EditCustomerDetails from '@/components/EditCustomerDetails'
 import SlideUpPanel from '@/components/SlideUpPanel'
 import DiagnosticReportEditor from '@/components/DiagnosticReportEditor'
 import CustomSmsComposer from '@/components/CustomSmsComposer'
+import PriceSetterModal from '@/components/PriceSetterModal'
+import QuickActionsModal from '@/components/QuickActionsModal'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -53,6 +55,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
   const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | null>(null)
   const [showSmsComposer, setShowSmsComposer] = useState(false)
+  const [showPriceModal, setShowPriceModal] = useState(false)
+  const [showQuickActions, setShowQuickActions] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -682,8 +686,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 {JOB_STATUS_LABELS[job.status]}
               </span>
             </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
+            <button
+              onClick={() => setShowPriceModal(true)}
+              className="text-right flex-shrink-0 active:scale-95 transition-transform"
+            >
+              <p className="text-xs text-gray-500 dark:text-gray-400">Total (tap to edit)</p>
               <p className="text-xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
               {job.deposit_required && !job.deposit_received && (
                 <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
@@ -691,24 +698,30 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               {job.deposit_required && job.deposit_received && (
                 <p className="text-xs text-green-600 font-bold">Deposit paid</p>
               )}
-            </div>
+            </button>
           </div>
           <div className="text-sm">
             <p className="text-gray-900 dark:text-white font-medium truncate">{job.device_make} {job.device_model}</p>
             <p className="text-gray-500 dark:text-gray-400 text-xs truncate">{job.issue}</p>
           </div>
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <div className="flex items-center gap-1.5 mt-3 flex-wrap">
             {job.device_password && !job.password_not_applicable && (
-              <span className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium flex items-center gap-1">
+              <button
+                onClick={() => { setShowPassword(!showPassword); setActivePanel('device') }}
+                className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium flex items-center gap-1 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+              >
                 <Lock className="h-3 w-3" />
-                Passcode set
-              </span>
+                {showPassword ? job.device_password : 'Password'}
+              </button>
             )}
             {job.diagnostic_report && (
-              <span className="text-xs px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg font-medium flex items-center gap-1">
+              <button
+                onClick={() => setActivePanel('diagnostic')}
+                className="text-xs px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg font-medium flex items-center gap-1 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+              >
                 <FileText className="h-3 w-3" />
                 Diagnostic
-              </span>
+              </button>
             )}
             {job.device_in_shop && (
               <span className="text-xs px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg font-medium flex items-center gap-1">
@@ -716,10 +729,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 In shop
               </span>
             )}
+            {job.onboarding_completed && (
+              <span className="text-xs px-1.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-1" title="Onboarding completed">
+                <CheckCircle className="h-3 w-3" />
+              </span>
+            )}
+            {job.terms_accepted && (
+              <span className="text-xs px-1.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-1" title="Terms accepted">
+                <ShieldCheck className="h-3 w-3" />
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Quick Action Buttons - open slide-up panels */}
+        {/* Mini Action Buttons Row 1 - info panels */}
         <div className="grid grid-cols-4 gap-2">
           <button
             onClick={() => setActivePanel('device')}
@@ -732,12 +755,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             onClick={() => setActivePanel('customer')}
             className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
           >
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Contact</span>
+            <User className="h-5 w-5 text-primary" />
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Customer</span>
           </button>
           <button
             onClick={() => setActivePanel('diagnostic')}
-            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded:border-primary transition-colors"
+            className="flex flex-col items-center gap-1 py-3 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
           >
             <FileText className="h-5 w-5 text-primary" />
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Diagnostic</span>
@@ -751,14 +774,30 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </button>
         </div>
 
-        {/* Message Customer - direct access to SMS composer */}
-        <button
-          onClick={() => setShowSmsComposer(true)}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 shadow-md"
-        >
-          <Send className="h-5 w-5" />
-          Message Customer
-        </button>
+        {/* Mini Action Buttons Row 2 - quick actions */}
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => setShowSmsComposer(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95"
+          >
+            <Send className="h-4 w-4" />
+            <span className="text-sm">Message</span>
+          </button>
+          <button
+            onClick={() => setShowPriceModal(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
+          >
+            <DollarSign className="h-4 w-4 text-primary" />
+            <span className="text-sm">Price</span>
+          </button>
+          <button
+            onClick={() => setShowQuickActions(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
+          >
+            <MoreVertical className="h-4 w-4 text-primary" />
+            <span className="text-sm">Status</span>
+          </button>
+        </div>
 
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
         {!job.onboarding_completed && (
@@ -1748,6 +1787,40 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           job={job}
           onClose={() => setShowSmsComposer(false)}
           onSent={loadJobData}
+        />
+      )}
+
+      {/* Price Setter Modal */}
+      {showPriceModal && (
+        <PriceSetterModal
+          jobId={job.id}
+          currentPrice={job.price_total}
+          onClose={() => setShowPriceModal(false)}
+          onSaved={loadJobData}
+        />
+      )}
+
+      {/* Quick Actions Modal (status changes) */}
+      {showQuickActions && (
+        <QuickActionsModal
+          jobRef={job.job_ref}
+          deviceInfo={`${job.device_make} ${job.device_model}`}
+          currentStatus={job.status}
+          onSelectStatus={(status) => {
+            setShowQuickActions(false)
+            handleWorkflowStatusChange(status)
+          }}
+          onDelete={async () => {
+            setShowQuickActions(false)
+            setActionLoading(true)
+            await supabase.from('job_events').delete().eq('job_id', job.id)
+            await supabase.from('sms_logs').delete().eq('job_id', job.id)
+            await supabase.from('email_logs').delete().eq('job_id', job.id)
+            await supabase.from('notifications').delete().eq('job_id', job.id)
+            await supabase.from('jobs').delete().eq('id', job.id)
+            router.push('/app/jobs')
+          }}
+          onClose={() => setShowQuickActions(false)}
         />
       )}
     </div>

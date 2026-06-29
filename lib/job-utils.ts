@@ -45,7 +45,11 @@ export function getDaysInStatus(statusChangedAt: string | null | undefined, fall
 export function formatTimeInStatus(statusChangedAt: string | null | undefined, fallback?: string | null): string {
   const hours = getHoursInStatus(statusChangedAt, fallback)
   
-  if (hours < 1) return 'Just now'
+  if (hours < 1) {
+    const mins = Math.floor(hours * 60)
+    if (mins < 1) return '1m'
+    return `${mins}m`
+  }
   if (hours < 2) return '1h'
   if (hours < 24) return `${Math.floor(hours)}h`
   
