@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText } from 'lucide-react'
+import { ArrowLeft, Clock, DollarSign, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -20,6 +20,7 @@ import CustomerNotesEditor from '@/components/CustomerNotesEditor'
 import EditCustomerDetails from '@/components/EditCustomerDetails'
 import SlideUpPanel from '@/components/SlideUpPanel'
 import DiagnosticReportEditor from '@/components/DiagnosticReportEditor'
+import CustomSmsComposer from '@/components/CustomSmsComposer'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -51,6 +52,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
   const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | null>(null)
+  const [showSmsComposer, setShowSmsComposer] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -748,6 +750,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">History</span>
           </button>
         </div>
+
+        {/* Message Customer - direct access to SMS composer */}
+        <button
+          onClick={() => setShowSmsComposer(true)}
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 shadow-md"
+        >
+          <Send className="h-5 w-5" />
+          Message Customer
+        </button>
 
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
         {!job.onboarding_completed && (
@@ -1730,6 +1741,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           )}
         </div>
       </SlideUpPanel>
+
+      {/* Direct SMS Composer (from Message Customer button) */}
+      {showSmsComposer && (
+        <CustomSmsComposer
+          job={job}
+          onClose={() => setShowSmsComposer(false)}
+          onSent={loadJobData}
+        />
+      )}
     </div>
   )
 }
