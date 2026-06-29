@@ -8,21 +8,35 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_scheduled_count INTEGER;
+  v_aftercare_count INTEGER;
 BEGIN
-  -- Schedule all COLLECTED jobs that haven't been scheduled
+  -- Schedule review SMS for COLLECTED jobs that haven't been sent or scheduled
   -- Excludes jobs with skip_review_request=true or sensitive customer flags
   UPDATE public.jobs
   SET 
-    post_collection_sms_scheduled_at = NOW() + INTERVAL '3 hours',
-    post_collection_email_scheduled_at = NOW() + INTERVAL '3 hours'
+    post_collection_sms_scheduled_at = NOW()
   WHERE status = 'COLLECTED'
     AND post_collection_sms_scheduled_at IS NULL
+    AND post_collection_sms_sent_at IS NULL
     AND skip_review_request = false
     AND (customer_flag IS NULL OR customer_flag NOT IN ('sensitive', 'awkward'));
   
   GET DIAGNOSTICS v_scheduled_count = ROW_COUNT;
+
+  -- Schedule aftercare SMS for COLLECTED jobs that have review sent but no aftercare scheduled
+  UPDATE public.jobs
+  SET 
+    aftercare_sms_scheduled_at = NOW() + INTERVAL '2 days'
+  WHERE status = 'COLLECTED'
+    AND aftercare_sms_scheduled_at IS NULL
+    AND aftercare_sms_sent_at IS NULL
+    AND post_collection_sms_sent_at IS NOT NULL
+    AND skip_review_request = false
+    AND (customer_flag IS NULL OR customer_flag NOT IN ('sensitive', 'awkward'));
   
-  RAISE NOTICE 'Backup scheduled % post-collection SMS jobs', v_scheduled_count;
+  GET DIAGNOSTICS v_aftercare_count = ROW_COUNT;
+  
+  RAISE NOTICE 'Backup scheduled % review SMS and % aftercare SMS jobs', v_scheduled_count, v_aftercare_count;
 END;
 $$;
 

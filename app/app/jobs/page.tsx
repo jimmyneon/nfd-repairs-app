@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, Bell, QrCode, MessageSquare, Settings, Plus, Shield, History, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Mail } from 'lucide-react'
+import { Search, Bell, QrCode, MessageSquare, Settings, Plus, Shield, History, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Mail, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
 import QRScanner from '@/components/QRScanner'
 import EnhancedJobTile from '@/components/EnhancedJobTile'
 import CustomerWaitingBanner from '@/components/CustomerWaitingBanner'
-import { groupJobsByAction, enrichJobWithMetrics, JobWithMetrics, ActionGroup } from '@/lib/job-utils'
+import { groupJobsByAction, JobWithMetrics, ActionGroup, getHoursInStatus } from '@/lib/job-utils'
 
 export default function JobsListPageV2() {
   const [jobs, setJobs] = useState<Job[]>([])
@@ -29,7 +29,7 @@ export default function JobsListPageV2() {
   const [showScanner, setShowScanner] = useState(false)
   const [showCollected, setShowCollected] = useState(false)
   const [showAllJobs, setShowAllJobs] = useState(false)
-  const [showAllJobsFlat, setShowAllJobsFlat] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<string>('all')
   const router = useRouter()
   const supabase = createClient()
 
@@ -76,7 +76,7 @@ export default function JobsListPageV2() {
   }, [showAllJobs])
 
   useEffect(() => {
-    // Filter jobs by search term
+    // Filter jobs by search term and active filter
     let filtered = jobs
     
     if (searchTerm) {
@@ -92,10 +92,24 @@ export default function JobsListPageV2() {
       )
     }
 
+    // Apply quick filter
+    if (activeFilter !== 'all') {
+      filtered = filtered.filter(job => {
+        switch (activeFilter) {
+          case 'in_shop': return job.device_in_shop
+          case 'needs_parts': return job.parts_required || job.requires_parts_order
+          case 'overdue': return getHoursInStatus(job.status_changed_at, job.created_at) > 72
+          case 'deposit': return job.deposit_required && !job.deposit_received
+          case 'arrived': return job.customer_arrived_at && (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
+          default: return true
+        }
+      })
+    }
+
     // Group filtered jobs by action
     const grouped = groupJobsByAction(filtered)
     setGroupedJobs(grouped)
-  }, [jobs, searchTerm])
+  }, [jobs, searchTerm, activeFilter])
 
   const loadJobs = async () => {
     const query = supabase
@@ -103,7 +117,7 @@ export default function JobsListPageV2() {
       .select('*')
 
     if (!showAllJobs) {
-      query.not('status', 'in', '("COMPLETED","CANCELLED")')
+      query.not('status', 'in', '("COMPLETED","CANCELLED","IN_STORAGE")')
     }
 
     const { data, error } = await query
@@ -271,6 +285,36 @@ export default function JobsListPageV2() {
               <QrCode className="h-6 w-6" />
             </button>
           </div>
+
+          {/* Quick Filter Chips */}
+          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+            {[
+              { key: 'all', label: 'All', icon: null },
+              { key: 'arrived', label: 'Customer Here', icon: MapPin },
+              { key: 'in_shop', label: 'In Shop', icon: Package },
+              { key: 'needs_parts', label: 'Needs Parts', icon: Clock },
+              { key: 'deposit', label: 'Deposit Due', icon: AlertTriangle },
+              { key: 'overdue', label: 'Overdue', icon: Flame },
+            ].map((chip) => {
+              const Icon = chip.icon
+              const isActive = activeFilter === chip.key
+              return (
+                <button
+                  key={chip.key}
+                  onClick={() => setActiveFilter(chip.key)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                    isActive
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`
+                }
+                >
+                  {Icon && <Icon className="h-3 w-3" />}
+                  {chip.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </header>
 
@@ -404,34 +448,6 @@ export default function JobsListPageV2() {
                 </div>
               </section>
             )}
-
-            {/* ALL JOBS Fallback - Always available at bottom */}
-            <section className="border-t-2 border-gray-300 dark:border-gray-600 pt-6 mt-6">
-              <button
-                onClick={() => setShowAllJobsFlat(!showAllJobsFlat)}
-                className="w-full bg-gray-800 dark:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2">
-                  <History className="h-5 w-5" />
-                  <span>All Jobs ({jobs.length}) - Fallback View</span>
-                </div>
-                <ChevronDown className={`h-5 w-5 transition-transform ${showAllJobsFlat ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showAllJobsFlat && (
-                <div className="mt-3">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Shows all jobs regardless of status or grouping
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {jobs.map(job => {
-                      const enriched = enrichJobWithMetrics(job)
-                      return <EnhancedJobTile key={job.id} job={enriched} />
-                    })}
-                  </div>
-                </div>
-              )}
-            </section>
 
             {/* Empty state */}
             {Object.values(groupedJobs).every(group => group.length === 0) && (

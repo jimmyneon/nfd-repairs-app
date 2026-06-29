@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 
 /**
  * POST /api/jobs/schedule-collection-sms
- * Schedule post-collection SMS when job status changes to COLLECTED
- * Called automatically by queue-status-sms endpoint
+ * Called when job status changes to COLLECTED.
+ *
+ * 1. Sends review request SMS immediately (via POST to send-collection-sms)
+ * 2. Schedules aftercare SMS for 2 days later
+ * 3. Schedules post-collection email for 1-3 hours later (existing behaviour)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
           type: 'SYSTEM',
           message: `Post-collection SMS skipped - customer flagged as ${job.customer_flag}`
         })
-      
+
       return NextResponse.json({
         success: true,
         message: `Review request skipped - customer flagged as ${job.customer_flag}`,
@@ -73,41 +76,58 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Calculate scheduled time
-    const scheduledTime = calculateScheduledTime()
+    // 1. Send review SMS immediately
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+    const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId }),
+    })
 
-    // Update job with scheduled time for both SMS and email
-    const { error: updateError } = await supabase
+    const reviewResult = await reviewResponse.json()
+    console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
+
+    // 2. Schedule aftercare SMS for 2 days later
+    const aftercareTime = calculateAftercareTime()
+
+    await supabase
       .from('jobs')
       .update({
-        post_collection_sms_scheduled_at: scheduledTime.toISOString(),
-        post_collection_email_scheduled_at: scheduledTime.toISOString()
+        aftercare_sms_scheduled_at: aftercareTime.toISOString(),
       })
       .eq('id', jobId)
 
-    if (updateError) {
-      console.error('Error scheduling post-collection SMS:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to schedule SMS' },
-        { status: 500 }
-      )
-    }
+    // 3. Schedule email for 1-3 hours later (existing behaviour)
+    const emailTime = calculateEmailTime()
+    await supabase
+      .from('jobs')
+      .update({
+        post_collection_email_scheduled_at: emailTime.toISOString(),
+      })
+      .eq('id', jobId)
 
-    // Log event
+    // Log events
     await supabase
       .from('job_events')
-      .insert({
-        job_id: jobId,
-        type: 'SYSTEM',
-        message: `Post-collection notifications (SMS + Email) scheduled for ${scheduledTime.toLocaleString()}`
-      })
-
-    console.log(`Post-collection notifications scheduled for job ${job.job_ref} at ${scheduledTime.toISOString()}`)
+      .insert([
+        {
+          job_id: jobId,
+          type: 'SYSTEM',
+          message: `Review SMS sent immediately - ${reviewResult.smsDeliveryStatus || 'unknown'}`
+        },
+        {
+          job_id: jobId,
+          type: 'SYSTEM',
+          message: `Aftercare SMS scheduled for ${aftercareTime.toLocaleString()}`
+        },
+      ])
 
     return NextResponse.json({
       success: true,
-      scheduledAt: scheduledTime.toISOString(),
-      message: 'Post-collection notifications (SMS + Email) scheduled'
+      reviewSent: reviewResult.success || false,
+      reviewDeliveryStatus: reviewResult.smsDeliveryStatus,
+      aftercareScheduledAt: aftercareTime.toISOString(),
+      message: 'Review SMS sent, aftercare scheduled for 2 days later',
     })
 
   } catch (error) {
@@ -120,46 +140,46 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate when to send post-collection SMS with randomized delay
- * GUARDRAILS: Only schedule between 8am-8pm
- * - If collected before 16:00, send 1-3 hours later (randomized)
- * - If collected after 16:00, send at 10:00-12:00 next day (randomized)
- * - If scheduled time would be outside 8am-8pm, adjust to next available window
- * This prevents all review requests from going out at exactly the same time
+ * Calculate when to send aftercare SMS (2 days from now, within 8am-8pm)
  */
-function calculateScheduledTime(): Date {
+function calculateAftercareTime(): Date {
   const now = new Date()
-  const currentHour = now.getHours()
+  const aftercare = new Date(now)
+  aftercare.setDate(aftercare.getDate() + 2)
 
-  let scheduledTime: Date
+  // Randomize between 10am-2pm for natural spread
+  const randomHour = 10 + Math.floor(Math.random() * 4)
+  const randomMinute = Math.floor(Math.random() * 60)
+  aftercare.setHours(randomHour, randomMinute, 0, 0)
 
-  if (currentHour < 16) {
-    // Send 1-3 hours from now (randomized)
-    const minDelay = 60 * 60 * 1000 // 1 hour in ms
-    const maxDelay = 3 * 60 * 60 * 1000 // 3 hours in ms
-    const randomDelay = minDelay + Math.random() * (maxDelay - minDelay)
-    scheduledTime = new Date(now.getTime() + randomDelay)
-  } else {
-    // Send at 10:00-12:00 next day (randomized)
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const randomHour = 10 + Math.floor(Math.random() * 2) // 10 or 11
-    const randomMinute = Math.floor(Math.random() * 60) // 0-59
-    tomorrow.setHours(randomHour, randomMinute, 0, 0)
-    scheduledTime = tomorrow
+  // Guardrail: ensure within 8am-8pm
+  const hour = aftercare.getHours()
+  if (hour < 8) {
+    aftercare.setHours(8, 0, 0, 0)
+  } else if (hour >= 20) {
+    aftercare.setHours(10, 0, 0, 0)
   }
 
-  // GUARDRAIL: Ensure scheduled time is within allowed hours (8am-8pm)
-  const scheduledHour = scheduledTime.getHours()
-  
-  if (scheduledHour < 8) {
-    // Too early - move to 8am same day
-    scheduledTime.setHours(8, 0, 0, 0)
-  } else if (scheduledHour >= 20) {
-    // Too late - move to 10am next day
-    scheduledTime.setDate(scheduledTime.getDate() + 1)
-    scheduledTime.setHours(10, 0, 0, 0)
+  return aftercare
+}
+
+/**
+ * Calculate when to send post-collection email (1-3 hours later, within 8am-8pm)
+ */
+function calculateEmailTime(): Date {
+  const now = new Date()
+  const minDelay = 60 * 60 * 1000
+  const maxDelay = 3 * 60 * 60 * 1000
+  const randomDelay = minDelay + Math.random() * (maxDelay - minDelay)
+  const emailTime = new Date(now.getTime() + randomDelay)
+
+  const hour = emailTime.getHours()
+  if (hour < 8) {
+    emailTime.setHours(8, 0, 0, 0)
+  } else if (hour >= 20) {
+    emailTime.setDate(emailTime.getDate() + 1)
+    emailTime.setHours(10, 0, 0, 0)
   }
 
-  return scheduledTime
+  return emailTime
 }

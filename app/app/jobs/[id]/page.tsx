@@ -929,6 +929,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <ContactActions 
             phone={job.customer_phone} 
             name={job.customer_name}
+            job={job}
+            onMessageSent={loadJobData}
           />
           <div className="mt-3">
             <EditCustomerDetails job={job} onUpdate={loadJobData} />

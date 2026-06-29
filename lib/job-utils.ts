@@ -24,25 +24,26 @@ export interface JobWithMetrics extends Job {
 /**
  * Calculate hours since status changed
  */
-export function getHoursInStatus(statusChangedAt: string | null | undefined): number {
-  if (!statusChangedAt) return 0
+export function getHoursInStatus(statusChangedAt: string | null | undefined, fallback?: string | null): number {
+  const ts = statusChangedAt || fallback
+  if (!ts) return 0
   const now = new Date()
-  const changed = new Date(statusChangedAt)
+  const changed = new Date(ts)
   return (now.getTime() - changed.getTime()) / (1000 * 60 * 60)
 }
 
 /**
  * Calculate days since status changed
  */
-export function getDaysInStatus(statusChangedAt: string | null | undefined): number {
-  return getHoursInStatus(statusChangedAt) / 24
+export function getDaysInStatus(statusChangedAt: string | null | undefined, fallback?: string | null): number {
+  return getHoursInStatus(statusChangedAt, fallback) / 24
 }
 
 /**
  * Format time in status for display
  */
-export function formatTimeInStatus(statusChangedAt: string | null | undefined): string {
-  const hours = getHoursInStatus(statusChangedAt)
+export function formatTimeInStatus(statusChangedAt: string | null | undefined, fallback?: string | null): string {
+  const hours = getHoursInStatus(statusChangedAt, fallback)
   
   if (hours < 1) return 'Just now'
   if (hours < 2) return '1h'
@@ -63,15 +64,15 @@ export function formatTimeInStatus(statusChangedAt: string | null | undefined): 
 /**
  * Determine if job is overdue (>3 days in status)
  */
-export function isJobOverdue(statusChangedAt: string | null | undefined): boolean {
-  return getHoursInStatus(statusChangedAt) > 72 // 3 days
+export function isJobOverdue(statusChangedAt: string | null | undefined, fallback?: string | null): boolean {
+  return getHoursInStatus(statusChangedAt, fallback) > 72 // 3 days
 }
 
 /**
  * Determine action group for a job
  */
 export function getActionGroup(job: Job): ActionGroup {
-  const hoursInStatus = getHoursInStatus(job.status_changed_at)
+  const hoursInStatus = getHoursInStatus(job.status_changed_at, job.created_at)
   
   // URGENT: Customer has arrived - HIGHEST PRIORITY
   if (hasCustomerArrived(job)) return 'URGENT'
@@ -103,6 +104,9 @@ export function getActionGroup(job: Job): ActionGroup {
   // READY_TO_COLLECT: Waiting for customer
   if (job.status === 'READY_TO_COLLECT') return 'READY_TO_COLLECT'
   
+  // IN_STORAGE: Long-held devices, show in OTHER to keep main view clean
+  if (job.status === 'IN_STORAGE') return 'OTHER'
+  
   // COLLECTED: Waiting for auto-close
   if (job.status === 'COLLECTED') return 'COLLECTED'
   
@@ -129,7 +133,7 @@ export function getBlockerText(blockerType: BlockerType, job: Job): string | nul
   
   switch (blockerType) {
     case 'DEPOSIT':
-      const depositDays = Math.floor(getDaysInStatus(job.status_changed_at))
+      const depositDays = Math.floor(getDaysInStatus(job.status_changed_at, job.created_at))
       return depositDays > 2 ? `£ Deposit (${depositDays}d overdue)` : '£ Deposit'
     case 'PARTS_ORDERED':
       if (job.parts_expected_at) {
@@ -159,7 +163,7 @@ export function getBlockerText(blockerType: BlockerType, job: Job): string | nul
  */
 export function getDepositOverdueDays(job: Job): number {
   if (job.status !== 'AWAITING_DEPOSIT') return 0
-  const days = getDaysInStatus(job.status_changed_at)
+  const days = getDaysInStatus(job.status_changed_at, job.created_at)
   return Math.max(0, days - 2) // Overdue after 2 days
 }
 
@@ -169,11 +173,11 @@ export function getDepositOverdueDays(job: Job): number {
 export function enrichJobWithMetrics(job: Job): JobWithMetrics {
   return {
     ...job,
-    hoursInStatus: getHoursInStatus(job.status_changed_at),
-    daysInStatus: getDaysInStatus(job.status_changed_at),
+    hoursInStatus: getHoursInStatus(job.status_changed_at, job.created_at),
+    daysInStatus: getDaysInStatus(job.status_changed_at, job.created_at),
     actionGroup: getActionGroup(job),
     blockerType: getBlockerType(job),
-    isOverdue: isJobOverdue(job.status_changed_at),
+    isOverdue: isJobOverdue(job.status_changed_at, job.created_at),
     depositOverdueDays: getDepositOverdueDays(job),
   }
 }

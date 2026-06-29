@@ -9,6 +9,7 @@ export type JobStatus =
   | 'IN_REPAIR'
   | 'DELAYED'
   | 'READY_TO_COLLECT'
+  | 'IN_STORAGE'
   | 'COLLECTED'
   | 'COMPLETED'
   | 'CANCELLED'
@@ -55,6 +56,7 @@ export interface Job {
   cancellation_reason?: string | null
   cancellation_notes?: string | null
   customer_notes?: string | null
+  diagnostic_report?: string | null
   
   // Parts & deposit
   requires_parts_order: boolean
@@ -92,11 +94,27 @@ export interface Job {
   parts_expected_at?: string | null
   customer_arrived_at?: string | null
   
-  // Post-collection SMS tracking
+  // Post-collection SMS tracking (review request sent immediately)
   post_collection_sms_scheduled_at?: string | null
   post_collection_sms_sent_at?: string | null
   post_collection_sms_delivery_status?: string | null
   post_collection_sms_body?: string | null
+  
+  // Aftercare SMS tracking (sent 2 days after collection)
+  aftercare_sms_scheduled_at?: string | null
+  aftercare_sms_sent_at?: string | null
+  aftercare_sms_delivery_status?: string | null
+  aftercare_sms_body?: string | null
+  
+  // Collection reminder tracking (aligned to T&Cs: 30 days collect, 90 days dispose)
+  collection_reminder_1_sent_at?: string | null  // Day 5
+  collection_reminder_2_sent_at?: string | null  // Day 14
+  collection_reminder_3_sent_at?: string | null  // Day 20
+  collection_reminder_4_sent_at?: string | null  // Day 28
+  collection_reminder_5_sent_at?: string | null  // Day 60 (in storage)
+  collection_reminder_6_sent_at?: string | null  // Day 85 (final notice)
+  storage_moved_at?: string | null               // Day 30
+  disposal_flagged_at?: string | null             // Day 90
   
   // Relationships
   conversation_id?: string | null

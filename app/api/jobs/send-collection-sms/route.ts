@@ -64,11 +64,13 @@ export async function POST(request: NextRequest) {
     // Get first name from customer name, with a safe fallback
     const firstName = getFirstName(job.customer_name)
 
-    // Build SMS message - aftercare-first, then review link
-    const smsBody = `Hi ${firstName}, how's your ${job.device_model} getting on? Any issues, just reply here and we'll sort it.
+    // Build SMS message - review-first, suggest 5-star, reply here for issues
+    const smsBody = `Hi ${firstName}, thanks for coming in! If you're happy with your ${job.device_model} repair, a 5-star Google review would mean a lot to us:
+${googleReviewLink}
 
-If all's good, a quick review would mean a lot:
-${googleReviewLink}`
+Any issues, just reply here.
+
+New Forest Device Repairs`
 
     // Send SMS via MacroDroid
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
@@ -239,7 +241,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get all jobs with scheduled SMS that haven't been sent yet
+    // Get all jobs with scheduled review SMS that haven't been sent yet
     const { data: jobs, error } = await supabase
       .from('jobs')
       .select('id, job_ref, customer_phone, customer_name')
@@ -247,6 +249,15 @@ export async function GET(request: NextRequest) {
       .is('post_collection_sms_sent_at', null)
       .lte('post_collection_sms_scheduled_at', new Date().toISOString())
       .order('post_collection_sms_scheduled_at', { ascending: true })
+
+    // Also get jobs with scheduled aftercare SMS that haven't been sent yet
+    const { data: aftercareJobs, error: aftercareError } = await supabase
+      .from('jobs')
+      .select('id, job_ref, customer_phone, customer_name, device_model')
+      .not('aftercare_sms_scheduled_at', 'is', null)
+      .is('aftercare_sms_sent_at', null)
+      .lte('aftercare_sms_scheduled_at', new Date().toISOString())
+      .order('aftercare_sms_scheduled_at', { ascending: true })
 
     if (error) {
       console.error('Error fetching scheduled SMS:', error)
@@ -256,7 +267,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (!jobs || jobs.length === 0) {
+    if (aftercareError) {
+      console.error('Error fetching aftercare SMS:', aftercareError)
+    }
+
+    if ((!jobs || jobs.length === 0) && (!aftercareJobs || aftercareJobs.length === 0)) {
       return NextResponse.json({
         success: true,
         message: 'No scheduled SMS to send',
@@ -264,9 +279,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Deduplicate by phone number to prevent sending multiple SMS to same customer
+    // Deduplicate review SMS by phone number
     const seenPhones = new Set<string>()
-    const uniqueJobs = jobs.filter(job => {
+    const uniqueJobs = (jobs || []).filter(job => {
       if (seenPhones.has(job.customer_phone)) {
         console.log(`Skipping duplicate for ${job.job_ref} - already sending to ${job.customer_phone}`)
         return false
@@ -275,38 +290,38 @@ export async function GET(request: NextRequest) {
       return true
     })
 
-    console.log(`Processing ${uniqueJobs.length} scheduled post-collection SMS (${jobs.length - uniqueJobs.length} duplicates filtered)`)
+    console.log(`Processing ${uniqueJobs.length} review SMS (${(jobs || []).length - uniqueJobs.length} duplicates filtered)`)
 
-    // Send each SMS with 30-second delay between sends (MacroDroid requirement)
     const results = []
+
+    // Send review SMS via POST handler (which also sends email)
     for (let i = 0; i < uniqueJobs.length; i++) {
       const job = uniqueJobs[i]
-      
+
       try {
-        console.log(`Sending SMS ${i + 1}/${uniqueJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
-        
+        console.log(`Sending review SMS ${i + 1}/${uniqueJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
+
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/api/jobs/send-collection-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jobId: job.id })
         })
-        
+
         const result = await response.json()
-        results.push({ jobRef: job.job_ref, customerName: job.customer_name, ...result })
-        
-        // Wait 30 seconds before next SMS (except for last one)
-        if (i < uniqueJobs.length - 1) {
+        results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review', ...result })
+
+        if (i < uniqueJobs.length - 1 || (aftercareJobs && aftercareJobs.length > 0)) {
           console.log('Waiting 30 seconds before next SMS...')
           await delay(30000)
         }
       } catch (err) {
-        console.error(`Error sending SMS for job ${job.job_ref}:`, err)
-        results.push({ jobRef: job.job_ref, customerName: job.customer_name, success: false, error: 'Failed to send' })
+        console.error(`Error sending review SMS for job ${job.job_ref}:`, err)
+        results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review', success: false, error: 'Failed to send' })
       }
     }
 
-    // Mark any duplicate jobs as sent (to prevent retry loops)
-    const duplicateJobIds = jobs.filter(job => !uniqueJobs.includes(job)).map(j => j.id)
+    // Mark any duplicate review jobs as sent
+    const duplicateJobIds = (jobs || []).filter(job => !uniqueJobs.includes(job)).map(j => j.id)
     if (duplicateJobIds.length > 0) {
       await supabase
         .from('jobs')
@@ -318,10 +333,67 @@ export async function GET(request: NextRequest) {
         .in('id', duplicateJobIds)
     }
 
+    // Send aftercare SMS directly (simple check-in, no review link)
+    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+    if (aftercareJobs && aftercareJobs.length > 0 && webhookUrl) {
+      console.log(`Processing ${aftercareJobs.length} aftercare SMS`)
+
+      for (let i = 0; i < aftercareJobs.length; i++) {
+        const job = aftercareJobs[i]
+
+        try {
+          const firstName = getFirstName(job.customer_name)
+          const aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
+
+New Forest Device Repairs`
+
+          console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
+
+          const smsResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: job.customer_phone,
+              message: aftercareBody,
+            }),
+          })
+
+          const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+          const now = new Date().toISOString()
+
+          await supabase
+            .from('jobs')
+            .update({
+              aftercare_sms_sent_at: now,
+              aftercare_sms_delivery_status: deliveryStatus,
+              aftercare_sms_body: aftercareBody,
+            })
+            .eq('id', job.id)
+
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'SYSTEM',
+            message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent`,
+          })
+
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: smsResponse.ok, deliveryStatus })
+
+          if (i < aftercareJobs.length - 1) {
+            console.log('Waiting 30 seconds before next SMS...')
+            await delay(30000)
+          }
+        } catch (err) {
+          console.error(`Error sending aftercare SMS for job ${job.job_ref}:`, err)
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: false, error: 'Failed to send' })
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      count: uniqueJobs.length,
-      duplicatesSkipped: jobs.length - uniqueJobs.length,
+      reviewCount: uniqueJobs.length,
+      aftercareCount: aftercareJobs?.length || 0,
+      duplicatesSkipped: (jobs || []).length - uniqueJobs.length,
       results
     })
 
