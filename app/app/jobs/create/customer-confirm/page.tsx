@@ -23,6 +23,8 @@ function CustomerConfirmContent() {
   const [landlineAccepted, setLandlineAccepted] = useState(false)
   const [isForeignNumber, setIsForeignNumber] = useState(false)
   const [phoneError, setPhoneError] = useState('')
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [showValidationSummary, setShowValidationSummary] = useState(false)
 
   // Load customer data from quote conversion if available
   useEffect(() => {
@@ -71,53 +73,74 @@ function CustomerConfirmContent() {
   }
 
   const handleSubmit = async () => {
+    const errors: Record<string, string> = {}
+
     if (!customerName.trim()) {
-      alert('Please enter your full name')
-      return
+      errors.customerName = 'Please enter your full name'
     }
 
     if (!customerPhone.trim()) {
-      alert('Please enter your mobile phone number')
-      return
-    }
-
-    // Validate UK phone number format
-    const cleanPhone = customerPhone.replace(/[\s\-()]/g, '')
-    const isUKNumber = /^(0|\+44|44)/.test(cleanPhone)
-    
-    if (isUKNumber) {
-      let normalizedPhone = cleanPhone
-      if (cleanPhone.startsWith('+44')) {
-        normalizedPhone = '0' + cleanPhone.substring(3)
-      } else if (cleanPhone.startsWith('44')) {
-        normalizedPhone = '0' + cleanPhone.substring(2)
-      }
+      errors.customerPhone = 'Please enter your mobile phone number'
+    } else {
+      // Validate UK phone number format
+      const cleanPhone = customerPhone.replace(/[\s\-()]/g, '')
+      const isUKNumber = /^(0|\+44|44)/.test(cleanPhone)
       
-      if (normalizedPhone.length !== 11) {
-        alert('Please enter a valid UK phone number (11 digits)')
-        return
+      if (isUKNumber) {
+        let normalizedPhone = cleanPhone
+        if (cleanPhone.startsWith('+44')) {
+          normalizedPhone = '0' + cleanPhone.substring(3)
+        } else if (cleanPhone.startsWith('44')) {
+          normalizedPhone = '0' + cleanPhone.substring(2)
+        }
+        
+        if (normalizedPhone.length !== 11) {
+          errors.customerPhone = 'Please enter a valid UK phone number (11 digits)'
+        }
       }
     }
 
     if (isForeignNumber && !customerEmail.trim()) {
-      alert('Foreign phone numbers cannot receive SMS. Please provide an email address for updates.')
-      return
+      errors.customerEmail = 'Foreign phone numbers cannot receive SMS. Please provide an email address for updates.'
     }
 
     if (isLandline && !landlineAccepted) {
-      alert('Please accept the additional charge for using a landline number, or provide a mobile number instead')
-      return
+      errors.landline = 'Please accept the additional charge for using a landline number, or provide a mobile number instead'
     }
 
     if (!repairAgreementAccepted) {
-      // Trigger shake animation to draw attention to repair agreement checkbox
-      setShakeTerms(true)
-      setTimeout(() => setShakeTerms(false), 600)
-      // Scroll to terms section smoothly
-      const termsSection = document.getElementById('terms-section')
-      termsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      errors.repairAgreement = 'Please accept the repair agreement to continue'
+    }
+
+    // If there are validation errors, show them and prevent submission
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      setShowValidationSummary(true)
+      
+      // Trigger shake animation on terms if terms not accepted
+      if (errors.repairAgreement) {
+        setShakeTerms(true)
+        setTimeout(() => setShakeTerms(false), 600)
+      }
+      
+      // Scroll to the first error field
+      const firstErrorField = Object.keys(errors)[0]
+      const errorElement = document.querySelector(`[data-field="${firstErrorField}"]`) || document.getElementById('terms-section')
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      
+      // Hide validation summary after 10 seconds
+      setTimeout(() => {
+        setShowValidationSummary(false)
+      }, 10000)
+      
       return
     }
+    
+    // Clear any previous validation errors
+    setValidationErrors({})
+    setShowValidationSummary(false)
 
     setLoading(true)
 
@@ -230,6 +253,12 @@ function CustomerConfirmContent() {
       console.log('🔍 API Response:', result)
 
       if (response.ok) {
+        // Clear form state so next job starts fresh
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('job_create_form_state')
+          sessionStorage.removeItem('quote_customer_data')
+          sessionStorage.removeItem('job_creation_overrides')
+        }
         // Show success and redirect
         // API returns job_ref directly, not nested in result.job
         router.push(`/app/jobs/create/success?job_ref=${result.job_ref}`)
@@ -252,6 +281,35 @@ function CustomerConfirmContent() {
           {/* Left: Customer Form */}
           <div className="lg:col-span-2 space-y-6">
             
+            {/* Validation Error Summary */}
+            {showValidationSummary && Object.keys(validationErrors).length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-red-900 dark:text-red-100 text-lg mb-2">Please complete the following required fields:</h3>
+                    <ul className="space-y-1">
+                      {Object.entries(validationErrors).map(([field, message]) => (
+                        <li key={field} className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
+                          <strong>{message}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowValidationSummary(false)}
+                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* Step 1: Your Details */}
             <div id="step-1" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -262,39 +320,55 @@ function CustomerConfirmContent() {
               </div>
 
               <div className="space-y-4">
-                <div>
+                <div data-field="customerName">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Full Name *
                   </label>
                   <input
                     type="text"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value)
+                      if (validationErrors.customerName) {
+                        setValidationErrors(prev => { const n = {...prev}; delete n.customerName; return n })
+                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && customerName.trim()) {
                         e.preventDefault()
                         document.querySelector<HTMLInputElement>('input[type="tel"]')?.focus()
                       }
                     }}
-                    className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.customerName ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
                     placeholder="Enter your full name"
                     autoFocus
                   />
+                  {validationErrors.customerName && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerName}
+                    </p>
+                  )}
                 </div>
 
-                {/* Scroll-down hint after Step 1 */}
-                <div className="flex justify-center pt-2">
+                {/* Continue hint after Step 1 */}
+                <div className="flex justify-center pt-3">
                   <button
                     type="button"
                     onClick={() => scrollToSection(jobData.passcode_requirement !== 'not_required' ? 'step-2' : 'submit-section')}
-                    className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors"
+                    className="flex flex-col items-center gap-1 text-primary hover:text-primary-dark transition-colors bg-primary/5 hover:bg-primary/10 rounded-xl px-6 py-2"
                   >
-                    <span className="text-xs font-medium">Continue</span>
+                    <span className="text-sm font-bold">
+                      {jobData.passcode_requirement !== 'not_required' ? 'Continue to Step 2: Device Passcode' : 'Continue to Confirm Booking'}
+                    </span>
                     <ArrowDown className="h-5 w-5 animate-bounce" />
                   </button>
                 </div>
 
-                <div>
+                <div data-field="customerPhone">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Mobile Phone *
                   </label>
@@ -305,6 +379,10 @@ function CustomerConfirmContent() {
                       const phone = e.target.value
                       setCustomerPhone(phone)
                       setPhoneError('')
+                      if (validationErrors.customerPhone) {
+                        setValidationErrors(prev => { const n = {...prev}; delete n.customerPhone; return n })
+                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
+                      }
                       
                       // Clean phone number (remove spaces, dashes, etc.)
                       const cleanPhone = phone.replace(/[\s\-()]/g, '')
@@ -375,9 +453,17 @@ function CustomerConfirmContent() {
                         document.querySelector<HTMLInputElement>('input[type="email"]')?.focus()
                       }
                     }}
-                    className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.customerPhone ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
                     placeholder="07410 123 456"
                   />
+                  {validationErrors.customerPhone && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerPhone}
+                    </p>
+                  )}
                   {phoneError && (
                     <p className="text-sm text-red-600 dark:text-red-400 mt-2">{phoneError}</p>
                   )}
@@ -414,7 +500,7 @@ function CustomerConfirmContent() {
                   )}
                 </div>
 
-                <div>
+                <div data-field="customerEmail">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Email {isForeignNumber && '*'}{!isForeignNumber && '(Optional)'}
                   </label>
@@ -429,7 +515,13 @@ function CustomerConfirmContent() {
                   <input
                     type="email"
                     value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerEmail(e.target.value)
+                      if (validationErrors.customerEmail) {
+                        setValidationErrors(prev => { const n = {...prev}; delete n.customerEmail; return n })
+                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
@@ -439,9 +531,17 @@ function CustomerConfirmContent() {
                         }
                       }
                     }}
-                    className="w-full px-4 py-4 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.customerEmail ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                    }`}
                     placeholder="your@email.com"
                   />
+                  {validationErrors.customerEmail && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerEmail}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -523,14 +623,14 @@ function CustomerConfirmContent() {
                   </label>
                 </div>
 
-                {/* Scroll-down hint after Step 2 */}
+                {/* Continue hint after Step 2 */}
                 <div className="flex justify-center pt-4">
                   <button
                     type="button"
                     onClick={() => scrollToSection('submit-section')}
-                    className="flex flex-col items-center gap-1 text-gray-400 hover:text-primary transition-colors"
+                    className="flex flex-col items-center gap-1 text-primary hover:text-primary-dark transition-colors bg-primary/5 hover:bg-primary/10 rounded-xl px-6 py-2"
                   >
-                    <span className="text-xs font-medium">Continue</span>
+                    <span className="text-sm font-bold">Continue to Confirm Booking</span>
                     <ArrowDown className="h-5 w-5 animate-bounce" />
                   </button>
                 </div>
@@ -547,19 +647,29 @@ function CustomerConfirmContent() {
               </div>
 
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
-                Please review the repair summary and terms on the right, then click below to confirm your booking.
+                Please review the repair summary and terms {typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'on the right' : 'below'}, then accept the agreement to confirm your booking.
               </p>
 
-              {/* Hint to scroll to terms if not accepted */}
+              {/* Prominent hint to accept terms if not accepted */}
               {!repairAgreementAccepted && customerName && customerPhone && (!isLandline || landlineAccepted) && (
-                <button
-                  type="button"
-                  onClick={() => scrollToSection('terms-section')}
-                  className="w-full mb-4 flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors py-2"
-                >
-                  <span>Please scroll down to accept the terms first</span>
-                  <ArrowDown className="h-4 w-4 animate-bounce" />
-                </button>
+                <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('terms-section')}
+                    className="w-full flex items-center justify-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
+                  >
+                    <span>Please accept the repair agreement to continue</span>
+                    <ArrowDown className="h-5 w-5 animate-bounce" />
+                  </button>
+                </div>
+              )}
+
+              {/* Success indicator when terms accepted */}
+              {repairAgreementAccepted && (
+                <div className="mb-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-xl p-3 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-semibold text-green-800 dark:text-green-200">Terms accepted - ready to confirm!</span>
+                </div>
               )}
 
               {/* Submit Button */}
@@ -694,6 +804,10 @@ function CustomerConfirmContent() {
                         onChange={(e) => {
                           setRepairAgreementAccepted(e.target.checked)
                           setTermsAccepted(e.target.checked)
+                          if (e.target.checked && validationErrors.repairAgreement) {
+                            setValidationErrors(prev => { const n = {...prev}; delete n.repairAgreement; return n })
+                            if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
+                          }
                         }}
                         className="w-6 h-6 text-primary focus:ring-primary border-2 border-gray-300 rounded mt-0.5 flex-shrink-0"
                       />

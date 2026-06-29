@@ -58,6 +58,21 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
     }
   }, [isOpen])
 
+  // Debounced live search - triggers as user types
+  useEffect(() => {
+    if (!isOpen) return
+    if (!searchQuery.trim()) {
+      setCustomers([])
+      return
+    }
+
+    const debounceTimer = setTimeout(() => {
+      handleSearch()
+    }, 300)
+
+    return () => clearTimeout(debounceTimer)
+  }, [searchQuery, isOpen])
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
 

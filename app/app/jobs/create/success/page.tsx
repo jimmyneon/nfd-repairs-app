@@ -10,6 +10,13 @@ function BookingSuccessContent() {
   const jobRef = searchParams.get('job_ref')
 
   useEffect(() => {
+    // Clear form state so next job starts fresh (safety net in case customer-confirm didn't clear)
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('job_create_form_state')
+      sessionStorage.removeItem('quote_customer_data')
+      sessionStorage.removeItem('job_creation_overrides')
+    }
+
     // Auto-redirect after 15 seconds
     const timer = setTimeout(() => {
       router.push('/app/jobs/create')

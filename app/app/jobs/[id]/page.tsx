@@ -17,6 +17,7 @@ import CancellationReasonModal from '@/components/CancellationReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
 import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
 import CustomerNotesEditor from '@/components/CustomerNotesEditor'
+import EditCustomerDetails from '@/components/EditCustomerDetails'
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -929,6 +930,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             phone={job.customer_phone} 
             name={job.customer_name}
           />
+          <div className="mt-3">
+            <EditCustomerDetails job={job} onUpdate={loadJobData} />
+          </div>
         </div>
 
         {/* Customer Flag Controls */}

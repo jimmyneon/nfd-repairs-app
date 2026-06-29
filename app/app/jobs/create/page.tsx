@@ -288,10 +288,10 @@ function CreateJobContent() {
             customer_name: customerName.trim(),
             customer_phone: customerPhone.trim(),
             customer_email: null,
-            device_make: 'TBD',
-            device_model: 'TBD',
-            issue: 'To be determined',
-            description: 'Quick intake - details to be added later',
+            device_make: 'To be added',
+            device_model: 'To be added',
+            issue: 'To be assessed',
+            description: 'Quick intake - details to be added from job page',
             price_total: 0,
             quoted_price: 0,
             requires_parts_order: false,
@@ -312,9 +312,27 @@ function CreateJobContent() {
         const result = await response.json()
 
         if (response.ok) {
-          // Clear form
+          // Clear form and session state so next job starts fresh
           setCustomerName('')
           setCustomerPhone('')
+          setFormData({
+            device_type: '',
+            device_make: '',
+            device_model: '',
+            issue: '',
+            description: '',
+            repair_type: '',
+            technician_notes: '',
+            price_total: '',
+            requires_parts_order: false,
+            device_left_with_us: true,
+            passcode_requirement: 'not_required',
+            linked_quote_id: null,
+          })
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('job_create_form_state')
+            sessionStorage.removeItem('quote_customer_data')
+          }
           // Show success and stay on page for next customer
           alert(`Job created! Ref: ${result.job_ref}\n\nYou can add device details later from the job page.`)
           setLoading(false)
@@ -402,14 +420,52 @@ function CreateJobContent() {
     return ''
   }
 
+  // Infer device make from model name when make is missing
+  // e.g. "iPhone 14" -> "Apple", "iPad Pro" -> "Apple", "Galaxy S23" -> "Samsung"
+  const inferDeviceMake = (make: string, model: string): string => {
+    if (make && make.trim() && make !== 'Unknown') return make
+    const modelLower = (model || '').toLowerCase().trim()
+    if (!modelLower) return make || ''
+    
+    if (modelLower.includes('iphone') || modelLower.includes('ipad') || 
+        modelLower.includes('macbook') || modelLower.includes('imac') ||
+        modelLower.includes('apple watch') || modelLower.includes('airpods')) {
+      return 'Apple'
+    }
+    if (modelLower.includes('galaxy') || modelLower.includes('samsung')) {
+      return 'Samsung'
+    }
+    if (modelLower.includes('pixel')) {
+      return 'Google'
+    }
+    if (modelLower.includes('playstation') || modelLower.includes('ps4') || modelLower.includes('ps5')) {
+      return 'Sony PlayStation'
+    }
+    if (modelLower.includes('xbox')) {
+      return 'Microsoft Xbox'
+    }
+    if (modelLower.includes('nintendo') || modelLower.includes('switch')) {
+      return 'Nintendo'
+    }
+    if (modelLower.includes('thinkpad')) {
+      return 'Lenovo'
+    }
+    if (modelLower.includes('surface')) {
+      return 'Microsoft'
+    }
+    return make || ''
+  }
+
   const handleQuoteSelect = (quote: any) => {
     // Auto-infer device type from device make AND model if not provided
     const inferredDeviceType = quote.device_type || inferDeviceType(quote.device_make || '', quote.device_model || '')
+    // Auto-infer device make from model if make is missing (e.g. "iPhone 14" -> "Apple")
+    const inferredMake = inferDeviceMake(quote.device_make || '', quote.device_model || '')
 
     setFormData({
       ...formData,
       device_type: inferredDeviceType,
-      device_make: quote.device_make || '',
+      device_make: inferredMake,
       device_model: quote.device_model || '',
       issue: quote.issue || '',
       description: quote.description || '',
@@ -436,12 +492,14 @@ function CreateJobContent() {
   const handleCustomerSelect = (customerData: any) => {
     // Auto-infer device type from device make AND model if provided
     const inferredDeviceType = customerData.device_type || inferDeviceType(customerData.device_make || '', customerData.device_model || '')
+    // Auto-infer device make from model if make is missing
+    const inferredMake = inferDeviceMake(customerData.device_make || '', customerData.device_model || '')
 
     // Update form data with customer data
     setFormData({
       ...formData,
       device_type: inferredDeviceType || formData.device_type,
-      device_make: customerData.device_make || formData.device_make,
+      device_make: inferredMake || formData.device_make,
       device_model: customerData.device_model || formData.device_model,
       issue: customerData.issue || formData.issue,
       description: customerData.description || formData.description,
@@ -738,7 +796,7 @@ function CreateJobContent() {
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
                   <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <strong>Quick Intake:</strong> Device details will be marked as "TBD". You can add them later from the job page.
+                    <strong>Quick Intake:</strong> Device details will be marked as "To be added". You can fill them in later from the job page.
                   </p>
                 </div>
               </div>

@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     const mapsLink = mapsSetting?.value || 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7'
     const hoursLink = hoursSetting?.value || mapsLink
 
+    const vcardUrl = 'https://newforestdevicerepairs.co.uk/new-forest-device-repairs.vcf'
     const contactCardUrl = 'https://newforestdevicerepairs.co.uk/contact-card.html'
 
     const smsBody = `New Forest Device Repairs
@@ -60,7 +61,10 @@ Lymington
 Call/Text: 07410 381247
 Email: nfdrepairs@gmail.com
 
-Save us to your contacts:
+Tap to save our contact card:
+${vcardUrl}
+
+Or view our digital card:
 ${contactCardUrl}
 
 Find us: ${mapsLink}
