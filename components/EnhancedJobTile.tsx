@@ -211,5 +211,5 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
         />
       )}
     </>
-  )}
+  )
 }
