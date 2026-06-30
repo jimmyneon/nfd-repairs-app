@@ -2,7 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown, ArrowDown } from 'lucide-react'
+import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown } from 'lucide-react'
+import FormErrorToast from '@/components/FormErrorToast'
+import FormGuideOverlay from '@/components/FormGuideOverlay'
 
 function CustomerConfirmContent() {
   const router = useRouter()
@@ -281,35 +283,6 @@ function CustomerConfirmContent() {
           {/* Left: Customer Form */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Validation Error Summary */}
-            {showValidationSummary && Object.keys(validationErrors).length > 0 && (
-              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-red-900 dark:text-red-100 text-lg mb-2">Please complete the following required fields:</h3>
-                    <ul className="space-y-1">
-                      {Object.entries(validationErrors).map(([field, message]) => (
-                        <li key={field} className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
-                          <strong>{message}</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowValidationSummary(false)}
-                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-            
             {/* Step 1: Your Details */}
             <div id="step-1" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -352,20 +325,6 @@ function CustomerConfirmContent() {
                       {validationErrors.customerName}
                     </p>
                   )}
-                </div>
-
-                {/* Continue hint after Step 1 */}
-                <div className="flex justify-center pt-3">
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection(jobData.passcode_requirement !== 'not_required' ? 'step-2' : 'submit-section')}
-                    className="flex flex-col items-center gap-1 text-primary hover:text-primary-dark transition-colors bg-primary/5 hover:bg-primary/10 rounded-xl px-6 py-2"
-                  >
-                    <span className="text-sm font-bold">
-                      {jobData.passcode_requirement !== 'not_required' ? 'Continue to Step 2: Device Passcode' : 'Continue to Confirm Booking'}
-                    </span>
-                    <ArrowDown className="h-5 w-5 animate-bounce" />
-                  </button>
                 </div>
 
                 <div data-field="customerPhone">
@@ -623,17 +582,6 @@ function CustomerConfirmContent() {
                   </label>
                 </div>
 
-                {/* Continue hint after Step 2 */}
-                <div className="flex justify-center pt-4">
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection('submit-section')}
-                    className="flex flex-col items-center gap-1 text-primary hover:text-primary-dark transition-colors bg-primary/5 hover:bg-primary/10 rounded-xl px-6 py-2"
-                  >
-                    <span className="text-sm font-bold">Continue to Confirm Booking</span>
-                    <ArrowDown className="h-5 w-5 animate-bounce" />
-                  </button>
-                </div>
               </div>
             )}
 
@@ -650,19 +598,6 @@ function CustomerConfirmContent() {
                 Please review the repair summary and terms {typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'on the right' : 'below'}, then accept the agreement to confirm your booking.
               </p>
 
-              {/* Prominent hint to accept terms if not accepted */}
-              {!repairAgreementAccepted && customerName && customerPhone && (!isLandline || landlineAccepted) && (
-                <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-xl p-4">
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection('terms-section')}
-                    className="w-full flex items-center justify-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
-                  >
-                    <span>Please accept the repair agreement to continue</span>
-                    <ArrowDown className="h-5 w-5 animate-bounce" />
-                  </button>
-                </div>
-              )}
 
               {/* Success indicator when terms accepted */}
               {repairAgreementAccepted && (
@@ -849,6 +784,21 @@ function CustomerConfirmContent() {
           </div>
         </div>
       </div>
+
+      <FormErrorToast
+        errors={validationErrors}
+        show={showValidationSummary}
+        onClose={() => setShowValidationSummary(false)}
+      />
+
+      <FormGuideOverlay
+        fields={[
+          { id: 'step-1', filled: customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted) },
+          { id: 'step-2', filled: passcodeMethod === 'send_link' || passwordNA || devicePassword.trim() || jobData.passcode_requirement === 'not_required' },
+          { id: 'terms-section', filled: repairAgreementAccepted && termsAccepted },
+        ]}
+        submitReady={customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted) && repairAgreementAccepted && termsAccepted}
+      />
     </div>
   )
 }

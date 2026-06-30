@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 import CustomerSearchModal from '@/components/CustomerSearchModal'
+import FormErrorToast from '@/components/FormErrorToast'
 import { getIssuesForDeviceType, saveCustomIssue, getCustomIssues } from '@/lib/device-issues'
 
 function CreateJobContent() {
@@ -1375,34 +1376,7 @@ function CreateJobContent() {
             </div>
           )}
 
-          {/* Validation Error Summary - Shown at bottom near submit button */}
-          {showValidationSummary && Object.keys(validationErrors).length > 0 && (
-            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 animate-shake">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h3 className="font-bold text-red-900 dark:text-red-100 text-lg mb-2">Please complete the following required fields:</h3>
-                  <ul className="space-y-1">
-                    {Object.entries(validationErrors).map(([field, message]) => (
-                      <li key={field} className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
-                        <strong>{message}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowValidationSummary(false)}
-                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Validation errors shown as bottom toast */}
 
           <div className="flex gap-4">
             <button
@@ -1456,6 +1430,12 @@ function CreateJobContent() {
         isOpen={showCustomerSearch}
         onClose={() => setShowCustomerSearch(false)}
         onSelectCustomer={handleCustomerSelect}
+      />
+
+      <FormErrorToast
+        errors={validationErrors}
+        show={showValidationSummary}
+        onClose={() => setShowValidationSummary(false)}
       />
     </div>
   )
