@@ -51,6 +51,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [overrideSMS, setOverrideSMS] = useState(false)
   const [overrideEmail, setOverrideEmail] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showBigPassword, setShowBigPassword] = useState(false)
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
@@ -810,7 +811,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           {job.device_password && !job.password_not_applicable ? (
             <button
               onClick={() => setShowPassword(!showPassword)}
-              className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl hover:border-blue-400 transition-colors active:scale-95"
+              onContextMenu={(e) => { e.preventDefault(); setShowBigPassword(true) }}
+              onTouchStart={(e) => {
+                const timer = setTimeout(() => setShowBigPassword(true), 500)
+                ;(e.currentTarget as HTMLElement).dataset.longPressTimer = String(timer)
+              }}
+              onTouchEnd={(e) => {
+                const timer = (e.currentTarget as HTMLElement).dataset.longPressTimer
+                if (timer) clearTimeout(Number(timer))
+              }}
+              onTouchMove={(e) => {
+                const timer = (e.currentTarget as HTMLElement).dataset.longPressTimer
+                if (timer) clearTimeout(Number(timer))
+              }}
+              className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl hover:border-blue-400 transition-colors active:scale-95 select-none"
             >
               <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 truncate max-w-full px-1">{showPassword ? job.device_password : 'Password'}</span>
@@ -1473,6 +1487,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             willSendSMS={willSendSMS}
             willSendEmail={willSendEmail}
           />
+        )}
+
+        {/* Big Password Overlay (long press) */}
+        {showBigPassword && job.device_password && (
+          <div
+            className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowBigPassword(false)}
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-lg w-full shadow-2xl text-center">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Lock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase">Device Password</span>
+              </div>
+              <p className="text-4xl font-mono font-black text-gray-900 dark:text-white break-all tracking-wider">
+                {job.device_password}
+              </p>
+              <p className="text-sm text-gray-400 mt-6">Tap anywhere to close</p>
+            </div>
+          </div>
         )}
 
         {/* Tracking Link Modal */}
