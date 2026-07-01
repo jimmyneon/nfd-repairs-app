@@ -86,6 +86,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         (payload) => {
           setJob(payload.new)
           setLastUpdated(new Date())
+          if (payload.new.status_changed_at) {
+            setStatusChangedAt(new Date(payload.new.status_changed_at))
+          }
         }
       )
       .subscribe()
@@ -122,7 +125,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
@@ -171,8 +174,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           setPreviousStatus(null)
         }
       } else {
-        // If no status change events, use job creation date
-        setStatusChangedAt(new Date(data.created_at))
+        // If no status change events, use status_changed_at from job or fall back to creation date
+        setStatusChangedAt(new Date(data.status_changed_at || data.created_at))
         setPreviousStatus(null)
       }
     }
@@ -214,8 +217,11 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     const diffHours = Math.floor(diffMins / 60)
     const diffDays = Math.floor(diffHours / 24)
     
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
+    if (diffMins < 1) return 'Just now'
+    if (diffMins === 1) return '1 minute ago'
+    if (diffMins < 60) return `${diffMins} minutes ago`
+    if (diffHours === 1) return '1 hour ago'
+    if (diffHours < 24) return `${diffHours} hours ago`
     if (diffDays === 1) return '1 day ago'
     return `${diffDays} days ago`
   }

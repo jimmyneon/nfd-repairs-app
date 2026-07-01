@@ -1,22 +1,61 @@
-const CACHE_NAME = 'nfd-repairs-v1'
-const urlsToCache = [
-  '/app/jobs',
-  '/app/notifications',
-  '/login',
-]
+const CACHE_NAME = 'nfd-repairs-v2'
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting()
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache)
+      return cache.addAll([
+        '/login',
+      ])
     })
   )
 })
 
 self.addEventListener('fetch', (event) => {
+  const request = event.request
+
+  // Network-first for navigation requests (HTML pages) - always get fresh content
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const responseClone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone)
+          })
+          return response
+        })
+        .catch(() => {
+          return caches.match(request).then((response) => {
+            return response || caches.match('/login')
+          })
+        })
+    )
+    return
+  }
+
+  // Cache-first for static assets (JS, CSS, images)
+  if (request.destination === 'script' || request.destination === 'style' || request.destination === 'image') {
+    event.respondWith(
+      caches.match(request).then((response) => {
+        return response || fetch(request).then((fetchResponse) => {
+          if (fetchResponse.ok) {
+            const responseClone = fetchResponse.clone()
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone)
+            })
+          }
+          return fetchResponse
+        })
+      })
+    )
+    return
+  }
+
+  // Default: try network, fall back to cache
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request)
+    fetch(request).catch(() => {
+      return caches.match(request)
     })
   )
 })
@@ -31,6 +70,8 @@ self.addEventListener('activate', (event) => {
           }
         })
       )
+    }).then(() => {
+      return self.clients.claim()
     })
   )
 })
