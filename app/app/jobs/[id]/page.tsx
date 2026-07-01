@@ -20,6 +20,7 @@ import CustomerNotesEditor from '@/components/CustomerNotesEditor'
 import EditCustomerDetails from '@/components/EditCustomerDetails'
 import SlideUpPanel from '@/components/SlideUpPanel'
 import DiagnosticReportEditor from '@/components/DiagnosticReportEditor'
+import HistoryTabs from '@/components/HistoryTabs'
 import CustomSmsComposer from '@/components/CustomSmsComposer'
 import PriceSetterModal from '@/components/PriceSetterModal'
 import QuickActionsModal from '@/components/QuickActionsModal'
@@ -54,6 +55,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
   const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | 'notes' | null>(null)
+  const [historyTab, setHistoryTab] = useState<'all' | 'status' | 'messages' | 'notes' | 'emails'>('all')
   const [showSmsComposer, setShowSmsComposer] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
@@ -1773,105 +1775,34 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       {/* Slide-Up Panel: History */}
       <SlideUpPanel
         isOpen={activePanel === 'history'}
-        onClose={() => setActivePanel(null)}
+        onClose={() => { setActivePanel(null); setHistoryTab('all') }}
         title="Job History"
         icon={<Clock className="h-5 w-5 text-primary" />}
         minHeight="60vh"
       >
-        <div className="space-y-6">
-          {/* Timeline */}
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Timeline</h3>
-            <div className="space-y-3">
-              {events.map((event) => (
-                <div key={event.id} className="border-l-2 border-primary pl-3 py-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{event.message}</p>
-                  <p className="text-xs text-gray-500">{new Date(event.created_at).toLocaleString('en-GB')}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SMS History */}
-          {smsLogs.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">SMS History</h3>
-              <div className="space-y-2">
-                {smsLogs.map((sms) => (
-                  <div key={sms.id} className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm overflow-hidden">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{sms.template_key}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          sms.status === 'SENT' ? 'bg-green-100 text-green-800' :
-                          sms.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {sms.status}
-                        </span>
-                        {(sms.status === 'FAILED' || sms.status === 'PENDING') && (
-                          <button
-                            onClick={async () => {
-                              setActionLoading(true)
-                              try {
-                                const response = await fetch('/api/sms/send', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                })
-                                if (response.ok) {
-                                  await loadJobData()
-                                }
-                              } catch (error) {
-                                console.error('Failed to retry SMS:', error)
-                              }
-                              setActionLoading(false)
-                            }}
-                            disabled={actionLoading}
-                            className="text-xs px-2 py-1 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
-                            title="Send SMS Again"
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-300 text-xs break-words">{sms.body_rendered}</p>
-                    <p className="text-gray-400 text-xs mt-1">{new Date(sms.created_at).toLocaleString('en-GB')}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Email History */}
-          {emailLogs.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Email History</h3>
-              <div className="space-y-2">
-                {emailLogs.map((email) => (
-                  <div key={email.id} className="bg-gray-50 dark:bg-gray-700 rounded p-2 text-sm overflow-hidden">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{email.template_key}</span>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        email.status === 'SENT' ? 'bg-green-100 text-green-800' :
-                        email.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {email.status}
-                      </span>
-                    </div>
-                    <p className="text-gray-700 dark:text-gray-300 font-medium text-xs mb-1">{email.subject}</p>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs">To: {email.recipient_email}</p>
-                    <p className="text-gray-400 text-xs mt-1">{new Date(email.created_at).toLocaleString('en-GB')}</p>
-                    {email.error_message && (
-                      <p className="text-red-600 text-xs mt-1">Error: {email.error_message}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <HistoryTabs
+          events={events}
+          smsLogs={smsLogs}
+          emailLogs={emailLogs}
+          actionLoading={actionLoading}
+          activeTab={historyTab}
+          onTabChange={setHistoryTab}
+          onRetrySms={async () => {
+            setActionLoading(true)
+            try {
+              const response = await fetch('/api/sms/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              })
+              if (response.ok) {
+                await loadJobData()
+              }
+            } catch (error) {
+              console.error('Failed to retry SMS:', error)
+            }
+            setActionLoading(false)
+          }}
+        />
       </SlideUpPanel>
 
       {/* Direct SMS Composer (from Message Customer button) */}
