@@ -807,7 +807,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </button>
           {job.device_password && !job.password_not_applicable ? (
             <button
-              onClick={() => { setShowPassword(!showPassword); setActivePanel('device') }}
+              onClick={() => setShowPassword(!showPassword)}
               className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl hover:border-blue-400 transition-colors active:scale-95"
             >
               <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />

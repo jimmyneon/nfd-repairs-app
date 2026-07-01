@@ -21,6 +21,7 @@ export default function SlideUpPanel({
   minHeight = '60vh',
 }: SlideUpPanelProps) {
   const [visible, setVisible] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [dragY, setDragY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const dragStartY = useRef(0)
@@ -29,9 +30,17 @@ export default function SlideUpPanel({
   useEffect(() => {
     if (isOpen) {
       setVisible(true)
+      setMounted(false)
       setDragY(0)
       document.body.style.overflow = 'hidden'
+      // Next frame: trigger transition to translate-y-0
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setMounted(true)
+        })
+      })
     } else {
+      setMounted(false)
       const timer = setTimeout(() => setVisible(false), 300)
       document.body.style.overflow = ''
       return () => clearTimeout(timer)
@@ -76,7 +85,7 @@ export default function SlideUpPanel({
         ref={panelRef}
         className={`relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl flex flex-col ${
           isDragging ? '' : 'transition-transform duration-300 ease-out'
-        } ${isOpen && dragY === 0 ? 'translate-y-0' : dragY > 0 ? '' : 'translate-y-full'}`}
+        } ${mounted && dragY === 0 ? 'translate-y-0' : dragY > 0 ? '' : 'translate-y-full'}`}
         style={{
           maxHeight: '90dvh',
           minHeight,
