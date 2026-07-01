@@ -281,7 +281,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setShowSimpleConfirm(false)
 
     // Prepare update object with status and device_in_shop
-    const updateData: any = { status: pendingWorkflowStatus }
+    const updateData: any = { status: pendingWorkflowStatus, status_changed_at: new Date().toISOString() }
     
     // Set device_in_shop based on status transition
     if (pendingWorkflowStatus === 'RECEIVED') {
@@ -297,7 +297,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('id', job.id)
 
     // Optimistic update - update local state immediately
-    setJob({ ...job, ...updateData, status_changed_at: new Date().toISOString() } as Job)
+    setJob({ ...job, ...updateData } as Job)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
@@ -564,7 +564,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const message = `Status changed to ${JOB_STATUS_LABELS[newStatus]}`
 
     // Prepare update object with status and device_in_shop
-    const updateData: any = { status: newStatus }
+    const updateData: any = { status: newStatus, status_changed_at: new Date().toISOString() }
     
     // Set device_in_shop based on status transition
     if (newStatus === 'RECEIVED') {
@@ -580,7 +580,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('id', job.id)
 
     // Optimistic update - update local state immediately
-    setJob({ ...job, ...updateData, status_changed_at: new Date().toISOString() } as Job)
+    setJob({ ...job, ...updateData } as Job)
 
     await supabase.from('job_events').insert({
       job_id: job.id,
@@ -715,22 +715,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       </header>
 
       <main className="p-4 space-y-3 max-w-2xl mx-auto">
-        {/* Compact Device Info Card */}
-        <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-4 border-2 border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+        {/* Device Info Card */}
+        <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border-2 border-gray-100 dark:border-gray-700">
+          <div className="flex items-start gap-4 mb-3">
+            <div className="flex-shrink-0 w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
               {getDeviceIcon(job.device_make || '', job.device_model || '')}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-base font-black text-gray-900 dark:text-white leading-tight truncate">{job.device_make} {job.device_model}</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{job.issue}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{job.customer_name} · {job.job_ref}</p>
+              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{job.device_make} {job.device_model}</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{job.issue}</p>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-1">{job.customer_name}</p>
             </div>
             <button
               onClick={() => setShowPriceModal(true)}
               className="text-right flex-shrink-0 active:scale-95 transition-transform"
             >
-              <p className="text-xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
+              <p className="text-2xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
               {job.deposit_required && !job.deposit_received && (
                 <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
               )}
@@ -739,79 +739,86 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               )}
             </button>
           </div>
-          <div className="flex items-center justify-between gap-2 mt-2">
-            <span className={`inline-block px-2.5 py-0.5 rounded-lg font-bold text-xs ${JOB_STATUS_COLORS[job.status]}`}>
+          <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job.status]}`}>
               {JOB_STATUS_LABELS[job.status]}
             </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {job.device_password && !job.password_not_applicable && (
-                <button
-                  onClick={() => { setShowPassword(!showPassword); setActivePanel('device') }}
-                  className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium flex items-center gap-1 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                >
-                  <Lock className="h-3 w-3" />
-                  {showPassword ? job.device_password : 'Password'}
-                </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {job.device_in_shop && (
+                <span className="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-lg font-bold flex items-center gap-1">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  In Shop
+                </span>
+              )}
+              {job.onboarding_completed && (
+                <span className="text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg font-bold flex items-center gap-1" title="Onboarding completed">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Onboarded
+                </span>
+              )}
+              {job.terms_accepted && (
+                <span className="text-xs px-2.5 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg font-bold flex items-center gap-1" title="Terms accepted">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Terms
+                </span>
               )}
               {job.diagnostic_report && (
                 <button
                   onClick={() => setActivePanel('diagnostic')}
-                  className="text-xs px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg font-medium flex items-center gap-1 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors"
+                  className="text-xs px-2.5 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-lg font-bold flex items-center gap-1 hover:bg-purple-200 dark:hover:bg-purple-900/60 transition-colors"
                 >
-                  <FileText className="h-3 w-3" />
+                  <FileText className="h-3.5 w-3.5" />
                   Diagnostic
                 </button>
-              )}
-              {job.device_in_shop && (
-                <span className="text-xs px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg font-medium flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  In shop
-                </span>
-              )}
-              {job.onboarding_completed && (
-                <span className="text-xs px-1.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-1" title="Onboarding completed">
-                  <CheckCircle className="h-3 w-3" />
-                </span>
-              )}
-              {job.terms_accepted && (
-                <span className="text-xs px-1.5 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg flex items-center gap-1" title="Terms accepted">
-                  <ShieldCheck className="h-3 w-3" />
-                </span>
               )}
             </div>
           </div>
         </div>
 
         {/* Mini Action Buttons Row 1 - info panels (square) */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           <button
             onClick={() => setActivePanel('device')}
-            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <Smartphone className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Device</span>
+            <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300">Device</span>
           </button>
           <button
             onClick={() => setActivePanel('customer')}
-            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <User className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Customer</span>
+            <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300">Customer</span>
           </button>
           <button
             onClick={() => setActivePanel('diagnostic')}
-            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <FileText className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Diagnostic</span>
+            <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300">Diagnostic</span>
           </button>
           <button
             onClick={() => setActivePanel('history')}
-            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
+            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <Clock className="h-5 w-5 text-primary" />
-            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">History</span>
+            <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300">History</span>
           </button>
+          {job.device_password && !job.password_not_applicable ? (
+            <button
+              onClick={() => { setShowPassword(!showPassword); setActivePanel('device') }}
+              className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl hover:border-blue-400 transition-colors active:scale-95"
+            >
+              <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 truncate max-w-full px-1">{showPassword ? job.device_password : 'Password'}</span>
+            </button>
+          ) : (
+            <div className="aspect-square flex flex-col items-center justify-center gap-1 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-100 dark:border-gray-700/50 rounded-xl opacity-50">
+              <Lock className="h-5 w-5 text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400">N/A</span>
+            </div>
+          )}
         </div>
 
         {/* Mini Action Buttons Row 2 - quick actions (square) */}
@@ -821,28 +828,28 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             className="aspect-square flex flex-col items-center justify-center gap-1 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95"
           >
             <Send className="h-5 w-5" />
-            <span className="text-xs">Message</span>
+            <span className="text-[10px]">Message</span>
           </button>
           <button
             onClick={() => setShowPriceModal(true)}
             className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <PoundSterling className="h-5 w-5 text-primary" />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Price</span>
+            <span className="text-[10px] text-gray-700 dark:text-gray-300">Price</span>
           </button>
           <button
             onClick={() => setActivePanel('notes')}
             className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <StickyNote className="h-5 w-5 text-primary" />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Notes</span>
+            <span className="text-[10px] text-gray-700 dark:text-gray-300">Notes</span>
           </button>
           <button
             onClick={() => setShowTrackingLinkModal(true)}
             className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
           >
             <Link2 className="h-5 w-5 text-primary" />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Tracking</span>
+            <span className="text-[10px] text-gray-700 dark:text-gray-300">Tracking</span>
           </button>
           <button
             onClick={handleQuickReviewToggle}
@@ -856,7 +863,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             title="Tap to toggle review · Long-press for reason"
           >
             <Star className="h-5 w-5" />
-            <span className="text-xs">{job.skip_review_request ? 'No Review' : 'Review'}</span>
+            <span className="text-[10px]">{job.skip_review_request ? 'No Review' : 'Review'}</span>
           </button>
         </div>
 

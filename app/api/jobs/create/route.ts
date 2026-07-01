@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       .from('jobs')
       .insert({
         status: initial_status,
+        status_changed_at: new Date().toISOString(),
         device_summary,
         repair_summary,
         price_total: parseFloat(price_total),

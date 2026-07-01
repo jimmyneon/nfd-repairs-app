@@ -43,6 +43,16 @@ export default function JobsListPageV2() {
     loadUnreadNotifications()
     loadWarrantyTickets()
 
+    // Reload on bfcache restoration (back button)
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        loadJobs()
+        loadUnreadNotifications()
+        loadWarrantyTickets()
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+
     const jobsSubscription = supabase
       .channel('jobs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
@@ -68,6 +78,7 @@ export default function JobsListPageV2() {
       jobsSubscription.unsubscribe()
       notificationsSubscription.unsubscribe()
       warrantySubscription.unsubscribe()
+      window.removeEventListener('pageshow', handlePageShow)
     }
   }, [])
 

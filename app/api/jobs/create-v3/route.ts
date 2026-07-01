@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       status: initial_status || (source === 'staff_manual' 
         ? (device_in_shop ? 'RECEIVED' : 'QUOTE_APPROVED')  // Manual: RECEIVED if in shop, QUOTE_APPROVED if not
         : 'QUOTE_APPROVED'),  // API: always QUOTE_APPROVED (customer has device)
+      status_changed_at: new Date().toISOString(),
       
       // Onboarding fields (if provided from manual creation)
       device_password: device_password || null,

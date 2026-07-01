@@ -29,6 +29,7 @@ export async function POST(
       .from('jobs')
       .update({
         status: 'AWAITING_ARRIVAL',
+        status_changed_at: new Date().toISOString(),
         quote_approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
