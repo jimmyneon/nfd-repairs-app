@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Home, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
@@ -622,9 +622,8 @@ function CreateJobContent() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
-          <Link href="/app/jobs" className="inline-flex items-center text-primary mb-3">
-            <ArrowLeft className="h-6 w-6 mr-2" />
-            <span className="font-bold">Back to Jobs</span>
+          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
+            <Home className="h-5 w-5 text-primary" />
           </Link>
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Job</h1>

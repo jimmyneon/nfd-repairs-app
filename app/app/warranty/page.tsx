@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, AlertTriangle, ArrowLeft, Clock, CheckCircle, Settings, ChevronDown, Bell, MessageSquare, Plus, Shield } from 'lucide-react'
+import { Search, AlertTriangle, Home, Clock, CheckCircle, Settings, ChevronDown, Bell, MessageSquare, Plus, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -167,8 +167,8 @@ export default function WarrantyTicketsPage() {
               <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
                 <Plus className="h-6 w-6" />
               </Link>
-              <Link href="/app/jobs" className="text-gray-600 hover:text-primary" title="Repair Jobs">
-                <Shield className="h-6 w-6" />
+              <Link href="/app/jobs" className="text-gray-600 hover:text-primary" title="Home">
+                <Home className="h-6 w-6" />
               </Link>
               <Link href="/app/templates" className="text-gray-600 hover:text-primary">
                 <MessageSquare className="h-6 w-6" />

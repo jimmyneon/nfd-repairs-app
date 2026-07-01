@@ -84,7 +84,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           filter: `tracking_token=eq.${params.token}`
         },
         (payload) => {
-          console.log('Job updated in real-time:', payload)
           setJob(payload.new)
           setLastUpdated(new Date())
         }
@@ -96,15 +95,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       loadJob()
     }, 30000)
 
-    // Re-render every second to update "Last Updated" timestamp
-    const renderInterval = setInterval(() => {
-      setLastUpdated(prev => prev) // Trigger re-render
-    }, 1000)
-
     return () => {
       supabase.removeChannel(channel)
       clearInterval(pollInterval)
-      clearInterval(renderInterval)
     }
   }, [params.token])
 
@@ -158,26 +151,17 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         
         // If current status is DELAYED, find the previous non-DELAYED status from events
         if (data.status === 'DELAYED' && events.length > 1) {
-          console.log('🔍 Job is DELAYED, searching for previous status in events:', events)
-          // Look through events to find the last non-DELAYED status
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
-            console.log(`Event ${i}:`, message)
-            // Extract status from message like "Status changed to Parts Ordered"
             if (message && !message.includes('Delayed')) {
-              // Try to extract the status from the message
               const statusMatch = message.match(/Status changed to (.+?)(?:\s*-|$)/)
               if (statusMatch) {
                 const statusLabel = statusMatch[1].trim()
-                console.log('Found status label:', statusLabel)
-                // Convert label back to status key
                 const statusKey = Object.entries(JOB_STATUS_LABELS).find(
                   ([key, label]) => label === statusLabel
                 )?.[0]
-                console.log('Converted to status key:', statusKey)
                 if (statusKey && statusKey !== 'DELAYED') {
                   setPreviousStatus(statusKey)
-                  console.log('✅ Set previousStatus to:', statusKey)
                   break
                 }
               }
@@ -345,18 +329,29 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   if (isExpired) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center bg-white rounded-2xl shadow-lg p-8">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto text-center bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="h-8 w-8 text-gray-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Tracking Link Expired</h1>
-          <p className="text-gray-600 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tracking Link Expired</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
             This repair has been completed and the tracking link has expired for privacy and security.
           </p>
-          <p className="text-sm text-gray-500">
-            If you need assistance, please contact us directly.
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            If you need assistance, please contact us:
           </p>
+          <div className="space-y-2">
+            <a href={`tel:${SHOP_INFO.phone}`} className="inline-flex items-center gap-2 text-primary font-semibold">
+              <Phone className="h-4 w-4" />
+              {SHOP_INFO.phone}
+            </a>
+            <br />
+            <a href={`mailto:${SHOP_INFO.email}`} className="inline-flex items-center gap-2 text-primary font-semibold">
+              <Mail className="h-4 w-4" />
+              {SHOP_INFO.email}
+            </a>
+          </div>
         </div>
       </div>
     )
@@ -364,10 +359,10 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Job Not Found</h1>
-          <p className="text-gray-600">This tracking link is invalid or has expired.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h1>
+          <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
         </div>
       </div>
     )
@@ -439,45 +434,29 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   // If status is DELAYED, use the previousStatus from job_events history
   // DELAYED is a modifier status, not a separate step in the timeline
   const getActualStepForDelayed = (): string => {
-    console.log('🔄 getActualStepForDelayed called')
-    console.log('previousStatus:', previousStatus)
-    console.log('statusSteps:', statusSteps)
-    
-    // Use the previousStatus if we found it from job_events
     if (previousStatus && statusSteps.includes(previousStatus)) {
-      console.log('✅ Using previousStatus:', previousStatus)
       return previousStatus
     }
     
-    // Fallback: infer from job data if we couldn't get it from events
     if (job.parts_required || job.deposit_required) {
-      console.log('⚠️ Fallback to PARTS_ORDERED (parts required)')
-      // Most common delay point is during parts ordering
       return 'PARTS_ORDERED'
     }
-    console.log('⚠️ Fallback to IN_REPAIR (no parts)')
-    // If no parts required, we're likely in the repair phase
     return 'IN_REPAIR'
   }
 
   const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed() : job.status
   const currentStepIndex = statusSteps.indexOf(displayStatus)
   
-  console.log('📊 Timeline Debug:')
-  console.log('Job status:', job.status)
-  console.log('Display status:', displayStatus)
-  console.log('Current step index:', currentStepIndex)
-  console.log('Status steps:', statusSteps)
-  
   // Safety check: if displayStatus is not in statusSteps, something is wrong
   if (currentStepIndex === -1) {
-    console.error('❌ TIMELINE ERROR: displayStatus not found in statusSteps!')
-    console.error('This means the job status is:', job.status)
-    console.error('And we tried to display:', displayStatus)
-    console.error('But statusSteps only contains:', statusSteps)
-    console.error('Parts required:', job.parts_required)
-    console.error('Deposit required:', job.deposit_required)
-    console.error('Source:', job.source)
+    console.error('Timeline error: displayStatus not found in statusSteps', {
+      jobStatus: job.status,
+      displayStatus,
+      statusSteps,
+      partsRequired: job.parts_required,
+      depositRequired: job.deposit_required,
+      source: job.source
+    })
   }
 
   return (
@@ -487,8 +466,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
             <Package className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{SHOP_INFO.name}</h1>
-          <p className="text-gray-600">Repair Tracking</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{SHOP_INFO.name}</h1>
+          <p className="text-gray-600 dark:text-gray-400">Repair Tracking</p>
         </div>
       </header>
 
@@ -599,16 +578,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <div className="space-y-4">
               <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">📍 Location</p>
-                <p className="text-base font-bold text-gray-900 dark:text-white">NFD Repairs</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">Unit 4, Newfield Drive Industrial Estate</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">Newfield Drive, Stonehouse</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">Larkhall ML9 2YR</p>
+                <p className="text-base font-bold text-gray-900 dark:text-white">{SHOP_INFO.name}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{SHOP_INFO.address}</p>
               </div>
 
               <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🕐 Opening Hours</p>
                 <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                  <p><span className="font-semibold">Mon-Fri:</span> 9am-5pm</p>
+                  <p><span className="font-semibold">Mon-Fri:</span> 9am-5:30pm</p>
                   <p><span className="font-semibold">Sat:</span> 10am-2pm</p>
                   <p><span className="font-semibold">Sun:</span> Closed</p>
                 </div>
@@ -838,12 +815,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         </a>
       </main>
-
-      <footer className="bg-gray-900 text-white mt-12">
-        <div className="max-w-2xl mx-auto px-4 py-6 text-center text-sm text-gray-400">
-          <p>© {new Date().getFullYear()} {SHOP_INFO.name}. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   )
 }

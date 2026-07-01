@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Save, Loader2, Link as LinkIcon, Star } from 'lucide-react'
+import { ArrowLeft, Home, Save, Loader2, Link as LinkIcon, Star } from 'lucide-react'
 import Link from 'next/link'
 
 interface AdminSetting {
@@ -165,9 +165,8 @@ export default function AdminSettingsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
-          <Link href="/app/settings" className="inline-flex items-center text-primary mb-3">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Settings
+          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
+            <Home className="h-5 w-5 text-primary" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Settings</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

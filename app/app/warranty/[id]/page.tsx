@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle } from 'lucide-react'
+import { Home, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -213,9 +213,8 @@ export default function WarrantyTicketDetailPage({ params }: { params: { id: str
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
-          <Link href="/app/warranty" className="inline-flex items-center text-primary mb-3">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Warranty Tickets
+          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
+            <Home className="h-5 w-5 text-primary" />
           </Link>
           <div className="flex items-center justify-between">
             <div>

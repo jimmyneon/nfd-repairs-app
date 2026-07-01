@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Home, Save, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -173,9 +173,8 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
-          <Link href={`/app/jobs/${params.id}`} className="inline-flex items-center text-primary mb-3">
-            <ArrowLeft className="h-6 w-6 mr-2" />
-            <span className="font-bold">Back to Job</span>
+          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
+            <Home className="h-5 w-5 text-primary" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Job Details</h1>
         </div>

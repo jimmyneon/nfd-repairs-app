@@ -181,8 +181,8 @@ export default function EnquiriesPage() {
                   {pendingCount} pending
                 </div>
               )}
-              <Link href="/app/jobs" className="text-gray-600 hover:text-gray-900">
-                Back to Jobs
+              <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+                <Home className="h-5 w-5 text-primary" />
               </Link>
             </div>
           </div>
