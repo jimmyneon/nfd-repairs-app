@@ -60,7 +60,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
   }
 
   const insertSignOff = () => {
-    insertText('Many thanks,\nJohn')
+    insertText('Many thanks,\nJohn\nNew Forest Device Repairs')
   }
 
   const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'

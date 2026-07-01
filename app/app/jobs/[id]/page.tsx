@@ -1756,7 +1756,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         onClose={() => setActivePanel(null)}
         title="Customer Notes"
         icon={<StickyNote className="h-5 w-5 text-primary" />}
-        minHeight="50vh"
+        minHeight="60vh"
       >
         <CustomerNotesEditor job={job} onUpdate={loadJobData} />
       </SlideUpPanel>
