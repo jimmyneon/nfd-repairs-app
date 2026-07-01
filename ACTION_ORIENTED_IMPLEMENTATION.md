@@ -12,13 +12,13 @@ This implementation transforms the job management system from **status-centric**
 
 **New Fields Added:**
 - `status_changed_at` - Tracks when status last changed (for time-in-status calculations)
-- `tracking_link_expires_at` - When tracking link expires (30 days after closure)
+- `tracking_link_expires_at` - When tracking link expires (14 days after closure)
 - `parts_ordered_at` - When parts were ordered
 - `parts_expected_at` - Expected arrival date for parts
 
 **Triggers Created:**
 1. `update_status_timestamp()` - Auto-updates `status_changed_at` when status changes
-2. `set_tracking_expiration()` - Sets expiration 30 days after job closure
+2. `set_tracking_expiration()` - Sets expiration 14 days after job closure
 3. `track_parts_ordered()` - Tracks parts ordering timestamp and sets 3-day ETA
 
 **View Created:**

@@ -35,9 +35,9 @@ CREATE TRIGGER jobs_status_timestamp
 CREATE OR REPLACE FUNCTION set_tracking_expiration()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Set expiration to 30 days after closure
+    -- Set expiration to 14 days after closure
     IF OLD.closed_at IS NULL AND NEW.closed_at IS NOT NULL THEN
-        NEW.tracking_link_expires_at := NEW.closed_at + INTERVAL '30 days';
+        NEW.tracking_link_expires_at := NEW.closed_at + INTERVAL '14 days';
     END IF;
     RETURN NEW;
 END;
@@ -85,13 +85,13 @@ WHERE status = 'PARTS_ORDERED'
 
 -- Set expiration for already closed jobs
 UPDATE jobs
-SET tracking_link_expires_at = closed_at + INTERVAL '30 days'
+SET tracking_link_expires_at = closed_at + INTERVAL '14 days'
 WHERE closed_at IS NOT NULL 
   AND tracking_link_expires_at IS NULL;
 
 -- Add helpful comments
 COMMENT ON COLUMN jobs.status_changed_at IS 'Timestamp when status last changed - used to calculate time in current status';
-COMMENT ON COLUMN jobs.tracking_link_expires_at IS 'When the tracking link expires (30 days after job closure)';
+COMMENT ON COLUMN jobs.tracking_link_expires_at IS 'When the tracking link expires (14 days after job closure)';
 COMMENT ON COLUMN jobs.parts_ordered_at IS 'Timestamp when parts were ordered';
 COMMENT ON COLUMN jobs.parts_expected_at IS 'Expected arrival date for ordered parts';
 
