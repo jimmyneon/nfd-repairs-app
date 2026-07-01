@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Mail, MessageSquare, Save, Loader2, Bell, Send } from 'lucide-react'
+import { ArrowLeft, Home, Mail, MessageSquare, Save, Loader2, Bell, Send, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { 
   registerServiceWorker, 
@@ -208,9 +208,14 @@ export default function NotificationSettingsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
-          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
-            <Home className="h-5 w-5 text-primary" />
-          </Link>
+          <div className="flex items-center gap-2 mb-3">
+            <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+              <Home className="h-5 w-5 text-primary" />
+            </Link>
+            <Link href="/app/jobs/create" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Create New Job">
+              <Plus className="h-5 w-5 text-primary" />
+            </Link>
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notification Settings</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Control which notifications are sent for each status change

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Bell, Mail, Home, Code, Clock, CheckCircle, XCircle, MessageSquare, ChevronDown } from 'lucide-react'
+import { Search, Bell, Mail, Home, Code, Clock, CheckCircle, XCircle, MessageSquare, ChevronDown, Plus } from 'lucide-react'
 import Link from 'next/link'
 
 interface Enquiry {
@@ -181,9 +181,14 @@ export default function EnquiriesPage() {
                   {pendingCount} pending
                 </div>
               )}
-              <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
-                <Home className="h-5 w-5 text-primary" />
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+                  <Home className="h-5 w-5 text-primary" />
+                </Link>
+                <Link href="/app/jobs/create" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Create New Job">
+                  <Plus className="h-5 w-5 text-primary" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>

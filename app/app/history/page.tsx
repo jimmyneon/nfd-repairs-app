@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { Search, ArrowLeft, Calendar, DollarSign, User, Smartphone } from 'lucide-react'
+import { Search, ArrowLeft, Calendar, DollarSign, User, Smartphone, Home, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -114,6 +114,12 @@ export default function JobHistoryPage() {
                 <ArrowLeft className="h-6 w-6" />
               </button>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Job History</h1>
+              <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+                <Home className="h-5 w-5 text-primary" />
+              </Link>
+              <Link href="/app/jobs/create" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Create New Job">
+                <Plus className="h-5 w-5 text-primary" />
+              </Link>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {filteredJobs.length} {filteredJobs.length === 1 ? 'job' : 'jobs'}

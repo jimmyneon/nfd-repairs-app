@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
-import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle } from 'lucide-react'
+import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, MessageSquare } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
@@ -329,27 +329,51 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   if (isExpired) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-md mx-auto text-center bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Package className="h-8 w-8 text-gray-400" />
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="h-8 w-8 text-gray-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tracking Link Expired</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              This repair has been completed and the tracking link has expired for privacy and security.
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tracking Link Expired</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            This repair has been completed and the tracking link has expired for privacy and security.
-          </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            If you need assistance, please contact us:
-          </p>
-          <div className="space-y-2">
-            <a href={`tel:${SHOP_INFO.phone}`} className="inline-flex items-center gap-2 text-primary font-semibold">
-              <Phone className="h-4 w-4" />
-              {SHOP_INFO.phone}
+
+          <a
+            href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
+          >
+            <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
+            <p className="text-white/90 text-sm mb-3">Start a new repair request online</p>
+            <div className="inline-flex items-center text-white font-bold">
+              <span>www.newforestdevicerepairs.co.uk</span>
+            </div>
+          </a>
+
+          <div className="mt-4 flex gap-3">
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 text-center transition-all active:scale-95"
+            >
+              <MapPin className="h-6 w-6 text-primary mx-auto mb-1" />
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Find Us</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Location & directions</p>
             </a>
-            <br />
-            <a href={`mailto:${SHOP_INFO.email}`} className="inline-flex items-center gap-2 text-primary font-semibold">
-              <Mail className="h-4 w-4" />
-              {SHOP_INFO.email}
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 text-center transition-all active:scale-95"
+            >
+              <Clock className="h-6 w-6 text-primary mx-auto mb-1" />
+              <p className="text-sm font-bold text-gray-900 dark:text-white">Opening Hours</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">View on Google</p>
             </a>
           </div>
         </div>
@@ -359,10 +383,21 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h1>
-          <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h1>
+            <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
+          </div>
+          <a
+            href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
+          >
+            <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
+            <p className="text-white/90 text-sm">Start a new repair request online</p>
+          </a>
         </div>
       </div>
     )
@@ -801,19 +836,51 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           )}
         </div>
 
-        {/* SECONDARY: Website Link */}
-        <a 
-          href="https://www.newforestdevicerepairs.co.uk/start"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
-        >
-          <p className="text-white font-black text-xl mb-2">Need Help?</p>
-          <p className="text-white/90 text-sm mb-3">Visit our website for more information</p>
-          <div className="inline-flex items-center text-white font-bold">
-            <span>www.newforestdevicerepairs.co.uk/start</span>
+        {/* SECONDARY: Business Card - Need Help */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-primary to-primary/90 p-6 text-center">
+            <p className="text-white font-black text-2xl mb-1">Need Help?</p>
+            <p className="text-white/90 text-sm">{SHOP_INFO.name}</p>
           </div>
-        </a>
+          <div className="p-6 space-y-3">
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              <MapPin className="h-6 w-6 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white text-sm">Find Us</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Location & directions on Google Maps</p>
+              </div>
+            </a>
+            <a
+              href={SHOP_INFO.google_maps_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              <Clock className="h-6 w-6 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white text-sm">Opening Hours</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">View on Google</p>
+              </div>
+            </a>
+            <a
+              href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/90 rounded-xl p-4 transition-all active:scale-95 hover:from-primary/90 hover:to-primary"
+            >
+              <Smartphone className="h-6 w-6 text-white flex-shrink-0" />
+              <div>
+                <p className="font-bold text-white text-sm">Start a New Repair</p>
+                <p className="text-xs text-white/80">www.newforestdevicerepairs.co.uk</p>
+              </div>
+            </a>
+          </div>
+        </div>
       </main>
     </div>
   )

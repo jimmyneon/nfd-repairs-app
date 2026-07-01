@@ -43,14 +43,16 @@ export default function JobsListPageV2() {
     loadUnreadNotifications()
     loadWarrantyTickets()
 
-    // Reload on bfcache restoration (back button) - always reload, not just persisted
-    const handlePageShow = () => {
+    // Reload on bfcache restoration (back button) - show loading state during reload
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setLoading(true)
+      }
       loadJobs()
       loadUnreadNotifications()
       loadWarrantyTickets()
     }
     window.addEventListener('pageshow', handlePageShow)
-    window.addEventListener('focus', handlePageShow)
 
     const jobsSubscription = supabase
       .channel('jobs-changes')
@@ -78,7 +80,6 @@ export default function JobsListPageV2() {
       notificationsSubscription.unsubscribe()
       warrantySubscription.unsubscribe()
       window.removeEventListener('pageshow', handlePageShow)
-      window.removeEventListener('focus', handlePageShow)
     }
   }, [])
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -318,7 +318,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     // Queue SMS for status change (unless overridden)
     if (!overrideSMS) {
       try {
-        console.log('🔔 Queueing SMS for status:', pendingWorkflowStatus)
         const response = await fetch('/api/jobs/queue-status-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -327,7 +326,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             status: pendingWorkflowStatus,
           }),
         })
-        console.log('SMS queue response:', response.status, response.ok)
         if (!response.ok) {
           const error = await response.text()
           console.error('SMS queue failed:', error)
@@ -335,16 +333,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       } catch (error) {
         console.error('Failed to queue status SMS:', error)
       }
-    } else {
-      console.log('⏭️ SMS skipped by user override')
     }
 
     // Send email notification (unless overridden)
     if (!overrideEmail) {
-      console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
       if (job.customer_email) {
         try {
-          console.log('📧 Calling email API for workflow status change...')
           const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -353,16 +347,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               type: 'STATUS_UPDATE',
             }),
           })
-          const emailResult = await emailResponse.json()
-          console.log('📧 Email API response:', emailResponse.status, emailResult)
+          await emailResponse.json()
         } catch (error) {
-          console.error('❌ Failed to send email:', error)
+          console.error('Failed to send email:', error)
         }
-      } else {
-        console.log('⚠️ No customer email - skipping email notification')
       }
-    } else {
-      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -434,8 +423,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       } catch (error) {
         console.error('Failed to queue delay SMS:', error)
       }
-    } else {
-      console.log('⏭️ SMS skipped by user override')
     }
 
     // Send email notification (unless overridden)
@@ -454,8 +441,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           console.error('Failed to send delay email:', error)
         }
       }
-    } else {
-      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -528,8 +513,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       } catch (error) {
         console.error('Failed to queue cancellation SMS:', error)
       }
-    } else {
-      console.log('⏭️ SMS skipped by user override')
     }
 
     // Send email notification (unless overridden)
@@ -548,8 +531,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           console.error('Failed to send cancellation email:', error)
         }
       }
-    } else {
-      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -601,7 +582,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     // Queue SMS for status change (unless overridden) - use parameter directly
     if (!overrideSMSParam) {
       try {
-        console.log('🔔 Queueing SMS for status:', newStatus)
         const response = await fetch('/api/jobs/queue-status-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -610,7 +590,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             status: newStatus,
           }),
         })
-        console.log('SMS queue response:', response.status, response.ok)
         if (!response.ok) {
           const error = await response.text()
           console.error('SMS queue failed:', error)
@@ -618,16 +597,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       } catch (error) {
         console.error('Failed to queue status SMS:', error)
       }
-    } else {
-      console.log('⏭️ SMS skipped by user override')
     }
 
     // Send email notification (unless overridden) - use parameter directly
     if (!overrideEmailParam) {
-      console.log('📧 Checking email for job:', job.job_ref, 'Email:', job.customer_email)
       if (job.customer_email) {
         try {
-          console.log('📧 Calling email API for manual status change...')
           const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -636,16 +611,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               type: 'STATUS_UPDATE',
             }),
           })
-          const emailResult = await emailResponse.json()
-          console.log('📧 Email API response:', emailResponse.status, emailResult)
+          await emailResponse.json()
         } catch (error) {
-          console.error('❌ Failed to send email:', error)
+          console.error('Failed to send email:', error)
         }
-      } else {
-        console.log('⚠️ No customer email - skipping email notification')
       }
-    } else {
-      console.log('⏭️ Email skipped by user override')
     }
 
     await loadJobData()
@@ -710,9 +680,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
-          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
-            <Home className="h-5 w-5 text-primary" />
-          </Link>
+          <div className="flex items-center gap-2 mb-3">
+            <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+              <Home className="h-5 w-5 text-primary" />
+            </Link>
+            <Link href="/app/jobs/create" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Create New Job">
+              <Plus className="h-5 w-5 text-primary" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -1188,11 +1163,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {/* Manual Status Change Buttons */}
-            <div className="pt-4 border-t-2 border-gray-300">
-              <p className="text-sm text-gray-600 mb-3 font-bold">Need to change status manually?</p>
+            <div className="pt-4 border-t-2 border-gray-300 dark:border-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 font-bold">Need to change status manually?</p>
               <div className="grid grid-cols-2 gap-4">
                 <button
-                  onClick={() => setShowStatusSelector(true)}
+                  onClick={() => setShowQuickActions(true)}
                   disabled={actionLoading}
                   className="bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95"
                 >
@@ -1200,7 +1175,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 </button>
                 <button
                   onClick={() => router.push('/app/jobs')}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-900 font-black py-6 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95"
+                  className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-black py-6 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95"
                 >
                   Cancel
                 </button>
@@ -1234,19 +1209,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         {showSimpleConfirm && pendingWorkflowStatus && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-              <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Status Change</h2>
-              <p className="text-gray-700 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">Confirm Status Change</h2>
+              <p className="text-gray-700 dark:text-gray-300 mb-4">
                 Change status to <span className="font-bold text-primary">{JOB_STATUS_LABELS[pendingWorkflowStatus]}</span>?
               </p>
               
               {/* Notification Warning */}
               {(willSendSMS || willSendEmail) && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
                   <div className="flex items-start space-x-3">
-                    <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-blue-900 mb-2">Notifications Will Be Sent</p>
+                      <p className="text-sm font-bold text-blue-900 dark:text-blue-200 mb-2">Notifications Will Be Sent</p>
                       <div className="space-y-2">
                         {willSendSMS && (
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -1256,7 +1231,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                               onChange={(e) => setOverrideSMS(!e.target.checked)}
                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <span className="text-xs text-blue-900">
+                            <span className="text-xs text-blue-900 dark:text-blue-200">
                               <span className="font-semibold">SMS</span> - Customer will receive a text message
                             </span>
                           </label>
@@ -1269,13 +1244,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                               onChange={(e) => setOverrideEmail(!e.target.checked)}
                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                             />
-                            <span className="text-xs text-blue-900">
+                            <span className="text-xs text-blue-900 dark:text-blue-200">
                               <span className="font-semibold">Email</span> - Customer will receive an email
                             </span>
                           </label>
                         )}
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">Uncheck to skip sending that notification</p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Uncheck to skip sending that notification</p>
                     </div>
                   </div>
                 </div>
@@ -1287,7 +1262,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     setShowSimpleConfirm(false)
                     setPendingWorkflowStatus(null)
                   }}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-bold py-4 px-6 rounded-xl transition-colors"
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
