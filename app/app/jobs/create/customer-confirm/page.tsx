@@ -27,9 +27,11 @@ function CustomerConfirmContent() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [showValidationSummary, setShowValidationSummary] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
+  const [editingField, setEditingField] = useState<string | null>(null)
 
   const passcodeRequired = jobData.passcode_requirement !== 'not_required'
   const totalSteps = passcodeRequired ? 5 : 4 // name, phone, email, [passcode], summary
+  const summaryStep = passcodeRequired ? 4 : 3
 
   // Load customer data from quote conversion if available
   useEffect(() => {
@@ -41,8 +43,11 @@ function CustomerConfirmContent() {
           setCustomerName(data.customer_name || '')
           setCustomerPhone(data.customer_phone || '')
           setCustomerEmail(data.customer_email || '')
-          // Clear the data after loading
           sessionStorage.removeItem('quote_customer_data')
+          // Skip straight to summary if we have name + phone from quote
+          if (data.customer_name && data.customer_phone) {
+            setCurrentStep(summaryStep)
+          }
         } catch (error) {
           console.error('Failed to load quote customer data:', error)
         }
@@ -534,28 +539,100 @@ function CustomerConfirmContent() {
         )}
 
         {/* Final Step: Summary + Terms + Confirm */}
-        {currentStep === (passcodeRequired ? 4 : 3) && (
+        {currentStep === summaryStep && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Please check your details</h2>
             <div className="space-y-3 mb-6">
-              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Name</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Phone</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{customerPhone}</span>
-              </div>
-              {customerEmail && (
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Email</span>
-                  <span className="font-semibold text-gray-900 dark:text-white text-right truncate ml-2">{customerEmail}</span>
+              {/* Name - inline editable */}
+              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Name</span>
+                  {editingField !== 'name' ? (
+                    <button onClick={() => setEditingField('name')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
+                      {customerName || 'Tap to add'} {customerName && <span className="text-xs text-primary ml-1">Edit</span>}
+                    </button>
+                  ) : (
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      onBlur={() => setEditingField(null)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
+                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700"
+                      autoFocus
+                    />
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Phone - inline editable */}
+              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Phone</span>
+                  {editingField !== 'phone' ? (
+                    <button onClick={() => setEditingField('phone')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
+                      {customerPhone || 'Tap to add'} {customerPhone && <span className="text-xs text-primary ml-1">Edit</span>}
+                    </button>
+                  ) : (
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onBlur={() => setEditingField(null)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
+                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Email - inline editable */}
+              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Email</span>
+                  {editingField !== 'email' ? (
+                    <button onClick={() => setEditingField('email')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors text-right truncate ml-2">
+                      {customerEmail || 'Tap to add'} {customerEmail && <span className="text-xs text-primary ml-1">Edit</span>}
+                    </button>
+                  ) : (
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      onBlur={() => setEditingField(null)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
+                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700 w-48"
+                      autoFocus
+                    />
+                  )}
+                </div>
+              </div>
               {passcodeRequired && (
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Passcode</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{passcodeMethod === 'send_link' ? 'Link to be sent' : devicePassword ? 'Provided' : 'Not set'}</span>
+                <div className="py-2 border-b border-gray-100 dark:border-gray-700">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Passcode</span>
+                    {editingField !== 'passcode' ? (
+                      <button onClick={() => setEditingField('passcode')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
+                        {passcodeMethod === 'send_link' ? 'Link to be sent' : devicePassword ? 'Provided' : 'Not set'} <span className="text-xs text-primary ml-1">Edit</span>
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-2 items-end">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="radio" name="passcode_summary" checked={passcodeMethod === 'provided'} onChange={() => { setPasscodeMethod('provided'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
+                          <span>Provide now</span>
+                        </label>
+                        {passcodeMethod === 'provided' && (
+                          <input type={showPassword ? "text" : "password"} value={devicePassword} onChange={(e) => setDevicePassword(e.target.value)} className="border-2 border-primary rounded-lg px-2 py-1 text-right focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono" placeholder="Enter passcode" autoFocus />
+                        )}
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="radio" name="passcode_summary" checked={passcodeMethod === 'send_link'} onChange={() => { setPasscodeMethod('send_link'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
+                          <span>Send link later</span>
+                        </label>
+                        <button onClick={() => setEditingField(null)} className="text-xs text-primary font-semibold">Done</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
