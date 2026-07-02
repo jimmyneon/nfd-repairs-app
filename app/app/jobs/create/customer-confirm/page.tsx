@@ -352,7 +352,7 @@ function CustomerConfirmContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-4 max-w-2xl">
+      <div className="container mx-auto px-4 py-4 max-w-4xl">
 
         {/* Progress dots */}
         <div className="flex items-center justify-center gap-2 mb-4">
@@ -370,9 +370,9 @@ function CustomerConfirmContent() {
           ))}
         </div>
 
-        {/* Device summary banner */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-3 mb-4 flex items-center gap-3">
-          <Smartphone className="h-6 w-6 text-primary flex-shrink-0" />
+        {/* Mobile device banner — compact, only on small screens */}
+        <div className="md:hidden bg-white dark:bg-gray-800 rounded-xl shadow p-3 mb-4 flex items-center gap-3">
+          <Smartphone className="h-5 w-5 text-primary flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
               {jobData.device_make} {jobData.device_model}
@@ -380,9 +380,13 @@ function CustomerConfirmContent() {
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{jobData.issue}</p>
           </div>
           {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
-            <p className="font-bold text-primary text-lg flex-shrink-0">£{parseFloat(jobData.price_total).toFixed(2)}</p>
+            <p className="font-bold text-primary text-base flex-shrink-0">£{parseFloat(jobData.price_total).toFixed(2)}</p>
           )}
         </div>
+
+        <div className="flex gap-4 items-start">
+          {/* Main wizard column */}
+          <div className="flex-1 min-w-0 max-w-2xl mx-auto w-full">
 
         {/* Step 0: Full Name */}
         {currentStep === 0 && (
@@ -646,6 +650,43 @@ function CustomerConfirmContent() {
             </div>
           </div>
         )}
+
+          </div>
+
+          {/* Device info sidebar — right side on md+, hidden on mobile */}
+          <div className="hidden md:block w-72 flex-shrink-0">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 sticky top-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Smartphone className="h-6 w-6 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-base text-gray-900 dark:text-white leading-tight">
+                    {jobData.device_make} {jobData.device_model}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Issue</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{jobData.issue}</p>
+                </div>
+                {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Price</p>
+                    <p className="text-2xl font-black text-primary">£{parseFloat(jobData.price_total).toFixed(2)}</p>
+                  </div>
+                )}
+                {jobData.requires_parts_order && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2 text-xs text-yellow-900 dark:text-yellow-100">
+                    £20 deposit needed for parts
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
 
       </div>
 
