@@ -792,10 +792,23 @@ function CustomerConfirmContent() {
       />
 
       <FormGuideOverlay
-        fields={[
-          { id: 'step-1', filled: customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted) },
-          { id: 'step-2', filled: passcodeMethod === 'send_link' || passwordNA || devicePassword.trim() || jobData.passcode_requirement === 'not_required' },
-          { id: 'terms-section', filled: repairAgreementAccepted && termsAccepted },
+        steps={[
+          {
+            id: 'step-1',
+            label: 'Enter your name, phone and email',
+            filled: customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted),
+            focusSelector: 'input[type="text"]',
+          },
+          {
+            id: 'step-2',
+            label: 'Provide your device passcode',
+            filled: passcodeMethod === 'send_link' || passwordNA || devicePassword.trim() || jobData.passcode_requirement === 'not_required',
+          },
+          {
+            id: 'terms-section',
+            label: 'Accept the repair terms to continue',
+            filled: repairAgreementAccepted && termsAccepted,
+          },
         ]}
         submitReady={customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted) && repairAgreementAccepted && termsAccepted}
       />
