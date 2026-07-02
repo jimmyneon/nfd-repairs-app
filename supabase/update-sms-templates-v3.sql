@@ -134,10 +134,10 @@ Many thanks,
 New Forest Device Repairs'
 WHERE key = 'COMPLETED';
 
--- READY_TO_COLLECT - Ready for pickup, include price (price line stripped if £0)
+-- READY_TO_COLLECT - Ready for pickup, price/deposit/balance lines auto-stripped when empty
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
-The total is £{price_total}.
+Total to pay: £{price_total}.
 Deposit paid: £{deposit_paid}.
 Balance to pay: £{balance_remaining}.
 

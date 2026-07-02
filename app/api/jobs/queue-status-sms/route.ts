@@ -156,10 +156,11 @@ export async function POST(request: NextRequest) {
     const includePrice = hasValidPrice && sendPriceInSms !== false && !job.payment_received
     const priceValue = includePrice ? job.price_total!.toString() : ''
 
-    // Calculate balance remaining after deposit
+    // Calculate balance remaining after deposit (empty if 0 or already fully paid)
     const depositAmount = job.deposit_received ? parseFloat((job.deposit_amount || 0).toString()) : 0
     const totalPrice = parseFloat((job.price_total || 0).toString())
-    const balanceRemaining = totalPrice > 0 ? (totalPrice - depositAmount).toFixed(2) : ''
+    const balanceNum = totalPrice > 0 ? totalPrice - depositAmount : 0
+    const balanceRemaining = balanceNum > 0 ? balanceNum.toFixed(2) : ''
     const depositPaidStr = job.deposit_received && depositAmount > 0 ? depositAmount.toFixed(2) : ''
 
     let smsBody = renderSmsTemplate(template.body, {

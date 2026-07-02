@@ -24,5 +24,27 @@ export function renderSmsTemplate(
     result = result.replaceAll(`{${key}}`, value)
   }
 
+  // Strip lines where a variable resolved to empty — removes "Deposit paid: £." etc.
+  // Also collapses multiple blank lines left behind
+  result = result
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim()
+      // Keep blank lines (they'll be collapsed next)
+      if (trimmed === '') return true
+      // Strip lines that end with "£." or "£ ." (variable was empty after £ prefix)
+      if (/£\s*\.\s*$/.test(trimmed)) return false
+      // Strip lines that are just a label + empty variable (e.g. "Balance to pay: .")
+      if (/[a-zA-Z\s]+:\s*\.\s*$/.test(trimmed)) return false
+      // Strip lines that are just a label + empty (e.g. "Deposit paid: ")
+      if (/[a-zA-Z\s]+:\s*$/.test(trimmed) && !trimmed.includes('http')) return false
+      return true
+    })
+    .join('\n')
+    // Collapse 3+ consecutive newlines to 2 (preserve paragraph breaks)
+    .replace(/\n{3,}/g, '\n\n')
+    // Trim leading/trailing whitespace
+    .trim()
+
   return result
 }
