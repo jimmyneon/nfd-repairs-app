@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown } from 'lucide-react'
 import FormErrorToast from '@/components/FormErrorToast'
-import FormGuideOverlay from '@/components/FormGuideOverlay'
 
 function CustomerConfirmContent() {
   const router = useRouter()
@@ -27,6 +26,10 @@ function CustomerConfirmContent() {
   const [phoneError, setPhoneError] = useState('')
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [showValidationSummary, setShowValidationSummary] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+
+  const passcodeRequired = jobData.passcode_requirement !== 'not_required'
+  const totalSteps = passcodeRequired ? 5 : 4 // name, phone, email, [passcode], summary
 
   // Load customer data from quote conversion if available
   useEffect(() => {
@@ -65,13 +68,43 @@ function CustomerConfirmContent() {
   const isSmallDevice = ['phone', 'tablet', 'watch'].includes(jobData.device_type)
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
 
-  // No auto-scroll - customer controls their own navigation on tablet
-
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Wizard navigation
+  const goNext = () => {
+    // Validate current step before proceeding
+    if (currentStep === 0 && !customerName.trim()) {
+      setValidationErrors({ customerName: 'Please enter your full name' })
+      setShowValidationSummary(true)
+      return
     }
+    if (currentStep === 1) {
+      if (!customerPhone.trim()) {
+        setValidationErrors({ customerPhone: 'Please enter your mobile phone number' })
+        setShowValidationSummary(true)
+        return
+      }
+      if (isLandline && !landlineAccepted) {
+        setValidationErrors({ landline: 'Please accept the landline charge or use a mobile number' })
+        setShowValidationSummary(true)
+        return
+      }
+    }
+    if (currentStep === 2 && isForeignNumber && !customerEmail.trim()) {
+      setValidationErrors({ customerEmail: 'Foreign phone numbers need an email for updates' })
+      setShowValidationSummary(true)
+      return
+    }
+
+    setValidationErrors({})
+    setShowValidationSummary(false)
+    setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const goBack = () => {
+    setValidationErrors({})
+    setShowValidationSummary(false)
+    setCurrentStep(prev => Math.max(prev - 1, 0))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleSubmit = async () => {
@@ -277,540 +310,307 @@ function CustomerConfirmContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 max-w-7xl mx-auto">
-          
-          {/* Left: Customer Form */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Step 1: Your Details */}
-            <div id="step-1" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
-                  1
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Your Details</h2>
+      <div className="container mx-auto px-4 py-4 max-w-2xl">
+
+        {/* Progress dots */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          {Array.from({ length: totalSteps }).map((_, i) => (
+            <div
+              key={i}
+              className={`h-2.5 rounded-full transition-all duration-300 ${
+                i === currentStep
+                  ? 'bg-primary w-12'
+                  : i < currentStep
+                    ? 'bg-primary w-6'
+                    : 'bg-gray-300 dark:bg-gray-600 w-6'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Device summary banner */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-3 mb-4 flex items-center gap-3">
+          <Smartphone className="h-6 w-6 text-primary flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+              {jobData.device_make} {jobData.device_model}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{jobData.issue}</p>
+          </div>
+          {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+            <p className="font-bold text-primary text-lg flex-shrink-0">£{parseFloat(jobData.price_total).toFixed(2)}</p>
+          )}
+        </div>
+
+        {/* Step 0: Full Name */}
+        {currentStep === 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              What's your full name?
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              We need this for your repair booking
+            </p>
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value)
+                if (validationErrors.customerName) {
+                  setValidationErrors({})
+                  setShowValidationSummary(false)
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goNext() }}
+              className={`w-full px-4 py-4 text-xl border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                validationErrors.customerName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+              }`}
+              placeholder="Enter your full name"
+              autoFocus
+            />
+            {validationErrors.customerName && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.customerName}
+              </p>
+            )}
+            <button
+              onClick={goNext}
+              className="w-full mt-6 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
+            >
+              Next
+              <ChevronDown className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Step 1: Phone Number */}
+        {currentStep === 1 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              What's your mobile number?
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              We'll text you updates about your repair
+            </p>
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => {
+                const phone = e.target.value
+                setCustomerPhone(phone)
+                setPhoneError('')
+                setValidationErrors({})
+                setShowValidationSummary(false)
+                const cleanPhone = phone.replace(/[\s\-()]/g, '')
+                if (cleanPhone.length > 0) {
+                  let isUKNumber = false
+                  if (cleanPhone.startsWith('+44') || cleanPhone.startsWith('0044')) isUKNumber = true
+                  else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) isUKNumber = true
+                  else if (cleanPhone.startsWith('0') && !cleanPhone.startsWith('00')) isUKNumber = true
+                  if (!isUKNumber && (cleanPhone.startsWith('+') || cleanPhone.startsWith('00'))) {
+                    setIsForeignNumber(true); setIsLandline(false); setLandlineAccepted(false)
+                  } else if (isUKNumber) {
+                    setIsForeignNumber(false)
+                    let normalizedPhone = cleanPhone
+                    if (cleanPhone.startsWith('+44')) normalizedPhone = '0' + cleanPhone.substring(3)
+                    else if (cleanPhone.startsWith('0044')) normalizedPhone = '0' + cleanPhone.substring(4)
+                    else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) normalizedPhone = '0' + cleanPhone.substring(2)
+                    const isLandlineNumber = /^0[123]/.test(normalizedPhone)
+                    setIsLandline(isLandlineNumber)
+                    if (!isLandlineNumber) setLandlineAccepted(false)
+                    if (normalizedPhone.length > 0 && normalizedPhone.length !== 11) setPhoneError('UK phone numbers must be 11 digits')
+                  }
+                } else {
+                  setIsForeignNumber(false); setIsLandline(false); setLandlineAccepted(false)
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goNext() }}
+              className={`w-full px-4 py-4 text-xl border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                validationErrors.customerPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+              }`}
+              placeholder="07410 123 456"
+              autoFocus
+            />
+            {validationErrors.customerPhone && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.customerPhone}
+              </p>
+            )}
+            {phoneError && <p className="text-sm text-red-600 dark:text-red-400 mt-2">{phoneError}</p>}
+            {isForeignNumber && (
+              <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
+                <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-1">Foreign Number Detected</p>
+                <p className="text-xs text-orange-800 dark:text-orange-200">We can only send SMS to UK numbers. You'll need to provide an email on the next step.</p>
               </div>
+            )}
+            {isLandline && (
+              <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
+                <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-1">Landline Number Detected</p>
+                <p className="text-xs text-orange-800 dark:text-orange-200 mb-3">Landline numbers require manual phone calls which take more time.</p>
+                <label className="flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg">
+                  <input type="checkbox" checked={landlineAccepted} onChange={(e) => setLandlineAccepted(e.target.checked)} className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-gray-900 dark:text-white">I understand there is an additional £20 charge for using a landline number.</span>
+                </label>
+              </div>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
+              <button onClick={goNext} className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2">Next <ChevronDown className="h-5 w-5" /></button>
+            </div>
+          </div>
+        )}
 
-              <div className="space-y-4">
-                <div data-field="customerName">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => {
-                      setCustomerName(e.target.value)
-                      if (validationErrors.customerName) {
-                        setValidationErrors(prev => { const n = {...prev}; delete n.customerName; return n })
-                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && customerName.trim()) {
-                        e.preventDefault()
-                        document.querySelector<HTMLInputElement>('input[type="tel"]')?.focus()
-                      }
-                    }}
-                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      validationErrors.customerName ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
-                    }`}
-                    placeholder="Enter your full name"
-                    autoFocus
-                  />
-                  {validationErrors.customerName && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      {validationErrors.customerName}
-                    </p>
-                  )}
-                </div>
+        {/* Step 2: Email */}
+        {currentStep === 2 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {isForeignNumber ? "What's your email address?" : "What's your email? (Optional)"}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {isForeignNumber ? "Required — we can't send SMS to your foreign number" : "Get detailed repair updates by email, or skip to just get SMS"}
+            </p>
+            {!isForeignNumber && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-4">
+                <p className="text-xs text-blue-900 dark:text-blue-100"><strong>With email:</strong> Detailed updates throughout the process.</p>
+                <p className="text-xs text-blue-800 dark:text-blue-200 mt-1"><strong>Without:</strong> SMS tracking link + notification when ready.</p>
+              </div>
+            )}
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => { setCustomerEmail(e.target.value); if (validationErrors.customerEmail) { setValidationErrors({}); setShowValidationSummary(false) } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goNext() }}
+              className={`w-full px-4 py-4 text-xl border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${validationErrors.customerEmail ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'}`}
+              placeholder="your@email.com"
+              autoFocus
+            />
+            {validationErrors.customerEmail && (
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1"><AlertCircle className="h-4 w-4" />{validationErrors.customerEmail}</p>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
+              {!isForeignNumber && <button onClick={() => { setCustomerEmail(''); goNext() }} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Skip</button>}
+              <button onClick={goNext} className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2">Next <ChevronDown className="h-5 w-5" /></button>
+            </div>
+          </div>
+        )}
 
-                <div data-field="customerPhone">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Mobile Phone *
-                  </label>
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => {
-                      const phone = e.target.value
-                      setCustomerPhone(phone)
-                      setPhoneError('')
-                      if (validationErrors.customerPhone) {
-                        setValidationErrors(prev => { const n = {...prev}; delete n.customerPhone; return n })
-                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
-                      }
-                      
-                      // Clean phone number (remove spaces, dashes, etc.)
-                      const cleanPhone = phone.replace(/[\s\-()]/g, '')
-                      
-                      if (cleanPhone.length > 0) {
-                        // Check if it's a UK number
-                        // UK formats: 07..., +447..., 447..., 01..., 02..., 03...
-                        // Foreign formats: +34..., 0034..., +1..., 001..., etc.
-                        let isUKNumber = false
-                        
-                        if (cleanPhone.startsWith('+44')) {
-                          // UK international format: +44...
-                          isUKNumber = true
-                        } else if (cleanPhone.startsWith('0044')) {
-                          // UK international format: 0044...
-                          isUKNumber = true
-                        } else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) {
-                          // UK international format without +: 44...
-                          isUKNumber = true
-                        } else if (cleanPhone.startsWith('0') && !cleanPhone.startsWith('00')) {
-                          // UK national format: 0...
-                          isUKNumber = true
-                        } else if (cleanPhone.startsWith('+') || cleanPhone.startsWith('00')) {
-                          // International format for other countries: +34, 0034, +1, 001, etc.
-                          isUKNumber = false
-                        }
-                        
-                        if (!isUKNumber) {
-                          // Foreign number detected
-                          setIsForeignNumber(true)
-                          setIsLandline(false)
-                          setLandlineAccepted(false)
-                        } else {
-                          setIsForeignNumber(false)
-                          
-                          // Normalize to standard format (remove +44 or 0044 or 44, add 0)
-                          let normalizedPhone = cleanPhone
-                          if (cleanPhone.startsWith('+44')) {
-                            normalizedPhone = '0' + cleanPhone.substring(3)
-                          } else if (cleanPhone.startsWith('0044')) {
-                            normalizedPhone = '0' + cleanPhone.substring(4)
-                          } else if (cleanPhone.startsWith('44') && cleanPhone.length >= 12) {
-                            normalizedPhone = '0' + cleanPhone.substring(2)
-                          }
-                          
-                          // Check if it's a UK landline (starts with 01, 02, or 03)
-                          const isLandlineNumber = /^0[123]/.test(normalizedPhone)
-                          setIsLandline(isLandlineNumber)
-                          
-                          if (!isLandlineNumber) {
-                            setLandlineAccepted(false)
-                          }
-                          
-                          // Validate UK number length (should be 11 digits)
-                          if (normalizedPhone.length > 0 && normalizedPhone.length !== 11) {
-                            setPhoneError('UK phone numbers must be 11 digits')
-                          }
-                        }
-                      } else {
-                        setIsForeignNumber(false)
-                        setIsLandline(false)
-                        setLandlineAccepted(false)
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && customerPhone.trim()) {
-                        e.preventDefault()
-                        document.querySelector<HTMLInputElement>('input[type="email"]')?.focus()
-                      }
-                    }}
-                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      validationErrors.customerPhone ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
-                    }`}
-                    placeholder="07410 123 456"
-                  />
-                  {validationErrors.customerPhone && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      {validationErrors.customerPhone}
-                    </p>
-                  )}
-                  {phoneError && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">{phoneError}</p>
-                  )}
-                  {isForeignNumber && (
-                    <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
-                      <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-2">
-                        Foreign Number Detected
-                      </p>
-                      <p className="text-xs text-orange-800 dark:text-orange-200">
-                        We only send SMS updates to UK numbers. Please provide an email address to receive repair updates.
-                      </p>
+        {/* Step 3: Passcode */}
+        {currentStep === 3 && passcodeRequired && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Device Passcode</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">We need this to test your device after repair</p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-4">
+              <p className="text-xs text-blue-800 dark:text-blue-200">Stored securely, deleted 7 days after repair.</p>
+            </div>
+            <div className="space-y-3">
+              <label className={`flex items-start space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${passcodeMethod === 'provided' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                <input type="radio" name="passcode_method" value="provided" checked={passcodeMethod === 'provided'} onChange={(e) => { setPasscodeMethod(e.target.value); setPasswordNA(false) }} className="w-5 h-5 text-primary focus:ring-primary mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Lock className="h-5 w-5" /> Provide passcode now</div>
+                  {passcodeMethod === 'provided' && (
+                    <div className="mt-3 relative">
+                      <input type={showPassword ? "text" : "password"} value={devicePassword} onChange={(e) => setDevicePassword(e.target.value)} className="w-full px-4 py-3 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono" placeholder="Enter passcode" autoFocus />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400">{showPassword ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}</button>
                     </div>
                   )}
-                  {isLandline && (
-                    <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-xl p-4">
-                      <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold mb-2">
-                        Landline Number Detected
-                      </p>
-                      <p className="text-xs text-orange-800 dark:text-orange-200 mb-3">
-                        Our system automatically sends SMS notifications to keep you updated. Landline numbers require manual phone calls from our team, which takes significantly more time.
-                      </p>
-                      <label className="flex items-start space-x-3 cursor-pointer p-3 bg-white dark:bg-gray-800 rounded-lg">
-                        <input
-                          type="checkbox"
-                          checked={landlineAccepted}
-                          onChange={(e) => setLandlineAccepted(e.target.checked)}
-                          className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 flex-shrink-0"
-                        />
-                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                          I understand there is an additional £20 charge for using a landline number due to the extra manual work required by your team.
-                        </span>
-                      </label>
-                    </div>
-                  )}
                 </div>
+              </label>
+              <label className={`flex items-start space-x-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${passcodeMethod === 'send_link' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                <input type="radio" name="passcode_method" value="send_link" checked={passcodeMethod === 'send_link'} onChange={(e) => { setPasscodeMethod(e.target.value); setPasswordNA(false) }} className="w-5 h-5 text-primary focus:ring-primary mt-0.5" />
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-white">Send me a link later</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">We will text a secure link to enter it</div>
+                </div>
+              </label>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
+              <button onClick={goNext} className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2">Next <ChevronDown className="h-5 w-5" /></button>
+            </div>
+          </div>
+        )}
 
-                <div data-field="customerEmail">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Email {isForeignNumber && '*'}{!isForeignNumber && '(Optional)'}
-                  </label>
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-3">
-                    <p className="text-xs text-blue-900 dark:text-blue-100">
-                      <strong>With email:</strong> Receive detailed repair information and updates throughout the entire process.
-                    </p>
-                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
-                      <strong>Without email:</strong> Receive SMS tracking link to check status anytime, plus notification when device is ready for collection.
-                    </p>
-                  </div>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => {
-                      setCustomerEmail(e.target.value)
-                      if (validationErrors.customerEmail) {
-                        setValidationErrors(prev => { const n = {...prev}; delete n.customerEmail; return n })
-                        if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        // Focus on next section if passcode required
-                        if (jobData.passcode_requirement !== 'not_required') {
-                          document.querySelector<HTMLInputElement>('input[type="radio"]')?.focus()
-                        }
-                      }
-                    }}
-                    className={`w-full px-4 py-4 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                      validationErrors.customerEmail ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
-                    }`}
-                    placeholder="your@email.com"
-                  />
-                  {validationErrors.customerEmail && (
-                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      {validationErrors.customerEmail}
-                    </p>
-                  )}
-                </div>
+        {/* Final Step: Summary + Terms + Confirm */}
+        {currentStep === (passcodeRequired ? 4 : 3) && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Please check your details</h2>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Name</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{customerName}</span>
               </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Phone</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{customerPhone}</span>
+              </div>
+              {customerEmail && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Email</span>
+                  <span className="font-semibold text-gray-900 dark:text-white text-right truncate ml-2">{customerEmail}</span>
+                </div>
+              )}
+              {passcodeRequired && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Passcode</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{passcodeMethod === 'send_link' ? 'Link to be sent' : devicePassword ? 'Provided' : 'Not set'}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Device</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-right">{jobData.device_make} {jobData.device_model}</span>
+              </div>
+              {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Price</span>
+                  <span className="font-bold text-primary text-lg">£{parseFloat(jobData.price_total).toFixed(2)}</span>
+                </div>
+              )}
+              {jobData.requires_parts_order && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-3 text-sm text-yellow-900 dark:text-yellow-100">£20 deposit needed for parts order</div>
+              )}
             </div>
 
-            {/* Step 2: Device Passcode */}
-            {jobData.passcode_requirement !== 'not_required' && (
-              <div id="step-2" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
-                    2
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Device Passcode</h2>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <strong>Why we need this:</strong> We need your device passcode to test it after repair and ensure everything works properly.
-                  </p>
-                  <p className="text-xs text-blue-800 dark:text-blue-200 mt-2">
-                    🔒 <strong>Security:</strong> Your passcode will be stored securely and automatically deleted 7 days after your repair is completed.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <input
-                      type="radio"
-                      name="passcode_method"
-                      value="provided"
-                      checked={passcodeMethod === 'provided'}
-                      onChange={(e) => {
-                        setPasscodeMethod(e.target.value)
-                        setPasswordNA(false)
-                      }}
-                      className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Lock className="h-5 w-5" />
-                        Provide passcode now
-                      </div>
-                      {passcodeMethod === 'provided' && (
-                        <div className="mt-3 relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={devicePassword}
-                            onChange={(e) => setDevicePassword(e.target.value)}
-                            className="w-full px-4 py-3 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-mono"
-                            placeholder="Enter passcode"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                          >
-                            {showPassword ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </label>
-
-                  <label className="flex items-start space-x-3 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <input
-                      type="radio"
-                      name="passcode_method"
-                      value="send_link"
-                      checked={passcodeMethod === 'send_link'}
-                      onChange={(e) => {
-                        setPasscodeMethod(e.target.value)
-                        setPasswordNA(false)
-                      }}
-                      className="w-5 h-5 text-primary focus:ring-primary mt-0.5"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">Send me a link to provide it later</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">We'll text you a secure link to enter your passcode when convenient</div>
-                    </div>
-                  </label>
-                </div>
-
+            {(jobData.issue?.toLowerCase().includes('water') || jobData.issue?.toLowerCase().includes('no power') || jobData.issue?.toLowerCase().includes('not loading') || jobData.issue?.toLowerCase().includes('black screen')) && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
+                <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-1 text-sm">Diagnostic Fee: {diagnosticFee}</h5>
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">Applies if you choose not to proceed. Waived if you proceed with the repair.</p>
               </div>
             )}
 
-            {/* Submit Section */}
-            <div id="submit-section" className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
-                  {jobData.passcode_requirement !== 'not_required' ? '3' : '2'}
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ready to Confirm?</h2>
-              </div>
-
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
-                Please review the repair summary and terms {typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'on the right' : 'below'}, then accept the agreement to confirm your booking.
-              </p>
-
-
-              {/* Success indicator when terms accepted */}
-              {repairAgreementAccepted && (
-                <div className="mb-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-xl p-3 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-semibold text-green-800 dark:text-green-200">Terms accepted - ready to confirm!</span>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="relative group">
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading || !repairAgreementAccepted || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 sm:py-5 px-4 sm:px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md text-base sm:text-lg flex items-center justify-center gap-2 sm:gap-3 touch-manipulation min-h-[56px]"
-                >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                    Creating Booking...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-6 w-6" />
-                    Confirm Booking
-                  </>
-                )}
-                </button>
-                {(loading || !repairAgreementAccepted || !termsAccepted || !customerName || !customerPhone || (isLandline && !landlineAccepted)) && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                    {!customerName && 'Please enter your name'}
-                    {customerName && !customerPhone && 'Please enter your phone number'}
-                    {customerName && customerPhone && isLandline && !landlineAccepted && 'Please accept landline charge'}
-                    {customerName && customerPhone && (!isLandline || landlineAccepted) && !repairAgreementAccepted && 'Please accept repair agreement'}
-                    {customerName && customerPhone && (!isLandline || landlineAccepted) && repairAgreementAccepted && !termsAccepted && 'Please accept terms & conditions'}
-                  </div>
-                )}
+            <div className={`bg-blue-50 dark:bg-blue-900/20 border-2 rounded-xl p-4 mb-4 transition-all ${repairAgreementAccepted ? 'border-green-300 dark:border-green-700' : 'border-blue-200 dark:border-blue-800'}`}>
+              <p className="text-xs text-blue-900 dark:text-blue-100 mb-3 leading-relaxed">Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.</p>
+              <label className={`flex items-start space-x-3 cursor-pointer p-4 rounded-lg transition-all ${repairAgreementAccepted ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-700'} ${shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50' : ''}`}>
+                <input type="checkbox" checked={repairAgreementAccepted} onChange={(e) => { setRepairAgreementAccepted(e.target.checked); setTermsAccepted(e.target.checked) }} className="w-6 h-6 text-primary focus:ring-primary border-2 border-gray-300 rounded mt-0.5 flex-shrink-0" />
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                  I agree to the repair terms and conditions
+                  {!repairAgreementAccepted && <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">Please tick this box to continue</span>}
+                  {repairAgreementAccepted && <span className="block text-xs text-green-600 dark:text-green-400 mt-1 font-normal">Thank you!</span>}
+                </span>
+              </label>
+              <div className="text-xs text-blue-800 dark:text-blue-200 mt-2">
+                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">View full terms and conditions</a>
               </div>
             </div>
-          </div>
+            {shakeTerms && <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-semibold animate-pulse">Please accept the terms to continue</p>}
 
-          {/* Right: Device Info Summary (Sticky) */}
-          <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:sticky lg:top-4">
-              <div className="flex items-center gap-3 mb-6">
-                <Smartphone className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Repair Summary</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Device</div>
-                  <div className="font-semibold text-gray-900 dark:text-white text-lg">
-                    {jobData.device_make} {jobData.device_model}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Issue</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{jobData.issue}</div>
-                </div>
-
-                {jobData.description && (
-                  <div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Description</div>
-                    <div className="text-gray-700 dark:text-gray-300 text-sm">{jobData.description}</div>
-                  </div>
-                )}
-
-                {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
-                  <div className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Repair Price</div>
-                    <div className="font-bold text-gray-900 dark:text-white text-2xl">
-                      £{parseFloat(jobData.price_total).toFixed(2)}
-                    </div>
-                  </div>
-                )}
-
-                {jobData.requires_parts_order && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
-                    <div className="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
-                      Parts Required
-                    </div>
-                    <div className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
-                      £20 deposit needed for parts order
-                    </div>
-                  </div>
-                )}
-
-                {/* Terms & Conditions */}
-                <div id="terms-section" className="pt-4 border-t-2 border-gray-200 dark:border-gray-700">
-                  <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    Important Information
-                  </h4>
-                  
-                  {/* Diagnostic Fee - Only for certain repair types */}
-                  {(jobData.issue?.toLowerCase().includes('water') || 
-                    jobData.issue?.toLowerCase().includes('no power') || 
-                    jobData.issue?.toLowerCase().includes('not loading') ||
-                    jobData.issue?.toLowerCase().includes('black screen')) && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
-                      <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">
-                        Diagnostic Fee: {diagnosticFee}
-                      </h5>
-                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                        In certain cases where diagnostics are required (such as water damage or when the device is not powered on), a diagnostic fee of {diagnosticFee} is applicable should you choose not to proceed with the repair. This fee is waived if you proceed with the repair.
-                      </p>
-                      <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 italic">
-                        Note: This does not apply to straightforward repairs like screen or battery replacements.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Combined Terms & Repair Agreement */}
-                  <div className={`bg-blue-50 dark:bg-blue-900/20 border-2 rounded-xl p-4 transition-all ${
-                    repairAgreementAccepted 
-                      ? 'border-green-300 dark:border-green-700' 
-                      : 'border-blue-200 dark:border-blue-800'
-                  }`}>
-                    <h5 className="font-bold text-blue-900 dark:text-blue-100 mb-2 text-sm">
-                      Repair Agreement
-                    </h5>
-                    <p className="text-xs text-blue-900 dark:text-blue-100 mb-3 leading-relaxed">
-                      Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.
-                    </p>
-                    
-                    {/* Single Combined Checkbox - Made more prominent */}
-                    <label className={`flex items-start space-x-3 cursor-pointer p-4 rounded-lg transition-all mb-3 ${
-                      repairAgreementAccepted
-                        ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700'
-                        : 'bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-gray-700'
-                    } ${
-                      shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50 bg-red-50 dark:bg-red-900/20' : ''
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={repairAgreementAccepted}
-                        onChange={(e) => {
-                          setRepairAgreementAccepted(e.target.checked)
-                          setTermsAccepted(e.target.checked)
-                          if (e.target.checked && validationErrors.repairAgreement) {
-                            setValidationErrors(prev => { const n = {...prev}; delete n.repairAgreement; return n })
-                            if (Object.keys(validationErrors).length === 1) setShowValidationSummary(false)
-                          }
-                        }}
-                        className="w-6 h-6 text-primary focus:ring-primary border-2 border-gray-300 rounded mt-0.5 flex-shrink-0"
-                      />
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        I agree to the repair terms and conditions
-                        {!repairAgreementAccepted && (
-                          <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
-                            Please tick this box to continue
-                          </span>
-                        )}
-                        {repairAgreementAccepted && (
-                          <span className="block text-xs text-green-600 dark:text-green-400 mt-1 font-normal">
-                            Thank you!
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                    
-                    {/* Link to Full Terms */}
-                    <div className="text-xs text-blue-800 dark:text-blue-200">
-                      <a 
-                        href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                      >
-                        View full terms and conditions
-                      </a>
-                    </div>
-                  </div>
-                  {shakeTerms && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-semibold animate-pulse">
-                      Please accept the terms to continue
-                    </p>
-                  )}
-                </div>
-              </div>
+            <div className="flex gap-3">
+              <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
+              <button onClick={handleSubmit} disabled={loading || !repairAgreementAccepted || !termsAccepted} className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 px-6 rounded-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2 min-h-[56px]">
+                {loading ? (<><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> Creating Booking...</>) : (<><CheckCircle className="h-6 w-6" /> Confirm Booking</>)}
+              </button>
             </div>
           </div>
-        </div>
+        )}
+
       </div>
 
       <FormErrorToast
         errors={validationErrors}
         show={showValidationSummary}
         onClose={() => setShowValidationSummary(false)}
-      />
-
-      <FormGuideOverlay
-        steps={[
-          {
-            id: 'step-1',
-            label: 'Enter your name, phone and email',
-            filled: customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted),
-            focusSelector: 'input[type="text"]',
-          },
-          {
-            id: 'step-2',
-            label: 'Provide your device passcode',
-            filled: passcodeMethod === 'send_link' || passwordNA || devicePassword.trim() || jobData.passcode_requirement === 'not_required',
-          },
-          {
-            id: 'terms-section',
-            label: 'Accept the repair terms to continue',
-            filled: repairAgreementAccepted && termsAccepted,
-          },
-        ]}
-        submitReady={customerName.trim() && customerPhone.trim() && (!isForeignNumber || customerEmail.trim()) && (!isLandline || landlineAccepted) && repairAgreementAccepted && termsAccepted}
       />
     </div>
   )
