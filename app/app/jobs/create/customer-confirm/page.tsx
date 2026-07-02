@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown } from 'lucide-react'
-import FormErrorToast from '@/components/FormErrorToast'
 
 function CustomerConfirmContent() {
   const router = useRouter()
@@ -186,10 +185,14 @@ function CustomerConfirmContent() {
       setValidationErrors(errors)
       setShowValidationSummary(true)
       
-      // Trigger shake animation on terms if terms not accepted
+      // Trigger shake + scroll to terms if terms not accepted
       if (errors.repairAgreement) {
         setShakeTerms(true)
         setTimeout(() => setShakeTerms(false), 600)
+        const termsEl = document.getElementById('terms-section')
+        if (termsEl) {
+          termsEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
       }
       
       // Scroll to the first error field
@@ -610,14 +613,6 @@ function CustomerConfirmContent() {
                   )}
                 </div>
               )}
-              <div className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700">
-                <div className="text-sm text-gray-500 dark:text-gray-400">Device</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-white">{jobData.device_make} {jobData.device_model}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">{jobData.issue}</div>
-                {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
-                  <div className="text-lg font-bold text-primary mt-1">£{parseFloat(jobData.price_total).toFixed(2)}</div>
-                )}
-              </div>
               {jobData.requires_parts_order && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-3 text-sm text-yellow-900 dark:text-yellow-100">£20 deposit needed for parts order</div>
               )}
@@ -642,14 +637,6 @@ function CustomerConfirmContent() {
                 <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="text-primary underline">View full terms</a>
               </p>
             </div>
-            {shakeTerms && (
-              <div className="flex items-center gap-2 mb-3 text-red-600 dark:text-red-400">
-                <svg className="h-5 w-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-                <span className="text-sm font-bold animate-pulse">Please tick the box above to continue</span>
-              </div>
-            )}
 
             <div className="flex gap-3">
               <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
@@ -662,11 +649,6 @@ function CustomerConfirmContent() {
 
       </div>
 
-      <FormErrorToast
-        errors={validationErrors}
-        show={showValidationSummary}
-        onClose={() => setShowValidationSummary(false)}
-      />
     </div>
   )
 }
