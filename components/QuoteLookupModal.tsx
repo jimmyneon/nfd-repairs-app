@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Search, FileText, Phone, User, Loader2, CheckCircle } from 'lucide-react'
+import SlideUpPanel from './SlideUpPanel'
 
 interface Quote {
   id: string
@@ -118,30 +119,22 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="bg-gradient-to-r from-primary to-primary-dark p-6 text-white relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6" />
-            Search Quotes
-          </h2>
-          <p className="text-sm text-white/90 mt-1">Find and convert existing quotes to jobs</p>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <div className="flex gap-3">
+    <SlideUpPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Search Quotes"
+      icon={<FileText className="h-5 w-5 text-primary" />}
+      minHeight="70vh"
+    >
+      <div className="flex flex-col h-full">
+        <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex gap-2">
             <div className="flex-1">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Start typing to search... (phone, name, or leave empty for recent)"
+                placeholder="Phone, name, or leave empty for recent"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 autoFocus
               />
@@ -149,38 +142,28 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as any)}
-              className="px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
             >
-              <option value="all">All Fields</option>
-              <option value="phone">Phone Only</option>
-              <option value="name">Name Only</option>
-              <option value="quote_id">Quote ID</option>
+              <option value="all">All</option>
+              <option value="phone">Phone</option>
+              <option value="name">Name</option>
+              <option value="quote_id">ID</option>
             </select>
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold disabled:opacity-50 transition-all shadow-lg flex items-center gap-2"
+              className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {loading ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Searching...
-                </>
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <>
-                  <Search className="h-5 w-5" />
-                  Search
-                </>
+                <Search className="h-5 w-5" />
               )}
             </button>
           </div>
-
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            💡 Showing {quotes.length > 0 ? `${quotes.length} recent` : 'recent'} unconverted quotes. Search to filter.
-          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="flex-1 overflow-y-auto pt-4">
           {loading && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               <Loader2 className="h-16 w-16 mx-auto mb-4 opacity-50 animate-spin" />
@@ -257,6 +240,6 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
           )}
         </div>
       </div>
-    </div>
+    </SlideUpPanel>
   )
 }

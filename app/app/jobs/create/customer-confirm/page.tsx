@@ -648,29 +648,29 @@ function CustomerConfirmContent() {
           </div>
 
           {/* Device info sidebar — right side on md+, hidden on mobile */}
-          <div className="hidden md:block w-72 flex-shrink-0">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 h-full flex flex-col">
-              {/* Big icon + device */}
-              <div className="flex flex-col items-center text-center mb-5">
-                <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center flex-shrink-0 mb-3">
-                  <Smartphone className="h-10 w-10 text-primary" />
+          <div className="hidden md:block w-72 flex-shrink-0 self-stretch">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 h-full flex flex-col overflow-hidden">
+              {/* Icon + device */}
+              <div className="flex flex-col items-center text-center mb-3">
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center flex-shrink-0 mb-2">
+                  <Smartphone className="h-8 w-8 text-primary" />
                 </div>
-                <p className="font-bold text-lg text-gray-900 dark:text-white leading-tight">
+                <p className="font-bold text-base text-gray-900 dark:text-white leading-tight">
                   {jobData.device_make} {jobData.device_model}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{jobData.issue}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{jobData.issue}</p>
               </div>
 
               {/* Price */}
               {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
-                <div className="text-center mb-4 pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="text-center mb-3 pb-3 border-b border-gray-100 dark:border-gray-700">
                   <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Price</p>
-                  <p className="text-3xl font-black text-primary">£{parseFloat(jobData.price_total).toFixed(2)}</p>
+                  <p className="text-2xl font-black text-primary">£{parseFloat(jobData.price_total).toFixed(2)}</p>
                 </div>
               )}
 
-              {/* Customer info — fills progressively */}
-              <div className="flex-1 space-y-3">
+              {/* Customer info — fills progressively, scrolls if needed */}
+              <div className="flex-1 overflow-y-auto space-y-3">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Your Details</p>
                 <div className="space-y-2">
                   <div className={`flex items-center gap-2 text-sm ${customerName ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>

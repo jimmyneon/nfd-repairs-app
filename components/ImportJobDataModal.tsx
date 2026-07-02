@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, Upload, FileJson, AlertCircle, CheckCircle } from 'lucide-react'
+import SlideUpPanel from './SlideUpPanel'
 
 interface ImportJobDataModalProps {
   onImport: (data: any) => void
@@ -92,34 +93,19 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-3">
-            <FileJson className="h-6 w-6 text-primary" />
-            <h2 className="text-xl font-semibold text-gray-900">Import Job Data from JSON</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <SlideUpPanel
+      isOpen={true}
+      onClose={onClose}
+      title="Import Job Data"
+      icon={<FileJson className="h-5 w-5 text-primary" />}
+      minHeight="70vh"
+    >
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto">
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
           {/* Instructions */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-blue-900 mb-2">How to use:</h3>
-            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-              <li>Take a photo of the paper form</li>
-              <li>Use ChatGPT or OCR software to extract the data</li>
-              <li>Ask it to format the data as JSON (use the sample below as a template)</li>
-              <li>Paste the JSON here and click Import</li>
-              <li>Review and edit the auto-filled form before submitting</li>
-            </ol>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-800">Photo the paper form → OCR/ChatGPT to JSON → paste here → Import</p>
           </div>
 
           {/* Sample Template */}
@@ -217,10 +203,10 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 font-medium"
           >
             Cancel
           </button>
@@ -234,6 +220,6 @@ export default function ImportJobDataModal({ onImport, onClose }: ImportJobDataM
           </button>
         </div>
       </div>
-    </div>
+    </SlideUpPanel>
   )
 }

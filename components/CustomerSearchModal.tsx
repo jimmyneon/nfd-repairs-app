@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { X, Search, User, Phone, Mail, Clock, Package, Loader2 } from 'lucide-react'
+import SlideUpPanel from './SlideUpPanel'
 
 interface CustomerJob {
   id: string
@@ -330,30 +331,18 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Search className="h-6 w-6 text-primary" />
-              Search Previous Customers
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Find repeat customers and reuse their details or previous repair information
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <SlideUpPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Search Previous Customers"
+      icon={<Search className="h-5 w-5 text-primary" />}
+      minHeight="70vh"
+    >
+      <div className="flex flex-col h-full">
 
         {/* Search Bar */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex gap-3">
+        <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
@@ -361,7 +350,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search by name, phone, or email..."
+                placeholder="Name, phone, or email..."
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 autoFocus
               />
@@ -369,25 +358,19 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
             <button
               onClick={handleSearch}
               disabled={searching || !searchQuery.trim()}
-              className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
+              className="px-4 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
             >
               {searching ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Searching...
-                </>
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <>
-                  <Search className="h-5 w-5" />
-                  Search
-                </>
+                <Search className="h-5 w-5" />
               )}
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto pt-4">
           {!selectedCustomer ? (
             /* Customer List */
             <div className="space-y-3">
@@ -540,6 +523,6 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
           )}
         </div>
       </div>
-    </div>
+    </SlideUpPanel>
   )
 }
