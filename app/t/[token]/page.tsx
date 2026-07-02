@@ -842,6 +842,33 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           )}
         </div>
 
+        {/* What Happens Next - Info Link */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
+          <details>
+            <summary className="p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <Clock className="h-6 w-6 text-primary flex-shrink-0" />
+                <span className="font-bold text-gray-900 dark:text-white">What happens next?</span>
+              </div>
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            </summary>
+            <div className="px-5 pb-5 space-y-3 border-t border-gray-100 dark:border-gray-700 pt-4">
+              <div className="flex items-start gap-3">
+                <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Tracking by text</strong> - we&apos;ll message you at each stage of your repair.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Updates in real time</strong> - this page updates automatically. You can also tap the status above to refresh.</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <MapPin className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Collection</strong> - we&apos;ll text you when your device is ready. Bring this page or your reference number.</p>
+              </div>
+            </div>
+          </details>
+        </div>
+
         {/* SECONDARY: Business Card - Need Help */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-primary to-primary/90 p-6 text-center">

@@ -301,7 +301,7 @@ function CustomerConfirmContent() {
         }
         // Show success and redirect
         // API returns job_ref directly, not nested in result.job
-        router.push(`/app/jobs/create/success?job_ref=${result.job_ref}`)
+        router.push(`/app/jobs/create/success?job_ref=${result.job_ref}${customerEmail ? '&email=' + encodeURIComponent(customerEmail) : ''}`)
       } else {
         alert(`Failed to create job: ${result.error}`)
         setLoading(false)
@@ -541,110 +541,49 @@ function CustomerConfirmContent() {
         {/* Final Step: Summary + Terms + Confirm */}
         {currentStep === summaryStep && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Please check your details</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Your Details</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Tap any field to edit if needed</p>
             <div className="space-y-3 mb-6">
-              {/* Name - inline editable */}
-              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Name</span>
-                  {editingField !== 'name' ? (
-                    <button onClick={() => setEditingField('name')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
-                      {customerName || 'Tap to add'} {customerName && <span className="text-xs text-primary ml-1">Edit</span>}
-                    </button>
-                  ) : (
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      onBlur={() => setEditingField(null)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
-                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700"
-                      autoFocus
-                    />
-                  )}
-                </div>
-              </div>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Full name" />
 
-              {/* Phone - inline editable */}
-              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Phone</span>
-                  {editingField !== 'phone' ? (
-                    <button onClick={() => setEditingField('phone')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
-                      {customerPhone || 'Tap to add'} {customerPhone && <span className="text-xs text-primary ml-1">Edit</span>}
-                    </button>
-                  ) : (
-                    <input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      onBlur={() => setEditingField(null)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
-                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700"
-                      autoFocus
-                    />
-                  )}
-                </div>
-              </div>
+              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Mobile phone" />
 
-              {/* Email - inline editable */}
-              <div className="py-2 border-b border-gray-100 dark:border-gray-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Email</span>
-                  {editingField !== 'email' ? (
-                    <button onClick={() => setEditingField('email')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors text-right truncate ml-2">
-                      {customerEmail || 'Tap to add'} {customerEmail && <span className="text-xs text-primary ml-1">Edit</span>}
-                    </button>
-                  ) : (
-                    <input
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      onBlur={() => setEditingField(null)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') setEditingField(null) }}
-                      className="font-semibold text-gray-900 dark:text-white text-right border-2 border-primary rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-gray-700 w-48"
-                      autoFocus
-                    />
-                  )}
-                </div>
-              </div>
+              <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Email (optional)" />
               {passcodeRequired && (
-                <div className="py-2 border-b border-gray-100 dark:border-gray-700">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Passcode</span>
-                    {editingField !== 'passcode' ? (
-                      <button onClick={() => setEditingField('passcode')} className="font-semibold text-gray-900 dark:text-white hover:text-primary transition-colors">
-                        {passcodeMethod === 'send_link' ? 'Link to be sent' : devicePassword ? 'Provided' : 'Not set'} <span className="text-xs text-primary ml-1">Edit</span>
-                      </button>
-                    ) : (
-                      <div className="flex flex-col gap-2 items-end">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input type="radio" name="passcode_summary" checked={passcodeMethod === 'provided'} onChange={() => { setPasscodeMethod('provided'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
-                          <span>Provide now</span>
-                        </label>
-                        {passcodeMethod === 'provided' && (
-                          <input type={showPassword ? "text" : "password"} value={devicePassword} onChange={(e) => setDevicePassword(e.target.value)} className="border-2 border-primary rounded-lg px-2 py-1 text-right focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono" placeholder="Enter passcode" autoFocus />
-                        )}
-                        <label className="flex items-center gap-2 text-sm">
-                          <input type="radio" name="passcode_summary" checked={passcodeMethod === 'send_link'} onChange={() => { setPasscodeMethod('send_link'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
-                          <span>Send link later</span>
-                        </label>
-                        <button onClick={() => setEditingField(null)} className="text-xs text-primary font-semibold">Done</button>
-                      </div>
-                    )}
+                <div className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg text-gray-900 dark:text-white">
+                      {passcodeMethod === 'send_link' ? 'Passcode: link to be sent' : devicePassword ? 'Passcode: provided' : 'Passcode: not set'}
+                    </span>
+                    <button onClick={() => setEditingField(editingField === 'passcode' ? null : 'passcode')} className="text-sm text-primary font-semibold">
+                      {editingField === 'passcode' ? 'Done' : 'Change'}
+                    </button>
                   </div>
+                  {editingField === 'passcode' && (
+                    <div className="mt-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="passcode_summary" checked={passcodeMethod === 'provided'} onChange={() => { setPasscodeMethod('provided'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
+                        <span>Provide now</span>
+                      </label>
+                      {passcodeMethod === 'provided' && (
+                        <input type={showPassword ? "text" : "password"} value={devicePassword} onChange={(e) => setDevicePassword(e.target.value)} className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono" placeholder="Enter passcode" autoFocus />
+                      )}
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="passcode_summary" checked={passcodeMethod === 'send_link'} onChange={() => { setPasscodeMethod('send_link'); setPasswordNA(false) }} className="w-4 h-4 text-primary" />
+                        <span>Send link later</span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Device</span>
-                <span className="font-semibold text-gray-900 dark:text-white text-right">{jobData.device_make} {jobData.device_model}</span>
+              <div className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">Device</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{jobData.device_make} {jobData.device_model}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{jobData.issue}</div>
+                {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+                  <div className="text-lg font-bold text-primary mt-1">£{parseFloat(jobData.price_total).toFixed(2)}</div>
+                )}
               </div>
-              {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
-                <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Price</span>
-                  <span className="font-bold text-primary text-lg">£{parseFloat(jobData.price_total).toFixed(2)}</span>
-                </div>
-              )}
               {jobData.requires_parts_order && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-3 text-sm text-yellow-900 dark:text-yellow-100">£20 deposit needed for parts order</div>
               )}
@@ -657,25 +596,30 @@ function CustomerConfirmContent() {
               </div>
             )}
 
-            <div className={`bg-blue-50 dark:bg-blue-900/20 border-2 rounded-xl p-4 mb-4 transition-all ${repairAgreementAccepted ? 'border-green-300 dark:border-green-700' : 'border-blue-200 dark:border-blue-800'}`}>
-              <p className="text-xs text-blue-900 dark:text-blue-100 mb-3 leading-relaxed">Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Devices without passcodes receive limited testing. Parts may affect warranty. Storage fees apply for uncollected devices.</p>
-              <label className={`flex items-start space-x-3 cursor-pointer p-4 rounded-lg transition-all ${repairAgreementAccepted ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-700'} ${shakeTerms && !repairAgreementAccepted ? 'animate-shake ring-4 ring-red-400 ring-opacity-50' : ''}`}>
-                <input type="checkbox" checked={repairAgreementAccepted} onChange={(e) => { setRepairAgreementAccepted(e.target.checked); setTermsAccepted(e.target.checked) }} className="w-6 h-6 text-primary focus:ring-primary border-2 border-gray-300 rounded mt-0.5 flex-shrink-0" />
+                        <div id="terms-section" className={`border-2 rounded-xl p-4 mb-4 transition-all ${repairAgreementAccepted ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : shakeTerms ? 'border-red-400 bg-red-50 dark:bg-red-900/20 animate-shake' : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'}`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={repairAgreementAccepted} onChange={(e) => { setRepairAgreementAccepted(e.target.checked); setTermsAccepted(e.target.checked); setShakeTerms(false) }} className={`w-6 h-6 text-primary focus:ring-primary border-2 rounded mt-0.5 flex-shrink-0 ${shakeTerms ? 'border-red-500 animate-pulse' : 'border-gray-300'}`} />
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">
                   I agree to the repair terms and conditions
-                  {!repairAgreementAccepted && <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">Please tick this box to continue</span>}
-                  {repairAgreementAccepted && <span className="block text-xs text-green-600 dark:text-green-400 mt-1 font-normal">Thank you!</span>}
                 </span>
               </label>
-              <div className="text-xs text-blue-800 dark:text-blue-200 mt-2">
-                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">View full terms and conditions</a>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-9 leading-relaxed">
+                Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Parts may affect warranty. Storage fees apply for uncollected devices.{' '}
+                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="text-primary underline">View full terms</a>
+              </p>
             </div>
-            {shakeTerms && <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-semibold animate-pulse">Please accept the terms to continue</p>}
+            {shakeTerms && (
+              <div className="flex items-center gap-2 mb-3 text-red-600 dark:text-red-400">
+                <svg className="h-5 w-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+                <span className="text-sm font-bold animate-pulse">Please tick the box above to continue</span>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button onClick={goBack} className="px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-lg active:scale-95 transition-all">Back</button>
-              <button onClick={handleSubmit} disabled={loading || !repairAgreementAccepted || !termsAccepted} className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 px-6 rounded-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2 min-h-[56px]">
+              <button onClick={handleSubmit} disabled={loading} className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-4 px-6 rounded-xl text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2 min-h-[56px]">
                 {loading ? (<><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> Creating Booking...</>) : (<><CheckCircle className="h-6 w-6" /> Confirm Booking</>)}
               </button>
             </div>
