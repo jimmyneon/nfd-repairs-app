@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Home, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImportJobDataModal from '@/components/ImportJobDataModal'
@@ -623,36 +623,24 @@ function CreateJobContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
-        <div className="px-4 py-4">
-          <Link href="/app/jobs" className="inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-3">
-            <Home className="h-5 w-5 text-primary" />
-          </Link>
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Job</h1>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCustomerSearch(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
-              >
-                <Search className="h-4 w-4" />
-                Search Customers
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Create New Job</h1>
+            <div className="flex items-center gap-2">
+              <Link href="/app/jobs" className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Home">
+                <Home className="h-5 w-5 text-primary" />
+              </Link>
+              <button type="button" onClick={() => setShowCustomerSearch(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors" title="Search Customers">
+                <UserSearch className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => setShowQuoteLookup(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-              >
+              <button type="button" onClick={() => setShowQuoteLookup(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors" title="Search Quotes">
                 <Search className="h-4 w-4" />
-                Search Quotes
               </button>
-              <button
-                type="button"
-                onClick={() => setShowImportModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium text-sm"
-              >
+              <button type="button" onClick={() => setShowImportModal(true)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors" title="Import JSON">
                 <FileJson className="h-4 w-4" />
-                Import JSON
+              </button>
+              <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors" title="Clear Form">
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -660,44 +648,6 @@ function CreateJobContent() {
       </header>
 
       <main className="p-4 max-w-2xl mx-auto">
-        {/* Clear Form Button */}
-        <div className="flex justify-end mb-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm('Clear all form data and start fresh?')) {
-                setFormData({
-                  device_type: '',
-                  device_make: '',
-                  device_model: '',
-                  issue: '',
-                  description: '',
-                  repair_type: '',
-                  technician_notes: '',
-                  price_total: '',
-                  requires_parts_order: false,
-                  device_left_with_us: true,
-                  passcode_requirement: 'not_required',
-                  linked_quote_id: null,
-                })
-                setCustomerName('')
-                setCustomerPhone('')
-                setValidationErrors({})
-                setShowValidationSummary(false)
-                if (typeof window !== 'undefined') {
-                  sessionStorage.removeItem('job_create_form_state')
-                  sessionStorage.removeItem('quote_customer_data')
-                  sessionStorage.removeItem('job_creation_overrides')
-                  sessionStorage.removeItem('customer_confirm_wizard')
-                }
-              }
-            }}
-            className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-semibold transition-colors flex items-center gap-1"
-          >
-            <Plus className="h-4 w-4 rotate-45" />
-            Clear Form
-          </button>
-        </div>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Super Quick Mode Toggle */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl shadow-lg p-4 border-2 border-green-300 dark:border-green-700">
@@ -855,7 +805,7 @@ function CreateJobContent() {
                       key={preset.label}
                       type="button"
                       onClick={() => handleQuickPreset(preset)}
-                      className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3`}
+                      className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all aspect-square flex flex-col items-center justify-center gap-1`}
                     >
                       <Icon className="h-6 w-6" />
                       <span>{preset.label}</span>
@@ -999,7 +949,7 @@ function CreateJobContent() {
                             key={preset.value}
                             type="button"
                             onClick={() => handleIssuePreset(preset.value)}
-                            className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all h-20 flex items-center justify-center gap-3 ${
+                            className={`${preset.color} text-white rounded-xl font-bold shadow-md transition-all aspect-square flex flex-col items-center justify-center gap-1 ${
                               formData.issue === preset.value ? 'ring-4 ring-primary ring-opacity-50' : ''
                             }`}
                           >
@@ -1324,9 +1274,9 @@ function CreateJobContent() {
                   </label>
                 </div>
                 
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border-2 border-blue-200 dark:border-blue-800">
-                  <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <strong>Next Step:</strong> After clicking "Switch to Customer Screen", hand the tablet/device to the customer to enter their details, passcode, and accept terms.
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border-2 border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-900 dark:text-blue-100">
+                    Hand the device to the customer after pressing "Switch to Customer Screen".
                   </p>
                 </div>
               </div>
@@ -1419,7 +1369,14 @@ function CreateJobContent() {
 
           {/* Validation errors shown as bottom toast */}
 
-          <div className="flex gap-4">
+          <div className="flex gap-3">
+            <Link
+              href="/app/jobs"
+              className="w-14 h-14 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold rounded-xl transition-all shadow-lg active:scale-95 flex-shrink-0"
+              title="Cancel"
+            >
+              <X className="h-5 w-5" />
+            </Link>
             <button
               type="submit"
               disabled={loading}
@@ -1442,14 +1399,6 @@ function CreateJobContent() {
                 </>
               )}
             </button>
-            
-            <Link
-              href="/app/jobs"
-              className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-2"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span>Cancel</span>
-            </Link>
           </div>
         </form>
       </main>

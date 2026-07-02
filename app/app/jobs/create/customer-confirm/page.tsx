@@ -511,18 +511,12 @@ function CustomerConfirmContent() {
         {/* Step 2: Email */}
         {currentStep === 2 && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {isForeignNumber ? "What's your email address?" : "What's your email? (Optional)"}
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {isForeignNumber ? "Email address" : "Email (optional)"}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              {isForeignNumber ? "Required — we can't send SMS to your foreign number" : "Get detailed repair updates by email, or skip to just get SMS"}
+              {isForeignNumber ? "Required — we can't SMS your foreign number" : "Get repair updates by email"}
             </p>
-            {!isForeignNumber && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-xl p-3 mb-4">
-                <p className="text-xs text-blue-900 dark:text-blue-100"><strong>With email:</strong> Detailed updates throughout the process.</p>
-                <p className="text-xs text-blue-800 dark:text-blue-200 mt-1"><strong>Without:</strong> SMS tracking link + notification when ready.</p>
-              </div>
-            )}
             <input
               type="email"
               value={customerEmail}
@@ -583,7 +577,7 @@ function CustomerConfirmContent() {
         {currentStep === summaryStep && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Your Details</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Tap any field to edit if needed</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Tap any field to edit</p>
             <div className="space-y-3 mb-6">
               <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Full name" />
 
@@ -625,20 +619,20 @@ function CustomerConfirmContent() {
             {(jobData.issue?.toLowerCase().includes('water') || jobData.issue?.toLowerCase().includes('no power') || jobData.issue?.toLowerCase().includes('not loading') || jobData.issue?.toLowerCase().includes('black screen')) && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
                 <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-1 text-sm">Diagnostic Fee: {diagnosticFee}</h5>
-                <p className="text-xs text-yellow-800 dark:text-yellow-200">Applies if you choose not to proceed. Waived if you proceed with the repair.</p>
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">Waived if you proceed with the repair.</p>
               </div>
             )}
 
-                        <div id="terms-section" className={`border-2 rounded-xl p-4 mb-4 transition-all ${repairAgreementAccepted ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : shakeTerms ? 'border-red-400 bg-red-50 dark:bg-red-900/20 animate-shake' : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'}`}>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={repairAgreementAccepted} onChange={(e) => { setRepairAgreementAccepted(e.target.checked); setTermsAccepted(e.target.checked); setShakeTerms(false) }} className={`w-6 h-6 text-primary focus:ring-primary border-2 rounded mt-0.5 flex-shrink-0 ${shakeTerms ? 'border-red-500 animate-pulse' : 'border-gray-300'}`} />
+                        <div id="terms-section" onClick={() => { setRepairAgreementAccepted(!repairAgreementAccepted); setTermsAccepted(!repairAgreementAccepted); setShakeTerms(false) }} className={`border-2 rounded-xl p-4 mb-4 transition-all cursor-pointer ${repairAgreementAccepted ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20' : shakeTerms ? 'border-red-400 bg-red-50 dark:bg-red-900/20 animate-shake' : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'}`}>
+              <div className="flex items-start gap-3">
+                <input type="checkbox" checked={repairAgreementAccepted} onChange={(e) => { setRepairAgreementAccepted(e.target.checked); setTermsAccepted(e.target.checked); setShakeTerms(false) }} onClick={(e) => e.stopPropagation()} className={`w-6 h-6 text-primary focus:ring-primary border-2 rounded mt-0.5 flex-shrink-0 ${shakeTerms ? 'border-red-500 animate-pulse' : 'border-gray-300'}`} />
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">
                   I agree to the repair terms and conditions
                 </span>
-              </label>
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-9 leading-relaxed">
-                Diagnostic work may incur a minimum charge. Additional issues will be discussed before work proceeds. Back up important data. Parts may affect warranty. Storage fees apply for uncollected devices.{' '}
-                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="text-primary underline">View full terms</a>
+                Diagnostic fees may apply. Back up your data. Storage fees for uncollected devices.{' '}
+                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">View full terms</a>
               </p>
             </div>
 

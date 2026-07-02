@@ -1,18 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { PoundSterling, RefreshCw } from 'lucide-react'
+import { PoundSterling, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
 import SlideUpPanel from './SlideUpPanel'
+import { createClient } from '@/lib/supabase-browser'
 
 interface PriceSetterModalProps {
   jobId: string
   currentPrice: number
+  paymentReceived?: boolean
+  depositRequired?: boolean
+  depositReceived?: boolean
+  depositAmount?: number | null
   onClose: () => void
   onSaved: () => void
 }
 
-export default function PriceSetterModal({ jobId, currentPrice, onClose, onSaved }: PriceSetterModalProps) {
+export default function PriceSetterModal({
+  jobId, currentPrice, paymentReceived = false,
+  depositRequired = false, depositReceived = false, depositAmount = null,
+  onClose, onSaved,
+}: PriceSetterModalProps) {
   const [price, setPrice] = useState(currentPrice.toString())
+  const [payLoading, setPayLoading] = useState(false)
+  const [isPaid, setIsPaid] = useState(paymentReceived)
+  const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -46,6 +58,30 @@ export default function PriceSetterModal({ jobId, currentPrice, onClose, onSaved
     }
   }
 
+  const handleTogglePaid = async () => {
+    setPayLoading(true)
+    const newValue = !isPaid
+    try {
+      await supabase.from('jobs').update({ payment_received: newValue }).eq('id', jobId)
+      await supabase.from('job_events').insert({
+        job_id: jobId,
+        type: 'NOTE',
+        message: newValue
+          ? `Payment of £${currentPrice.toFixed(2)} marked as received`
+          : 'Payment status reset to unpaid',
+      })
+      setIsPaid(newValue)
+      onSaved()
+    } catch (err) {
+      console.error('Error updating payment status:', err)
+    } finally {
+      setPayLoading(false)
+    }
+  }
+
+  const canMarkPaid = currentPrice > 0 && (!depositRequired || depositReceived)
+  const balance = depositReceived ? currentPrice - (depositAmount || 0) : currentPrice
+
   return (
     <SlideUpPanel
       isOpen={true}
@@ -73,6 +109,47 @@ export default function PriceSetterModal({ jobId, currentPrice, onClose, onSaved
 
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
+        )}
+
+        {/* Payment Status */}
+        {canMarkPaid && (
+          <div className={`rounded-xl p-4 border-2 transition-colors ${
+            isPaid
+              ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+              : 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isPaid ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-orange-600" />
+                )}
+                <span className="font-bold text-gray-900 dark:text-white text-sm">
+                  {isPaid ? 'Payment Received' : 'Payment Outstanding'}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                {isPaid ? '£' + currentPrice.toFixed(2) : '£' + balance.toFixed(2) + ' due'}
+              </span>
+            </div>
+            <button
+              onClick={handleTogglePaid}
+              disabled={payLoading}
+              className={`w-full mt-3 font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                isPaid
+                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {payLoading ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              {isPaid ? 'Mark as Unpaid' : 'Mark as Paid'}
+            </button>
+          </div>
         )}
 
         <div className="flex gap-3">

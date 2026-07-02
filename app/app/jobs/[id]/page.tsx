@@ -738,49 +738,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </button>
           </div>
 
-          {/* Payment status + mark as paid button (under price) */}
-          {job.price_total > 0 && (!job.deposit_required || job.deposit_received) && (
-            <button
-              onClick={async () => {
-                if (!job) return
-                setActionLoading(true)
-                const newValue = !job.payment_received
-                await supabase
-                  .from('jobs')
-                  .update({ payment_received: newValue })
-                  .eq('id', job.id)
-                await supabase.from('job_events').insert({
-                  job_id: job.id,
-                  type: 'NOTE',
-                  message: newValue
-                    ? `Payment of £${job.price_total.toFixed(2)} marked as received`
-                    : 'Payment status reset to unpaid',
-                })
-                await loadJobData()
-                setActionLoading(false)
-              }}
-              disabled={actionLoading}
-              className={`w-full mt-3 font-bold py-3 px-4 rounded-xl text-sm disabled:opacity-50 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${
-                job.payment_received
-                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {actionLoading ? (
-                <span>Processing...</span>
-              ) : job.payment_received ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Mark as Unpaid</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Mark as Paid{job.deposit_received ? ` (£${(job.price_total - (job.deposit_amount || 0)).toFixed(2)} balance)` : ''}</span>
-                </>
-              )}
-            </button>
-          )}
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job.status]}`}>
               {JOB_STATUS_LABELS[job.status]}
@@ -1951,6 +1908,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <PriceSetterModal
           jobId={job.id}
           currentPrice={job.price_total}
+          paymentReceived={job.payment_received}
+          depositRequired={job.deposit_required}
+          depositReceived={job.deposit_received}
+          depositAmount={job.deposit_amount}
           onClose={() => setShowPriceModal(false)}
           onSaved={loadJobData}
         />
