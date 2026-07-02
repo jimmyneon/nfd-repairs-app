@@ -134,17 +134,12 @@ Many thanks,
 New Forest Device Repairs'
 WHERE key = 'COMPLETED';
 
--- READY_TO_COLLECT - Ready for pickup, price/deposit/balance lines auto-stripped when empty
+-- READY_TO_COLLECT - Ready for pickup (no price lines — price already communicated)
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
-Total to pay: £{price_total}.
-Deposit paid: £{deposit_paid}.
-Balance to pay: £{balance_remaining}.
 
 Please check our opening times before popping in:
 {hours_link}
-
-Track your repair: {tracking_link}
 
 Many thanks,
 New Forest Device Repairs'
@@ -218,16 +213,20 @@ WHERE key = 'POST_COLLECTION_REVIEW';
 -- AFTERCARE_CHECKIN - Sent 2 days after collection (simple check-in, no review link)
 INSERT INTO sms_templates (key, body, is_active)
 SELECT 'AFTERCARE_CHECKIN',
-'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
+'Hi {first_name}, just checking in to make sure your {device_model} is working as expected.
 
-New Forest Device Repairs', true
+If you''ve had any issues at all, just reply to this message and we''ll do our best to put it right.
+
+Thanks, New Forest Device Repairs', true
 WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'AFTERCARE_CHECKIN');
 
 -- Update if already exists
 UPDATE sms_templates SET body =
-'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
+'Hi {first_name}, just checking in to make sure your {device_model} is working as expected.
 
-New Forest Device Repairs'
+If you''ve had any issues at all, just reply to this message and we''ll do our best to put it right.
+
+Thanks, New Forest Device Repairs'
 WHERE key = 'AFTERCARE_CHECKIN';
 
 -- Ensure all templates are active
