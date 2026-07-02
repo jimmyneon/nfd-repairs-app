@@ -15,6 +15,7 @@ function BookingSuccessContent() {
       sessionStorage.removeItem('job_create_form_state')
       sessionStorage.removeItem('quote_customer_data')
       sessionStorage.removeItem('job_creation_overrides')
+      sessionStorage.removeItem('customer_confirm_wizard')
     }
     const timer = setTimeout(() => {
       router.push('/app/jobs/create')

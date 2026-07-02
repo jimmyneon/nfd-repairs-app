@@ -333,6 +333,7 @@ function CreateJobContent() {
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('job_create_form_state')
             sessionStorage.removeItem('quote_customer_data')
+            sessionStorage.removeItem('customer_confirm_wizard')
           }
           // Show success and stay on page for next customer
           alert(`Job created! Ref: ${result.job_ref}\n\nYou can add device details later from the job page.`)
@@ -659,6 +660,44 @@ function CreateJobContent() {
       </header>
 
       <main className="p-4 max-w-2xl mx-auto">
+        {/* Clear Form Button */}
+        <div className="flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Clear all form data and start fresh?')) {
+                setFormData({
+                  device_type: '',
+                  device_make: '',
+                  device_model: '',
+                  issue: '',
+                  description: '',
+                  repair_type: '',
+                  technician_notes: '',
+                  price_total: '',
+                  requires_parts_order: false,
+                  device_left_with_us: true,
+                  passcode_requirement: 'not_required',
+                  linked_quote_id: null,
+                })
+                setCustomerName('')
+                setCustomerPhone('')
+                setValidationErrors({})
+                setShowValidationSummary(false)
+                if (typeof window !== 'undefined') {
+                  sessionStorage.removeItem('job_create_form_state')
+                  sessionStorage.removeItem('quote_customer_data')
+                  sessionStorage.removeItem('job_creation_overrides')
+                  sessionStorage.removeItem('customer_confirm_wizard')
+                }
+              }
+            }}
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-semibold transition-colors flex items-center gap-1"
+          >
+            <Plus className="h-4 w-4 rotate-45" />
+            Clear Form
+          </button>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Super Quick Mode Toggle */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl shadow-lg p-4 border-2 border-green-300 dark:border-green-700">

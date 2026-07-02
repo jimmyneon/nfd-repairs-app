@@ -48,9 +48,25 @@ function CustomerConfirmContent() {
   const totalSteps = passcodeRequired ? 5 : 4 // name, phone, email, [passcode], summary
   const summaryStep = passcodeRequired ? 4 : 3
 
-  // Load customer data from quote conversion if available
+  // Load saved wizard state from sessionStorage (survives back navigation)
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const savedWizard = sessionStorage.getItem('customer_confirm_wizard')
+      if (savedWizard) {
+        try {
+          const saved = JSON.parse(savedWizard)
+          if (saved.customerName) setCustomerName(saved.customerName)
+          if (saved.customerPhone) setCustomerPhone(saved.customerPhone)
+          if (saved.customerEmail) setCustomerEmail(saved.customerEmail)
+          if (saved.devicePassword) setDevicePassword(saved.devicePassword)
+          if (saved.passcodeMethod) setPasscodeMethod(saved.passcodeMethod)
+          if (saved.currentStep !== undefined) setCurrentStep(saved.currentStep)
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+
+      // Also check for quote customer data (takes priority for pre-filling)
       const quoteCustomerData = sessionStorage.getItem('quote_customer_data')
       if (quoteCustomerData) {
         try {
@@ -59,7 +75,6 @@ function CustomerConfirmContent() {
           setCustomerPhone(data.customer_phone || '')
           setCustomerEmail(data.customer_email || '')
           sessionStorage.removeItem('quote_customer_data')
-          // Skip straight to summary if we have name + phone from quote
           if (data.customer_name && data.customer_phone) {
             setCurrentStep(summaryStep)
           }
@@ -69,6 +84,20 @@ function CustomerConfirmContent() {
       }
     }
   }, [])
+
+  // Save wizard state to sessionStorage whenever fields change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('customer_confirm_wizard', JSON.stringify({
+        customerName,
+        customerPhone,
+        customerEmail,
+        devicePassword,
+        passcodeMethod,
+        currentStep,
+      }))
+    }
+  }, [customerName, customerPhone, customerEmail, devicePassword, passcodeMethod, currentStep])
 
   const isSmallDevice = ['phone', 'tablet', 'watch'].includes(jobData.device_type)
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
@@ -276,6 +305,10 @@ function CustomerConfirmContent() {
           message: 'Onboarding completed in-shop by staff',
         } as any)
 
+        // Clear wizard state so next job starts fresh
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('customer_confirm_wizard')
+        }
         // Redirect back to job detail page
         router.push(`/app/jobs/${jobId}`)
         return
@@ -298,6 +331,7 @@ function CustomerConfirmContent() {
           sessionStorage.removeItem('job_create_form_state')
           sessionStorage.removeItem('quote_customer_data')
           sessionStorage.removeItem('job_creation_overrides')
+          sessionStorage.removeItem('customer_confirm_wizard')
         }
         // Show success and redirect
         // API returns job_ref directly, not nested in result.job
