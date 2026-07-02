@@ -29,6 +29,21 @@ function CustomerConfirmContent() {
   const [currentStep, setCurrentStep] = useState(0)
   const [editingField, setEditingField] = useState<string | null>(null)
 
+  // Get job data from URL params
+  const jobId = searchParams.get('jobId') // For completing onboarding on existing job
+  const jobData = {
+    device_make: searchParams.get('device_make') || '',
+    device_model: searchParams.get('device_model') || '',
+    device_type: searchParams.get('device_type') || '',
+    issue: searchParams.get('issue') || '',
+    description: searchParams.get('description') || '',
+    price_total: searchParams.get('price_total') || '0',
+    requires_parts_order: searchParams.get('requires_parts_order') === 'true',
+    device_left_with_us: searchParams.get('device_left_with_us') === 'true',
+    passcode_requirement: searchParams.get('passcode_requirement') || 'recommended',
+    linked_quote_id: searchParams.get('linked_quote_id') || null,
+  }
+
   const passcodeRequired = jobData.passcode_requirement !== 'not_required'
   const totalSteps = passcodeRequired ? 5 : 4 // name, phone, email, [passcode], summary
   const summaryStep = passcodeRequired ? 4 : 3
@@ -54,21 +69,6 @@ function CustomerConfirmContent() {
       }
     }
   }, [])
-
-  // Get job data from URL params
-  const jobId = searchParams.get('jobId') // For completing onboarding on existing job
-  const jobData = {
-    device_make: searchParams.get('device_make') || '',
-    device_model: searchParams.get('device_model') || '',
-    device_type: searchParams.get('device_type') || '',
-    issue: searchParams.get('issue') || '',
-    description: searchParams.get('description') || '',
-    price_total: searchParams.get('price_total') || '0',
-    requires_parts_order: searchParams.get('requires_parts_order') === 'true',
-    device_left_with_us: searchParams.get('device_left_with_us') === 'true',
-    passcode_requirement: searchParams.get('passcode_requirement') || 'recommended',
-    linked_quote_id: searchParams.get('linked_quote_id') || null,
-  }
 
   const isSmallDevice = ['phone', 'tablet', 'watch'].includes(jobData.device_type)
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
