@@ -138,6 +138,8 @@ WHERE key = 'COMPLETED';
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
 The total is £{price_total}.
+Deposit paid: £{deposit_paid}.
+Balance to pay: £{balance_remaining}.
 
 Please check our opening times before popping in:
 {hours_link}

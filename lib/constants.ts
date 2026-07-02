@@ -63,6 +63,8 @@ export const SMS_TEMPLATE_VARIABLES = [
   '{device_summary}',
   '{repair_summary}',
   '{price_total}',
+  '{balance_remaining}',
+  '{deposit_paid}',
   '{deposit_amount}',
   '{deposit_link}',
   '{tracking_link}',

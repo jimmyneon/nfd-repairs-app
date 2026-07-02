@@ -65,6 +65,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [nameValue, setNameValue] = useState('')
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
+  const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -636,10 +637,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (!job) return
     setActionLoading(true)
 
+    const depositAmount = parseFloat(depositAmountInput) || 20.00
+
     await supabase
       .from('jobs')
       .update({ 
         deposit_received: true,
+        deposit_amount: depositAmount,
         status: 'PARTS_ORDERED'
       } as any)
       .eq('id', job.id)
@@ -647,7 +651,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
-      message: `Deposit of £${job.deposit_amount} received`,
+      message: `Deposit of £${depositAmount.toFixed(2)} received`,
     } as any)
 
     await loadJobData()
@@ -724,7 +728,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
               )}
               {job.deposit_required && job.deposit_received && !job.payment_received && (
-                <p className="text-xs text-green-600 font-bold">Deposit paid</p>
+                <p className="text-xs text-green-600 font-bold">
+                  Deposit paid · £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)} due
+                </p>
               )}
             </button>
           </div>
@@ -927,13 +933,32 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <div className="flex items-start space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
-              <div>
+              <div className="flex-1">
                 <p className="font-bold text-yellow-900 text-lg mb-1">
                   Deposit Required
                 </p>
-                <p className="text-yellow-800">
-                  £{job.deposit_amount?.toFixed(2)} deposit needed before ordering parts
+                <p className="text-yellow-800 text-sm mb-3">
+                  Deposit needed before ordering parts
                 </p>
+                <div>
+                  <label className="block text-sm font-semibold text-yellow-900 mb-1">
+                    Deposit Amount (£)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={depositAmountInput}
+                    onChange={(e) => setDepositAmountInput(e.target.value)}
+                    className="w-full px-4 py-3 text-2xl font-bold border-2 border-yellow-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-yellow-900"
+                    placeholder="20.00"
+                  />
+                  {job.price_total > 0 && (
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Balance after deposit: £{(job.price_total - (parseFloat(depositAmountInput) || 0)).toFixed(2)}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <button
@@ -946,15 +971,36 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               ) : (
                 <>
                   <CheckCircle className="h-8 w-8" />
-                  <span>Mark Deposit Received</span>
+                  <span>Mark Deposit Received (£{(parseFloat(depositAmountInput) || 20).toFixed(2)})</span>
                 </>
               )}
             </button>
           </div>
         )}
 
+        {job.deposit_required && job.deposit_received && (
+          <div className="card bg-green-50 border-2 border-green-300">
+            <div className="flex items-start space-x-3">
+              <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <p className="font-bold text-green-900 text-lg mb-1">
+                  Deposit Paid
+                </p>
+                <p className="text-green-800 text-sm">
+                  £{job.deposit_amount?.toFixed(2) || '20.00'} deposit received
+                </p>
+                {job.price_total > 0 && (
+                  <p className="text-green-700 text-sm font-semibold mt-1">
+                    Balance remaining: £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Payment Status Toggle */}
-        {job.price_total > 0 && !job.deposit_required && (
+        {job.price_total > 0 && (!job.deposit_required || job.deposit_received) && (
           <div className={`card ${job.payment_received ? 'bg-green-50 border-2 border-green-300' : 'bg-blue-50 border-2 border-blue-200'}`}>
             <div className="flex items-start space-x-3 mb-4">
               <PoundSterling className={`h-6 w-6 ${job.payment_received ? 'text-green-600' : 'text-blue-600'} flex-shrink-0 mt-1`} />
@@ -965,7 +1011,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <p className="text-gray-700 text-sm">
                   {job.payment_received
                     ? `£${job.price_total.toFixed(2)} paid in full — price won't be included in SMS`
-                    : `£${job.price_total.toFixed(2)} — mark as paid if customer paid in advance`}
+                    : job.deposit_received
+                      ? `£${(job.price_total - (job.deposit_amount || 0)).toFixed(2)} balance remaining — mark as paid when settled`
+                      : `£${job.price_total.toFixed(2)} — mark as paid if customer paid in advance`}
                 </p>
               </div>
             </div>

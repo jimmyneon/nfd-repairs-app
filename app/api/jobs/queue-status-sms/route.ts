@@ -156,12 +156,20 @@ export async function POST(request: NextRequest) {
     const includePrice = hasValidPrice && sendPriceInSms !== false && !job.payment_received
     const priceValue = includePrice ? job.price_total!.toString() : ''
 
+    // Calculate balance remaining after deposit
+    const depositAmount = job.deposit_received ? parseFloat((job.deposit_amount || 0).toString()) : 0
+    const totalPrice = parseFloat((job.price_total || 0).toString())
+    const balanceRemaining = totalPrice > 0 ? (totalPrice - depositAmount).toFixed(2) : ''
+    const depositPaidStr = job.deposit_received && depositAmount > 0 ? depositAmount.toFixed(2) : ''
+
     let smsBody = renderSmsTemplate(template.body, {
       customer_name: job.customer_name,
       first_name: getFirstName(job.customer_name),
       device_make: job.device_make,
       device_model: job.device_model,
       price_total: priceValue,
+      balance_remaining: balanceRemaining,
+      deposit_paid: depositPaidStr,
       tracking_link: trackingUrl,
       job_ref: job.job_ref,
       google_maps_link: mapsLink,
@@ -180,6 +188,22 @@ export async function POST(request: NextRequest) {
         .replace(/£\s*repair/gi, 'repair')
         .replace(/£\s*for your/gi, 'for your')
         .replace(/^.*£\s*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }
+
+    // Clean up empty deposit/balance lines
+    if (!depositPaidStr) {
+      smsBody = smsBody
+        .replace(/^.*Deposit paid: £\s*$/gim, '')
+        .replace(/^.*deposit of £\s*has been paid.*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }
+    if (!balanceRemaining) {
+      smsBody = smsBody
+        .replace(/^.*Balance to pay: £\s*$/gim, '')
+        .replace(/^.*balance of £\s*on collection.*$/gim, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
     }
