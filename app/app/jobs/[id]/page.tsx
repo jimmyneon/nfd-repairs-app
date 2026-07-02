@@ -50,6 +50,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [willSendEmail, setWillSendEmail] = useState(false)
   const [overrideSMS, setOverrideSMS] = useState(false)
   const [overrideEmail, setOverrideEmail] = useState(false)
+  const [sendPriceInSms, setSendPriceInSms] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showBigPassword, setShowBigPassword] = useState(false)
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
@@ -212,6 +213,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setWillSendEmail(config?.send_email && config?.is_active || false)
     setOverrideSMS(false)
     setOverrideEmail(false)
+    setSendPriceInSms(true)
     
     setShowStatusModal(true)
   }
@@ -274,6 +276,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setWillSendEmail(config?.send_email && config?.is_active || false)
     setOverrideSMS(false)
     setOverrideEmail(false)
+    setSendPriceInSms(true)
     
     setShowSimpleConfirm(true)
   }
@@ -324,6 +327,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           body: JSON.stringify({
             jobId: job.id,
             status: pendingWorkflowStatus,
+            sendPriceInSms,
           }),
         })
         if (!response.ok) {
@@ -376,6 +380,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setWillSendEmail(config?.send_email && config?.is_active || false)
     setOverrideSMS(false)
     setOverrideEmail(false)
+    setSendPriceInSms(true)
     
     // Show confirmation modal
     setShowDelayConfirm(true)
@@ -418,6 +423,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           body: JSON.stringify({
             jobId: job.id,
             status: 'DELAYED',
+            sendPriceInSms,
           }),
         })
       } catch (error) {
@@ -466,6 +472,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setWillSendEmail(config?.send_email && config?.is_active || false)
     setOverrideSMS(false)
     setOverrideEmail(false)
+    setSendPriceInSms(true)
     
     // Show confirmation modal
     setShowCancellationConfirm(true)
@@ -508,6 +515,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           body: JSON.stringify({
             jobId: job.id,
             status: 'CANCELLED',
+            sendPriceInSms,
           }),
         })
       } catch (error) {
@@ -588,6 +596,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           body: JSON.stringify({
             jobId: job.id,
             status: newStatus,
+            sendPriceInSms,
           }),
         })
         if (!response.ok) {
@@ -1251,11 +1260,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                         )}
                       </div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Uncheck to skip sending that notification</p>
+
+                      {willSendSMS && !overrideSMS && (pendingWorkflowStatus === 'READY_TO_COLLECT' || pendingWorkflowStatus === 'QUOTE_REMINDER') && job.price_total > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                          <input
+                            type="checkbox"
+                            checked={sendPriceInSms}
+                            onChange={(e) => setSendPriceInSms(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-blue-900 dark:text-blue-200">
+                            <span className="font-semibold">Include price (£{job.price_total.toFixed(2)})</span> in SMS
+                          </span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
-              
+
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -1460,6 +1483,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             }}
             willSendSMS={willSendSMS}
             willSendEmail={willSendEmail}
+            showPriceOption={newStatus === 'READY_TO_COLLECT' || newStatus === 'QUOTE_REMINDER'}
+            priceValue={job.price_total}
+            sendPriceInSms={sendPriceInSms}
+            onSendPriceInSmsChange={setSendPriceInSms}
           />
         )}
 

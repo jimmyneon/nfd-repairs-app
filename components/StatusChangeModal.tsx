@@ -13,6 +13,10 @@ interface StatusChangeModalProps {
   onCancel: () => void
   willSendSMS: boolean
   willSendEmail?: boolean
+  showPriceOption?: boolean
+  priceValue?: number
+  sendPriceInSms?: boolean
+  onSendPriceInSmsChange?: (value: boolean) => void
 }
 
 export default function StatusChangeModal({
@@ -22,7 +26,11 @@ export default function StatusChangeModal({
   onConfirm,
   onCancel,
   willSendSMS,
-  willSendEmail = false
+  willSendEmail = false,
+  showPriceOption = false,
+  priceValue = 0,
+  sendPriceInSms = true,
+  onSendPriceInSmsChange
 }: StatusChangeModalProps) {
   const [sendSMS, setSendSMS] = useState(willSendSMS)
   const [sendEmail, setSendEmail] = useState(willSendEmail)
@@ -104,6 +112,20 @@ export default function StatusChangeModal({
                   )}
                 </div>
                 <p className="text-xs text-blue-600 mt-2">Uncheck to skip sending that notification</p>
+
+                {showPriceOption && priceValue > 0 && sendSMS && (
+                  <label className="flex items-center gap-2 cursor-pointer mt-3 pt-3 border-t border-blue-200">
+                    <input
+                      type="checkbox"
+                      checked={sendPriceInSms}
+                      onChange={(e) => onSendPriceInSmsChange?.(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-blue-900">
+                      <span className="font-semibold">Include price (£{priceValue.toFixed(2)})</span> in SMS
+                    </span>
+                  </label>
+                )}
               </div>
             </div>
           </div>

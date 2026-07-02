@@ -134,11 +134,12 @@ Many thanks,
 New Forest Device Repairs'
 WHERE key = 'COMPLETED';
 
--- READY_TO_COLLECT - Ready for pickup, include price
+-- READY_TO_COLLECT - Ready for pickup, include price (price line stripped if £0)
 UPDATE sms_templates SET body =
-'Hi {first_name}, your {device_model} is ready to collect. The total is £{price_total}.
+'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
+The total is £{price_total}.
 
-Please check our opening times before coming.
+Please check our opening times before popping in:
 {hours_link}
 
 Track your repair: {tracking_link}
@@ -147,15 +148,14 @@ Many thanks,
 New Forest Device Repairs'
 WHERE key = 'READY_TO_COLLECT';
 
--- QUOTE_REMINDER - Gentle nudge to proceed
+-- QUOTE_REMINDER - Gentle, polite nudge to proceed (price line stripped if £0)
 UPDATE sms_templates SET body =
-'Hi {first_name}, just checking — would you like to go ahead with the £{price_total} repair for your {device_model}? No rush, just let us know.
+'Hi {first_name}, just following up — would you like to go ahead with the repair for your {device_model}?
+The quoted price is £{price_total}.
 
-If you would like to check what''s happening with it, please use this link below.
+No rush at all, just let us know either way.
 
-{tracking_link}
-
-We''ll update you as soon as possible.
+Track your repair: {tracking_link}
 
 Many thanks,
 New Forest Device Repairs'

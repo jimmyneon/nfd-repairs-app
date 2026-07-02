@@ -4,7 +4,7 @@ import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 export async function POST(request: NextRequest) {
   try {
-    const { jobId, status } = await request.json()
+    const { jobId, status, sendPriceInSms } = await request.json()
 
     if (!jobId || !status) {
       return NextResponse.json(
@@ -151,12 +151,17 @@ export async function POST(request: NextRequest) {
     const includeMapsLink = !job.device_in_shop || status === 'READY_TO_COLLECT'
     const mapsLink = includeMapsLink ? googleMapsLink : ''
 
+    // Only include price if it's > 0 and the caller hasn't explicitly disabled it
+    const hasValidPrice = job.price_total && parseFloat(job.price_total.toString()) > 0
+    const includePrice = hasValidPrice && sendPriceInSms !== false
+    const priceValue = includePrice ? job.price_total!.toString() : ''
+
     let smsBody = renderSmsTemplate(template.body, {
       customer_name: job.customer_name,
       first_name: getFirstName(job.customer_name),
       device_make: job.device_make,
       device_model: job.device_model,
-      price_total: job.price_total?.toString() || '0',
+      price_total: priceValue,
       tracking_link: trackingUrl,
       job_ref: job.job_ref,
       google_maps_link: mapsLink,
@@ -166,6 +171,18 @@ export async function POST(request: NextRequest) {
       delay_reason: status === 'DELAYED' ? (job.delay_reason || '') : '',
       delay_notes: status === 'DELAYED' ? (job.delay_notes || '') : '',
     })
+
+    // Clean up price-related lines when price was intentionally omitted
+    if (!includePrice) {
+      smsBody = smsBody
+        .replace(/^The total is £\s*$/gim, '')
+        .replace(/^The quoted price is £\s*$/gim, '')
+        .replace(/£\s*repair/gi, 'repair')
+        .replace(/£\s*for your/gi, 'for your')
+        .replace(/^.*£\s*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    }
 
     // Clean up any dangling labels if the maps link was intentionally omitted
     if (!includeMapsLink) {
