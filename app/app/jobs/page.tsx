@@ -298,35 +298,7 @@ export default function JobsListPageV2() {
             </button>
           </div>
 
-          {/* Quick Filter Chips */}
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-            {[
-              { key: 'all', label: 'All', icon: null },
-              { key: 'arrived', label: 'Customer Here', icon: MapPin },
-              { key: 'in_shop', label: 'In Shop', icon: Package },
-              { key: 'needs_parts', label: 'Needs Parts', icon: Clock },
-              { key: 'deposit', label: 'Deposit Due', icon: AlertTriangle },
-              { key: 'overdue', label: 'Overdue', icon: Flame },
-            ].map((chip) => {
-              const Icon = chip.icon
-              const isActive = activeFilter === chip.key
-              return (
-                <button
-                  key={chip.key}
-                  onClick={() => setActiveFilter(chip.key)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                    isActive
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`
-                }
-                >
-                  {Icon && <Icon className="h-3 w-3" />}
-                  {chip.label}
-                </button>
-              )
-            })}
-          </div>
+          {/* Quick filter chips removed — moved to job detail page */}
         </div>
       </header>
 

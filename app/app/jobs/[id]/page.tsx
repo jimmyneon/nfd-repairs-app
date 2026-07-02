@@ -732,8 +732,55 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   Deposit paid · £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)} due
                 </p>
               )}
+              {!job.payment_received && !job.deposit_required && job.price_total > 0 && (
+                <p className="text-xs text-orange-600 font-bold">Payment due</p>
+              )}
             </button>
           </div>
+
+          {/* Payment status + mark as paid button (under price) */}
+          {job.price_total > 0 && (!job.deposit_required || job.deposit_received) && (
+            <button
+              onClick={async () => {
+                if (!job) return
+                setActionLoading(true)
+                const newValue = !job.payment_received
+                await supabase
+                  .from('jobs')
+                  .update({ payment_received: newValue })
+                  .eq('id', job.id)
+                await supabase.from('job_events').insert({
+                  job_id: job.id,
+                  type: 'NOTE',
+                  message: newValue
+                    ? `Payment of £${job.price_total.toFixed(2)} marked as received`
+                    : 'Payment status reset to unpaid',
+                })
+                await loadJobData()
+                setActionLoading(false)
+              }}
+              disabled={actionLoading}
+              className={`w-full mt-3 font-bold py-3 px-4 rounded-xl text-sm disabled:opacity-50 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${
+                job.payment_received
+                  ? 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {actionLoading ? (
+                <span>Processing...</span>
+              ) : job.payment_received ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Mark as Unpaid</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Mark as Paid{job.deposit_received ? ` (£${(job.price_total - (job.deposit_amount || 0)).toFixed(2)} balance)` : ''}</span>
+                </>
+              )}
+            </button>
+          )}
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job.status]}`}>
               {JOB_STATUS_LABELS[job.status]}
@@ -999,65 +1046,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* Payment Status Toggle */}
-        {job.price_total > 0 && (!job.deposit_required || job.deposit_received) && (
-          <div className={`card ${job.payment_received ? 'bg-green-50 border-2 border-green-300' : 'bg-blue-50 border-2 border-blue-200'}`}>
-            <div className="flex items-start space-x-3 mb-4">
-              <PoundSterling className={`h-6 w-6 ${job.payment_received ? 'text-green-600' : 'text-blue-600'} flex-shrink-0 mt-1`} />
-              <div className="flex-1">
-                <p className="font-bold text-gray-900 text-lg mb-1">
-                  {job.payment_received ? 'Payment Received' : 'Payment Outstanding'}
-                </p>
-                <p className="text-gray-700 text-sm">
-                  {job.payment_received
-                    ? `£${job.price_total.toFixed(2)} paid in full — price won't be included in SMS`
-                    : job.deposit_received
-                      ? `£${(job.price_total - (job.deposit_amount || 0)).toFixed(2)} balance remaining — mark as paid when settled`
-                      : `£${job.price_total.toFixed(2)} — mark as paid if customer paid in advance`}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={async () => {
-                if (!job) return
-                setActionLoading(true)
-                const newValue = !job.payment_received
-                await supabase
-                  .from('jobs')
-                  .update({ payment_received: newValue })
-                  .eq('id', job.id)
-                await supabase.from('job_events').insert({
-                  job_id: job.id,
-                  type: 'NOTE',
-                  message: newValue
-                    ? `Payment of £${job.price_total.toFixed(2)} marked as received`
-                    : 'Payment status reset to unpaid',
-                })
-                await loadJobData()
-                setActionLoading(false)
-              }}
-              disabled={actionLoading}
-              className={`w-full font-black py-4 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3 ${
-                job.payment_received
-                  ? 'bg-gray-300 hover:bg-gray-400 text-gray-800'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {actionLoading ? (
-                <span>Processing...</span>
-              ) : job.payment_received ? (
-                <>
-                  <span>Mark as Unpaid</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-6 w-6" />
-                  <span>Mark as Paid</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Payment Status Toggle — moved to header under price button */}
 
         <div className="card">
           <h2 className="text-xl font-black text-gray-900 mb-5">Update Status</h2>

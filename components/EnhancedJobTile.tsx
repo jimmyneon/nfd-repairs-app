@@ -10,8 +10,8 @@ import {
   getCustomerFlagEmoji,
   getPriorityEmoji
 } from '@/lib/job-utils'
-import { MapPin, MoreVertical } from 'lucide-react'
-import { useState } from 'react'
+import { MapPin, CheckCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
 import QuickActionsModal from '@/components/QuickActionsModal'
 import { JobStatus } from '@/lib/types-v3'
 
@@ -56,7 +56,36 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
     router.push(`/app/jobs/${job.id}`)
   }
 
-  const handleQuickActionsClick = (e: React.MouseEvent) => {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    longPressTriggered.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      setShowQuickActions(true)
+    }, 500)
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    if (longPressTriggered.current) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
+  const handleTouchMove = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setShowQuickActions(true)
@@ -106,7 +135,11 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
     <>
       <div
         onClick={handleCardClick}
-        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square ${statusBg} ${
+        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
+        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-l-4 ${statusBg} ${
           customerArrived ? 'ring-4 ring-yellow-400 ring-offset-2 animate-pulse' : ''
         }`}
       >
@@ -121,25 +154,24 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
             </div>
           )}
 
-          {/* Top Row: Status label + Quick actions button */}
+          {/* Top Row: Status label + badges */}
           <div className="flex items-center justify-between mb-1">
             <p className="font-black text-xs leading-tight uppercase tracking-wide">
               {getShortStatus(job.status)}
             </p>
             <div className="flex items-center gap-1">
+              {job.payment_received && (
+                <span className="bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <CheckCircle className="h-3 w-3" />
+                  PAID
+                </span>
+              )}
               {priorityEmoji && (
                 <span className="text-sm" title="High Priority">{priorityEmoji}</span>
               )}
               {flagEmoji && (
                 <span className="text-sm" title={job.customer_flag || undefined}>{flagEmoji}</span>
               )}
-              <button
-                onClick={handleQuickActionsClick}
-                className="text-white/70 hover:text-white p-0.5 -mr-1 rounded-lg hover:bg-white/10 transition-colors"
-                title="Quick Actions"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
             </div>
           </div>
 

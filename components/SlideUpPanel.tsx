@@ -26,12 +26,15 @@ export default function SlideUpPanel({
   const [isDragging, setIsDragging] = useState(false)
   const dragStartY = useRef(0)
   const panelRef = useRef<HTMLDivElement>(null)
+  const savedOverflow = useRef<string>('')
 
   useEffect(() => {
     if (isOpen) {
       setVisible(true)
       setMounted(false)
       setDragY(0)
+      // Save current overflow value before locking
+      savedOverflow.current = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       // Next frame: trigger transition to translate-y-0
       requestAnimationFrame(() => {
@@ -42,10 +45,18 @@ export default function SlideUpPanel({
     } else {
       setMounted(false)
       const timer = setTimeout(() => setVisible(false), 300)
-      document.body.style.overflow = ''
+      // Restore original overflow value
+      document.body.style.overflow = savedOverflow.current
       return () => clearTimeout(timer)
     }
   }, [isOpen])
+
+  // Cleanup on unmount: ensure scroll is restored if panel was open
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = savedOverflow.current
+    }
+  }, [])
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     dragStartY.current = e.touches[0].clientY
