@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
-import { getFirstName } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 /**
  * POST /api/jobs/send-collection-sms
@@ -64,13 +64,35 @@ export async function POST(request: NextRequest) {
     // Get first name from customer name, with a safe fallback
     const firstName = getFirstName(job.customer_name)
 
-    // Build SMS message - review-first, suggest 5-star, reply here for issues
-    const smsBody = `Hi ${firstName}, thanks for coming in! If you're happy with your ${job.device_model} repair, a 5-star Google review would mean a lot to us:
+    // Fetch the POST_COLLECTION_REVIEW template from the database
+    const { data: reviewTemplate } = await supabase
+      .from('sms_templates')
+      .select('*')
+      .eq('key', 'POST_COLLECTION_REVIEW')
+      .eq('is_active', true)
+      .single()
+
+    // Build SMS message from template, or fall back to hardcoded default
+    let smsBody: string
+    if (reviewTemplate) {
+      smsBody = renderSmsTemplate(reviewTemplate.body, {
+        first_name: firstName,
+        customer_name: job.customer_name,
+        device_make: job.device_make || '',
+        device_model: job.device_model || '',
+        review_link: googleReviewLink,
+        tracking_link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/t/${job.tracking_token}`,
+        job_ref: job.job_ref,
+      })
+    } else {
+      // Fallback if template not in database
+      smsBody = `Hi ${firstName}, thanks for coming in! If you're happy with your ${job.device_model} repair, a 5-star Google review would mean a lot to us:
 ${googleReviewLink}
 
 Any issues, just reply here.
 
 New Forest Device Repairs`
+    }
 
     // Send SMS via MacroDroid
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
@@ -253,7 +275,7 @@ export async function GET(request: NextRequest) {
     // Also get jobs with scheduled aftercare SMS that haven't been sent yet
     const { data: aftercareJobs, error: aftercareError } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_phone, customer_name, device_model')
+      .select('id, job_ref, customer_phone, customer_name, device_make, device_model')
       .not('aftercare_sms_scheduled_at', 'is', null)
       .is('aftercare_sms_sent_at', null)
       .lte('aftercare_sms_scheduled_at', new Date().toISOString())
@@ -336,6 +358,14 @@ export async function GET(request: NextRequest) {
     // Send aftercare SMS directly (simple check-in, no review link)
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (aftercareJobs && aftercareJobs.length > 0 && webhookUrl) {
+      // Fetch the AFTERCARE_CHECKIN template
+      const { data: aftercareTemplate } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('key', 'AFTERCARE_CHECKIN')
+        .eq('is_active', true)
+        .single()
+
       console.log(`Processing ${aftercareJobs.length} aftercare SMS`)
 
       for (let i = 0; i < aftercareJobs.length; i++) {
@@ -343,9 +373,22 @@ export async function GET(request: NextRequest) {
 
         try {
           const firstName = getFirstName(job.customer_name)
-          const aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
+          let aftercareBody: string
+
+          if (aftercareTemplate) {
+            aftercareBody = renderSmsTemplate(aftercareTemplate.body, {
+              first_name: firstName,
+              customer_name: job.customer_name,
+              device_make: job.device_make || '',
+              device_model: job.device_model || '',
+              job_ref: job.job_ref,
+            })
+          } else {
+            // Fallback if template not in database
+            aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
 
 New Forest Device Repairs`
+          }
 
           console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, JOB_STATUS_BORDER_COLORS } from '@/lib/constants'
+import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
 import { JobWithMetrics } from '@/lib/job-utils'
 import {
   formatTimeInStatus,
@@ -10,22 +10,10 @@ import {
   getCustomerFlagEmoji,
   getPriorityEmoji
 } from '@/lib/job-utils'
-import { MapPin, Clock, MoreVertical, User } from 'lucide-react'
+import { MapPin, MoreVertical } from 'lucide-react'
 import { useState } from 'react'
 import QuickActionsModal from '@/components/QuickActionsModal'
 import { JobStatus } from '@/lib/types-v3'
-
-function formatStatusTimestamp(dateStr: string | null | undefined): string {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-
-  if (isToday) {
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  }
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
 
 interface EnhancedJobTileProps {
   job: JobWithMetrics
@@ -112,88 +100,70 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
     router.refresh()
   }
 
-  // Status accent color for left border
-  const borderAccent = JOB_STATUS_BORDER_COLORS[job.status] || 'border-gray-400'
   const statusBg = JOB_STATUS_COLORS[job.status] || 'bg-gray-600 text-white'
 
   return (
     <>
       <div
         onClick={handleCardClick}
-        className={`relative bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer select-none border-l-4 ${borderAccent} ${
+        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square ${statusBg} ${
           customerArrived ? 'ring-4 ring-yellow-400 ring-offset-2 animate-pulse' : ''
         }`}
       >
-        {/* Customer Arrived Banner */}
-        {customerArrived && (
-          <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-gray-900 px-2 py-1 text-center z-10 rounded-t-xl">
-            <div className="flex items-center justify-center gap-1 text-xs font-black">
-              <MapPin className="h-3 w-3" />
-              <span>CUSTOMER HERE</span>
+        <div className={`p-3 h-full flex flex-col relative text-white ${customerArrived ? 'pt-8' : ''}`}>
+          {/* Customer Arrived Banner */}
+          {customerArrived && (
+            <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-gray-900 px-2 py-1 text-center z-10 rounded-t-xl">
+              <div className="flex items-center justify-center gap-1 text-xs font-black">
+                <MapPin className="h-3 w-3" />
+                <span>CUSTOMER HERE</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className={`p-3 ${customerArrived ? 'pt-8' : ''}`}>
-          {/* Top Row: Status badge + Quick actions button */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <span className={`${statusBg} px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide`}>
-                {getShortStatus(job.status)}
-              </span>
+          {/* Top Row: Status label + Quick actions button */}
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-black text-xs leading-tight uppercase tracking-wide">
+              {getShortStatus(job.status)}
+            </p>
+            <div className="flex items-center gap-1">
               {priorityEmoji && (
                 <span className="text-sm" title="High Priority">{priorityEmoji}</span>
               )}
               {flagEmoji && (
                 <span className="text-sm" title={job.customer_flag || undefined}>{flagEmoji}</span>
               )}
+              <button
+                onClick={handleQuickActionsClick}
+                className="text-white/70 hover:text-white p-0.5 -mr-1 rounded-lg hover:bg-white/10 transition-colors"
+                title="Quick Actions"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              onClick={handleQuickActionsClick}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 -mr-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Quick Actions"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
           </div>
 
-          {/* Main Content: Device & Issue */}
-          <div className="mb-2">
-            <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight truncate">
-              {job.device_make} {job.device_model}
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{job.issue}</p>
+          {/* Device & Issue - Main Content */}
+          <div className="flex-1 flex flex-col justify-center text-center">
+            <p className="text-sm font-black leading-tight mb-1 truncate">{job.device_make} {job.device_model}</p>
+            <p className="text-xs font-semibold truncate opacity-90">{job.issue}</p>
           </div>
 
-          {/* Customer name */}
-          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
-            <User className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{job.customer_name}</span>
-          </div>
-
-          {/* Blocker Badge (if applicable) */}
+          {/* Blocker Badge */}
           {blockerText && (
-            <div className="mb-2 bg-gray-100 dark:bg-gray-700 rounded-md px-2 py-1">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate">{blockerText}</p>
+            <div className="mb-1 bg-white/20 rounded-md px-2 py-0.5">
+              <p className="text-xs font-semibold truncate">{blockerText}</p>
             </div>
           )}
 
           {/* Bottom Row: Time + Deposit indicator */}
-          <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-2">
-            <div className="flex flex-col">
-              <span className={`font-bold ${timeWarning ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                {timeWarning && '⚠️ '}{timeText}
-              </span>
-              {job.status_changed_at && (
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
-                  <Clock className="h-2.5 w-2.5" />
-                  {formatStatusTimestamp(job.status_changed_at)}
-                </span>
-              )}
-            </div>
+          <div className="flex items-center justify-between text-xs border-t border-white/20 pt-1.5">
+            <span className={`font-bold ${timeWarning ? 'text-yellow-300' : 'opacity-80'}`}>
+              {timeWarning && '⚠️ '}{timeText}
+            </span>
             {job.deposit_required && !job.deposit_received && (
-              <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-full px-2 py-0.5">
-                <span className="text-xs font-black text-yellow-700 dark:text-yellow-400">£ Deposit</span>
+              <div className="w-5 h-5 bg-white rounded-full shadow-md flex items-center justify-center">
+                <span className="text-xs font-black text-yellow-600">£</span>
               </div>
             )}
           </div>

@@ -70,6 +70,7 @@ export const SMS_TEMPLATE_VARIABLES = [
   '{google_maps_link}',
   '{location_link}',
   '{hours_link}',
+  '{review_link}',
   '{delay_reason}',
   '{delay_notes}',
   '{shop_address}',

@@ -189,10 +189,50 @@ WHERE key = 'DELAYED' OR key = 'DELAY_NOTIFICATION';
 -- via /api/jobs/send-collection-sms (delayed, aftercare-first with review link)
 DELETE FROM sms_templates WHERE key = 'COLLECTED';
 
+-- POST_COLLECTION_REVIEW - Sent 3 hours after collection (or next morning)
+-- Uses {review_link} which is populated from admin_settings.google_review_link
+INSERT INTO sms_templates (key, body, is_active)
+SELECT 'POST_COLLECTION_REVIEW',
+'Hi {first_name}, thanks for coming in! If you''re happy with your {device_model} repair, a 5-star Google review would mean a lot to us:
+
+{review_link}
+
+Any issues, just reply here.
+
+New Forest Device Repairs', true
+WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'POST_COLLECTION_REVIEW');
+
+-- Update if already exists
+UPDATE sms_templates SET body =
+'Hi {first_name}, thanks for coming in! If you''re happy with your {device_model} repair, a 5-star Google review would mean a lot to us:
+
+{review_link}
+
+Any issues, just reply here.
+
+New Forest Device Repairs'
+WHERE key = 'POST_COLLECTION_REVIEW';
+
+-- AFTERCARE_CHECKIN - Sent 2 days after collection (simple check-in, no review link)
+INSERT INTO sms_templates (key, body, is_active)
+SELECT 'AFTERCARE_CHECKIN',
+'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
+
+New Forest Device Repairs', true
+WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'AFTERCARE_CHECKIN');
+
+-- Update if already exists
+UPDATE sms_templates SET body =
+'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
+
+New Forest Device Repairs'
+WHERE key = 'AFTERCARE_CHECKIN';
+
 -- Ensure all templates are active
 UPDATE sms_templates SET is_active = true WHERE key IN (
   'RECEIVED', 'QUOTE_APPROVED', 'ONBOARDING_WITH_DEPOSIT', 'ONBOARDING_REQUIRED',
   'DEPOSIT_REQUIRED', 'AWAITING_DEPOSIT', 'DEPOSIT_RECEIVED', 'PARTS_ORDERED',
   'PARTS_ARRIVED', 'IN_REPAIR', 'COMPLETED', 'READY_TO_COLLECT',
-  'QUOTE_REMINDER', 'CANCELLED', 'DELAYED', 'DELAY_NOTIFICATION'
+  'QUOTE_REMINDER', 'CANCELLED', 'DELAYED', 'DELAY_NOTIFICATION',
+  'POST_COLLECTION_REVIEW', 'AFTERCARE_CHECKIN'
 );
