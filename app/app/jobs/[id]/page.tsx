@@ -717,10 +717,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               className="text-right flex-shrink-0 active:scale-95 transition-transform"
             >
               <p className="text-2xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
+              {job.payment_received && (
+                <p className="text-xs text-green-600 font-bold">Paid in full</p>
+              )}
               {job.deposit_required && !job.deposit_received && (
                 <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
               )}
-              {job.deposit_required && job.deposit_received && (
+              {job.deposit_required && job.deposit_received && !job.payment_received && (
                 <p className="text-xs text-green-600 font-bold">Deposit paid</p>
               )}
             </button>
@@ -944,6 +947,64 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <>
                   <CheckCircle className="h-8 w-8" />
                   <span>Mark Deposit Received</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Payment Status Toggle */}
+        {job.price_total > 0 && !job.deposit_required && (
+          <div className={`card ${job.payment_received ? 'bg-green-50 border-2 border-green-300' : 'bg-blue-50 border-2 border-blue-200'}`}>
+            <div className="flex items-start space-x-3 mb-4">
+              <PoundSterling className={`h-6 w-6 ${job.payment_received ? 'text-green-600' : 'text-blue-600'} flex-shrink-0 mt-1`} />
+              <div className="flex-1">
+                <p className="font-bold text-gray-900 text-lg mb-1">
+                  {job.payment_received ? 'Payment Received' : 'Payment Outstanding'}
+                </p>
+                <p className="text-gray-700 text-sm">
+                  {job.payment_received
+                    ? `£${job.price_total.toFixed(2)} paid in full — price won't be included in SMS`
+                    : `£${job.price_total.toFixed(2)} — mark as paid if customer paid in advance`}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!job) return
+                setActionLoading(true)
+                const newValue = !job.payment_received
+                await supabase
+                  .from('jobs')
+                  .update({ payment_received: newValue })
+                  .eq('id', job.id)
+                await supabase.from('job_events').insert({
+                  job_id: job.id,
+                  type: 'NOTE',
+                  message: newValue
+                    ? `Payment of £${job.price_total.toFixed(2)} marked as received`
+                    : 'Payment status reset to unpaid',
+                })
+                await loadJobData()
+                setActionLoading(false)
+              }}
+              disabled={actionLoading}
+              className={`w-full font-black py-4 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3 ${
+                job.payment_received
+                  ? 'bg-gray-300 hover:bg-gray-400 text-gray-800'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {actionLoading ? (
+                <span>Processing...</span>
+              ) : job.payment_received ? (
+                <>
+                  <span>Mark as Unpaid</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-6 w-6" />
+                  <span>Mark as Paid</span>
                 </>
               )}
             </button>

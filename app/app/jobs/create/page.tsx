@@ -232,7 +232,7 @@ function CreateJobContent() {
         errors.device_type = 'Device type is required'
       }
       
-      if (!formData.device_make) {
+      if (!formData.device_make && formData.device_type !== 'other') {
         errors.device_make = 'Device make is required'
       }
       
@@ -547,7 +547,8 @@ function CreateJobContent() {
       setFormData(prev => ({
         ...prev,
         device_type: value,
-        device_make: '',
+        // For 'other' device type, auto-set make to N/A since it doesn't matter
+        device_make: value === 'other' ? 'N/A' : '',
       }))
       setShowMakeOther(false)
       return
@@ -862,7 +863,7 @@ function CreateJobContent() {
                 )}
               </div>
 
-              {formData.device_type && (
+              {formData.device_type && formData.device_type !== 'other' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Make <span className="text-red-500">*</span>
@@ -919,7 +920,7 @@ function CreateJobContent() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Model {!quickWalkInMode && <span className="text-red-500">*</span>}
+                  {formData.device_type === 'other' ? 'Device Name' : 'Model'} {!quickWalkInMode && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
@@ -932,7 +933,9 @@ function CreateJobContent() {
                       ? 'border-red-500 dark:border-red-500 focus:ring-red-500' 
                       : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
                   }`}
-                  placeholder={quickWalkInMode ? "Optional - or use preset above" : "e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"}
+                  placeholder={formData.device_type === 'other' 
+                    ? "e.g. Printer, Radio, Drone, TV..." 
+                    : quickWalkInMode ? "Optional - or use preset above" : "e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"}
                 />
                 {validationErrors.device_model && (
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">

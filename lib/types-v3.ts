@@ -64,6 +64,7 @@ export interface Job {
   deposit_required: boolean
   deposit_amount?: number | null
   deposit_received: boolean
+  payment_received?: boolean
   
   // Device possession tracking
   device_in_shop: boolean

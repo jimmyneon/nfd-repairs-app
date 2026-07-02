@@ -151,9 +151,9 @@ export async function POST(request: NextRequest) {
     const includeMapsLink = !job.device_in_shop || status === 'READY_TO_COLLECT'
     const mapsLink = includeMapsLink ? googleMapsLink : ''
 
-    // Only include price if it's > 0 and the caller hasn't explicitly disabled it
+    // Only include price if it's > 0, the caller hasn't disabled it, and the customer hasn't already paid
     const hasValidPrice = job.price_total && parseFloat(job.price_total.toString()) > 0
-    const includePrice = hasValidPrice && sendPriceInSms !== false
+    const includePrice = hasValidPrice && sendPriceInSms !== false && !job.payment_received
     const priceValue = includePrice ? job.price_total!.toString() : ''
 
     let smsBody = renderSmsTemplate(template.body, {

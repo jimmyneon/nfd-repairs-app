@@ -105,7 +105,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
       setFormData(prev => ({
         ...prev,
         device_type: value,
-        device_make: '',
+        device_make: value === 'other' ? 'N/A' : '',
       }))
       setShowMakeOther(false)
       return
@@ -209,7 +209,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                 </select>
               </div>
 
-              {formData.device_type && (
+              {formData.device_type && formData.device_type !== 'other' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Make *
@@ -241,7 +241,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Model *
+                  {formData.device_type === 'other' ? 'Device Name *' : 'Model *'}
                 </label>
                 <input
                   type="text"
@@ -250,7 +250,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"
+                  placeholder={formData.device_type === 'other' ? "e.g. Printer, Radio, Drone, TV..." : "e.g. iPhone 14 Pro, Galaxy S23, ThinkPad X1"}
                 />
               </div>
 
