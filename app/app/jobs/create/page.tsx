@@ -631,21 +631,17 @@ function CreateJobContent() {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setShowCustomerSearch(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors text-xs font-semibold">
-              <UserSearch className="h-4 w-4" />
-              <span>Customers</span>
+            <button type="button" onClick={() => setShowCustomerSearch(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors active:scale-90" title="Search Customers">
+              <UserSearch className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => setShowQuoteLookup(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-xs font-semibold">
-              <Search className="h-4 w-4" />
-              <span>Quotes</span>
+            <button type="button" onClick={() => setShowQuoteLookup(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Search Quotes">
+              <Search className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => setShowImportModal(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors text-xs font-semibold">
-              <FileJson className="h-4 w-4" />
-              <span>Import</span>
+            <button type="button" onClick={() => setShowImportModal(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Import JSON">
+              <FileJson className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors text-xs font-semibold ml-auto">
-              <Trash2 className="h-4 w-4" />
-              <span>Clear</span>
+            <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors active:scale-90 ml-auto" title="Clear Form">
+              <Trash2 className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -1030,49 +1026,45 @@ function CreateJobContent() {
           )}
 
           {!superQuickMode && (quickWalkInMode ? (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Price & Quick Options</h2>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Price (£)
-                    </label>
-                    <input
-                      type="number"
-                      name="price_total"
-                      value={formData.price_total}
-                      onChange={handleChange}
-                      required={false}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-semibold"
-                      placeholder="Optional - add later if needed"
-                    />
-                  </div>
-                  <div className="flex items-center">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="requires_parts_order"
-                        checked={formData.requires_parts_order}
-                        onChange={handleChange}
-                        className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">Parts needed?</span>
-                    </label>
-                  </div>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Price & Options</h2>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Price (£)
+                  </label>
+                  <input
+                    type="number"
+                    name="price_total"
+                    value={formData.price_total}
+                    onChange={handleChange}
+                    required={false}
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold"
+                    placeholder="Add later"
+                  />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
+                  className={`px-4 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center gap-2 ${
+                    formData.requires_parts_order
+                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                      : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  <Wrench className="h-4 w-4" />
+                  Parts
+                </button>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Pricing & Parts</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Pricing & Parts</h2>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                     Total Price (£)
                   </label>
                   <input
@@ -1083,25 +1075,26 @@ function CreateJobContent() {
                     required={false}
                     step="0.01"
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Optional - can be added later"
+                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold"
+                    placeholder="Can be added later"
                   />
                 </div>
-
-                <div className="flex items-center space-x-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border-2 border-yellow-200 dark:border-yellow-800">
-                  <input
-                    type="checkbox"
-                    name="requires_parts_order"
-                    checked={formData.requires_parts_order}
-                    onChange={handleChange}
-                    className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
-                    id="requires_parts"
-                  />
-                  <label htmlFor="requires_parts" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                    Requires parts order (£20 deposit will be requested)
-                  </label>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
+                  className={`px-4 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center gap-2 self-end h-[42px] ${
+                    formData.requires_parts_order
+                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                      : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  <Wrench className="h-4 w-4" />
+                  Parts
+                </button>
               </div>
+              {formData.requires_parts_order && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">£20 deposit will be requested</p>
+              )}
             </div>
           ))}
 

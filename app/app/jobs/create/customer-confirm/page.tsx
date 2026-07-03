@@ -384,9 +384,9 @@ function CustomerConfirmContent() {
           )}
         </div>
 
-        <div className="flex gap-4 items-stretch">
+        <div className="relative md:pr-[19rem]">
           {/* Main wizard column */}
-          <div className="flex-1 min-w-0 max-w-2xl mx-auto w-full">
+          <div className="max-w-2xl mx-auto w-full">
 
         {/* Step 0: Full Name */}
         {currentStep === 0 && (
@@ -647,8 +647,8 @@ function CustomerConfirmContent() {
 
           </div>
 
-          {/* Device info sidebar — right side on md+, hidden on mobile */}
-          <div className="hidden md:block w-72 flex-shrink-0 self-stretch">
+          {/* Device info sidebar — absolutely positioned to match main card height exactly */}
+          <div className="hidden md:block absolute top-0 right-0 bottom-0 w-72">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 h-full flex flex-col overflow-hidden">
               {/* Icon + device */}
               <div className="flex flex-col items-center text-center mb-3">
