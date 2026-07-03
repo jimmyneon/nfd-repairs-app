@@ -182,6 +182,36 @@ Many thanks,
 New Forest Device Repairs'
 WHERE key = 'DELAYED' OR key = 'DELAY_NOTIFICATION';
 
+-- DEPOSIT_REQUEST - Sent when staff manually sends deposit request from job card
+-- Uses {deposit_link} (SumUp payment link) and {deposit_amount}
+INSERT INTO sms_templates (key, body, is_active)
+SELECT 'DEPOSIT_REQUEST',
+'Hi {first_name}, we need to order parts for your {device_model}. To pay the £{deposit_amount} deposit and get that started, please use this link below.
+
+{deposit_link}
+
+If you would like to check what''s happening with it, please use this link below.
+
+{tracking_link}
+
+Many thanks,
+New Forest Device Repairs', true
+WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'DEPOSIT_REQUEST');
+
+-- Update if already exists
+UPDATE sms_templates SET body =
+'Hi {first_name}, we need to order parts for your {device_model}. To pay the £{deposit_amount} deposit and get that started, please use this link below.
+
+{deposit_link}
+
+If you would like to check what''s happening with it, please use this link below.
+
+{tracking_link}
+
+Many thanks,
+New Forest Device Repairs'
+WHERE key = 'DEPOSIT_REQUEST';
+
 -- COLLECTED template removed — post-collection aftercare SMS is sent separately
 -- via /api/jobs/send-collection-sms (delayed, aftercare-first with review link)
 DELETE FROM sms_templates WHERE key = 'COLLECTED';
@@ -236,5 +266,6 @@ UPDATE sms_templates SET is_active = true WHERE key IN (
   'DEPOSIT_REQUIRED', 'AWAITING_DEPOSIT', 'DEPOSIT_RECEIVED', 'PARTS_ORDERED',
   'PARTS_ARRIVED', 'IN_REPAIR', 'COMPLETED', 'READY_TO_COLLECT',
   'QUOTE_REMINDER', 'CANCELLED', 'DELAYED', 'DELAY_NOTIFICATION',
+  'DEPOSIT_REQUEST',
   'POST_COLLECTION_REVIEW', 'AFTERCARE_CHECKIN'
 );

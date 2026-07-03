@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,18 +56,58 @@ export async function POST(
       console.error('Failed to create deposit request event:', eventError)
     }
 
-    // Send SMS about deposit request
+    // Send SMS using DEPOSIT_REQUEST template from database
     try {
-      const smsMessage = `Your £${job.deposit_amount || 20.00} deposit is required for parts. Please visit our shop to pay. Ref: ${job.job_ref}`
-      
-      await fetch('/api/sms/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: job.customer_phone,
-          message: smsMessage,
-          job_id: jobId,
-        }),
+      const firstName = getFirstName(job.customer_name)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+      const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      const depositAmount = (job.deposit_amount || 20.00).toFixed(2)
+
+      // Fetch template from database
+      const { data: template } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('key', 'DEPOSIT_REQUEST')
+        .eq('is_active', true)
+        .single()
+
+      let smsMessage: string
+      if (template) {
+        smsMessage = renderSmsTemplate(template.body, {
+          first_name: firstName,
+          customer_name: job.customer_name || '',
+          device_make: job.device_make || '',
+          device_model: job.device_model || '',
+          deposit_amount: depositAmount,
+          deposit_link: depositUrl,
+          tracking_link: trackingUrl,
+          job_ref: job.job_ref,
+        })
+      } else {
+        // Fallback if template not in database
+        smsMessage = `Hi ${firstName}, we need to order parts for your ${job.device_model || 'device'}. To pay the £${depositAmount} deposit and get that started, please use this link below.\n\n${depositUrl}\n\nIf you would like to check what's happening with it, please use this link below.\n\n${trackingUrl}\n\nMany thanks,\nNew Forest Device Repairs`
+      }
+
+      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+      if (webhookUrl) {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: job.customer_phone,
+            message: smsMessage,
+          }),
+        })
+      } else {
+        console.error('MACRODROID_WEBHOOK_URL not configured')
+      }
+
+      // Log the SMS
+      await supabase.from('job_events').insert({
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: 'Deposit request SMS sent to customer',
       })
     } catch (smsError) {
       console.error('Failed to send deposit SMS:', smsError)

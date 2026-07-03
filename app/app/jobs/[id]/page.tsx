@@ -658,6 +658,33 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setActionLoading(false)
   }
 
+  const [depositSending, setDepositSending] = useState(false)
+  const sendDepositRequest = async () => {
+    if (!job) return
+    setDepositSending(true)
+
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/request-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'SYSTEM',
+          message: 'Deposit request SMS sent to customer',
+        } as any)
+        await loadJobData()
+      }
+    } catch (error) {
+      console.error('Failed to send deposit request:', error)
+    }
+
+    setDepositSending(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -965,20 +992,33 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
             </div>
-            <button
-              onClick={markDepositReceived}
-              disabled={actionLoading}
-              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-            >
-              {actionLoading ? (
-                <span>Processing...</span>
-              ) : (
-                <>
-                  <CheckCircle className="h-8 w-8" />
-                  <span>Mark Deposit Received (£{(parseFloat(depositAmountInput) || 20).toFixed(2)})</span>
-                </>
-              )}
-            </button>
+            <div className="space-y-3">
+              <button
+                onClick={sendDepositRequest}
+                disabled={depositSending || actionLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                {depositSending ? (
+                  <><RefreshCw className="h-6 w-6 animate-spin" /><span>Sending...</span></>
+                ) : (
+                  <><Send className="h-6 w-6" /><span>Send Deposit Request SMS</span></>
+                )}
+              </button>
+              <button
+                onClick={markDepositReceived}
+                disabled={actionLoading || depositSending}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                {actionLoading ? (
+                  <span>Processing...</span>
+                ) : (
+                  <>
+                    <CheckCircle className="h-8 w-8" />
+                    <span>Mark Deposit Received (£{(parseFloat(depositAmountInput) || 20).toFixed(2)})</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
