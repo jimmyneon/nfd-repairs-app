@@ -725,15 +725,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
-      {/* Customer Arrived Prompt */}
-      {showCustomerArrivedPrompt && job && (
-        <CustomerArrivedPrompt
-          jobRef={job.job_ref}
-          onConfirm={handleCustomerArrivedConfirm}
-          onDismiss={() => setShowCustomerArrivedPrompt(false)}
-        />
-      )}
-
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-4">
           <div className="flex items-center gap-2 mb-3">
@@ -748,6 +739,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       </header>
 
       <main className="p-4 space-y-3 max-w-2xl mx-auto">
+        {/* Customer Arrived Prompt - inline banner */}
+        {showCustomerArrivedPrompt && job && (
+          <CustomerArrivedPrompt
+            jobRef={job.job_ref}
+            onConfirm={handleCustomerArrivedConfirm}
+            onDismiss={() => setShowCustomerArrivedPrompt(false)}
+          />
+        )}
+
         {/* Device Info Card */}
         <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border-2 border-gray-100 dark:border-gray-700">
           <div className="flex items-start gap-4 mb-3">

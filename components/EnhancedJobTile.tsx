@@ -10,7 +10,7 @@ import {
   getCustomerFlagEmoji,
   getPriorityEmoji
 } from '@/lib/job-utils'
-import { MapPin, CheckCircle } from 'lucide-react'
+import { CheckCircle } from 'lucide-react'
 import { useState, useRef } from 'react'
 import QuickActionsModal from '@/components/QuickActionsModal'
 import { JobStatus } from '@/lib/types-v3'
@@ -121,26 +121,20 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchMove}
-        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-l-4 ${statusBg} ${
-          customerArrived ? 'ring-4 ring-yellow-400 ring-offset-2 animate-pulse' : ''
-        }`}
+        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-l-4 ${statusBg}`}
       >
-        <div className={`p-3 h-full flex flex-col relative text-white ${customerArrived ? 'pt-8' : ''}`}>
-          {/* Customer Arrived Banner */}
-          {customerArrived && (
-            <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-gray-900 px-2 py-1 text-center z-10 rounded-t-xl">
-              <div className="flex items-center justify-center gap-1 text-xs font-black">
-                <MapPin className="h-3 w-3" />
-                <span>CUSTOMER HERE</span>
-              </div>
-            </div>
-          )}
+        <div className="p-3 h-full flex flex-col relative text-white">
 
           {/* Top Row: Status label + badges */}
           <div className="flex items-center justify-between mb-1">
-            <p className="font-black text-xs leading-tight uppercase tracking-wide">
-              {JOB_STATUS_SHORT_LABELS[job.status as JobStatus] || job.status}
-            </p>
+            <div className="flex items-center gap-1.5">
+              {customerArrived && (
+                <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
+              )}
+              <p className="font-black text-xs leading-tight uppercase tracking-wide">
+                {JOB_STATUS_SHORT_LABELS[job.status as JobStatus] || job.status}
+              </p>
+            </div>
             <div className="flex items-center gap-1">
               {job.payment_received && (
                 <span className="bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
