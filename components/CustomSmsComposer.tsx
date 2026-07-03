@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
+import { getFirstName } from '@/lib/sms-template'
 import SlideUpPanel from './SlideUpPanel'
 
 interface CustomSmsComposerProps {
@@ -33,7 +34,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
   }
 
   const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
-  const firstName = job.customer_name?.trim().split(' ')[0] || 'there'
+  const firstName = getFirstName(job.customer_name)
 
   const messageTemplates = [
     {

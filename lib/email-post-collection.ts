@@ -1,4 +1,5 @@
 import { Job } from './types-v3'
+import { getFirstName } from './sms-template'
 
 export interface PostCollectionEmailData {
   job: Job
@@ -152,7 +153,7 @@ export function generatePostCollectionEmail(data: PostCollectionEmailData): {
   text: string
 } {
   const { job, googleReviewLink } = data
-  const firstName = job.customer_name.split(' ')[0]
+  const firstName = getFirstName(job.customer_name)
   const crossSell = getCrossSellContent(job.device_make, job.device_model)
 
   const subject = `Thanks for choosing us - ${job.job_ref}`

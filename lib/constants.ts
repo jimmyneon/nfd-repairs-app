@@ -15,6 +15,21 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   CANCELLED: 'Cancelled',
 }
 
+export const JOB_STATUS_SHORT_LABELS: Record<JobStatus, string> = {
+  QUOTE_APPROVED: 'Approved',
+  RECEIVED: 'Received',
+  AWAITING_DEPOSIT: 'Deposit',
+  PARTS_ORDERED: 'Parts',
+  PARTS_ARRIVED: 'Arrived',
+  IN_REPAIR: 'Repair',
+  DELAYED: 'Delayed',
+  READY_TO_COLLECT: 'Collect',
+  IN_STORAGE: 'Storage',
+  COLLECTED: 'Collected',
+  COMPLETED: 'Done',
+  CANCELLED: 'Cancel',
+}
+
 export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'bg-cyan-600 text-white !text-white',
   RECEIVED: 'bg-blue-700 text-white !text-white',

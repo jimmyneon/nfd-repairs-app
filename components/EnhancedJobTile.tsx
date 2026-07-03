@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import { JOB_STATUS_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
+import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
 import { JobWithMetrics } from '@/lib/job-utils'
 import {
   formatTimeInStatus,
@@ -33,24 +33,6 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
     (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
 
   const timeWarning = job.isOverdue
-
-  const getShortStatus = (status: string) => {
-    const shortLabels: Record<string, string> = {
-      'QUOTE_APPROVED': 'Approved',
-      'AWAITING_DEPOSIT': 'Deposit',
-      'PARTS_ORDERED': 'Parts',
-      'PARTS_ARRIVED': 'Arrived',
-      'IN_REPAIR': 'Repair',
-      'READY_TO_COLLECT': 'Collect',
-      'IN_STORAGE': 'Storage',
-      'COLLECTED': 'Collected',
-      'COMPLETED': 'Done',
-      'CANCELLED': 'Cancel',
-      'RECEIVED': 'Received',
-      'DELAYED': 'Delayed'
-    }
-    return shortLabels[status] || JOB_STATUS_LABELS[status as keyof typeof JOB_STATUS_LABELS]
-  }
 
   const handleCardClick = () => {
     router.push(`/app/jobs/${job.id}`)
@@ -157,7 +139,7 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
           {/* Top Row: Status label + badges */}
           <div className="flex items-center justify-between mb-1">
             <p className="font-black text-xs leading-tight uppercase tracking-wide">
-              {getShortStatus(job.status)}
+              {JOB_STATUS_SHORT_LABELS[job.status as JobStatus] || job.status}
             </p>
             <div className="flex items-center gap-1">
               {job.payment_received && (
