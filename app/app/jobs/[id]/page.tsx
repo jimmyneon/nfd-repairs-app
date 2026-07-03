@@ -66,7 +66,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [nameValue, setNameValue] = useState('')
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
-  const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired' | 'partial' | 'warranty_claim'>('repaired')
+  const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -298,17 +298,26 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     } else if (pendingWorkflowStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
       updateData.customer_arrived_at = null  // Clear arrival indicator
-      // Save repair outcome and auto-skip review if not repaired
+      // Save repair outcome and auto-skip review if not fixed
       updateData.repair_outcome = repairOutcome
-      if (repairOutcome === 'unrepaired' || repairOutcome === 'warranty_claim') {
+      if (repairOutcome === 'unrepaired') {
         updateData.skip_review_request = true
       }
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
       .eq('id', job.id)
+
+    if (updateError) {
+      console.error('Failed to update job:', updateError)
+      // If repair_outcome column doesn't exist yet, retry without it
+      if (updateError.message.includes('repair_outcome') || updateError.message.includes('Could not find')) {
+        const { repair_outcome, ...dataWithoutOutcome } = updateData
+        await supabase.from('jobs').update(dataWithoutOutcome).eq('id', job.id)
+      }
+    }
 
     // Optimistic update - update local state immediately
     setJob({ ...job, ...updateData } as Job)
@@ -778,12 +787,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </span>
             {job.repair_outcome && (
               <span className={`text-xs px-2.5 py-1 rounded-lg font-bold ${
-                job.repair_outcome === 'repaired' ? 'bg-green-100 text-green-700' :
-                job.repair_outcome === 'unrepaired' ? 'bg-red-100 text-red-700' :
-                job.repair_outcome === 'partial' ? 'bg-amber-100 text-amber-700' :
-                'bg-purple-100 text-purple-700'
+                job.repair_outcome === 'repaired' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}>
-                {job.repair_outcome === 'warranty_claim' ? 'Warranty' : job.repair_outcome}
+                {job.repair_outcome === 'repaired' ? 'Fixed' : 'Not Fixed'}
               </span>
             )}
             <div className="flex items-center gap-2 flex-wrap">

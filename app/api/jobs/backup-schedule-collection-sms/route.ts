@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       .is('post_collection_sms_scheduled_at', null)
       .is('skip_review_request', false)
       .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
-      .or('repair_outcome.is.null,repair_outcome.eq.repaired,repair_outcome.eq.partial')
+      .or('repair_outcome.is.null,repair_outcome.eq.repaired')
 
     if (!jobs || jobs.length === 0) {
       // Still check for aftercare jobs even if no review jobs need scheduling
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         .not('post_collection_sms_sent_at', 'is', null)
         .is('skip_review_request', false)
         .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
-        .or('repair_outcome.is.null,repair_outcome.eq.repaired,repair_outcome.eq.partial')
+        .or('repair_outcome.is.null,repair_outcome.eq.repaired')
 
       if (aftercareJobsOnly && aftercareJobsOnly.length > 0) {
         await supabase
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       .not('post_collection_sms_sent_at', 'is', null)
       .is('skip_review_request', false)
       .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
-      .or('repair_outcome.is.null,repair_outcome.eq.repaired,repair_outcome.eq.partial')
+      .or('repair_outcome.is.null,repair_outcome.eq.repaired')
 
     let aftercareCount = 0
     if (aftercareJobs && aftercareJobs.length > 0) {

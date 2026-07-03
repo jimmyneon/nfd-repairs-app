@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check repair outcome - skip review for unrepaired/warranty
-    if (job.repair_outcome === 'unrepaired' || job.repair_outcome === 'warranty_claim') {
+    // Check repair outcome - skip review if not fixed
+    if (job.repair_outcome === 'unrepaired') {
       return NextResponse.json({
         success: false,
         message: `Review skipped - repair outcome: ${job.repair_outcome}`,
