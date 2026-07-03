@@ -138,7 +138,7 @@ WHERE key = 'COMPLETED';
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
 
-Please check our opening times before popping in:
+Please check our opening times before setting off:
 {hours_link}
 
 Many thanks,

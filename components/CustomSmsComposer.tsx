@@ -46,7 +46,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
     },
     {
       label: 'Ready to Collect',
-      text: `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}. Pop in whenever we're open.`,
+      text: `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`,
     },
     {
       label: 'Deposit Needed',
@@ -55,6 +55,10 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
     {
       label: 'Chase Collection',
       text: `Hi ${firstName}, just a friendly reminder that your ${deviceName} is ready for collection. It's been a while so please pop in soon to pick it up.`,
+    },
+    {
+      label: 'Final Pickup Reminder',
+      text: `Hi ${firstName}, this is a final reminder that your ${deviceName} is ready for collection. Please collect it within 5 days, otherwise we may need to recycle it.\n\nOur opening times:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nMany thanks,\nNew Forest Device Repairs`,
     },
     {
       label: 'Quote Sent',
