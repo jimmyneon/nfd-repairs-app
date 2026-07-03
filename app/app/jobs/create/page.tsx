@@ -630,18 +630,18 @@ function CreateJobContent() {
               <Home className="h-5 w-5 text-primary" />
             </Link>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setShowCustomerSearch(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors active:scale-90" title="Search Customers">
-              <UserSearch className="h-5 w-5" />
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setShowCustomerSearch(true)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors active:scale-90" title="Search Customers">
+              <UserSearch className="h-6 w-6" />
             </button>
-            <button type="button" onClick={() => setShowQuoteLookup(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Search Quotes">
-              <Search className="h-5 w-5" />
+            <button type="button" onClick={() => setShowQuoteLookup(true)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Search Quotes">
+              <Search className="h-6 w-6" />
             </button>
-            <button type="button" onClick={() => setShowImportModal(true)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Import JSON">
-              <FileJson className="h-5 w-5" />
+            <button type="button" onClick={() => setShowImportModal(true)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Import JSON">
+              <FileJson className="h-6 w-6" />
             </button>
-            <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors active:scale-90 ml-auto" title="Clear Form">
-              <Trash2 className="h-5 w-5" />
+            <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors active:scale-90 ml-auto" title="Clear Form">
+              <Trash2 className="h-6 w-6" />
             </button>
           </div>
         </div>
@@ -649,31 +649,31 @@ function CreateJobContent() {
 
       <main className="p-4 max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Mode toggles — compact row */}
-          <div className="flex gap-2">
+          {/* Mode toggles — perfectly square buttons */}
+          <div className="flex gap-3 justify-center">
             <button
               type="button"
               onClick={() => { setSuperQuickMode(!superQuickMode); if (!superQuickMode) setQuickWalkInMode(false) }}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all active:scale-95 ${
+              className={`w-32 h-32 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 transition-all active:scale-95 ${
                 superQuickMode
                   ? 'bg-green-600 text-white border-green-600 shadow-md'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
               }`}
             >
-              <Zap className="h-4 w-4" />
+              <Zap className="h-8 w-8" />
               <span className="text-sm font-bold">Super Quick</span>
             </button>
             <button
               type="button"
               onClick={() => { if (!superQuickMode) setQuickWalkInMode(!quickWalkInMode) }}
               disabled={superQuickMode}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all active:scale-95 disabled:opacity-40 ${
+              className={`w-32 h-32 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 transition-all active:scale-95 disabled:opacity-40 ${
                 quickWalkInMode
                   ? 'bg-orange-500 text-white border-orange-500 shadow-md'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
               }`}
             >
-              <Zap className="h-4 w-4" />
+              <Zap className="h-8 w-8" />
               <span className="text-sm font-bold">Quick Walk-In</span>
             </button>
           </div>
@@ -1028,8 +1028,8 @@ function CreateJobContent() {
           {!superQuickMode && (quickWalkInMode ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Price & Options</h2>
-              <div className="flex gap-3">
-                <div className="flex-1">
+              <div className="space-y-3">
+                <div>
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                     Price (£)
                   </label>
@@ -1041,29 +1041,29 @@ function CreateJobContent() {
                     required={false}
                     step="0.01"
                     min="0"
-                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-lg"
                     placeholder="Add later"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
-                  className={`px-4 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center gap-2 ${
+                  className={`w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${
                     formData.requires_parts_order
                       ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
                       : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
                   }`}
                 >
-                  <Wrench className="h-4 w-4" />
-                  Parts
+                  <Wrench className="h-5 w-5" />
+                  {formData.requires_parts_order ? 'Parts Needed (£20 deposit)' : 'Mark as Parts Needed'}
                 </button>
               </div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Pricing & Parts</h2>
-              <div className="flex gap-3">
-                <div className="flex-1">
+              <div className="space-y-3">
+                <div>
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                     Total Price (£)
                   </label>
@@ -1075,26 +1075,23 @@ function CreateJobContent() {
                     required={false}
                     step="0.01"
                     min="0"
-                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-lg"
                     placeholder="Can be added later"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
-                  className={`px-4 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center gap-2 self-end h-[42px] ${
+                  className={`w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${
                     formData.requires_parts_order
                       ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
                       : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
                   }`}
                 >
-                  <Wrench className="h-4 w-4" />
-                  Parts
+                  <Wrench className="h-5 w-5" />
+                  {formData.requires_parts_order ? 'Parts Needed (£20 deposit)' : 'Mark as Parts Needed'}
                 </button>
               </div>
-              {formData.requires_parts_order && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">£20 deposit will be requested</p>
-              )}
             </div>
           ))}
 
