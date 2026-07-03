@@ -191,7 +191,7 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
                         messagePref === option.value
                           ? 'border-primary bg-primary/10'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                      }`
+                      }`}
                     >
                       <div className="font-bold text-gray-900 dark:text-white">{option.label}</div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
