@@ -503,28 +503,22 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
       <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-2xl mx-auto px-4 py-6 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
-            <Package className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{SHOP_INFO.name}</h1>
-          <p className="text-gray-600 dark:text-gray-400">Repair Tracking</p>
+        <div className="max-w-2xl mx-auto px-4 py-4 text-center">
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white">{SHOP_INFO.name}</h1>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {/* PRIMARY: Device Info - Most Important */}
+        {/* PRIMARY: Device Info - Clean and Simple */}
         <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
           <div className="flex items-center gap-4 md:gap-5">
-            <div className="flex-shrink-0 w-24 h-24 md:w-28 md:h-28 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-primary/10 rounded-2xl flex items-center justify-center">
               {getDeviceIcon(job.device_make, job.device_model)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-1 md:mb-2">Your Device</p>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white">Track Your Repair</h1>
-              <h2 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white mb-1 md:mb-2 leading-tight">
+              <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white leading-tight mb-1">
                 {job.device_make} {job.device_model}
-              </h2>
+              </h1>
               <p className="text-base md:text-lg text-gray-700 dark:text-gray-400 font-medium">{job.issue}</p>
             </div>
           </div>

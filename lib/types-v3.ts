@@ -85,6 +85,8 @@ export interface Job {
   customer_flag?: 'sensitive' | 'awkward' | 'vip' | 'normal' | null
   customer_flag_notes?: string | null
   skip_review_request?: boolean
+  repair_outcome?: 'repaired' | 'unrepaired' | 'partial' | 'warranty_claim' | null
+  message_preference?: 'sms' | 'whatsapp' | null
   repair_type?: string | null
   device_type?: string | null
   

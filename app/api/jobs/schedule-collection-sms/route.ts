@@ -76,58 +76,62 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 1. Send review SMS immediately
+    // Check repair outcome
+    if (job.repair_outcome === 'unrepaired' || job.repair_outcome === 'warranty_claim') {
+      console.log(`Post-collection SMS skipped - repair outcome: ${job.repair_outcome} for ${job.job_ref}`)
+      await supabase.from('job_events').insert({
+        job_id: jobId, type: 'SYSTEM',
+        message: `Post-collection SMS skipped - repair outcome: ${job.repair_outcome}`
+      })
+      return NextResponse.json({ success: true, message: `Skipped - repair outcome: ${job.repair_outcome}`, skipped: true })
+    }
+
+    // For partial repairs: skip review but still schedule aftercare
+    const skipReviewOnly = job.repair_outcome === 'partial'
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
-    const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId }),
-    })
+    let reviewResult: any = { success: false, smsDeliveryStatus: 'skipped' }
 
-    const reviewResult = await reviewResponse.json()
-    console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
+    if (!skipReviewOnly) {
+      // 1. Send review SMS immediately
+      const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      })
+      reviewResult = await reviewResponse.json()
+      console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
+    } else {
+      console.log(`Review SMS skipped for partial repair: ${job.job_ref}`)
+      await supabase.from('job_events').insert({
+        job_id: jobId, type: 'SYSTEM',
+        message: 'Review SMS skipped - partial repair outcome'
+      })
+    }
 
-    // 2. Schedule aftercare SMS for 3-5 days later
+    // 2. Schedule aftercare SMS for 3-5 days later (always, even for partial)
     const aftercareTime = calculateAftercareTime()
+    await supabase.from('jobs').update({ aftercare_sms_scheduled_at: aftercareTime.toISOString() }).eq('id', jobId)
 
-    await supabase
-      .from('jobs')
-      .update({
-        aftercare_sms_scheduled_at: aftercareTime.toISOString(),
-      })
-      .eq('id', jobId)
+    // 3. Schedule email for 1-3 hours later (only if review was sent)
+    if (!skipReviewOnly) {
+      const emailTime = calculateEmailTime()
+      await supabase.from('jobs').update({ post_collection_email_scheduled_at: emailTime.toISOString() }).eq('id', jobId)
+    }
 
-    // 3. Schedule email for 1-3 hours later (existing behaviour)
-    const emailTime = calculateEmailTime()
-    await supabase
-      .from('jobs')
-      .update({
-        post_collection_email_scheduled_at: emailTime.toISOString(),
-      })
-      .eq('id', jobId)
-
-    // Log events
-    await supabase
-      .from('job_events')
-      .insert([
-        {
-          job_id: jobId,
-          type: 'SYSTEM',
-          message: `Review SMS sent immediately - ${reviewResult.smsDeliveryStatus || 'unknown'}`
-        },
-        {
-          job_id: jobId,
-          type: 'SYSTEM',
-          message: `Aftercare SMS scheduled for ${aftercareTime.toLocaleString()}`
-        },
-      ])
+    await supabase.from('job_events').insert({
+      job_id: jobId, type: 'SYSTEM',
+      message: skipReviewOnly
+        ? `Aftercare SMS scheduled for ${aftercareTime.toLocaleString()} (review skipped - partial)`
+        : `Review SMS sent - ${reviewResult.smsDeliveryStatus || 'unknown'}. Aftercare scheduled for ${aftercareTime.toLocaleString()}`
+    })
 
     return NextResponse.json({
       success: true,
-      reviewSent: reviewResult.success || false,
+      reviewSent: !skipReviewOnly && (reviewResult.success || false),
       reviewDeliveryStatus: reviewResult.smsDeliveryStatus,
       aftercareScheduledAt: aftercareTime.toISOString(),
-      message: 'Review SMS sent, aftercare scheduled for 3-5 days later',
+      message: skipReviewOnly ? 'Review skipped (partial), aftercare scheduled' : 'Review SMS sent, aftercare scheduled',
     })
 
   } catch (error) {

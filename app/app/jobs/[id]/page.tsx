@@ -22,6 +22,7 @@ import SlideUpPanel from '@/components/SlideUpPanel'
 import DiagnosticReportEditor from '@/components/DiagnosticReportEditor'
 import HistoryTabs from '@/components/HistoryTabs'
 import CustomSmsComposer from '@/components/CustomSmsComposer'
+import RepairOutcomeSelector from '@/components/RepairOutcomeSelector'
 import PriceSetterModal from '@/components/PriceSetterModal'
 import QuickActionsModal from '@/components/QuickActionsModal'
 
@@ -65,6 +66,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [nameValue, setNameValue] = useState('')
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
+  const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired' | 'partial' | 'warranty_claim'>('repaired')
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -296,6 +298,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     } else if (pendingWorkflowStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
       updateData.customer_arrived_at = null  // Clear arrival indicator
+      // Save repair outcome and auto-skip review if not repaired
+      updateData.repair_outcome = repairOutcome
+      if (repairOutcome === 'unrepaired' || repairOutcome === 'warranty_claim') {
+        updateData.skip_review_request = true
+      }
     }
 
     await supabase
@@ -769,6 +776,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job.status]}`}>
               {JOB_STATUS_SHORT_LABELS[job.status]}
             </span>
+            {job.repair_outcome && (
+              <span className={`text-xs px-2.5 py-1 rounded-lg font-bold ${
+                job.repair_outcome === 'repaired' ? 'bg-green-100 text-green-700' :
+                job.repair_outcome === 'unrepaired' ? 'bg-red-100 text-red-700' :
+                job.repair_outcome === 'partial' ? 'bg-amber-100 text-amber-700' :
+                'bg-purple-100 text-purple-700'
+              }`}>
+                {job.repair_outcome === 'warranty_claim' ? 'Warranty' : job.repair_outcome}
+              </span>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {job.device_in_shop && (
                 <span className="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-lg font-bold flex items-center gap-1">
@@ -1372,6 +1389,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {pendingWorkflowStatus === 'COLLECTED' && (
+                <RepairOutcomeSelector value={repairOutcome} onChange={setRepairOutcome} />
               )}
 
               <div className="flex gap-3">

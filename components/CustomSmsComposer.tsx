@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X } from 'lucide-react'
+import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
 import { getFirstName } from '@/lib/sms-template'
 import SlideUpPanel from './SlideUpPanel'
@@ -16,6 +16,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
   const [message, setMessage] = useState('')
   const [sendEmailToo, setSendEmailToo] = useState(true)
   const [sending, setSending] = useState(false)
+  const [channel, setChannel] = useState<'sms' | 'whatsapp'>(job.message_preference === 'whatsapp' ? 'whatsapp' : 'sms')
   const [result, setResult] = useState<{ success: boolean; smsStatus?: string; emailStatus?: string } | null>(null)
   const [showPicker, setShowPicker] = useState<'templates' | 'inserts' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -81,6 +82,17 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
 
   const handleSend = async () => {
     if (!message.trim() || sending) return
+
+    if (channel === 'whatsapp') {
+      const phone = (job.customer_phone || '').replace(/[^0-9]/g, '')
+      const text = encodeURIComponent(message.trim())
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank')
+      setResult({ success: true, smsStatus: 'WhatsApp opened' })
+      onSent?.()
+      setTimeout(() => onClose(), 1500)
+      return
+    }
+
     setSending(true)
     setResult(null)
 
@@ -153,6 +165,28 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
             })}
           </div>
 
+          {/* Channel toggle: SMS vs WhatsApp */}
+          <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setChannel('sms')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-bold transition-all ${
+                channel === 'sms' ? 'bg-white dark:bg-gray-900 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              SMS
+            </button>
+            <button
+              onClick={() => setChannel('whatsapp')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-bold transition-all ${
+                channel === 'whatsapp' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'
+              }`}
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </button>
+          </div>
+
           {/* Textarea - small, auto-grow */}
           <textarea
             ref={textareaRef}
@@ -197,10 +231,12 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
           <button
             onClick={handleSend}
             disabled={!message.trim() || sending}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`w-full flex items-center justify-center gap-2 py-3 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+              channel === 'whatsapp' ? 'bg-green-500 hover:bg-green-600' : 'bg-primary hover:bg-primary-dark'
+            }`}
           >
-            <Send className="h-4 w-4" />
-            {sending ? 'Sending...' : 'Send'}
+            {channel === 'whatsapp' ? <MessageCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            {channel === 'whatsapp' ? 'Open in WhatsApp' : sending ? 'Sending...' : 'Send SMS'}
           </button>
         </div>
       </SlideUpPanel>

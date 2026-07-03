@@ -52,6 +52,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Check repair outcome - skip review for unrepaired/warranty
+    if (job.repair_outcome === 'unrepaired' || job.repair_outcome === 'warranty_claim') {
+      return NextResponse.json({
+        success: false,
+        message: `Review skipped - repair outcome: ${job.repair_outcome}`,
+        skipped: true
+      })
+    }
+
     // Get Google review link from settings
     const { data: reviewLinkSetting } = await supabase
       .from('admin_settings')

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Flag, AlertTriangle, Star, User, X } from 'lucide-react'
+import { Flag, AlertTriangle, Star, User, X, MessageSquare, MessageCircle } from 'lucide-react'
 
 interface CustomerFlagControlsProps {
   job: Job
@@ -15,6 +15,7 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
   const [selectedFlag, setSelectedFlag] = useState<'sensitive' | 'awkward' | 'vip' | 'normal' | null>(job.customer_flag || null)
   const [flagNotes, setFlagNotes] = useState(job.customer_flag_notes || '')
   const [skipReview, setSkipReview] = useState(job.skip_review_request || false)
+  const [messagePref, setMessagePref] = useState<'sms' | 'whatsapp' | null>(job.message_preference || null)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
@@ -26,7 +27,8 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
       .update({
         customer_flag: selectedFlag,
         customer_flag_notes: flagNotes || null,
-        skip_review_request: skipReview
+        skip_review_request: skipReview,
+        message_preference: messagePref
       } as any)
       .eq('id', job.id)
 
@@ -34,7 +36,7 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
       await supabase.from('job_events').insert({
         job_id: job.id,
         type: 'SYSTEM',
-        message: `Customer flag updated to: ${selectedFlag || 'none'}. Review request: ${skipReview ? 'disabled' : 'enabled'}`
+        message: `Customer flag updated to: ${selectedFlag || 'none'}. Review request: ${skipReview ? 'disabled' : 'enabled'}. Message preference: ${messagePref || 'default (SMS)'}`
       } as any)
       
       onUpdate()
@@ -116,6 +118,20 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
             </div>
           </div>
 
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Message Preference</p>
+            <div className={`flex items-center gap-2 p-3 rounded-lg border-2 ${
+              job.message_preference === 'whatsapp'
+                ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300'
+                : 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-300'
+            }`}>
+              {job.message_preference === 'whatsapp' ? <MessageCircle className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
+              <span className="text-sm font-bold uppercase">
+                {job.message_preference === 'whatsapp' ? 'WhatsApp' : 'SMS (default)'}
+              </span>
+            </div>
+          </div>
+
           <button
             onClick={() => setShowModal(true)}
             className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all"
@@ -151,6 +167,31 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
                           ? 'border-primary bg-primary/10'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       }`}
+                    >
+                      <div className="font-bold text-gray-900 dark:text-white">{option.label}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Message Preference
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: null, label: 'SMS (default)', desc: 'Send messages via text message' },
+                    { value: 'whatsapp', label: 'WhatsApp', desc: 'Prefer WhatsApp for messaging' },
+                  ].map((option) => (
+                    <button
+                      key={option.label}
+                      onClick={() => setMessagePref(option.value as any)}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                        messagePref === option.value
+                          ? 'border-primary bg-primary/10'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      }`
                     >
                       <div className="font-bold text-gray-900 dark:text-white">{option.label}</div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">{option.desc}</div>
