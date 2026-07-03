@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, Bell, QrCode, MessageSquare, Settings, Plus, Shield, History, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Mail, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
+import { Search, Bell, QrCode, Settings, Plus, Shield, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -230,75 +230,33 @@ export default function JobsListPageV2() {
       
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Repair Jobs</h1>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAllJobs(!showAllJobs)}
-                className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                  showAllJobs
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-                title={showAllJobs ? 'Show active jobs only' : 'Show all jobs including completed/cancelled'}
-              >
-                {showAllJobs ? 'All Jobs' : 'Active Only'}
-              </button>
-              <Link href="/app/jobs/create" className="text-gray-600 hover:text-primary" title="Create New Job">
-                <Plus className="h-6 w-6" />
-              </Link>
-              <Link href="/app/history" className="text-gray-600 hover:text-primary" title="Job History">
-                <History className="h-6 w-6" />
-              </Link>
-              <Link href="/app/enquiries" className="text-gray-600 hover:text-primary" title="Enquiries">
-                <Mail className="h-6 w-6" />
-              </Link>
-              <Link href="/app/warranty" className="relative text-gray-600 hover:text-primary" title="Warranty Tickets">
-                <Shield className="h-6 w-6" />
-                {warrantyCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {warrantyCount}
-                  </span>
-                )}
-              </Link>
-              <Link href="/app/templates" className="text-gray-600 hover:text-primary">
-                <MessageSquare className="h-6 w-6" />
-              </Link>
-              <Link href="/app/notifications" className="relative text-gray-600 hover:text-primary">
-                <Bell className="h-6 w-6" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </Link>
-              <Link href="/app/settings" className="text-gray-600 hover:text-primary">
-                <Settings className="h-6 w-6" />
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by job ref, name, phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <button
-              onClick={() => setShowScanner(!showScanner)}
-              className="flex-shrink-0 w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-xl flex items-center justify-center transition-colors shadow-md"
-              title="Scan QR Code"
-            >
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Repair Jobs</h1>
+          <div className="flex items-center gap-3 mb-3">
+            <Link href="/app/jobs/create" className="w-14 h-14 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Create New Job">
+              <Plus className="h-6 w-6" />
+            </Link>
+            <button onClick={() => setShowScanner(!showScanner)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Scan QR Code">
               <QrCode className="h-6 w-6" />
             </button>
+            <button onClick={() => setShowAllJobs(!showAllJobs)} className={`w-14 h-14 flex items-center justify-center rounded-xl transition-colors active:scale-90 ${showAllJobs ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} title={showAllJobs ? 'Show active only' : 'Show all jobs'}>
+              <Archive className="h-6 w-6" />
+            </button>
+            <Link href="/app/warranty" className="relative w-14 h-14 flex items-center justify-center rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors active:scale-90" title="Warranty Tickets">
+              <Shield className="h-6 w-6" />
+              {warrantyCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{warrantyCount}</span>}
+            </Link>
+            <Link href="/app/notifications" className="relative w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors active:scale-90" title="Notifications">
+              <Bell className="h-6 w-6" />
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{unreadCount}</span>}
+            </Link>
+            <Link href="/app/settings" className="w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors active:scale-90 ml-auto" title="Settings">
+              <Settings className="h-6 w-6" />
+            </Link>
           </div>
-
-          {/* Quick filter chips removed — moved to job detail page */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input type="text" placeholder="Search by job ref, name, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+          </div>
         </div>
       </header>
 

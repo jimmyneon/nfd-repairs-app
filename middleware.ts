@@ -55,8 +55,19 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Always allow access to login and signup pages
+  // Redirect to dashboard if already authenticated and visiting /login or /signup
   if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup') {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        return NextResponse.redirect(new URL('/app/jobs', req.url))
+      }
+    } catch (error) {
+      // Not authenticated, allow access to login/signup
+    }
     return response
   }
 

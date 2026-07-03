@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -11,8 +11,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.replace('/app/jobs')
+      } else {
+        setCheckingAuth(false)
+      }
+    }
+    checkSession()
+  }, [router, supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,6 +60,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background-light to-white flex items-center justify-center px-4">
+      {checkingAuth ? (
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      ) : (
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
@@ -113,6 +129,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Home, Moon, Sun, Bell, User, LogOut, Smartphone, Plus } from 'lucide-react'
+import { ArrowLeft, Home, Moon, Sun, Bell, User, LogOut, Smartphone, Plus, History, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
@@ -176,6 +176,26 @@ export default function SettingsPage() {
               <div>
                 <p className="font-semibold text-gray-900 dark:text-white">SMS Templates</p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">Manage message templates</p>
+              </div>
+              <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
+            </Link>
+            <Link
+              href="/app/history"
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">Job History</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Search and view past jobs</p>
+              </div>
+              <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
+            </Link>
+            <Link
+              href="/app/enquiries"
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+            >
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white">Enquiries</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Customer enquiries and contact form submissions</p>
               </div>
               <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
             </Link>
