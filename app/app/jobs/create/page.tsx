@@ -464,12 +464,36 @@ function CreateJobContent() {
     // Auto-infer device make from model if make is missing (e.g. "iPhone 14" -> "Apple")
     const inferredMake = inferDeviceMake(quote.device_make || '', quote.device_model || '')
 
+    const availableMakes = makesByType[inferredDeviceType] || []
+    const matchedMake = availableMakes.find(m => m.toLowerCase() === inferredMake?.toLowerCase())
+    if (inferredMake && !matchedMake) setShowMakeOther(true)
+    const availableIssues = getIssuesForDeviceType(inferredDeviceType || 'other')
+    const quoteIssue = (quote.issue || '').toLowerCase().trim()
+    // Try exact match first, then fuzzy match for common variations
+    let matchedIssue = availableIssues.find(i => i.toLowerCase() === quoteIssue)
+    if (!matchedIssue && quoteIssue) {
+      const fuzzyMap: Record<string, string> = {
+        'screen': 'Screen Replacement', 'cracked screen': 'Screen Replacement',
+        'broken screen': 'Screen Replacement', 'screen repair': 'Screen Repair',
+        'battery': 'Battery Replacement', 'battery replacement': 'Battery Replacement',
+        'charging': 'Not Charging', 'charging port': 'Charging Port Replacement',
+        'not charging': 'Not Charging', 'water': 'Water Damage',
+        'no power': 'No Power', 'black screen': 'Black Screen',
+        'diagnostic': 'Diagnostics', 'diagnostics': 'Diagnostics',
+      }
+      const fuzzyMatch = Object.entries(fuzzyMap).find(([key]) => quoteIssue.includes(key))
+      if (fuzzyMatch) {
+        matchedIssue = availableIssues.find(i => i === fuzzyMatch[1])
+      }
+    }
+    if (quote.issue && !matchedIssue) setShowIssueOther(true)
+
     setFormData({
       ...formData,
       device_type: inferredDeviceType,
-      device_make: inferredMake,
+      device_make: matchedMake || inferredMake,
       device_model: quote.device_model || '',
-      issue: quote.issue || '',
+      issue: matchedIssue || quote.issue || '',
       description: quote.description || '',
       price_total: quote.quoted_price ? String(quote.quoted_price) : (quote.price_total ? String(quote.price_total) : ''),
       linked_quote_id: quote.quote_request_id,
@@ -492,18 +516,22 @@ function CreateJobContent() {
   }
 
   const handleCustomerSelect = (customerData: any) => {
-    // Auto-infer device type from device make AND model if provided
     const inferredDeviceType = customerData.device_type || inferDeviceType(customerData.device_make || '', customerData.device_model || '')
-    // Auto-infer device make from model if make is missing
     const inferredMake = inferDeviceMake(customerData.device_make || '', customerData.device_model || '')
 
-    // Update form data with customer data
+    const availableMakes = makesByType[inferredDeviceType] || []
+    const matchedMake = availableMakes.find(m => m.toLowerCase() === inferredMake?.toLowerCase())
+    if (inferredMake && !matchedMake) setShowMakeOther(true)
+    const availableIssues = getIssuesForDeviceType(inferredDeviceType || 'other')
+    const matchedIssue = availableIssues.find(i => i.toLowerCase() === (customerData.issue || '').toLowerCase())
+    if (customerData.issue && !matchedIssue) setShowIssueOther(true)
+
     setFormData({
       ...formData,
       device_type: inferredDeviceType || formData.device_type,
-      device_make: inferredMake || formData.device_make,
+      device_make: matchedMake || inferredMake || formData.device_make,
       device_model: customerData.device_model || formData.device_model,
-      issue: customerData.issue || formData.issue,
+      issue: matchedIssue || customerData.issue || formData.issue,
       description: customerData.description || formData.description,
       price_total: customerData.price_total || formData.price_total,
       requires_parts_order: customerData.requires_parts_order ?? formData.requires_parts_order,
