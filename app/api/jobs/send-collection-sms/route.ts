@@ -86,12 +86,12 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}, thanks for coming in! If you're happy with your ${job.device_model} repair, a 5-star Google review would mean a lot to us:
+      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs. If you're happy with your ${job.device_model} repair, we'd really appreciate a quick Google review:
 ${googleReviewLink}
 
-Any issues, just reply here.
+If anything isn't quite right, just reply to this message and we'll do our best to put it right.
 
-New Forest Device Repairs`
+– New Forest Device Repairs`
     }
 
     // Send SMS via MacroDroid

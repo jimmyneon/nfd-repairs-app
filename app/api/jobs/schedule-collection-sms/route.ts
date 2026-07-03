@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     const reviewResult = await reviewResponse.json()
     console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
 
-    // 2. Schedule aftercare SMS for 2 days later
+    // 2. Schedule aftercare SMS for 3-5 days later
     const aftercareTime = calculateAftercareTime()
 
     await supabase
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       reviewSent: reviewResult.success || false,
       reviewDeliveryStatus: reviewResult.smsDeliveryStatus,
       aftercareScheduledAt: aftercareTime.toISOString(),
-      message: 'Review SMS sent, aftercare scheduled for 2 days later',
+      message: 'Review SMS sent, aftercare scheduled for 3-5 days later',
     })
 
   } catch (error) {
@@ -140,12 +140,15 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate when to send aftercare SMS (2 days from now, within 8am-8pm)
+ * Calculate when to send aftercare SMS (3-5 days from now, within 8am-8pm)
  */
 function calculateAftercareTime(): Date {
   const now = new Date()
   const aftercare = new Date(now)
-  aftercare.setDate(aftercare.getDate() + 2)
+
+  // Randomize between 3-5 days
+  const daysToAdd = 3 + Math.floor(Math.random() * 3) // 3, 4, or 5
+  aftercare.setDate(aftercare.getDate() + daysToAdd)
 
   // Randomize between 10am-2pm for natural spread
   const randomHour = 10 + Math.floor(Math.random() * 4)

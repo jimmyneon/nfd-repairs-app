@@ -186,31 +186,32 @@ WHERE key = 'DELAYED' OR key = 'DELAY_NOTIFICATION';
 -- via /api/jobs/send-collection-sms (delayed, aftercare-first with review link)
 DELETE FROM sms_templates WHERE key = 'COLLECTED';
 
--- POST_COLLECTION_REVIEW - Sent 3 hours after collection (or next morning)
+-- POST_COLLECTION_REVIEW - Sent shortly after collection
 -- Uses {review_link} which is populated from admin_settings.google_review_link
 INSERT INTO sms_templates (key, body, is_active)
 SELECT 'POST_COLLECTION_REVIEW',
-'Hi {first_name}, thanks for coming in! If you''re happy with your {device_model} repair, a 5-star Google review would mean a lot to us:
+'Hi {first_name}, thanks for choosing New Forest Device Repairs. If you''re happy with your {device_model} repair, we''d really appreciate a quick Google review:
 
 {review_link}
 
-Any issues, just reply here.
+If anything isn''t quite right, just reply to this message and we''ll do our best to put it right.
 
-New Forest Device Repairs', true
+– New Forest Device Repairs', true
 WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'POST_COLLECTION_REVIEW');
 
 -- Update if already exists
 UPDATE sms_templates SET body =
-'Hi {first_name}, thanks for coming in! If you''re happy with your {device_model} repair, a 5-star Google review would mean a lot to us:
+'Hi {first_name}, thanks for choosing New Forest Device Repairs. If you''re happy with your {device_model} repair, we''d really appreciate a quick Google review:
 
 {review_link}
 
-Any issues, just reply here.
+If anything isn''t quite right, just reply to this message and we''ll do our best to put it right.
 
-New Forest Device Repairs'
+– New Forest Device Repairs'
 WHERE key = 'POST_COLLECTION_REVIEW';
 
--- AFTERCARE_CHECKIN - Sent 2 days after collection (simple check-in, no review link)
+-- AFTERCARE_CHECKIN - Sent 3-5 days after collection (simple check-in, no review link)
+-- Only sent if customer hasn't replied or left a review
 INSERT INTO sms_templates (key, body, is_active)
 SELECT 'AFTERCARE_CHECKIN',
 'Hi {first_name}, just checking in to make sure your {device_model} is working as expected.

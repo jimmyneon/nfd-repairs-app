@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (!jobs || jobs.length === 0) {
       // Still check for aftercare jobs even if no review jobs need scheduling
-      const aftercareTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+      const aftercareTime = new Date(Date.now() + (3 + Math.floor(Math.random() * 3)) * 24 * 60 * 60 * 1000)
       const { data: aftercareJobsOnly } = await supabase
         .from('jobs')
         .select('id, job_ref')
