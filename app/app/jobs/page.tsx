@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, Bell, QrCode, Settings, Plus, Shield, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
+import { Search, Bell, QrCode, Settings, Plus, Shield, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, Smartphone } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -238,6 +238,9 @@ export default function JobsListPageV2() {
             <button onClick={() => setShowScanner(!showScanner)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Scan QR Code">
               <QrCode className="h-6 w-6" />
             </button>
+            <Link href="/app/qr-display" className="w-14 h-14 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors active:scale-90" title="Walk-In QR Code">
+              <Smartphone className="h-6 w-6" />
+            </Link>
             <button onClick={() => setShowAllJobs(!showAllJobs)} className={`w-14 h-14 flex items-center justify-center rounded-xl transition-colors active:scale-90 ${showAllJobs ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} title={showAllJobs ? 'Show active only' : 'Show all jobs'}>
               <Archive className="h-6 w-6" />
             </button>

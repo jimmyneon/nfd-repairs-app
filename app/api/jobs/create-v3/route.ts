@@ -101,11 +101,15 @@ export async function POST(request: NextRequest) {
       // Device possession - explicit for manual jobs, inferred for API jobs
       device_in_shop: source === 'staff_manual' 
         ? (device_in_shop || false)  // Use explicit value from manual form
+        : source === 'walk_in_self'
+        ? true  // Walk-in self-booking: device is in shop
         : false,  // API jobs - customer has device
       
       // Status - use initial_status if provided (from import), otherwise calculate
       status: initial_status || (source === 'staff_manual' 
         ? (device_in_shop ? 'RECEIVED' : 'QUOTE_APPROVED')  // Manual: RECEIVED if in shop, QUOTE_APPROVED if not
+        : source === 'walk_in_self'
+        ? 'RECEIVED'  // Walk-in self-booking: device is in shop
         : 'QUOTE_APPROVED'),  // API: always QUOTE_APPROVED (customer has device)
       status_changed_at: new Date().toISOString(),
       
@@ -291,8 +295,8 @@ export async function POST(request: NextRequest) {
     // Onboarding will be completed in-store or via tracking page when customer is ready
     let templateKey: string
     
-    if (source === 'staff_manual') {
-      // Manual job - device already in shop
+    if (source === 'staff_manual' || source === 'walk_in_self') {
+      // Manual or walk-in self-booking - device already in shop
       if (jobData.deposit_required) {
         templateKey = 'DEPOSIT_REQUIRED'
       } else {

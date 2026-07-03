@@ -91,7 +91,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         .limit(50)
 
       // Also search jobs with normalized phone if it looks like a phone number
-      let jobsPhonePromise: Promise<typeof jobsPromise> | null = null
+      let jobsPhonePromise: any = null
       if (normalizedPhone.length >= 7 && /^\d+$/.test(normalizedPhone)) {
         jobsPhonePromise = supabase
           .from('jobs')
@@ -109,7 +109,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         .order('original_created_at', { ascending: false })
         .limit(50)
 
-      let quotesPhonePromise: Promise<typeof quotesPromise> | null = null
+      let quotesPhonePromise: any = null
       if (normalizedPhone.length >= 7 && /^\d+$/.test(normalizedPhone)) {
         quotesPhonePromise = supabase
           .from('quotes')
@@ -128,6 +128,9 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
       ])
 
       if (jobsResult.error) throw jobsResult.error
+      if (quotesResult.error) {
+        console.error('Quotes search error (non-fatal):', quotesResult.error)
+      }
 
       // Merge job results
       const allJobs: CustomerJob[] = [...(jobsResult.data || [])]
@@ -421,6 +424,11 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {customer.issue}
                       </div>
+                      {customer.source === 'quote' && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                          Quote only
+                        </div>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -511,7 +519,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
-                          {job.status.replace(/_/g, ' ')}
+                          {job.source === 'quote' ? 'QUOTE' : job.status.replace(/_/g, ' ')}
                         </span>
                         <span className="text-gray-400">#{job.job_ref}</span>
                       </div>

@@ -2,10 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Plus, Loader2, FileJson, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X } from 'lucide-react'
+import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import ImportJobDataModal from '@/components/ImportJobDataModal'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 import CustomerSearchModal from '@/components/CustomerSearchModal'
 import FormErrorToast from '@/components/FormErrorToast'
@@ -20,7 +19,6 @@ function CreateJobContent() {
   const [loading, setLoading] = useState(false)
   const [showMakeOther, setShowMakeOther] = useState(false)
   const [showIssueOther, setShowIssueOther] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
   const [showQuoteLookup, setShowQuoteLookup] = useState(false)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
   const [quickWalkInMode, setQuickWalkInMode] = useState(() => {
@@ -609,45 +607,6 @@ function CreateJobContent() {
     }))
   }
 
-  const handleImportData = (importedData: any) => {
-    // Convert price to string for form input
-    const priceString = importedData.price_total ? String(importedData.price_total) : ''
-    
-    // Store import options for later use
-    const importOptions = {
-      initial_status: importedData.initial_status,
-      skip_sms: importedData.skip_sms,
-    }
-    
-    // Update form data with imported values
-    setFormData({
-      device_type: importedData.device_type || '',
-      device_make: importedData.device_make || '',
-      device_model: importedData.device_model || '',
-      issue: importedData.issue || '',
-      description: importedData.description || '',
-      repair_type: importedData.repair_type || '',
-      technician_notes: importedData.technician_notes || '',
-      price_total: priceString,
-      requires_parts_order: importedData.requires_parts_order || false,
-      device_left_with_us: importedData.device_left_with_us || false,
-      passcode_requirement: importedData.passcode_requirement || 'recommended',
-      linked_quote_id: null,
-    })
-
-    // Handle "Other" selections
-    if (importedData.device_make === 'Other') {
-      setShowMakeOther(true)
-    }
-    if (importedData.issue === 'Other') {
-      setShowIssueOther(true)
-    }
-    
-    // Store import options in state for use when creating job
-    // @ts-ignore - temporary storage
-    window.__importOptions = importOptions
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
@@ -664,9 +623,6 @@ function CreateJobContent() {
             </button>
             <button type="button" onClick={() => setShowQuoteLookup(true)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Search Quotes">
               <Search className="h-6 w-6" />
-            </button>
-            <button type="button" onClick={() => setShowImportModal(true)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Import JSON">
-              <FileJson className="h-6 w-6" />
             </button>
             <button type="button" onClick={() => { if (confirm('Clear all form data?')) { setFormData({ device_type: '', device_make: '', device_model: '', issue: '', description: '', repair_type: '', technician_notes: '', price_total: '', requires_parts_order: false, device_left_with_us: true, passcode_requirement: 'not_required', linked_quote_id: null }); setCustomerName(''); setCustomerPhone(''); setValidationErrors({}); setShowValidationSummary(false); if (typeof window !== 'undefined') { sessionStorage.removeItem('job_create_form_state'); sessionStorage.removeItem('quote_customer_data'); sessionStorage.removeItem('job_creation_overrides'); sessionStorage.removeItem('customer_confirm_wizard') } } }} className="w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 transition-colors active:scale-90 ml-auto" title="Clear Form">
               <Trash2 className="h-6 w-6" />
@@ -1390,13 +1346,6 @@ function CreateJobContent() {
           </div>
         </form>
       </main>
-
-      {showImportModal && (
-        <ImportJobDataModal 
-          onImport={handleImportData}
-          onClose={() => setShowImportModal(false)}
-        />
-      )}
 
       <QuoteLookupModal
         isOpen={showQuoteLookup}
