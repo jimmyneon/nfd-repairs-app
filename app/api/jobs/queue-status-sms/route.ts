@@ -250,12 +250,13 @@ export async function POST(request: NextRequest) {
     // Automatically send the SMS
     if (smsLog) {
       try {
-        console.log('📤 Triggering SMS send for job:', job.job_ref)
+        console.log('📤 Triggering SMS send for job:', job.job_ref, 'sms_log_id:', smsLog.id)
         // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
         const appUrl = 'https://nfd-repairs-app.vercel.app'
         const response = await fetch(`${appUrl}/api/sms/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sms_log_id: smsLog.id }),
         })
         console.log('SMS send trigger response:', response.status, response.ok)
       } catch (error) {
