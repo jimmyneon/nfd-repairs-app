@@ -5,11 +5,13 @@
  * literal placeholders (e.g. {first_name}) ever reach customers.
  */
 
+const TITLES = ['mr','mr.','mrs','mrs.','ms','ms.','miss','dr','dr.','sir','prof','prof.','rev','rev.','fr','fr.','mx','mx.']
+
 export function getFirstName(name: string | null | undefined): string {
-  const cleaned = (name || '').trim().split(' ')[0]
-  if (!cleaned) return 'there'
-  // Capitalise first letter, keep the rest as-is to avoid mangling names
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  const first = parts.find(p => !TITLES.includes(p.toLowerCase()))
+  if (!first) return 'there'
+  return first
 }
 
 export function renderSmsTemplate(
