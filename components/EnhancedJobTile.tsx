@@ -10,7 +10,7 @@ import {
   getCustomerFlagEmoji,
   getPriorityEmoji
 } from '@/lib/job-utils'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Shield, MessageCircle } from 'lucide-react'
 import { useState, useRef } from 'react'
 import QuickActionsModal from '@/components/QuickActionsModal'
 import { JobStatus } from '@/lib/types-v3'
@@ -136,6 +136,18 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
               </p>
             </div>
             <div className="flex items-center gap-1">
+              {job.is_warranty && (
+                <span className="bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5" title="Warranty repair">
+                  <Shield className="h-3 w-3" />
+                  W
+                </span>
+              )}
+              {job.message_preference === 'whatsapp' && (
+                <span className="bg-emerald-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5" title="Customer prefers WhatsApp">
+                  <MessageCircle className="h-3 w-3" />
+                  WA
+                </span>
+              )}
               {job.payment_received && (
                 <span className="bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                   <CheckCircle className="h-3 w-3" />
@@ -169,7 +181,7 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
             <span className={`font-bold ${timeWarning ? 'text-yellow-300' : 'opacity-80'}`}>
               {timeWarning && '⚠️ '}{timeText}
             </span>
-            {job.deposit_required && !job.deposit_received && (
+            {!job.is_warranty && job.deposit_required && !job.deposit_received && (
               <div className="w-5 h-5 bg-white rounded-full shadow-md flex items-center justify-center">
                 <span className="text-xs font-black text-yellow-600">£</span>
               </div>

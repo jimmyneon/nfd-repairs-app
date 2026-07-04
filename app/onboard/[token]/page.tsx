@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Loader2, CheckCircle, AlertCircle, X, FileText, Mail, Lock, Unlock } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, X, FileText, Mail, Lock, Unlock, Shield } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Job {
@@ -20,6 +20,7 @@ interface Job {
   terms_accepted: boolean
   device_password: string | null
   password_not_applicable: boolean
+  is_warranty: boolean
 }
 
 export default function OnboardingPage({ params }: { params: { token: string } }) {
@@ -97,7 +98,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
       return
     }
 
-    if (!formData.diagnosticFeeAcknowledged) {
+    if (!job.is_warranty && !formData.diagnosticFeeAcknowledged) {
       setError('Please acknowledge the diagnostic fee policy')
       return
     }
@@ -197,11 +198,15 @@ export default function OnboardingPage({ params }: { params: { token: string } }
               <p><span className="text-gray-600">Customer:</span> <span className="font-semibold">{job.customer_name}</span></p>
               <p><span className="text-gray-600">Device:</span> <span className="font-semibold">{job.device_make} {job.device_model}</span></p>
               <p><span className="text-gray-600">Issue:</span> <span className="font-semibold">{job.issue}</span></p>
-              <p><span className="text-gray-600">Price:</span> <span className="font-semibold">£{job.price_total.toFixed(2)}</span></p>
+              {job.is_warranty ? (
+                <p><span className="text-gray-600">Price:</span> <span className="font-semibold text-green-600">Warranty repair — no charge</span></p>
+              ) : (
+                <p><span className="text-gray-600">Price:</span> <span className="font-semibold">£{job.price_total.toFixed(2)}</span></p>
+              )}
             </div>
 
             {/* Deposit Alert */}
-            {job.deposit_required && (
+            {job.deposit_required && !job.is_warranty && (
               <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
                 <h3 className="font-bold text-amber-900 mb-2 flex items-center">
                   <AlertCircle className="h-5 w-5 mr-2" />
@@ -290,6 +295,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
             </div>
 
             {/* Diagnostic Fee Notice */}
+            {!job.is_warranty && (
             <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
               <h3 className="font-semibold text-yellow-900 flex items-center gap-2 mb-3">
                 <AlertCircle className="h-5 w-5" />
@@ -309,8 +315,23 @@ export default function OnboardingPage({ params }: { params: { token: string } }
                 </p>
               </div>
             </div>
+            )}
+
+            {/* Warranty notice for warranty jobs */}
+            {job.is_warranty && (
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                <h3 className="font-semibold text-green-900 flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5" />
+                  Warranty Repair
+                </h3>
+                <p className="text-sm text-green-800">
+                  This repair is covered under warranty — there is no charge for this service.
+                </p>
+              </div>
+            )}
 
             {/* Diagnostic Fee Acknowledgment */}
+            {!job.is_warranty && (
             <div className="flex items-start space-x-3 p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
               <input
                 type="checkbox"
@@ -326,6 +347,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
                 </p>
               </label>
             </div>
+            )}
 
             {/* Terms and Conditions */}
             <div className="flex items-start space-x-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">

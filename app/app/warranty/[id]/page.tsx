@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Home, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle, Plus } from 'lucide-react'
+import { Home, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle, Plus, Wrench } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -141,8 +141,22 @@ export default function WarrantyTicketDetailPage({ params }: { params: { id: str
           metadata: { requiresParts }
         } as any)
 
-      // TODO: Send SMS to customer
-      
+      // Send SMS to customer
+      const firstName = ticket.customer_name?.split(' ')[0] || 'there'
+      const smsMessage = requiresParts
+        ? `Hi ${firstName}, we've approved your warranty claim for your ${ticket.device_model || 'device'}. We need to order parts - we'll let you know when they arrive. Ref: ${ticket.ticket_ref}`
+        : `Hi ${firstName}, we've approved your warranty claim for your ${ticket.device_model || 'device'}. Please bring your device to our shop at your earliest convenience. Ref: ${ticket.ticket_ref}`
+
+      try {
+        await fetch('/api/warranty/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticketId: params.id, message: smsMessage }),
+        })
+      } catch (smsErr) {
+        console.error('Failed to send warranty SMS:', smsErr)
+      }
+
       setShowApproveModal(false)
       await loadTicket()
     }
@@ -361,6 +375,39 @@ export default function WarrantyTicketDetailPage({ params }: { params: { id: str
             </div>
           </div>
         ) : null}
+
+        {/* Create Warranty Job button — shown when approved (IN_PROGRESS) and no matched job yet */}
+        {ticket.status === 'IN_PROGRESS' && !ticket.matched_job_id && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h2 className="font-semibold text-lg mb-3 text-gray-900 dark:text-white">Next Steps</h2>
+            <Link
+              href={`/app/jobs/create?warranty_ticket_id=${ticket.id}&customer_name=${encodeURIComponent(ticket.customer_name)}&customer_phone=${encodeURIComponent(ticket.customer_phone)}&device_model=${encodeURIComponent(ticket.device_model || '')}&issue=${encodeURIComponent(ticket.issue_description)}`}
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-3 rounded-lg font-medium transition-colors"
+            >
+              <Wrench className="h-5 w-5" />
+              Create Warranty Job
+            </Link>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+              Creates a new repair job marked as warranty (no charge to customer)
+            </p>
+          </div>
+        )}
+
+        {/* If matched job exists, show link */}
+        {ticket.status === 'IN_PROGRESS' && ticket.matched_job_id && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Warranty job created</span>
+            </div>
+            <Link
+              href={`/app/jobs/${ticket.matched_job_id}`}
+              className="text-primary hover:underline mt-1 inline-block"
+            >
+              View Job Details →
+            </Link>
+          </div>
+        )}
       </main>
 
       {/* Approve Modal */}

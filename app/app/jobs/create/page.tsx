@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X } from 'lucide-react'
+import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
@@ -38,6 +38,7 @@ function CreateJobContent() {
   
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [isWarranty, setIsWarranty] = useState(false)
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -57,6 +58,20 @@ function CreateJobContent() {
   // Restore form state from sessionStorage on mount (survives back navigation)
   useEffect(() => {
     if (typeof window !== 'undefined' && !jobId) {
+      // Check for warranty ticket params (from warranty ticket page)
+      const warrantyTicketId = searchParams.get('warranty_ticket_id')
+      if (warrantyTicketId) {
+        setCustomerName(searchParams.get('customer_name') || '')
+        setCustomerPhone(searchParams.get('customer_phone') || '')
+        setFormData(prev => ({
+          ...prev,
+          device_model: searchParams.get('device_model') || '',
+          issue: searchParams.get('issue') || '',
+        }))
+        setIsWarranty(true)
+        return
+      }
+
       const savedForm = sessionStorage.getItem('job_create_form_state')
       if (savedForm) {
         try {
@@ -377,12 +392,18 @@ function CreateJobContent() {
       device_model: formData.device_model,
       issue: formData.issue,
       description: formData.description || '',
-      price_total: formData.price_total || '0',
+      price_total: isWarranty ? '0' : (formData.price_total || '0'),
       requires_parts_order: String(formData.requires_parts_order),
       device_left_with_us: String(formData.device_left_with_us),
       passcode_requirement: formData.passcode_requirement,
       linked_quote_id: formData.linked_quote_id || '',
+      is_warranty: String(isWarranty),
     })
+
+    const warrantyTicketId = searchParams.get('warranty_ticket_id')
+    if (warrantyTicketId) {
+      params.set('linked_warranty_ticket_id', warrantyTicketId)
+    }
     
     // If completing onboarding for existing job, pass jobId
     if (jobId) {
@@ -1010,26 +1031,44 @@ function CreateJobContent() {
             </div>
           )}
 
-          {!superQuickMode && (quickWalkInMode ? (
+          {!superQuickMode && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Price & Options</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+                {isWarranty ? 'Warranty Repair' : (quickWalkInMode ? 'Price & Options' : 'Pricing & Parts')}
+              </h2>
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Price (£)
-                  </label>
-                  <input
-                    type="number"
-                    name="price_total"
-                    value={formData.price_total}
-                    onChange={handleChange}
-                    required={false}
-                    step="0.01"
-                    min="0"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-lg"
-                    placeholder="Add later"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsWarranty(!isWarranty)}
+                  className={`w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                    isWarranty
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                      : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  <Shield className="h-5 w-5" />
+                  {isWarranty ? 'Warranty Repair — No Charge' : 'Mark as Warranty Repair'}
+                </button>
+
+                {!isWarranty && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      {quickWalkInMode ? 'Price (£)' : 'Total Price (£)'}
+                    </label>
+                    <input
+                      type="number"
+                      name="price_total"
+                      value={formData.price_total}
+                      onChange={handleChange}
+                      required={false}
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-lg"
+                      placeholder={quickWalkInMode ? "Add later" : "Can be added later"}
+                    />
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
@@ -1040,45 +1079,11 @@ function CreateJobContent() {
                   }`}
                 >
                   <Wrench className="h-5 w-5" />
-                  {formData.requires_parts_order ? 'Parts Needed (£20 deposit)' : 'Mark as Parts Needed'}
+                  {formData.requires_parts_order ? 'Parts Needed' : 'Mark as Parts Needed'}
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Pricing & Parts</h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Total Price (£)
-                  </label>
-                  <input
-                    type="number"
-                    name="price_total"
-                    value={formData.price_total}
-                    onChange={handleChange}
-                    required={false}
-                    step="0.01"
-                    min="0"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-lg"
-                    placeholder="Can be added later"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
-                  className={`w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                    formData.requires_parts_order
-                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
-                      : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
-                  }`}
-                >
-                  <Wrench className="h-5 w-5" />
-                  {formData.requires_parts_order ? 'Parts Needed (£20 deposit)' : 'Mark as Parts Needed'}
-                </button>
-              </div>
-            </div>
-          ))}
+          )}
 
           {/* Passcode Requirement Section */}
           {!superQuickMode && (!quickWalkInMode ? (

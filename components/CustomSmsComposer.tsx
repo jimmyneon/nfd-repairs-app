@@ -49,12 +49,16 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
     },
     {
       label: 'Ready to Collect',
-      text: `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`,
+      text: job.is_warranty
+        ? `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`
+        : `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`,
     },
-    {
-      label: 'Deposit Needed',
-      text: `Hi ${firstName}, I need to order parts for your ${deviceName}. A £20 deposit is required - please pop into the shop when you can to get this sorted.`,
-    },
+    ...(job.is_warranty ? [] : [
+      {
+        label: 'Deposit Needed',
+        text: `Hi ${firstName}, I need to order parts for your ${deviceName}. A £20 deposit is required - please pop into the shop when you can to get this sorted.`,
+      },
+    ]),
     {
       label: 'Chase Collection',
       text: `Hi ${firstName}, just a friendly reminder that your ${deviceName} is ready for collection. It's been a while so please pop in soon to pick it up.`,
@@ -63,10 +67,12 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
       label: 'Final Pickup Reminder',
       text: `Hi ${firstName}, this is a final reminder that your ${deviceName} is ready for collection. Please collect it within 5 days, otherwise we may need to recycle it.\n\nOur opening times:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nMany thanks,\nNew Forest Device Repairs`,
     },
-    {
-      label: 'Quote Sent',
-      text: `Hi ${firstName}, your repair quote for ${deviceName} is ready. Total: £${job.price_total?.toFixed(2) || '0.00'}. Let me know if you'd like to go ahead.\n${trackingUrl}`,
-    },
+    ...(job.is_warranty ? [] : [
+      {
+        label: 'Quote Sent',
+        text: `Hi ${firstName}, your repair quote for ${deviceName} is ready. Total: £${job.price_total?.toFixed(2) || '0.00'}. Let me know if you'd like to go ahead.\n${trackingUrl}`,
+      },
+    ]),
   ]
 
   const applyTemplate = (text: string) => {
@@ -152,7 +158,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
   const quickInserts = [
     { label: 'Greeting', icon: Plus, action: () => setMessage((prev) => `Hi ${firstName}, ${prev}`) },
     { label: 'Sign-off', icon: MessageSquare, action: () => insertText('Many thanks,\nJohn\nNew Forest Device Repairs') },
-    { label: 'Price', icon: DollarSign, action: () => job.price_total && insertText(`Total: £${job.price_total.toFixed(2)}`), show: !!job.price_total },
+    { label: 'Price', icon: DollarSign, action: () => job.price_total && insertText(`Total: £${job.price_total.toFixed(2)}`), show: !!job.price_total && !job.is_warranty },
     { label: 'Diagnostic', icon: FileText, action: () => job.diagnostic_report && insertText(`\nDiagnostic report:\n${job.diagnostic_report}\n`), show: !!job.diagnostic_report },
     { label: 'Tracking', icon: LinkIcon, action: () => insertText(`Track your repair: ${trackingUrl}`) },
     { label: 'Hours', icon: Clock, action: () => insertText('Opening times: https://maps.app.goo.gl/oVczouUePXkRbrKb7') },

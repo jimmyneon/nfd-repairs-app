@@ -51,6 +51,10 @@ export async function POST(request: NextRequest) {
       initial_status,
       skip_sms,
       quick_intake,
+      
+      // Warranty
+      is_warranty,
+      linked_warranty_ticket_id,
     } = body
 
     // Map quote_requests fields to jobs fields
@@ -74,24 +78,25 @@ export async function POST(request: NextRequest) {
       page: page || null,
       
       // Pricing
-      quoted_price: quoted_price || price_total || 0,
-      price_total: price_total || quoted_price || 0,
+      quoted_price: is_warranty ? 0 : (quoted_price || price_total || 0),
+      price_total: is_warranty ? 0 : (price_total || quoted_price || 0),
       quoted_at: quoted_price ? new Date().toISOString() : null,
       
       // Parts & deposit (always £20 for parts when deposit required)
       // Auto-infer parts_required from initial_status if status implies parts are needed
       // But deposit_required is ONLY set if explicitly requested or status is AWAITING_DEPOSIT
-      requires_parts_order: requires_parts_order || parts_required || 
+      // Warranty jobs: no deposit ever
+      requires_parts_order: is_warranty ? (requires_parts_order || parts_required || false) : (requires_parts_order || parts_required || 
                            (initial_status && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
-                           false,
-      parts_required: parts_required || requires_parts_order || 
+                           false),
+      parts_required: is_warranty ? (parts_required || requires_parts_order || false) : (parts_required || requires_parts_order || 
                      (initial_status && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(initial_status)) || 
-                     false,
-      deposit_required: deposit_required || 
+                     false),
+      deposit_required: is_warranty ? false : (deposit_required || 
                        (initial_status && initial_status === 'AWAITING_DEPOSIT') || 
-                       false,
-      deposit_amount: (deposit_required || (initial_status && initial_status === 'AWAITING_DEPOSIT')) 
-                      ? 20.00 : null,
+                       false),
+      deposit_amount: is_warranty ? null : ((deposit_required || (initial_status && initial_status === 'AWAITING_DEPOSIT')) 
+                      ? 20.00 : null),
       deposit_received: false,
       
       // Relationships
@@ -122,6 +127,10 @@ export async function POST(request: NextRequest) {
       terms_accepted_at: terms_accepted ? new Date().toISOString() : null,
       onboarding_completed: onboarding_completed || false,
       onboarding_completed_at: onboarding_completed ? new Date().toISOString() : null,
+      
+      // Warranty
+      is_warranty: is_warranty || false,
+      linked_warranty_ticket_id: linked_warranty_ticket_id || null,
     }
 
     // Validate required fields
@@ -196,6 +205,23 @@ export async function POST(request: NextRequest) {
       type: 'SYSTEM',
       message: `Job created via API from ${jobData.source}`,
     } as any)
+
+    // If this is a warranty job linked to a warranty ticket, update the ticket
+    if (is_warranty && linked_warranty_ticket_id) {
+      await supabase
+        .from('warranty_tickets')
+        .update({ matched_job_id: job.id })
+        .eq('id', linked_warranty_ticket_id)
+
+      await supabase.from('warranty_ticket_events').insert({
+        ticket_id: linked_warranty_ticket_id,
+        type: 'JOB_CREATED',
+        message: `Warranty job created: ${job.job_ref}`,
+        metadata: { job_id: job.id, job_ref: job.job_ref }
+      } as any)
+
+      console.log(`✅ Linked warranty ticket ${linked_warranty_ticket_id} to job ${job.job_ref}`)
+    }
 
     // If initial_status was provided (imported/manual job with skipped statuses),
     // create synthetic STATUS_CHANGE events for the logical steps that must have occurred

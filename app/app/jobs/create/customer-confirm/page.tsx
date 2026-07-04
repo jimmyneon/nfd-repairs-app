@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown } from 'lucide-react'
+import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown, Shield } from 'lucide-react'
 
 function CustomerConfirmContent() {
   const router = useRouter()
@@ -41,6 +41,8 @@ function CustomerConfirmContent() {
     device_left_with_us: searchParams.get('device_left_with_us') === 'true',
     passcode_requirement: searchParams.get('passcode_requirement') || 'recommended',
     linked_quote_id: searchParams.get('linked_quote_id') || null,
+    is_warranty: searchParams.get('is_warranty') === 'true',
+    linked_warranty_ticket_id: searchParams.get('linked_warranty_ticket_id') || null,
   }
 
   const passcodeRequired = jobData.passcode_requirement !== 'not_required'
@@ -241,8 +243,8 @@ function CustomerConfirmContent() {
         device_model: jobData.device_model || 'Unknown',
         issue: jobData.issue || 'Repair needed',
         description: jobData.description || null,
-        price_total: finalPrice,
-        quoted_price: finalPrice,
+        price_total: jobData.is_warranty ? 0 : finalPrice,
+        quoted_price: jobData.is_warranty ? 0 : finalPrice,
         requires_parts_order: jobData.requires_parts_order,
         source: 'staff_manual',
         device_password: (passwordNA || passcodeMethod !== 'provided') ? null : devicePassword.trim(),
@@ -254,6 +256,8 @@ function CustomerConfirmContent() {
         onboarding_completed: true,
         device_in_shop: jobData.device_left_with_us,
         linked_quote_id: jobData.linked_quote_id,
+        is_warranty: jobData.is_warranty,
+        linked_warranty_ticket_id: jobData.linked_warranty_ticket_id,
         // Advanced overrides for importing old jobs
         initial_status: overrideOptions?.initial_status || null,
         skip_sms: overrideOptions?.skip_initial_sms || false,
@@ -379,8 +383,11 @@ function CustomerConfirmContent() {
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{jobData.issue}</p>
           </div>
-          {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+          {jobData.price_total && parseFloat(jobData.price_total) > 0 && !jobData.is_warranty && (
             <p className="font-bold text-primary text-base flex-shrink-0">£{parseFloat(jobData.price_total).toFixed(2)}</p>
+          )}
+          {jobData.is_warranty && (
+            <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full flex-shrink-0">WARRANTY</span>
           )}
         </div>
 
@@ -611,12 +618,18 @@ function CustomerConfirmContent() {
                   )}
                 </div>
               )}
-              {jobData.requires_parts_order && (
+              {jobData.requires_parts_order && !jobData.is_warranty && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-3 text-sm text-yellow-900 dark:text-yellow-100">£20 deposit needed for parts order</div>
+              )}
+              {jobData.is_warranty && (
+                <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-900 dark:text-green-100 font-semibold flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Warranty repair — no charge
+                </div>
               )}
             </div>
 
-            {(jobData.issue?.toLowerCase().includes('water') || jobData.issue?.toLowerCase().includes('no power') || jobData.issue?.toLowerCase().includes('not loading') || jobData.issue?.toLowerCase().includes('black screen')) && (
+            {!jobData.is_warranty && (jobData.issue?.toLowerCase().includes('water') || jobData.issue?.toLowerCase().includes('no power') || jobData.issue?.toLowerCase().includes('not loading') || jobData.issue?.toLowerCase().includes('black screen')) && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4 mb-4">
                 <h5 className="font-bold text-yellow-900 dark:text-yellow-100 mb-1 text-sm">Diagnostic Fee: {diagnosticFee}</h5>
                 <p className="text-xs text-yellow-800 dark:text-yellow-200">Waived if you proceed with the repair.</p>
@@ -661,13 +674,18 @@ function CustomerConfirmContent() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{jobData.issue}</p>
               </div>
 
-              {/* Price */}
-              {jobData.price_total && parseFloat(jobData.price_total) > 0 && (
+              {/* Price or Warranty badge */}
+              {jobData.is_warranty ? (
+                <div className="text-center mb-3 pb-3 border-b border-gray-100 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-green-500 uppercase tracking-wide">Warranty</p>
+                  <p className="text-lg font-black text-green-600">No Charge</p>
+                </div>
+              ) : jobData.price_total && parseFloat(jobData.price_total) > 0 ? (
                 <div className="text-center mb-3 pb-3 border-b border-gray-100 dark:border-gray-700">
                   <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Price</p>
                   <p className="text-2xl font-black text-primary">£{parseFloat(jobData.price_total).toFixed(2)}</p>
                 </div>
-              )}
+              ) : null}
 
               {/* Customer info — fills progressively, scrolls if needed */}
               <div className="flex-1 overflow-y-auto space-y-3">
@@ -695,7 +713,7 @@ function CustomerConfirmContent() {
               </div>
 
               {/* Deposit info at bottom */}
-              {jobData.requires_parts_order && (
+              {jobData.requires_parts_order && !jobData.is_warranty && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2 text-xs text-yellow-900 dark:text-yellow-100 mt-3">
                   £20 deposit needed for parts
                 </div>

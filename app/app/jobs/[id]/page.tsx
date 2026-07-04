@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -760,26 +760,36 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{job.issue}</p>
               <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-1">{job.customer_name}</p>
             </div>
-            <button
-              onClick={() => setShowPriceModal(true)}
-              className="text-right flex-shrink-0 active:scale-95 transition-transform"
-            >
-              <p className="text-2xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
-              {job.payment_received && (
-                <p className="text-xs text-green-600 font-bold">Paid in full</p>
-              )}
-              {job.deposit_required && !job.deposit_received && (
-                <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
-              )}
-              {job.deposit_required && job.deposit_received && !job.payment_received && (
-                <p className="text-xs text-green-600 font-bold">
-                  Deposit paid · £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)} due
-                </p>
-              )}
-              {!job.payment_received && !job.deposit_required && job.price_total > 0 && (
-                <p className="text-xs text-orange-600 font-bold">Payment due</p>
-              )}
-            </button>
+            {job.is_warranty ? (
+              <div className="text-right flex-shrink-0">
+                <div className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 px-3 py-1.5 rounded-lg">
+                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-black text-green-700 dark:text-green-300 uppercase">Warranty</span>
+                </div>
+                <p className="text-xs text-green-600 font-bold mt-1">No charge</p>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowPriceModal(true)}
+                className="text-right flex-shrink-0 active:scale-95 transition-transform"
+              >
+                <p className="text-2xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
+                {job.payment_received && (
+                  <p className="text-xs text-green-600 font-bold">Paid in full</p>
+                )}
+                {job.deposit_required && !job.deposit_received && (
+                  <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
+                )}
+                {job.deposit_required && job.deposit_received && !job.payment_received && (
+                  <p className="text-xs text-green-600 font-bold">
+                    Deposit paid · £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)} due
+                  </p>
+                )}
+                {!job.payment_received && !job.deposit_required && job.price_total > 0 && (
+                  <p className="text-xs text-orange-600 font-bold">Payment due</p>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -820,6 +830,18 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   <FileText className="h-3.5 w-3.5" />
                   Diagnostic
                 </button>
+              )}
+              {job.is_warranty && (
+                <span className="text-xs px-2.5 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-lg font-bold flex items-center gap-1">
+                  <Shield className="h-3.5 w-3.5" />
+                  Warranty
+                </span>
+              )}
+              {job.message_preference === 'whatsapp' && (
+                <span className="text-xs px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg font-bold flex items-center gap-1" title="Customer prefers WhatsApp">
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  WhatsApp
+                </span>
               )}
             </div>
           </div>
@@ -907,13 +929,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <Send className="h-5 w-5" />
             <span className="text-[10px]">Message</span>
           </button>
-          <button
-            onClick={() => setShowPriceModal(true)}
-            className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
-          >
-            <PoundSterling className="h-5 w-5 text-primary" />
-            <span className="text-[10px] text-gray-700 dark:text-gray-300">Price</span>
-          </button>
+          {job.is_warranty ? (
+            <div className="aspect-square flex flex-col items-center justify-center gap-1 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl">
+              <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <span className="text-[10px] text-green-700 dark:text-green-300 font-bold">Warranty</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowPriceModal(true)}
+              className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
+            >
+              <PoundSterling className="h-5 w-5 text-primary" />
+              <span className="text-[10px] text-gray-700 dark:text-gray-300">Price</span>
+            </button>
+          )}
           <button
             onClick={() => setActivePanel('notes')}
             className="aspect-square flex flex-col items-center justify-center gap-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold rounded-xl hover:border-primary transition-colors active:scale-95"
@@ -998,7 +1027,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job.deposit_required && !job.deposit_received && (
+        {job.deposit_required && !job.deposit_received && !job.is_warranty && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <div className="flex items-start space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
@@ -1060,7 +1089,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job.deposit_required && job.deposit_received && (
+        {job.deposit_required && job.deposit_received && !job.is_warranty && (
           <div className="card bg-green-50 border-2 border-green-300">
             <div className="flex items-start space-x-3">
               <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />

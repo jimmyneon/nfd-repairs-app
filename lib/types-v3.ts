@@ -89,6 +89,8 @@ export interface Job {
   message_preference?: 'sms' | 'whatsapp' | null
   repair_type?: string | null
   device_type?: string | null
+  is_warranty?: boolean
+  linked_warranty_ticket_id?: string | null
   
   // Action-oriented enhancements
   status_changed_at?: string | null
