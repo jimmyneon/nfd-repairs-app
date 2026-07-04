@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
           success: true, 
           job_id: job.id,
           job_ref: job.job_ref,
+          tracking_token: job.tracking_token,
           sms_skipped: true,
           email_skipped: true,
         })

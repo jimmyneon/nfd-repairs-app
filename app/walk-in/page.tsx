@@ -112,7 +112,7 @@ export default function WalkInSelfBookingPage() {
         onboarding_completed: false,
         device_in_shop: false,
         linked_quote_id: null,
-        skip_sms: false,
+        skip_sms: true,
         quick_intake: true,
         initial_status: 'RECEIVED',
       }
@@ -127,6 +127,21 @@ export default function WalkInSelfBookingPage() {
 
       if (response.ok) {
         setJobRef(result.job_ref)
+
+        // Send custom SMS with completion link
+        const completionUrl = `${window.location.origin}/walk-in/complete/${result.tracking_token}`
+        const firstName = formData.customerName.trim().split(' ')[0]
+        const smsMessage = `Hi ${firstName}, thanks for starting your check-in with New Forest Device Repairs. Please use this link to complete your details when you're ready:\n\n${completionUrl}\n\nMany thanks,\nNew Forest Device Repairs`
+
+        await fetch('/api/sms/send-custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: result.job_id,
+            message: smsMessage,
+          }),
+        })
+
         setFinishLaterSuccess(true)
       } else {
         setError(result.error || 'Failed to send link')
