@@ -1,13 +1,14 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Smartphone } from 'lucide-react'
+import { CheckCircle, Smartphone, Send } from 'lucide-react'
 import { Suspense } from 'react'
 import Link from 'next/link'
 
 function SuccessContent() {
   const searchParams = useSearchParams()
   const jobRef = searchParams.get('job_ref')
+  const finishLater = searchParams.get('finish_later') === 'true'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -18,11 +19,15 @@ function SuccessContent() {
           </div>
           
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            Quote Request Received!
+            {finishLater ? 'Link Sent!' : 'Quote Request Received!'}
           </h1>
           
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-            Thank you for your quote request. We'll review your device details and send you a quote via SMS.
+            {finishLater ? (
+              <>We&apos;ve sent you an SMS with a link to complete your booking details. You can fill them in whenever you&apos;re ready.</>
+            ) : (
+              <>Thank you for your quote request. We&apos;ll review your device details and send you a quote via SMS.</>
+            )}
           </p>
 
           {jobRef && (
@@ -44,24 +49,41 @@ function SuccessContent() {
 
           <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 mb-8 text-left">
             <h2 className="font-bold text-gray-900 dark:text-white mb-3">What happens next?</h2>
-            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>We'll review your device details and assess the repair</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>You'll receive a quote via SMS with a link to approve</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>Once you approve the quote, you can bring in your device</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                <span>No commitment until you approve the quote</span>
-              </li>
-            </ul>
+            {finishLater ? (
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>Check your phone for an SMS from us</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>Click the link in the SMS to complete your device details</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>We&apos;ll review your details and send you a quote</span>
+                </li>
+              </ul>
+            ) : (
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>We&apos;ll review your device details and assess the repair</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>You&apos;ll receive a quote via SMS with a link to approve</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>Once you approve the quote, you can bring in your device</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span>No commitment until you approve the quote</span>
+                </li>
+              </ul>
+            )}
           </div>
 
           <div className="text-sm text-gray-600 dark:text-gray-400">

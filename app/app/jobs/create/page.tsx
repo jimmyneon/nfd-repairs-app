@@ -304,7 +304,8 @@ function CreateJobContent() {
             onboarding_completed: false,
             device_in_shop: true,
             linked_quote_id: null,
-            skip_sms: true,
+            skip_sms: false,
+            quick_intake: true,
           }),
         })
 
@@ -334,7 +335,7 @@ function CreateJobContent() {
             sessionStorage.removeItem('customer_confirm_wizard')
           }
           // Show success and stay on page for next customer
-          alert(`Job created! Ref: ${result.job_ref}\n\nYou can add device details later from the job page.`)
+          alert(`Job created! Ref: ${result.job_ref}\n\nSMS sent to customer with link to complete details.`)
           setLoading(false)
         } else {
           alert(`Failed to create job: ${result.error}`)

@@ -54,6 +54,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [sendPriceInSms, setSendPriceInSms] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showBigPassword, setShowBigPassword] = useState(false)
+  const [decryptedPassword, setDecryptedPassword] = useState<string | null>(null)
   const [showTrackingLinkModal, setShowTrackingLinkModal] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
@@ -856,7 +857,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </button>
           {job.device_password && !job.password_not_applicable ? (
             <button
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={async () => {
+                if (job.device_password?.startsWith('ENCRYPTED:') && !decryptedPassword) {
+                  try {
+                    const res = await fetch('/api/password/decrypt', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ jobId: job.id }),
+                    })
+                    const data = await res.json()
+                    if (data.password) setDecryptedPassword(data.password)
+                    else if (data.notApplicable) setDecryptedPassword('N/A')
+                  } catch (e) { console.error('Decrypt failed:', e) }
+                }
+                setShowPassword(!showPassword)
+              }}
               onContextMenu={(e) => { e.preventDefault(); setShowBigPassword(true) }}
               onTouchStart={(e) => {
                 const timer = setTimeout(() => setShowBigPassword(true), 500)
@@ -873,7 +888,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-200 dark:border-blue-700 rounded-xl hover:border-blue-400 transition-colors active:scale-95 select-none"
             >
               <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 truncate max-w-full px-1">{showPassword ? job.device_password : 'Password'}</span>
+              <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 truncate max-w-full px-1">{showPassword ? (decryptedPassword || (job.device_password?.startsWith('ENCRYPTED:') ? 'Loading...' : job.device_password)) : 'Password'}</span>
             </button>
           ) : (
             <div className="aspect-square flex flex-col items-center justify-center gap-1 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-100 dark:border-gray-700/50 rounded-xl opacity-50">
@@ -1624,7 +1639,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase">Device Password</span>
               </div>
               <p className="text-4xl font-mono font-black text-gray-900 dark:text-white break-all tracking-wider">
-                {job.device_password}
+                {decryptedPassword || (job.device_password?.startsWith('ENCRYPTED:') ? 'Loading...' : job.device_password)}
               </p>
               <p className="text-sm text-gray-400 mt-6">Tap anywhere to close</p>
             </div>
@@ -1713,11 +1728,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       <span className="text-xs font-bold text-blue-900 dark:text-blue-300">CONFIDENTIAL</span>
                     </div>
                     <p className="text-lg font-mono font-bold text-gray-900 dark:text-white break-all">
-                      {showPassword ? job.device_password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
+                      {showPassword ? (decryptedPassword || (job.device_password?.startsWith('ENCRYPTED:') ? 'Loading...' : job.device_password)) : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
                     </p>
                   </div>
                   <button
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={async () => {
+                      if (job.device_password?.startsWith('ENCRYPTED:') && !decryptedPassword) {
+                        try {
+                          const res = await fetch('/api/password/decrypt', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ jobId: job.id }),
+                          })
+                          const data = await res.json()
+                          if (data.password) setDecryptedPassword(data.password)
+                          else if (data.notApplicable) setDecryptedPassword('N/A')
+                        } catch (e) { console.error('Decrypt failed:', e) }
+                      }
+                      setShowPassword(!showPassword)
+                    }}
                     className="flex-shrink-0 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors active:scale-95"
                     title={showPassword ? 'Hide password' : 'Show password'}
                   >

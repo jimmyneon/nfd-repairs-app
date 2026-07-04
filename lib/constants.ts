@@ -92,4 +92,5 @@ export const SMS_TEMPLATE_VARIABLES = [
   '{delay_notes}',
   '{shop_address}',
   '{opening_times}',
+  '{password_link}',
 ]

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Smartphone, CheckCircle, Loader2, AlertCircle, Lock, Unlock } from 'lucide-react'
+import { Smartphone, CheckCircle, Loader2, AlertCircle, Lock, Unlock, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function CustomerBookingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [finishLaterLoading, setFinishLaterLoading] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [showValidationSummary, setShowValidationSummary] = useState(false)
   const [shakeTerms, setShakeTerms] = useState(false)
@@ -161,6 +162,85 @@ export default function CustomerBookingPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
+  }
+
+  const handleFinishLater = async (e: React.MouseEvent) => {
+    e.preventDefault()
+
+    const errors: Record<string, string> = {}
+
+    if (!formData.customerName.trim()) {
+      errors.customerName = 'Your name is required'
+    }
+
+    if (!formData.customerPhone.trim()) {
+      errors.customerPhone = 'Your phone number is required'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      setShowValidationSummary(true)
+      const firstErrorField = Object.keys(errors)[0]
+      const errorElement = document.querySelector(`[name="${firstErrorField}"]`)
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setTimeout(() => { (errorElement as HTMLElement).focus() }, 500)
+      }
+      setTimeout(() => setShowValidationSummary(false), 10000)
+      return
+    }
+
+    setValidationErrors({})
+    setShowValidationSummary(false)
+    setFinishLaterLoading(true)
+
+    try {
+      const payload = {
+        customer_name: formData.customerName.trim(),
+        customer_phone: formData.customerPhone.trim(),
+        customer_email: formData.customerEmail.trim() || null,
+        device_make: 'To be added',
+        device_model: 'To be added',
+        device_type: formData.deviceType,
+        issue: 'To be assessed',
+        description: 'Customer started form but chose to finish later',
+        price_total: 0,
+        quoted_price: 0,
+        requires_parts_order: false,
+        source: 'customer_online',
+        device_password: null,
+        password_not_applicable: true,
+        passcode_requirement: 'not_required',
+        passcode_method: 'not_applicable',
+        customer_signature: null,
+        terms_accepted: true,
+        onboarding_completed: false,
+        device_in_shop: false,
+        linked_quote_id: null,
+        skip_sms: false,
+        quick_intake: true,
+        initial_status: 'QUOTE_REQUESTED',
+      }
+
+      const response = await fetch('/api/jobs/create-v3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        router.push(`/booking/success?job_ref=${result.job_ref}&finish_later=true`)
+      } else {
+        alert(`Failed to create booking: ${result.error}`)
+        setFinishLaterLoading(false)
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error)
+      alert('Failed to create booking. Please try again.')
+      setFinishLaterLoading(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -597,7 +677,7 @@ export default function CustomerBookingPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || finishLaterLoading}
               className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
             >
               {loading ? (
@@ -612,6 +692,34 @@ export default function CustomerBookingPage() {
                 </>
               )}
             </button>
+
+            <div className="flex items-center gap-4 py-2">
+              <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+              <span className="text-sm text-gray-500 dark:text-gray-400">or</span>
+              <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFinishLater}
+              disabled={loading || finishLaterLoading}
+              className="w-full bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:scale-95 text-gray-700 dark:text-gray-300 font-bold py-4 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md text-lg flex items-center justify-center gap-3 border-2 border-gray-300 dark:border-gray-600"
+            >
+              {finishLaterLoading ? (
+                <>
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  Sending link...
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5" />
+                  Just send me a link to finish later
+                </>
+              )}
+            </button>
+            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+              Only need your name and phone number — fill in the rest later
+            </p>
           </form>
         </div>
       </div>

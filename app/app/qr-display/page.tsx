@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
-import { QrCode, RefreshCw, Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 
 export default function QRDisplayPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [fullscreen, setFullscreen] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
-
   const walkInUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/walk-in`
     : ''
@@ -24,69 +22,34 @@ export default function QRDisplayPage() {
         },
       }).then(setQrDataUrl)
     }
-  }, [walkInUrl, fullscreen, refreshKey])
+  }, [walkInUrl, fullscreen])
 
   return (
-    <div className={`flex flex-col items-center justify-center ${fullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'p-6'}`}>
-      {!fullscreen && (
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-primary/10 rounded-2xl mb-3">
-            <QrCode className="h-7 w-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Walk-In Check-In QR Code
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Display this for customers to scan and self-check-in
-          </p>
-        </div>
-      )}
-
+    <div className={`flex flex-col items-center justify-center ${fullscreen ? 'fixed inset-0 z-50 bg-white' : 'min-h-screen bg-gray-50 dark:bg-gray-900 p-4'}`}>
       {qrDataUrl && (
-        <div className="bg-white p-6 rounded-3xl shadow-2xl">
-          <img
-            src={qrDataUrl}
-            alt="Walk-in check-in QR code"
-            className="block mx-auto"
-            style={{ width: fullscreen ? '70vh' : '320px', height: fullscreen ? '70vh' : '320px' }}
-          />
-        </div>
+        <img
+          src={qrDataUrl}
+          alt="Scan to check in"
+          className="rounded-2xl shadow-lg"
+          style={{ width: fullscreen ? '70vh' : '350px', height: fullscreen ? '70vh' : '350px' }}
+        />
       )}
 
-      <div className="mt-6 text-center">
-        <p className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Scan to check in your repair
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 break-all">
-          {walkInUrl}
-        </p>
-      </div>
+      <p className={`mt-4 font-semibold text-gray-900 dark:text-white ${fullscreen ? 'text-2xl' : 'text-base'}`}>
+        Scan to check in your repair
+      </p>
 
-      <div className="mt-6 flex gap-3">
-        <button
-          onClick={() => setFullscreen(!fullscreen)}
-          className="flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
-        >
-          {fullscreen ? (
-            <>
-              <Minimize2 className="h-5 w-5" />
-              Exit Fullscreen
-            </>
-          ) : (
-            <>
-              <Maximize2 className="h-5 w-5" />
-              Fullscreen
-            </>
-          )}
-        </button>
-        <button
-          onClick={() => setRefreshKey(k => k + 1)}
-          className="flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
-        >
-          <RefreshCw className="h-5 w-5" />
-          Refresh
-        </button>
-      </div>
+      <button
+        onClick={() => setFullscreen(!fullscreen)}
+        className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+          fullscreen
+            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+        }`}
+      >
+        {fullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+        {fullscreen ? 'Exit' : 'Fullscreen'}
+      </button>
     </div>
   )
 }

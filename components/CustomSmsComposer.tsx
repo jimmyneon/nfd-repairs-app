@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle } from 'lucide-react'
+import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle, Lock } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
 import { getFirstName } from '@/lib/sms-template'
 import SlideUpPanel from './SlideUpPanel'
@@ -19,6 +19,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
   const [channel, setChannel] = useState<'sms' | 'whatsapp'>(job.message_preference === 'whatsapp' ? 'whatsapp' : 'sms')
   const [result, setResult] = useState<{ success: boolean; smsStatus?: string; emailStatus?: string } | null>(null)
   const [showPicker, setShowPicker] = useState<'templates' | 'inserts' | null>(null)
+  const [sendingPasswordRequest, setSendingPasswordRequest] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const appUrl = 'https://nfd-repairs-app.vercel.app'
@@ -80,6 +81,30 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
     setTimeout(() => textareaRef.current?.focus(), 100)
   }
 
+  const handleSendPasswordRequest = async () => {
+    if (sendingPasswordRequest) return
+    setSendingPasswordRequest(true)
+    setResult(null)
+    try {
+      const response = await fetch('/api/password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setResult({ success: true, smsStatus: 'Password request sent' })
+        onSent?.()
+        setTimeout(() => onClose(), 1500)
+      } else {
+        setResult({ success: false, smsStatus: data.error || 'Failed' })
+      }
+    } catch {
+      setResult({ success: false, smsStatus: 'Failed' })
+    }
+    setSendingPasswordRequest(false)
+  }
+
   const handleSend = async () => {
     if (!message.trim() || sending) return
 
@@ -135,6 +160,7 @@ export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsCom
 
   const squareButtons = [
     { label: 'Templates', icon: FileText, onClick: () => setShowPicker('templates') },
+    { label: 'Password', icon: Lock, onClick: handleSendPasswordRequest },
     ...quickInserts.map((q) => ({ label: q.label, icon: q.icon, onClick: () => applyInsert(q.action) })),
   ]
 

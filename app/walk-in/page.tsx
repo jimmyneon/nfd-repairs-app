@@ -1,14 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle, Loader2, AlertCircle, Smartphone, Wrench } from 'lucide-react'
-import { SHOP_INFO } from '@/lib/constants'
+import { CheckCircle, Loader2, AlertCircle, Smartphone } from 'lucide-react'
 
 export default function WalkInSelfBookingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [jobRef, setJobRef] = useState('')
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [showValidationSummary, setShowValidationSummary] = useState(false)
 
   const [formData, setFormData] = useState({
     customerName: '',
@@ -22,38 +23,58 @@ export default function WalkInSelfBookingPage() {
     notSure: false,
   })
 
-  const deviceTypes = [
-    { value: 'phone', label: 'Phone', icon: Smartphone },
-    { value: 'tablet', label: 'Tablet', icon: Smartphone },
-    { value: 'laptop', label: 'Laptop', icon: Wrench },
-    { value: 'macbook', label: 'MacBook', icon: Wrench },
-    { value: 'console', label: 'Console', icon: Wrench },
-    { value: 'other', label: 'Other', icon: Wrench },
-  ]
-
   const issueOptions: Record<string, string[]> = {
-    phone: ['Screen Replacement', 'Battery Replacement', 'Charging Port', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Software Issues', 'Other'],
-    tablet: ['Screen Replacement', 'Battery Replacement', 'Charging Port', 'Not Charging', 'Water Damage', 'No Power', 'Software Issues', 'Other'],
-    laptop: ['Screen Replacement', 'Keyboard', 'Battery', 'Charging Issues', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
-    macbook: ['Screen Replacement', 'Battery', 'Keyboard', 'Charging Issues', 'macOS Issues', 'Software Issues', 'Hardware Diagnostics', 'Other'],
-    console: ['HDMI Port', 'Disc Drive', 'Overheating', 'No Power', 'Software Issues', 'Controller Issues', 'Other'],
+    phone: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Data Recovery', 'Software Issues', 'Other'],
+    tablet: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Software Issues', 'Other'],
+    laptop: ['Screen Replacement', 'Keyboard Replacement', 'Battery Replacement', 'Charging Issues', 'Windows Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
+    macbook: ['Screen Replacement', 'Battery Replacement', 'Keyboard Replacement', 'Charging Issues', 'macOS Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
+    console: ['HDMI Port Replacement', 'Disc Drive Issues', 'Overheating', 'No Power', 'Software Issues', 'Controller Issues', 'Other'],
     other: ['Hardware Issue', 'Software Issue', 'Data Recovery', 'Other'],
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
+
+    if (validationErrors[name]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[name]
+        return newErrors
+      })
+    }
+
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.customerName.trim() || !formData.customerPhone.trim()) {
-      setError('Please enter your name and phone number')
+    const errors: Record<string, string> = {}
+
+    if (!formData.customerName.trim()) {
+      errors.customerName = 'Your name is required'
+    }
+
+    if (!formData.customerPhone.trim()) {
+      errors.customerPhone = 'Your phone number is required'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      setShowValidationSummary(true)
+      const firstErrorField = Object.keys(errors)[0]
+      const errorElement = document.querySelector(`[name="${firstErrorField}"]`)
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setTimeout(() => { (errorElement as HTMLElement).focus() }, 500)
+      }
+      setTimeout(() => setShowValidationSummary(false), 10000)
       return
     }
 
+    setValidationErrors({})
+    setShowValidationSummary(false)
     setLoading(true)
     setError(null)
 
@@ -132,21 +153,12 @@ export default function WalkInSelfBookingPage() {
             </div>
           )}
 
-          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-2xl p-5 text-left">
-            <h2 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">What happens next?</h2>
-            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Hand your device to staff</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>We&apos;ll assess your device and text you a quote</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Track your repair status via SMS updates</span>
-              </li>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-5 text-left">
+            <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg mb-2">What happens next?</h3>
+            <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
+              <li>1. Hand your device to a member of staff</li>
+              <li>2. We&apos;ll assess it and text you a quote</li>
+              <li>3. Track your repair via SMS updates</li>
             </ul>
           </div>
         </div>
@@ -156,219 +168,255 @@ export default function WalkInSelfBookingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-6 max-w-lg">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-3">
-            <Smartphone className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            Welcome to {SHOP_INFO.name}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Quick check-in — just a few details and you&apos;re done
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Customer Details - Required */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 space-y-4">
-            <h2 className="font-bold text-gray-900 dark:text-white text-lg">Your Details</h2>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="customerName"
-                value={formData.customerName}
-                onChange={handleChange}
-                required
-                autoComplete="name"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg"
-                placeholder="Your full name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                name="customerPhone"
-                value={formData.customerPhone}
-                onChange={handleChange}
-                required
-                autoComplete="tel"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg"
-                placeholder="07410 123 456"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                We&apos;ll text you updates about your repair
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Email <span className="text-gray-400 text-xs">(optional)</span>
-              </label>
-              <input
-                type="email"
-                name="customerEmail"
-                value={formData.customerEmail}
-                onChange={handleChange}
-                autoComplete="email"
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="you@email.com"
-              />
-            </div>
-          </div>
-
-          {/* Device Details - Optional */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-gray-900 dark:text-white text-lg">Device Details</h2>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Optional</span>
-            </div>
-
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Fill in what you know — leave the rest to us. We&apos;ll check your device when you hand it in.
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              Check In Your Repair
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Fill in what you know below, then hand your device to staff
             </p>
-
-            {/* Not sure toggle */}
-            <label className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl cursor-pointer border-2 border-blue-200 dark:border-blue-800">
-              <input
-                type="checkbox"
-                name="notSure"
-                checked={formData.notSure}
-                onChange={handleChange}
-                className="w-5 h-5 rounded text-primary focus:ring-primary"
-              />
-              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                I&apos;m not sure — let staff figure it out
-              </span>
-            </label>
-
-            {!formData.notSure && (
-              <>
-                {/* Device type quick select */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    What type of device?
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {deviceTypes.map(dt => {
-                      const Icon = dt.icon
-                      return (
-                        <button
-                          key={dt.value}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, deviceType: dt.value }))}
-                          className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 transition-all ${
-                            formData.deviceType === dt.value
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
-                          <span className="text-xs font-medium">{dt.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Make / Brand
-                  </label>
-                  <input
-                    type="text"
-                    name="deviceMake"
-                    value={formData.deviceMake}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="e.g. Apple, Samsung, Sony"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Model
-                  </label>
-                  <input
-                    type="text"
-                    name="deviceModel"
-                    value={formData.deviceModel}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="e.g. iPhone 14, Galaxy S23, PS5"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    What&apos;s the issue?
-                  </label>
-                  <select
-                    name="issue"
-                    value={formData.issue}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Select an issue...</option>
-                    {(issueOptions[formData.deviceType] || []).map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Anything else we should know?
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
-                    placeholder="Optional - describe the problem in your own words"
-                  />
-                </div>
-              </>
-            )}
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-2xl transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 text-lg"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-6 w-6 animate-spin" />
-                Booking in...
-              </>
-            ) : (
-              'Check In'
-            )}
-          </button>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
 
-          <p className="text-center text-xs text-gray-500 dark:text-gray-400 pb-4">
-            By checking in, you agree to our terms. No payment until you approve a quote.
-          </p>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Section 1: Your Details */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
+                  1
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Details</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="customerName"
+                    value={formData.customerName}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.customerName
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary focus:border-transparent'
+                    }`}
+                    placeholder="Enter your full name"
+                    autoFocus
+                  />
+                  {validationErrors.customerName && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerName}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Mobile Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    name="customerPhone"
+                    value={formData.customerPhone}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                      validationErrors.customerPhone
+                        ? 'border-red-500 focus:ring-red-500'
+                        : 'border-gray-300 dark:border-gray-600 focus:ring-primary focus:border-transparent'
+                    }`}
+                    placeholder="07410 123 456"
+                  />
+                  {validationErrors.customerPhone && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {validationErrors.customerPhone}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    name="customerEmail"
+                    value={formData.customerEmail}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="your@email.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Device Information */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-lg">
+                  2
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Device Information</h2>
+                <span className="text-sm text-gray-500 dark:text-gray-400 ml-auto">Optional</span>
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center space-x-3 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    name="notSure"
+                    checked={formData.notSure}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    I&apos;m not sure — let staff figure it out
+                  </span>
+                </label>
+
+                {!formData.notSure && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Device Type
+                      </label>
+                      <select
+                        name="deviceType"
+                        value={formData.deviceType}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="phone">Phone</option>
+                        <option value="tablet">Tablet</option>
+                        <option value="laptop">Laptop (Windows)</option>
+                        <option value="macbook">MacBook (Apple)</option>
+                        <option value="console">Games Console</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Device Make
+                      </label>
+                      <input
+                        type="text"
+                        name="deviceMake"
+                        value={formData.deviceMake}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., Apple, Samsung, HP"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Device Model
+                      </label>
+                      <input
+                        type="text"
+                        name="deviceModel"
+                        value={formData.deviceModel}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., iPhone 14 Pro, Galaxy S23"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        What&apos;s the issue?
+                      </label>
+                      <select
+                        name="issue"
+                        value={formData.issue}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">Select an issue...</option>
+                        {(issueOptions[formData.deviceType] || []).map(issue => (
+                          <option key={issue} value={issue}>{issue}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Additional Details (Optional)
+                      </label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="Tell us more about the problem..."
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {showValidationSummary && Object.keys(validationErrors).length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700 rounded-xl p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-red-900 dark:text-red-100 text-lg mb-2">Please complete the following required fields:</h3>
+                    <ul className="space-y-1">
+                      {Object.entries(validationErrors).map(([field, message]) => (
+                        <li key={field} className="text-sm text-red-800 dark:text-red-200 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
+                          <strong>{message}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowValidationSummary(false)}
+                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 active:scale-95 text-white font-bold py-5 px-6 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg text-lg flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  Checking In...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-6 w-6" />
+                  Check In
+                </>
+              )}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )

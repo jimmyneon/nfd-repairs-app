@@ -1,0 +1,15 @@
+-- Setup script for password encryption
+-- Run this to generate a PASSWORD_ENCRYPTION_KEY for your .env file
+-- 
+-- In Node.js, run:
+-- node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+--
+-- Add the output to your .env file as:
+-- PASSWORD_ENCRYPTION_KEY=<the hex string>
+--
+-- IMPORTANT: Never lose this key! If you lose it, all encrypted passwords become unrecoverable.
+-- Store it securely (e.g., in your password manager or Vercel environment variables).
+
+-- Schedule the cleanup function to run every hour (if pg_cron is available)
+-- Uncomment and run in Supabase SQL Editor:
+-- SELECT cron.schedule('cleanup-passwords', '0 * * * *', 'SELECT cleanup_old_passwords()');

@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       // Import options (from JSON import)
       initial_status,
       skip_sms,
+      quick_intake,
     } = body
 
     // Map quote_requests fields to jobs fields
@@ -297,11 +298,16 @@ export async function POST(request: NextRequest) {
     
     if (source === 'staff_manual' || source === 'walk_in_self') {
       // Manual or walk-in self-booking - device already in shop
-      if (jobData.deposit_required) {
+      if (quick_intake) {
+        templateKey = 'QUICK_INTAKE'
+      } else if (jobData.deposit_required) {
         templateKey = 'DEPOSIT_REQUIRED'
       } else {
         templateKey = 'RECEIVED'
       }
+    } else if (quick_intake) {
+      // Customer online booking with finish later - send link to complete
+      templateKey = 'QUICK_INTAKE'
     } else {
       // API/online job - customer has device, needs to drop off
       // Send simple acceptance message with location/hours
