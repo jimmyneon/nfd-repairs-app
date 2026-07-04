@@ -37,9 +37,9 @@ export function renderSmsTemplate(
       // Strip lines that end with "£." or "£ ." (variable was empty after £ prefix)
       if (/£\s*\.\s*$/.test(trimmed)) return false
       // Strip lines that are just a label + empty variable (e.g. "Balance to pay: .")
-      if (/[a-zA-Z\s]+:\s*\.\s*$/.test(trimmed)) return false
+      if (/^[a-zA-Z\s]+:\s*\.\s*$/.test(trimmed)) return false
       // Strip lines that are just a label + empty (e.g. "Deposit paid: ")
-      if (/[a-zA-Z\s]+:\s*$/.test(trimmed) && !trimmed.includes('http')) return false
+      if (/^[a-zA-Z\s]+:\s*$/.test(trimmed) && !trimmed.includes('http')) return false
       return true
     })
     .join('\n')
