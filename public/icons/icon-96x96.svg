@@ -1,8 +1,1 @@
-<svg width="96" height="96" xmlns="http://www.w3.org/2000/svg">
-  <rect width="96" height="96" fill="#FAF5E9" rx="19.200000000000003"/>
-  <g transform="translate(19.200000000000003, 19.200000000000003)">
-    <path fill="#009B4D" d="M 28.799999999999997 14.399999999999999 L 43.2 28.799999999999997 L 28.799999999999997 43.2 L 14.399999999999999 28.799999999999997 Z"/>
-    <circle cx="28.799999999999997" cy="43.2" r="4.800000000000001" fill="#009B4D"/>
-  </g>
-  <text x="50%" y="75%" text-anchor="middle" font-family="Arial, sans-serif" font-size="14.399999999999999" font-weight="bold" fill="#009B4D">NFD</text>
-</svg>
+<svg width="96" height="96" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00B85C"/><stop offset="100%" stop-color="#00823F"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#bg)"/><g transform="translate(256, 256)"><g transform="rotate(-45)"><rect x="-18" y="-150" width="36" height="180" rx="18" fill="#fff"/><path d="M -30 -150 L 0 -200 L 30 -150 L 18 -145 L 18 -120 L -18 -120 L -18 -145 Z" fill="#fff"/></g><g transform="rotate(45)"><rect x="-18" y="-30" width="36" height="180" rx="18" fill="#fff"/><circle cx="0" cy="-45" r="32" fill="none" stroke="#fff" stroke-width="18"/></g></g></svg>

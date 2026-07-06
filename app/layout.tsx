@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: 'NFD Repairs - Repair Tracking',
   description: 'Track your device repair with New Forest Device Repairs',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-touch-icon.svg',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
