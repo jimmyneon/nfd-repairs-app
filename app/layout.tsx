@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { Providers } from './providers'
+import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 
 export const metadata: Metadata = {
   title: 'NFD Repairs - Repair Tracking',
@@ -30,6 +31,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <PwaInstallPrompt />
       </body>
     </html>
   )

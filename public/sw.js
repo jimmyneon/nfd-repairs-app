@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nfd-repairs-v2'
+const CACHE_NAME = 'nfd-repairs-v3'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -105,8 +105,8 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body || 'New notification',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-96x96.png',
+    icon: '/icons/icon-192x192.svg',
+    badge: '/icons/icon-96x96.svg',
     vibrate: vibrationPatterns[notificationType] || vibrationPatterns.default,
     tag: tag, // Groups notifications by job
     renotify: true, // Re-alert even if notification with same tag exists
@@ -123,7 +123,7 @@ self.addEventListener('push', (event) => {
       {
         action: 'view',
         title: '👁️ View Job',
-        icon: '/icons/icon-96x96.png'
+        icon: '/icons/icon-96x96.svg'
       },
       {
         action: 'close',
@@ -134,7 +134,7 @@ self.addEventListener('push', (event) => {
   
   // Add image for specific notification types
   if (notificationType === 'READY_TO_COLLECT' || notificationType === 'PARTS_ARRIVED') {
-    options.image = '/icons/icon-512x512.png' // Large image for important notifications
+    options.image = '/icons/icon-512x512.svg' // Large image for important notifications
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
