@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield } from 'lucide-react'
+import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
@@ -39,6 +39,7 @@ function CreateJobContent() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [isWarranty, setIsWarranty] = useState(false)
+  const [sendCompleteLaterSms, setSendCompleteLaterSms] = useState(false)
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -319,7 +320,7 @@ function CreateJobContent() {
             onboarding_completed: false,
             device_in_shop: true,
             linked_quote_id: null,
-            skip_sms: false,
+            skip_sms: sendCompleteLaterSms,
             quick_intake: true,
           }),
         })
@@ -327,9 +328,26 @@ function CreateJobContent() {
         const result = await response.json()
 
         if (response.ok) {
+          // If sendCompleteLaterSms is on, send custom SMS with completion link
+          if (sendCompleteLaterSms && result.tracking_token) {
+            const completionUrl = `${window.location.origin}/walk-in/complete/${result.tracking_token}`
+            const firstName = customerName.trim().split(' ')[0]
+            const smsMessage = `Hi ${firstName}, thanks for bringing your device to New Forest Device Repairs. Please use this link to complete your details when you're ready:\n\n${completionUrl}\n\nMany thanks,\nNew Forest Device Repairs`
+
+            await fetch('/api/sms/send-custom', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jobId: result.job_id,
+                message: smsMessage,
+              }),
+            })
+          }
+
           // Clear form and session state so next job starts fresh
           setCustomerName('')
           setCustomerPhone('')
+          setSendCompleteLaterSms(false)
           setFormData({
             device_type: '',
             device_make: '',
@@ -350,7 +368,7 @@ function CreateJobContent() {
             sessionStorage.removeItem('customer_confirm_wizard')
           }
           // Show success and stay on page for next customer
-          alert(`Job created! Ref: ${result.job_ref}\n\nSMS sent to customer with link to complete details.`)
+          alert(`Job created! Ref: ${result.job_ref}\n\n${sendCompleteLaterSms ? 'SMS sent to customer with link to complete details.' : 'Customer will receive booking confirmation SMS.'}`)
           setLoading(false)
         } else {
           alert(`Failed to create job: ${result.error}`)
@@ -761,6 +779,19 @@ function CreateJobContent() {
                     <strong>Quick Intake:</strong> Device details will be marked as "To be added". You can fill them in later from the job page.
                   </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSendCompleteLaterSms(!sendCompleteLaterSms)}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold border-2 transition-colors ${
+                    sendCompleteLaterSms
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary'
+                  }`}
+                >
+                  <Send className="h-5 w-5" />
+                  {sendCompleteLaterSms ? 'Will send SMS to customer to complete later' : 'Send SMS to customer to complete later'}
+                </button>
               </div>
             </div>
           )}
