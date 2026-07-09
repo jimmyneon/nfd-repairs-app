@@ -517,9 +517,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white leading-tight mb-1">
-                {job.device_make} {job.device_model}
+                {job.device_make || job.device_model ? `${job.device_make || ''} ${job.device_model || ''}`.trim() : 'Your Device'}
               </h1>
-              <p className="text-base md:text-lg text-gray-700 dark:text-gray-400 font-medium">{job.issue}</p>
+              <p className="text-base md:text-lg text-gray-700 dark:text-gray-400 font-medium">{job.issue || 'Your repair'}</p>
             </div>
           </div>
         </div>

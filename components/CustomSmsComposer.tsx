@@ -10,10 +10,11 @@ interface CustomSmsComposerProps {
   job: Job
   onClose: () => void
   onSent?: () => void
+  initialMessage?: string
 }
 
-export default function CustomSmsComposer({ job, onClose, onSent }: CustomSmsComposerProps) {
-  const [message, setMessage] = useState('')
+export default function CustomSmsComposer({ job, onClose, onSent, initialMessage }: CustomSmsComposerProps) {
+  const [message, setMessage] = useState(initialMessage || '')
   const [sendEmailToo, setSendEmailToo] = useState(true)
   const [sending, setSending] = useState(false)
   const [channel, setChannel] = useState<'sms' | 'whatsapp'>(job.message_preference === 'whatsapp' ? 'whatsapp' : 'sms')

@@ -1,19 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, FileText, CheckCircle } from 'lucide-react'
+import { Save, FileText, CheckCircle, Send, Link2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
 
 interface DiagnosticReportEditorProps {
   job: Job
   onUpdate?: () => void
+  onSendMessage?: (report: string) => void
 }
 
-export default function DiagnosticReportEditor({ job, onUpdate }: DiagnosticReportEditorProps) {
+export default function DiagnosticReportEditor({ job, onUpdate, onSendMessage }: DiagnosticReportEditorProps) {
   const [report, setReport] = useState(job.diagnostic_report || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const supabase = createClient()
 
   const handleSave = async () => {
@@ -81,6 +83,44 @@ export default function DiagnosticReportEditor({ job, onUpdate }: DiagnosticRepo
           )}
         </button>
       </div>
+
+      {/* Saved report actions: link to job + send to customer */}
+      {job.diagnostic_report && job.diagnostic_report.trim() && (
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Report Saved</p>
+
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <Link2 className="h-4 w-4 flex-shrink-0" />
+            <span>Linked to job <span className="font-bold text-gray-900 dark:text-white">{job.job_ref}</span></span>
+          </div>
+
+          <button
+            onClick={() => {
+              const trackingUrl = `${window.location.origin}/t/${job.tracking_token}`
+              const fullText = `Hi, diagnostic report for your ${job.device_make} ${job.device_model} (${job.job_ref}):
+
+${job.diagnostic_report}
+
+Track your repair: ${trackingUrl}`
+              navigator.clipboard.writeText(fullText)
+              setLinkCopied(true)
+              setTimeout(() => setLinkCopied(false), 2000)
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+          >
+            <Link2 className="h-4 w-4" />
+            {linkCopied ? 'Copied with tracking link!' : 'Copy Report + Tracking Link'}
+          </button>
+
+          <button
+            onClick={() => onSendMessage?.(job.diagnostic_report!)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition-colors shadow-md active:scale-95"
+          >
+            <Send className="h-5 w-5" />
+            Send to Customer
+          </button>
+        </div>
+      )}
     </div>
   )
 }

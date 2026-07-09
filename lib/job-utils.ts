@@ -96,6 +96,7 @@ export function getActionGroup(job: Job): ActionGroup {
   
   // READY_TO_WORK: Can be worked on right now
   if (job.status === 'IN_REPAIR' && job.device_in_shop) return 'READY_TO_WORK'
+  if (job.status === 'DIAGNOSTIC' && job.device_in_shop) return 'READY_TO_WORK'
   if (job.status === 'PARTS_ARRIVED' && job.device_in_shop) return 'READY_TO_WORK'
   if (job.status === 'RECEIVED' && !job.parts_required && job.device_in_shop) return 'READY_TO_WORK'
   

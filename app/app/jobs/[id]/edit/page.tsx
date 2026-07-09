@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Home, Save, Loader2, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { getIssuesForDeviceType, saveCustomIssue, getCustomIssues } from '@/lib/device-issues'
 
 export default function EditJobPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -30,41 +31,21 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     { value: 'laptop', label: 'Laptop' },
     { value: 'desktop', label: 'Desktop PC' },
     { value: 'console', label: 'Gaming Console' },
+    { value: 'watch', label: 'Smartwatch / Wearable' },
     { value: 'other', label: 'Other' },
   ]
 
   const makesByType: Record<string, string[]> = {
-    phone: ['Apple', 'Samsung', 'Google', 'OnePlus', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Other'],
+    phone: ['Apple', 'Samsung', 'Google', 'OnePlus', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi', 'Oppo', 'Other'],
     tablet: ['Apple', 'Samsung', 'Amazon', 'Lenovo', 'Microsoft', 'Huawei', 'Other'],
     laptop: ['Apple', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Microsoft', 'MSI', 'Razer', 'Other'],
     desktop: ['Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Custom Build', 'Other'],
     console: ['Sony PlayStation', 'Microsoft Xbox', 'Nintendo Switch', 'Nintendo', 'Other'],
+    watch: ['Apple', 'Samsung', 'Garmin', 'Fitbit', 'Google', 'Amazfit', 'Other'],
     other: ['Other'],
   }
 
-  const commonIssues = [
-    'Screen Replacement',
-    'Battery Replacement',
-    'Charging Port Replacement',
-    'Not Charging',
-    'No Power',
-    'Water Damage',
-    'Data Recovery',
-    'Windows 10 Installation',
-    'Windows 11 Installation',
-    'Software Glitches',
-    'Not Loading',
-    'Black Screen',
-    'Blue Screen of Death',
-    'SSD Upgrade',
-    'Hard Drive Replacement',
-    'RAM Upgrade',
-    'HDMI Port Repair',
-    'Software Malfunction',
-    'Overheating',
-    'Virus Removal',
-    'Other',
-  ]
+  const currentIssues = getIssuesForDeviceType(formData.device_type || 'other')
 
   useEffect(() => {
     loadJob()
@@ -91,7 +72,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
         setShowMakeOther(true)
       }
       
-      if (job.issue && !commonIssues.includes(job.issue)) {
+      if (job.issue && !getIssuesForDeviceType(job.device_type || 'other').includes(job.issue)) {
         setShowIssueOther(true)
       }
     }
@@ -111,11 +92,11 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
       return
     }
 
-    if (name === 'device_make') {
+    if (name === 'device_make' && !showMakeOther) {
       setShowMakeOther(value === 'Other')
     }
 
-    if (name === 'issue') {
+    if (name === 'issue' && !showIssueOther) {
       setShowIssueOther(value === 'Other')
     }
     
@@ -145,7 +126,11 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
       if (error) {
         alert('Failed to update job: ' + error.message)
       } else {
-        await supabase.from('job_events').insert({
+        if (showIssueOther && formData.issue && formData.issue !== 'Other') {
+        saveCustomIssue(formData.device_type || 'other', formData.issue)
+      }
+
+      await supabase.from('job_events').insert({
           job_id: params.id,
           type: 'SYSTEM',
           message: 'Job details updated by staff',
@@ -214,27 +199,42 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Make *
                   </label>
-                  <select
-                    name="device_make"
-                    value={formData.device_make}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Select make...</option>
-                    {makesByType[formData.device_type]?.map(make => (
-                      <option key={make} value={make}>{make}</option>
-                    ))}
-                  </select>
-                  {showMakeOther && (
-                    <input
-                      type="text"
+                  {!showMakeOther ? (
+                    <select
                       name="device_make"
-                      value={formData.device_make === 'Other' ? '' : formData.device_make}
+                      value={formData.device_make}
                       onChange={handleChange}
-                      placeholder="Enter make..."
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
-                    />
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Select make...</option>
+                      {makesByType[formData.device_type]?.map(make => (
+                        <option key={make} value={make}>{make}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        name="device_make"
+                        value={formData.device_make === 'Other' ? '' : formData.device_make}
+                        onChange={handleChange}
+                        placeholder="Enter make..."
+                        required
+                        autoFocus
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMakeOther(false)
+                          setFormData(prev => ({ ...prev, device_make: '' }))
+                        }}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        ← Back to dropdown
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -258,27 +258,48 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Issue *
                 </label>
-                <select
-                  name="issue"
-                  value={formData.issue}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="">Select issue...</option>
-                  {commonIssues.map(issue => (
-                    <option key={issue} value={issue}>{issue}</option>
-                  ))}
-                </select>
-                {showIssueOther && (
-                  <input
-                    type="text"
+                {!showIssueOther ? (
+                  <select
                     name="issue"
-                    value={formData.issue === 'Other' ? '' : formData.issue}
+                    value={formData.issue}
                     onChange={handleChange}
-                    placeholder="Describe the issue..."
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-2"
-                  />
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select issue...</option>
+                    {currentIssues.map(issue => (
+                      <option key={issue} value={issue}>{issue}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      name="issue"
+                      value={formData.issue === 'Other' ? '' : formData.issue}
+                      onChange={handleChange}
+                      placeholder="Describe the issue..."
+                      required
+                      autoFocus
+                      list="edit-custom-issue-suggestions"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <datalist id="edit-custom-issue-suggestions">
+                      {getCustomIssues(formData.device_type || 'other').map((suggestion, idx) => (
+                        <option key={idx} value={suggestion} />
+                      ))}
+                    </datalist>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowIssueOther(false)
+                        setFormData(prev => ({ ...prev, issue: '' }))
+                      }}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      ← Back to dropdown
+                    </button>
+                  </div>
                 )}
               </div>
 

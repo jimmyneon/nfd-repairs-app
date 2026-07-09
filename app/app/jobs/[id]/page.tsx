@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -65,6 +65,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
+  const [editingPhone, setEditingPhone] = useState(false)
+  const [phoneValue, setPhoneValue] = useState('')
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [emailValue, setEmailValue] = useState('')
+  const [diagnosticSmsMessage, setDiagnosticSmsMessage] = useState<string | null>(null)
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
   const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
@@ -236,6 +241,43 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       loadJobData()
     } catch (err) {
       console.error('Failed to update name:', err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSavePhone = async () => {
+    if (!phoneValue.trim()) return
+    setActionLoading(true)
+    try {
+      await supabase.from('jobs').update({ customer_phone: phoneValue.trim() }).eq('id', job.id)
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'SYSTEM',
+        message: `Customer phone updated to: ${phoneValue.trim()}`,
+      })
+      setEditingPhone(false)
+      loadJobData()
+    } catch (err) {
+      console.error('Failed to update phone:', err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSaveEmail = async () => {
+    setActionLoading(true)
+    try {
+      await supabase.from('jobs').update({ customer_email: emailValue.trim() || null }).eq('id', job.id)
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'SYSTEM',
+        message: emailValue.trim() ? `Customer email updated to: ${emailValue.trim()}` : 'Customer email cleared',
+      })
+      setEditingEmail(false)
+      loadJobData()
+    } catch (err) {
+      console.error('Failed to update email:', err)
     } finally {
       setActionLoading(false)
     }
@@ -1246,14 +1288,24 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             )}
             
             {job.status === 'RECEIVED' && !job.parts_required && (
-              <button
-                onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
-                disabled={actionLoading}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <Wrench className="h-7 w-7" />
-                <span>Start Repair</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleWorkflowStatusChange('DIAGNOSTIC')}
+                  disabled={actionLoading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <Stethoscope className="h-7 w-7" />
+                  <span>Start Diagnostic</span>
+                </button>
+                <button
+                  onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
+                  disabled={actionLoading}
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-4 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <Wrench className="h-6 w-6" />
+                  <span>Skip to Repair</span>
+                </button>
+              </>
             )}
             
             {job.status === 'RECEIVED' && job.parts_required && (
@@ -1298,6 +1350,27 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 <Wrench className="h-8 w-8" />
                 <span>Start Repair</span>
               </button>
+            )}
+
+            {job.status === 'DIAGNOSTIC' && (
+              <>
+                <button
+                  onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
+                  disabled={actionLoading}
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <Wrench className="h-7 w-7" />
+                  <span>Start Repair</span>
+                </button>
+                <button
+                  onClick={() => setActivePanel('diagnostic')}
+                  disabled={actionLoading}
+                  className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <FileText className="h-5 w-5" />
+                  <span>Write Diagnostic Report</span>
+                </button>
+              </>
             )}
 
             {job.status === 'IN_REPAIR' && (
@@ -1844,38 +1917,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          {/* Onboarding & Terms */}
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Onboarding Status</p>
-            <div className={`flex items-center gap-2 p-3 rounded-lg ${
-              job.onboarding_completed
-                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-            }`}>
-              {job.onboarding_completed ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm font-bold text-green-900 dark:text-green-300">Onboarding completed</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Onboarding pending</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {job.terms_accepted && (
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Terms & Conditions</p>
-              <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-bold text-green-900 dark:text-green-300">Accepted by customer</span>
-              </div>
-            </div>
-          )}
-
           {(job.source || job.page) && (
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Job Source</p>
@@ -1943,16 +1984,109 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
           </div>
+          {/* Phone - clickable to open SMS app, with inline edit */}
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Phone</p>
-            <p className="text-base text-gray-900 dark:text-white font-medium">{job.customer_phone}</p>
+            {editingPhone ? (
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={phoneValue}
+                  onChange={(e) => setPhoneValue(e.target.value)}
+                  className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSavePhone(); if (e.key === 'Escape') setEditingPhone(false) }}
+                />
+                <button
+                  onClick={handleSavePhone}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingPhone(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-bold rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <a
+                  href={`sms:${job.customer_phone}`}
+                  className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors"
+                >
+                  {job.customer_phone}
+                </a>
+                <button
+                  onClick={() => { setPhoneValue(job.customer_phone); setEditingPhone(true) }}
+                  className="p-1 text-gray-400 hover:text-primary transition-colors"
+                  title="Edit phone number"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
-          {job.customer_email && (
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Email</p>
-              <p className="text-base text-gray-900 dark:text-white font-medium break-all">{job.customer_email}</p>
-            </div>
-          )}
+          {/* Email - with inline edit */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Email</p>
+            {editingEmail ? (
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={emailValue}
+                  onChange={(e) => setEmailValue(e.target.value)}
+                  className="flex-1 px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  autoFocus
+                  placeholder="(optional)"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEmail(); if (e.key === 'Escape') setEditingEmail(false) }}
+                />
+                <button
+                  onClick={handleSaveEmail}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingEmail(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-bold rounded-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {job.customer_email ? (
+                  <>
+                    <a
+                      href={`mailto:${job.customer_email}`}
+                      className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors break-all"
+                    >
+                      {job.customer_email}
+                    </a>
+                    <button
+                      onClick={() => { setEmailValue(job.customer_email || ''); setEditingEmail(true) }}
+                      className="p-1 text-gray-400 hover:text-primary transition-colors flex-shrink-0"
+                      title="Edit email"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => { setEmailValue(''); setEditingEmail(true) }}
+                    className="text-sm text-gray-400 hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add email
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           <p className="text-sm text-gray-600 dark:text-gray-400">Tap to call, text, or message</p>
           <ContactActions
@@ -1983,7 +2117,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         icon={<FileText className="h-5 w-5 text-primary" />}
         minHeight="60vh"
       >
-        <DiagnosticReportEditor job={job} onUpdate={loadJobData} />
+        <DiagnosticReportEditor 
+          job={job} 
+          onUpdate={loadJobData} 
+          onSendMessage={(report) => {
+            setDiagnosticSmsMessage(report)
+            setActivePanel(null)
+          }}
+        />
       </SlideUpPanel>
 
       {/* Slide-Up Panel: History */}
@@ -2024,6 +2165,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <CustomSmsComposer
           job={job}
           onClose={() => setShowSmsComposer(false)}
+          onSent={loadJobData}
+        />
+      )}
+
+      {/* Diagnostic Report SMS Composer */}
+      {diagnosticSmsMessage && (
+        <CustomSmsComposer
+          job={job}
+          initialMessage={diagnosticSmsMessage}
+          onClose={() => setDiagnosticSmsMessage(null)}
           onSent={loadJobData}
         />
       )}

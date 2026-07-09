@@ -154,16 +154,18 @@ function CreateJobContent() {
     { value: 'laptop', label: 'Laptop' },
     { value: 'desktop', label: 'Desktop PC' },
     { value: 'console', label: 'Gaming Console' },
+    { value: 'watch', label: 'Smartwatch / Wearable' },
     { value: 'other', label: 'Other' },
   ]
 
   // Common makes by device type
   const makesByType: Record<string, string[]> = {
-    phone: ['Apple', 'Samsung', 'Google', 'OnePlus', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Other'],
+    phone: ['Apple', 'Samsung', 'Google', 'OnePlus', 'Huawei', 'Motorola', 'Nokia', 'Sony', 'Xiaomi', 'Oppo', 'Other'],
     tablet: ['Apple', 'Samsung', 'Amazon', 'Lenovo', 'Microsoft', 'Huawei', 'Other'],
     laptop: ['Apple', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Microsoft', 'MSI', 'Razer', 'Other'],
     desktop: ['Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Custom Build', 'Other'],
     console: ['Sony PlayStation', 'Microsoft Xbox', 'Nintendo Switch', 'Nintendo', 'Other'],
+    watch: ['Apple', 'Samsung', 'Garmin', 'Fitbit', 'Google', 'Amazfit', 'Other'],
     other: ['Other'],
   }
 

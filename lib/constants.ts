@@ -3,6 +3,7 @@ import { JobStatus } from './types-v3'
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'Quote Approved',
   RECEIVED: 'Received',
+  DIAGNOSTIC: 'Diagnostic',
   AWAITING_DEPOSIT: 'Awaiting Deposit',
   PARTS_ORDERED: 'Parts Ordered',
   PARTS_ARRIVED: 'Parts Arrived',
@@ -18,6 +19,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
 export const JOB_STATUS_SHORT_LABELS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'Approved',
   RECEIVED: 'Received',
+  DIAGNOSTIC: 'Diag',
   AWAITING_DEPOSIT: 'Deposit',
   PARTS_ORDERED: 'Parts',
   PARTS_ARRIVED: 'Arrived',
@@ -33,6 +35,7 @@ export const JOB_STATUS_SHORT_LABELS: Record<JobStatus, string> = {
 export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'bg-cyan-600 text-white !text-white',
   RECEIVED: 'bg-blue-700 text-white !text-white',
+  DIAGNOSTIC: 'bg-indigo-600 text-white !text-white',
   AWAITING_DEPOSIT: 'bg-yellow-500 text-white !text-white',
   PARTS_ORDERED: 'bg-purple-600 text-white !text-white',
   PARTS_ARRIVED: 'bg-purple-700 text-white !text-white',
@@ -48,6 +51,7 @@ export const JOB_STATUS_COLORS: Record<JobStatus, string> = {
 export const JOB_STATUS_BORDER_COLORS: Record<JobStatus, string> = {
   QUOTE_APPROVED: 'border-cyan-500',
   RECEIVED: 'border-blue-700',
+  DIAGNOSTIC: 'border-indigo-500',
   AWAITING_DEPOSIT: 'border-yellow-500',
   PARTS_ORDERED: 'border-purple-500',
   PARTS_ARRIVED: 'border-purple-700',
