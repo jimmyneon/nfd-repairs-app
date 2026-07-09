@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Bell, Mail, Home, Code, Clock, CheckCircle, XCircle, MessageSquare, ChevronDown, Plus } from 'lucide-react'
+import { Search, Bell, Mail, Home, Code, Clock, CheckCircle, XCircle, MessageSquare, ChevronDown, Plus, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 
 interface Enquiry {
   id: string
   enquiry_ref: string
-  enquiry_type: 'web_services' | 'home_services'
+  enquiry_type: 'web_services' | 'home_services' | 'business'
   customer_name: string
   customer_email: string
   customer_phone: string | null
@@ -31,6 +31,13 @@ interface Enquiry {
   preferred_date?: string
   preferred_time?: string
   description?: string
+  // Business enquiry fields
+  help_type?: string
+  other_detail?: string
+  device_count?: string
+  urgency?: string
+  support_type?: string
+  company?: string
   additional_info?: string | null
   // Staff response
   staff_notes?: string | null
@@ -93,7 +100,9 @@ export default function EnquiriesPage() {
         e.customer_email.toLowerCase().includes(search) ||
         (e.customer_phone && e.customer_phone.includes(search)) ||
         (e.project_type && e.project_type.toLowerCase().includes(search)) ||
-        (e.service_type && e.service_type.toLowerCase().includes(search))
+        (e.service_type && e.service_type.toLowerCase().includes(search)) ||
+        (e.help_type && e.help_type.toLowerCase().includes(search)) ||
+        (e.company && e.company.toLowerCase().includes(search))
       )
     }
 
@@ -173,7 +182,7 @@ export default function EnquiriesPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Enquiries</h1>
-              <p className="text-gray-600 mt-1">Manage quote requests from web services and home services</p>
+              <p className="text-gray-600 mt-1">Manage quote requests from business, web services and home services</p>
             </div>
             <div className="flex items-center gap-4">
               {pendingCount > 0 && (
@@ -227,6 +236,7 @@ export default function EnquiriesPage() {
             className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             <option value="all">All Types</option>
+            <option value="business">Business</option>
             <option value="web_services">Web Services</option>
             <option value="home_services">Home Services</option>
           </select>
@@ -259,6 +269,10 @@ export default function EnquiriesPage() {
                         {enquiry.enquiry_type === 'web_services' ? (
                           <span className="flex items-center gap-1 text-sm text-gray-600">
                             <Code className="w-4 h-4" /> Web Services
+                          </span>
+                        ) : enquiry.enquiry_type === 'business' ? (
+                          <span className="flex items-center gap-1 text-sm text-gray-600">
+                            <Briefcase className="w-4 h-4" /> Business
                           </span>
                         ) : (
                           <span className="flex items-center gap-1 text-sm text-gray-600">
@@ -327,7 +341,11 @@ export default function EnquiriesPage() {
               {/* Enquiry Details */}
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  {selectedEnquiry.enquiry_type === 'web_services' ? 'Project Details' : 'Service Details'}
+                  {selectedEnquiry.enquiry_type === 'web_services' 
+                    ? 'Project Details' 
+                    : selectedEnquiry.enquiry_type === 'business' 
+                    ? 'Enquiry Details' 
+                    : 'Service Details'}
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                   {selectedEnquiry.enquiry_type === 'web_services' ? (
@@ -340,6 +358,15 @@ export default function EnquiriesPage() {
                       <p><strong>Timeline:</strong> {selectedEnquiry.timeline}</p>
                       <p><strong>Existing Website:</strong> {selectedEnquiry.existing_website}</p>
                       {selectedEnquiry.existing_url && <p><strong>URL:</strong> {selectedEnquiry.existing_url}</p>}
+                    </>
+                  ) : selectedEnquiry.enquiry_type === 'business' ? (
+                    <>
+                      {selectedEnquiry.company && <p><strong>Company:</strong> {selectedEnquiry.company}</p>}
+                      {selectedEnquiry.help_type && <p><strong>Help Type:</strong> {selectedEnquiry.help_type}</p>}
+                      {selectedEnquiry.other_detail && <p><strong>Other Detail:</strong> {selectedEnquiry.other_detail}</p>}
+                      {selectedEnquiry.device_count && <p><strong>Device Count:</strong> {selectedEnquiry.device_count}</p>}
+                      {selectedEnquiry.urgency && <p><strong>Urgency:</strong> {selectedEnquiry.urgency}</p>}
+                      {selectedEnquiry.support_type && <p><strong>Support Type:</strong> {selectedEnquiry.support_type}</p>}
                     </>
                   ) : (
                     <>
