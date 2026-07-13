@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Bell, Mail, Home, Code, Clock, CheckCircle, XCircle, MessageSquare, ChevronDown, Plus, Briefcase, Wrench } from 'lucide-react'
+import { Search, Mail, Home, Code, CheckCircle, XCircle, MessageSquare, ChevronDown, Plus, Briefcase, Wrench } from 'lucide-react'
 import Link from 'next/link'
 
 interface Enquiry {
@@ -442,58 +442,54 @@ export default function EnquiriesPage() {
             <p className="mt-1 text-gray-500">No enquiries match your current filters.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {otherEnquiries.map((enquiry) => (
-              <div key={enquiry.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="font-mono text-sm text-gray-600">{enquiry.enquiry_ref}</span>
-                        {getStatusBadge(enquiry.status)}
-                        {enquiry.enquiry_type === 'web_services' ? (
-                          <span className="flex items-center gap-1 text-sm text-gray-600">
-                            <Code className="w-4 h-4" /> Web Services
-                          </span>
-                        ) : enquiry.enquiry_type === 'business' ? (
-                          <span className="flex items-center gap-1 text-sm text-gray-600">
-                            <Briefcase className="w-4 h-4" /> Business
-                          </span>
-                        ) : enquiry.enquiry_type === 'repair_quote' ? (
-                          <span className="flex items-center gap-1 text-sm text-gray-600">
-                            <Wrench className="w-4 h-4" /> Repair Quote
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-sm text-gray-600">
-                            <Home className="w-4 h-4" /> Home Services
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900">{enquiry.customer_name}</h3>
-                      <p className="text-gray-600 text-sm">{enquiry.customer_email}</p>
-                      {enquiry.customer_phone && (
-                        <p className="text-gray-600 text-sm">{enquiry.customer_phone}</p>
+          <div className="space-y-2">
+            {otherEnquiries.map((enquiry) => {
+              const isRepair = enquiry.enquiry_type === 'repair_quote'
+              const summary = isRepair
+                ? `${enquiry.device_make || ''} ${enquiry.device_model || ''} — ${enquiry.repair_type || 'Repair'}`.trim()
+                : enquiry.enquiry_type === 'business'
+                ? enquiry.help_type || 'Business enquiry'
+                : enquiry.enquiry_type === 'web_services'
+                ? enquiry.project_type || 'Web project'
+                : enquiry.service_type || 'Home service'
+
+              return (
+                <div key={enquiry.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <button
+                    onClick={() => { setSelectedEnquiry(enquiry); setShowModal(true) }}
+                    className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {isRepair ? (
+                        <Wrench className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      ) : enquiry.enquiry_type === 'business' ? (
+                        <Briefcase className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                      ) : enquiry.enquiry_type === 'web_services' ? (
+                        <Code className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                      ) : (
+                        <Home className="w-5 h-5 text-orange-600 flex-shrink-0" />
                       )}
-                      <div className="mt-2 text-sm text-gray-500">
-                        <Clock className="inline w-4 h-4 mr-1" />
-                        {new Date(enquiry.created_at).toLocaleString()}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900 truncate">{enquiry.customer_name}</span>
+                          {isRepair && enquiry.quoted_price != null && (
+                            <span className="text-green-700 font-semibold text-sm flex-shrink-0">£{enquiry.quoted_price}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 truncate">{summary}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedEnquiry(enquiry)
-                          setShowModal(true)
-                        }}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        View Details
-                      </button>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                      {getStatusBadge(enquiry.status)}
+                      <span className="text-xs text-gray-400 hidden sm:inline">
+                        {new Date(enquiry.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
                     </div>
-                  </div>
+                  </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -502,166 +498,180 @@ export default function EnquiriesPage() {
       {showModal && selectedEnquiry && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
+            {/* Header */}
+            <div className="p-5 border-b">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">{selectedEnquiry.enquiry_ref}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-bold text-gray-900">{selectedEnquiry.customer_name}</h2>
+                  {getStatusBadge(selectedEnquiry.status)}
+                </div>
                 <button
-                  onClick={() => {
-                    setShowModal(false)
-                    setSelectedEnquiry(null)
-                  }}
+                  onClick={() => { setShowModal(false); setSelectedEnquiry(null) }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <XCircle className="w-6 h-6" />
                 </button>
               </div>
+              <p className="text-sm text-gray-500 mt-1">
+                <span className="font-mono">{selectedEnquiry.enquiry_ref}</span>
+                {' · '}
+                {new Date(selectedEnquiry.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
-            <div className="p-6">
-              {/* Customer Info */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Customer Details</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  <p><strong>Name:</strong> {selectedEnquiry.customer_name}</p>
-                  <p><strong>Email:</strong> {selectedEnquiry.customer_email}</p>
-                  {selectedEnquiry.customer_phone && <p><strong>Phone:</strong> {selectedEnquiry.customer_phone}</p>}
-                </div>
+
+            <div className="p-5 space-y-4">
+              {/* Quick Contact */}
+              <div className="flex flex-wrap gap-3">
+                {selectedEnquiry.customer_phone && (
+                  <a href={`sms:${selectedEnquiry.customer_phone}`} className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+                    <MessageSquare className="w-4 h-4 text-gray-600" /> {selectedEnquiry.customer_phone}
+                  </a>
+                )}
+                {selectedEnquiry.customer_email && (
+                  <a href={`mailto:${selectedEnquiry.customer_email}`} className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+                    <Mail className="w-4 h-4 text-gray-600" /> {selectedEnquiry.customer_email}
+                  </a>
+                )}
               </div>
 
-              {/* Enquiry Details */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  {selectedEnquiry.enquiry_type === 'web_services' 
-                    ? 'Project Details' 
-                    : selectedEnquiry.enquiry_type === 'business' 
-                    ? 'Enquiry Details' 
-                    : selectedEnquiry.enquiry_type === 'repair_quote'
-                    ? 'Repair Quote Details'
-                    : 'Service Details'}
-                </h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  {selectedEnquiry.enquiry_type === 'web_services' ? (
-                    <>
-                      <p><strong>Project Type:</strong> {selectedEnquiry.project_type}</p>
-                      <p><strong>Sector:</strong> {selectedEnquiry.sector}</p>
-                      <p><strong>Number of Pages:</strong> {selectedEnquiry.number_pages}</p>
-                      <p><strong>Goals:</strong> {selectedEnquiry.goals}</p>
-                      <p><strong>Budget:</strong> {selectedEnquiry.budget}</p>
-                      <p><strong>Timeline:</strong> {selectedEnquiry.timeline}</p>
-                      <p><strong>Existing Website:</strong> {selectedEnquiry.existing_website}</p>
-                      {selectedEnquiry.existing_url && <p><strong>URL:</strong> {selectedEnquiry.existing_url}</p>}
-                    </>
-                  ) : selectedEnquiry.enquiry_type === 'business' ? (
-                    <>
-                      {selectedEnquiry.company && <p><strong>Company:</strong> {selectedEnquiry.company}</p>}
-                      {selectedEnquiry.help_type && <p><strong>Help Type:</strong> {selectedEnquiry.help_type}</p>}
-                      {selectedEnquiry.other_detail && <p><strong>Other Detail:</strong> {selectedEnquiry.other_detail}</p>}
-                      {selectedEnquiry.device_count && <p><strong>Device Count:</strong> {selectedEnquiry.device_count}</p>}
-                      {selectedEnquiry.urgency && <p><strong>Urgency:</strong> {selectedEnquiry.urgency}</p>}
-                      {selectedEnquiry.support_type && <p><strong>Support Type:</strong> {selectedEnquiry.support_type}</p>}
-                    </>
-                  ) : selectedEnquiry.enquiry_type === 'repair_quote' ? (
-                    <>
-                      {selectedEnquiry.device_category && <p><strong>Category:</strong> {selectedEnquiry.device_category}</p>}
-                      {selectedEnquiry.device_make && <p><strong>Make:</strong> {selectedEnquiry.device_make}</p>}
-                      {selectedEnquiry.device_model && <p><strong>Model:</strong> {selectedEnquiry.device_model}</p>}
-                      {selectedEnquiry.repair_type && <p><strong>Repair Type:</strong> {selectedEnquiry.repair_type}</p>}
-                      {selectedEnquiry.screen_option && <p><strong>Screen Option:</strong> {selectedEnquiry.screen_option}</p>}
-                      {selectedEnquiry.quoted_price != null && <p><strong>Quoted Price:</strong> £{selectedEnquiry.quoted_price}</p>}
-                      {selectedEnquiry.quote_type && <p><strong>Quote Type:</strong> {selectedEnquiry.quote_type}</p>}
-                      {selectedEnquiry.issue_description && <p><strong>Issue Description:</strong> {selectedEnquiry.issue_description}</p>}
-                      <p><strong>Terms Accepted:</strong> {selectedEnquiry.terms_accepted ? 'Yes' : 'No'}</p>
-                      <p><strong>Quote Accepted:</strong> {selectedEnquiry.proceed_with_repair ? 'Yes — customer accepted via link' : 'No'}</p>
-                      <p><strong>Marketing Consent:</strong> {selectedEnquiry.marketing_consent ? 'Yes' : 'No'}</p>
-                      {selectedEnquiry.quote_source && <p><strong>Source:</strong> {selectedEnquiry.quote_source}</p>}
-                      {selectedEnquiry.repair_reserved && <p><strong>Repair Reserved:</strong> Yes — customer reserved via quote page</p>}
-                      {selectedEnquiry.part_reserved && <p><strong>Part Reserved:</strong> Yes — customer waiting until payday</p>}
-                      {selectedEnquiry.quote_sent_method && <p><strong>Quote Sent Via:</strong> {selectedEnquiry.quote_sent_method}</p>}
-                      {selectedEnquiry.hesitation_reason && (
-                        <p><strong>Hesitation:</strong> {selectedEnquiry.hesitation_reason.replace(/_/g, ' ')}</p>
-                      )}
-                      {selectedEnquiry.customer_budget != null && (
-                        <p><strong>Customer Budget:</strong> £{selectedEnquiry.customer_budget} (quote was £{selectedEnquiry.quoted_price})</p>
-                      )}
-                      {selectedEnquiry.customer_notes && <p><strong>Customer Notes:</strong> {selectedEnquiry.customer_notes}</p>}
-                      {selectedEnquiry.preferred_contact_method && <p><strong>Preferred Contact:</strong> {selectedEnquiry.preferred_contact_method}</p>}
-                    </>
-                  ) : (
-                    <>
-                      <p><strong>Service Type:</strong> {selectedEnquiry.service_type}</p>
-                      <p><strong>Address:</strong> {selectedEnquiry.address}</p>
-                      <p><strong>Address Type:</strong> {selectedEnquiry.address_type}</p>
-                      <p><strong>Preferred Date:</strong> {selectedEnquiry.preferred_date}</p>
-                      <p><strong>Preferred Time:</strong> {selectedEnquiry.preferred_time}</p>
-                    </>
-                  )}
-                  <p><strong>Description:</strong></p>
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {selectedEnquiry.enquiry_type === 'web_services' 
-                      ? selectedEnquiry.project_description 
-                      : selectedEnquiry.description}
-                  </p>
-                  {selectedEnquiry.additional_info && (
-                    <p><strong>Additional Info:</strong> {selectedEnquiry.additional_info}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Status */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Status</h3>
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(selectedEnquiry.status)}
-                  <div className="flex gap-2">
-                    {selectedEnquiry.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(selectedEnquiry.id, 'rejected')}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
+              {/* Repair Quote Summary */}
+              {selectedEnquiry.enquiry_type === 'repair_quote' && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-500">Device</span>
+                    <span className="text-sm text-gray-900">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</span>
                   </div>
-                </div>
-              </div>
-
-              {/* Staff Response */}
-              {selectedEnquiry.staff_response && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Staff Response</h3>
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-gray-700 whitespace-pre-wrap">{selectedEnquiry.staff_response}</p>
-                    {selectedEnquiry.responded_at && (
-                      <p className="text-sm text-gray-500 mt-2">
-                        Responded: {new Date(selectedEnquiry.responded_at).toLocaleString()}
-                      </p>
-                    )}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-500">Repair</span>
+                    <span className="text-sm text-gray-900">{selectedEnquiry.repair_type}</span>
                   </div>
+                  {selectedEnquiry.quoted_price != null && (
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-500">Quoted Price</span>
+                      <span className="text-sm font-semibold text-green-700">£{selectedEnquiry.quoted_price}</span>
+                    </div>
+                  )}
+                  {selectedEnquiry.quote_type && (
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-500">Quote Type</span>
+                      <span className="text-sm text-gray-900 capitalize">{selectedEnquiry.quote_type}</span>
+                    </div>
+                  )}
+                  {selectedEnquiry.screen_option && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-500">Part Option</span>
+                      <span className="text-sm text-gray-900">{selectedEnquiry.screen_option}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* New Response */}
+              {/* Issue Description (if any) */}
+              {selectedEnquiry.issue_description && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Issue Description</p>
+                  <p className="text-sm text-gray-900 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
+                </div>
+              )}
+
+              {/* Post-Quote Journey (if any) */}
+              {selectedEnquiry.enquiry_type === 'repair_quote' && (selectedEnquiry.repair_reserved || selectedEnquiry.part_reserved || selectedEnquiry.hesitation_reason || selectedEnquiry.customer_notes) && (
+                <div className="bg-blue-50 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-semibold text-blue-900">Customer Actions</p>
+                  {selectedEnquiry.repair_reserved && <p className="text-sm text-blue-800">✓ Repair reserved via quote page</p>}
+                  {selectedEnquiry.part_reserved && <p className="text-sm text-blue-800">✓ Part reserved (waiting until payday)</p>}
+                  {selectedEnquiry.hesitation_reason && <p className="text-sm text-blue-800">⚠ Hesitation: {selectedEnquiry.hesitation_reason.replace(/_/g, ' ')}</p>}
+                  {selectedEnquiry.customer_budget != null && <p className="text-sm text-blue-800">Budget: £{selectedEnquiry.customer_budget}</p>}
+                  {selectedEnquiry.customer_notes && <p className="text-sm text-blue-800 italic">"{selectedEnquiry.customer_notes}"</p>}
+                  {selectedEnquiry.quote_sent_method && <p className="text-sm text-blue-800">Quote sent via: {selectedEnquiry.quote_sent_method}</p>}
+                </div>
+              )}
+
+              {/* Business Enquiry Summary */}
+              {selectedEnquiry.enquiry_type === 'business' && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  {selectedEnquiry.company && <p className="text-sm"><strong>Company:</strong> {selectedEnquiry.company}</p>}
+                  {selectedEnquiry.help_type && <p className="text-sm"><strong>Help Type:</strong> {selectedEnquiry.help_type}</p>}
+                  {selectedEnquiry.device_count && <p className="text-sm"><strong>Device Count:</strong> {selectedEnquiry.device_count}</p>}
+                  {selectedEnquiry.urgency && <p className="text-sm"><strong>Urgency:</strong> {selectedEnquiry.urgency}</p>}
+                  {selectedEnquiry.support_type && <p className="text-sm"><strong>Support Type:</strong> {selectedEnquiry.support_type}</p>}
+                </div>
+              )}
+
+              {/* Web Services Summary */}
+              {selectedEnquiry.enquiry_type === 'web_services' && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <p className="text-sm"><strong>Project Type:</strong> {selectedEnquiry.project_type}</p>
+                  <p className="text-sm"><strong>Sector:</strong> {selectedEnquiry.sector}</p>
+                  <p className="text-sm"><strong>Budget:</strong> {selectedEnquiry.budget}</p>
+                  <p className="text-sm"><strong>Timeline:</strong> {selectedEnquiry.timeline}</p>
+                  {selectedEnquiry.project_description && <p className="text-sm"><strong>Description:</strong> {selectedEnquiry.project_description}</p>}
+                </div>
+              )}
+
+              {/* Collapsible More Details */}
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700 flex items-center gap-2">
+                  <ChevronDown className="w-4 h-4 group-open:rotate-180 transition-transform" />
+                  More Details
+                </summary>
+                <div className="mt-3 bg-gray-50 rounded-lg p-4 space-y-2">
+                  <p className="text-sm"><strong>Terms Accepted:</strong> {selectedEnquiry.terms_accepted ? 'Yes' : 'No'}</p>
+                  <p className="text-sm"><strong>Marketing Consent:</strong> {selectedEnquiry.marketing_consent ? 'Yes' : 'No'}</p>
+                  {selectedEnquiry.quote_source && <p className="text-sm"><strong>Source:</strong> {selectedEnquiry.quote_source}</p>}
+                  {selectedEnquiry.preferred_contact_method && <p className="text-sm"><strong>Preferred Contact:</strong> {selectedEnquiry.preferred_contact_method}</p>}
+                  {selectedEnquiry.additional_info && <p className="text-sm"><strong>Additional Info:</strong> {selectedEnquiry.additional_info}</p>}
+                  {selectedEnquiry.staff_notes && <p className="text-sm"><strong>Staff Notes:</strong> {selectedEnquiry.staff_notes}</p>}
+                </div>
+              </details>
+
+              {/* Status Actions */}
+              <div className="flex items-center gap-3 pt-2 border-t">
+                {getStatusBadge(selectedEnquiry.status)}
+                {selectedEnquiry.status === 'pending' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
+                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleStatusChange(selectedEnquiry.id, 'rejected')}
+                      className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Staff Response (if exists) */}
+              {selectedEnquiry.staff_response && (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-blue-900 mb-1">Staff Response</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedEnquiry.staff_response}</p>
+                  {selectedEnquiry.responded_at && (
+                    <p className="text-xs text-gray-500 mt-2">{new Date(selectedEnquiry.responded_at).toLocaleString()}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Add Staff Notes */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Send Response</h3>
                 <textarea
                   value={responseText}
                   onChange={(e) => setResponseText(e.target.value)}
-                  placeholder="Type your response to the customer..."
-                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 min-h-32"
+                  placeholder="Add staff notes or response..."
+                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                  rows={3}
                 />
                 <button
                   onClick={handleRespond}
                   disabled={responding || !responseText.trim()}
-                  className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="mt-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {responding ? 'Sending...' : 'Send Response'}
+                  {responding ? 'Saving...' : 'Save Notes'}
                 </button>
               </div>
             </div>
