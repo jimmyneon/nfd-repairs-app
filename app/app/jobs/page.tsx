@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, Bell, QrCode, Settings, Plus, Shield, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, Smartphone } from 'lucide-react'
+import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
 import QRScanner from '@/components/QRScanner'
 import EnhancedJobTile from '@/components/EnhancedJobTile'
 import CustomerWaitingBanner from '@/components/CustomerWaitingBanner'
+import NavDropdown from '@/components/NavDropdown'
 import { groupJobsByAction, JobWithMetrics, ActionGroup, getHoursInStatus } from '@/lib/job-utils'
 
 export default function JobsListPageV2() {
@@ -30,6 +31,8 @@ export default function JobsListPageV2() {
   const [showCollected, setShowCollected] = useState(false)
   const [showAllJobs, setShowAllJobs] = useState(false)
   const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [sendInCount, setSendInCount] = useState(0)
+  const [enquiryCount, setEnquiryCount] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -42,6 +45,8 @@ export default function JobsListPageV2() {
     loadJobs()
     loadUnreadNotifications()
     loadWarrantyTickets()
+    loadSendInCount()
+    loadEnquiryCount()
 
     // Reload on bfcache restoration (back button) - show loading state during reload
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -51,6 +56,8 @@ export default function JobsListPageV2() {
       loadJobs()
       loadUnreadNotifications()
       loadWarrantyTickets()
+      loadSendInCount()
+      loadEnquiryCount()
     }
     window.addEventListener('pageshow', handlePageShow)
 
@@ -158,6 +165,24 @@ export default function JobsListPageV2() {
     setWarrantyCount(count || 0)
   }
 
+  const loadSendInCount = async () => {
+    const { count } = await supabase
+      .from('send_in_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+
+    setSendInCount(count || 0)
+  }
+
+  const loadEnquiryCount = async () => {
+    const { count } = await supabase
+      .from('enquiries')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+
+    setEnquiryCount(count || 0)
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -232,29 +257,15 @@ export default function JobsListPageV2() {
         <div className="px-4 py-3">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Repair Jobs</h1>
           <div className="flex items-center gap-3 mb-3">
-            <Link href="/app/jobs/create" className="w-14 h-14 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors active:scale-90" title="Create New Job">
-              <Plus className="h-6 w-6" />
-            </Link>
             <button onClick={() => setShowScanner(!showScanner)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Scan QR Code">
               <QrCode className="h-6 w-6" />
             </button>
-            <Link href="/app/qr-display" className="w-14 h-14 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors active:scale-90" title="Walk-In QR Code">
-              <Smartphone className="h-6 w-6" />
-            </Link>
             <button onClick={() => setShowAllJobs(!showAllJobs)} className={`w-14 h-14 flex items-center justify-center rounded-xl transition-colors active:scale-90 ${showAllJobs ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} title={showAllJobs ? 'Show active only' : 'Show all jobs'}>
               <Archive className="h-6 w-6" />
             </button>
-            <Link href="/app/warranty" className="relative w-14 h-14 flex items-center justify-center rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors active:scale-90" title="Warranty Tickets">
-              <Shield className="h-6 w-6" />
-              {warrantyCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{warrantyCount}</span>}
-            </Link>
-            <Link href="/app/notifications" className="relative w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors active:scale-90" title="Notifications">
-              <Bell className="h-6 w-6" />
-              {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{unreadCount}</span>}
-            </Link>
-            <Link href="/app/settings" className="w-14 h-14 flex items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors active:scale-90 ml-auto" title="Settings">
-              <Settings className="h-6 w-6" />
-            </Link>
+            <div className="ml-auto">
+              <NavDropdown unreadCount={unreadCount} warrantyCount={warrantyCount} sendInCount={sendInCount} enquiryCount={enquiryCount} />
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
