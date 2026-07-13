@@ -70,14 +70,20 @@ export async function POST(request: NextRequest) {
 
         // Actually send the quote
         const quoteUrl = `https://newforestdevicerepairs.co.uk/quote/accept/?ref=${enquiry.enquiry_ref}`
-        const priceText = enquiry.quoted_price ? `£${enquiry.quoted_price}` : 'Personalized quote'
+        const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
+        const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
         const warranty = enquiry.screen_option || 'Standard warranty'
         const turnaround = '30–60 mins'
+        const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim()
+        const repairName = enquiry.repair_type || 'repair'
 
         if (method === 'sms' || method === 'both') {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl && enquiry.customer_phone) {
-            const smsMessage = `Hi ${enquiry.customer_name}, your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ${enquiry.repair_type || 'repair'} quote: ${priceText}. ${warranty}. ~${turnaround}. View & reserve: ${quoteUrl} - NFD Repairs`
+            // SMS with line breaks for readability
+            const smsMessage = isInstant
+              ? `Hi ${enquiry.customer_name},\n\nYour ${deviceName} ${repairName} quote:\n${priceText}\n\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nView & reserve:\n${quoteUrl}\n\nValid 14 days. No obligation.\nNFD Repairs`
+              : `Hi ${enquiry.customer_name},\n\nThanks for your ${deviceName} repair enquiry.\n\nWe'll get back to you with a personalised quote within working hours.\n\nYour ref: ${enquiry.enquiry_ref}\nNFD Repairs`
             try {
               await fetch(webhookUrl, {
                 method: 'POST',
@@ -98,35 +104,109 @@ export async function POST(request: NextRequest) {
 
         if (method === 'email' || method === 'both') {
           if (enquiry.customer_email) {
-            const emailSubject = `Your Quote: ${enquiry.device_make || ''} ${enquiry.device_model || ''} ${enquiry.repair_type || ''} - ${priceText}`
-            const emailHtml = `<!DOCTYPE html><html><body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#FAF5E9;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF5E9;padding:20px;"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-<tr><td style="background:#009B4D;padding:30px;text-align:center;"><h1 style="color:#fff;margin:0;font-size:24px;">New Forest Device Repairs</h1></td></tr>
-<tr><td style="padding:40px 30px;">
-<h2 style="color:#333;margin:0 0 20px;">Hi ${enquiry.customer_name},</h2>
-<p style="color:#666;font-size:16px;line-height:1.6;">Here's your quote as requested.</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:6px;padding:20px;margin:20px 0;">
-<tr><td>
-<p style="margin:0 0 10px;color:#666;"><strong>Device:</strong> ${enquiry.device_make || ''} ${enquiry.device_model || ''}</p>
-<p style="margin:0 0 10px;color:#666;"><strong>Repair:</strong> ${enquiry.repair_type || ''}</p>
-${enquiry.screen_option ? `<p style="margin:0 0 10px;color:#666;"><strong>Option:</strong> ${enquiry.screen_option}</p>` : ''}
-<p style="margin:0 0 10px;color:#666;"><strong>Price:</strong> ${priceText}</p>
-<p style="margin:0 0 10px;color:#666;"><strong>Warranty:</strong> ${warranty}</p>
-<p style="margin:0;color:#666;"><strong>Turnaround:</strong> ${turnaround}</p>
+            const emailSubject = isInstant
+              ? `Your Repair Quote: ${deviceName} ${repairName} — ${priceText}`
+              : `Your Repair Enquiry: ${deviceName} — We'll be in touch`
+
+            const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#FAF5E9;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF5E9;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:600px;">
+
+<!-- Header -->
+<tr><td style="background:linear-gradient(135deg,#009B4D,#007a3d);padding:32px 30px;text-align:center;">
+<h1 style="color:#fff;margin:0;font-size:22px;font-weight:700;letter-spacing:0.5px;">New Forest Device Repairs</h1>
+<p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;">Professional repairs with warranty</p>
+</td></tr>
+
+<!-- Body -->
+<tr><td style="padding:36px 30px 20px;">
+<h2 style="color:#1a1a2e;margin:0 0 16px;font-size:20px;">Hi ${enquiry.customer_name},</h2>
+${isInstant ? `
+<p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 24px;">Here's your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName}. Ready to go ahead? Just click the button below to reserve your repair — we'll text you to arrange a time that works for you.</p>
+
+<!-- Quote card -->
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 24px;">
+<tr><td style="padding:24px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;width:130px;">Device</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${deviceName}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;">Repair</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${repairName}</td>
+</tr>
+${enquiry.screen_option ? `<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;">Option</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.screen_option}</td>
+</tr>` : ''}
+<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;">Warranty</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${warranty}</td>
+</tr>
+<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;">Turnaround</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${turnaround}</td>
+</tr>
+<tr><td colspan="2" style="padding:16px 0 0;border-top:2px solid #e0e0e0;margin-top:8px;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="padding-top:14px;color:#888;font-size:14px;">Total price</td>
+<td align="right" style="padding-top:14px;color:#009B4D;font-size:28px;font-weight:700;">${priceText}</td>
+</tr></table>
 </td></tr>
 </table>
-<p style="color:#666;font-size:16px;line-height:1.6;">Ready to go ahead? Click below to reserve your repair — we'll text you to arrange a time.</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center">
-<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:15px 40px;text-decoration:none;border-radius:4px;font-weight:bold;font-size:16px;">Reserve My Repair</a>
+</td></tr>
+</table>
+
+<!-- CTA button -->
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td align="center">
+<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:16px 48px;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px;letter-spacing:0.3px;">Reserve My Repair</a>
 </td></tr></table>
-<p style="color:#666;font-size:14px;line-height:1.6;margin-top:30px;">This quote is valid for 14 days. No obligation — we'll confirm everything with you before any work starts.</p>
+
+<p style="color:#999;font-size:13px;line-height:1.6;text-align:center;margin:0 0 0;">This quote is valid for 14 days. No obligation — we'll confirm everything with you before any work starts.</p>
+` : `
+<p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 20px;">Thanks for your enquiry about your <strong style="color:#1a1a2e;">${deviceName}</strong>. We'll review the details and get back to you with a personalised quote within working hours <strong style="color:#1a1a2e;">(Mon–Fri 10–5, Sat 10–3)</strong>.</p>
+
+${enquiry.issue_description ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;margin:0 0 24px;"><tr><td style="padding:18px 20px;">
+<p style="color:#888;font-size:13px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Your description</p>
+<p style="color:#555;font-size:14px;line-height:1.6;margin:0;">${enquiry.issue_description}</p>
+</td></tr></table>` : ''}
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 24px;">
+<tr><td style="padding:20px;text-align:center;">
+<p style="color:#888;font-size:13px;margin:0 0 4px;">Your reference</p>
+<p style="color:#1a1a2e;font-size:18px;font-weight:700;margin:0;">${enquiry.enquiry_ref}</p>
 </td></tr>
-<tr><td style="background:#f8f9fa;padding:20px 30px;text-align:center;">
-<p style="color:#666;font-size:14px;margin:0 0 10px;"><strong>New Forest Device Repairs</strong><br>Phone: 07410 381247<br>Web: <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;">newforestdevicerepairs.co.uk</a></p>
+</table>
+`}
 </td></tr>
-</table></td></tr></table></body></html>`
-            const emailText = `Hi ${enquiry.customer_name},\n\nYour quote for ${enquiry.device_make || ''} ${enquiry.device_model || ''} ${enquiry.repair_type || 'repair'}: ${priceText}\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nReserve your repair: ${quoteUrl}\n\nValid for 14 days. No obligation.\n\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
+
+<!-- Footer -->
+<tr><td style="background:#f8f9fa;padding:24px 30px;border-top:1px solid #eee;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center">
+<p style="color:#888;font-size:14px;margin:0 0 8px;"><strong style="color:#555;">New Forest Device Repairs</strong></p>
+<p style="color:#aaa;font-size:13px;margin:0 0 12px;line-height:1.6;">
+Phone: <a href="tel:07410381247" style="color:#009B4D;text-decoration:none;">07410 381247</a> &nbsp;|&nbsp;
+Web: <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-decoration:none;">newforestdevicerepairs.co.uk</a>
+</p>
+<p style="color:#bbb;font-size:12px;margin:0;">Lymington, New Forest &nbsp;|&nbsp; Mon–Fri 10–5, Sat 10–3</p>
+</td></tr>
+</table>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>`
+
+            const emailText = isInstant
+              ? `Hi ${enquiry.customer_name},\n\nYour quote for ${deviceName} ${repairName}: ${priceText}\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nReserve your repair: ${quoteUrl}\n\nValid for 14 days. No obligation — we'll confirm everything before any work starts.\n\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
+              : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours (Mon–Fri 10–5, Sat 10–3).\n\nYour ref: ${enquiry.enquiry_ref}\n\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
             try {
               await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
               try {
