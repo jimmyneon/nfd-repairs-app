@@ -17,6 +17,37 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days)
     const startDateISO = startDate.toISOString()
 
+    // Check if the table exists by doing a minimal query
+    const { error: tableCheckError } = await supabase
+      .from('quote_analytics_events')
+      .select('id')
+      .limit(1)
+
+    if (tableCheckError) {
+      // Table doesn't exist or isn't accessible — return empty data
+      return NextResponse.json({
+        success: true,
+        period_days: days,
+        total_sessions: 0,
+        funnel: {
+          steps: { 1: { count: 0, label: 'Category' }, 2: { count: 0, label: 'Brand' }, 3: { count: 0, label: 'Model' }, 4: { count: 0, label: 'Repair' }, 5: { count: 0, label: 'Quote Details' } },
+          actions: { Form_Started: 0, Form_Submitted: 0, Quote_Revealed: 0, Action_Clicked: 0 },
+        },
+        action_breakdown: [],
+        hesitation_breakdown: [],
+        traffic_sources: { utm_sources: [], utm_mediums: [], source_tags: [], referrers: [] },
+        avg_step_times: {},
+        popular: { categories: [], brands: [], repairs: [], combos: [] },
+        search_queries: [],
+        additional_repairs: { total_added: 0, breakdown: [] },
+        device_breakdown: { mobile: 0, desktop: 0 },
+        accept_page: { views: 0, clicks: 0, conversion_rate: 0 },
+        form_errors: [],
+        budget_comparisons: [] as Array<{ budget: number; quoted_price: number | null }>,
+        table_missing: true,
+      })
+    }
+
     // 1. Funnel — count distinct sessions per event type
     const { data: funnelData } = await supabase
       .from('quote_analytics_events')

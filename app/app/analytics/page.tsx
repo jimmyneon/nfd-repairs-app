@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { BarChart3, TrendingDown, Clock, Search, Users, Smartphone, Monitor, ArrowRight, RefreshCw, ExternalLink, Link2 } from 'lucide-react'
+import { BarChart3, TrendingDown, Clock, Search, Users, Smartphone, Monitor, ArrowRight, RefreshCw, ExternalLink, Link2, Home, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
 interface AnalyticsData {
@@ -45,6 +45,7 @@ interface AnalyticsData {
   }
   form_errors: [string, number][]
   budget_comparisons: { budget: number; quoted_price: number | null }[]
+  table_missing?: boolean
 }
 
 function formatTime(ms: number): string {
@@ -89,53 +90,62 @@ export default function AnalyticsPage() {
   const maxStepCount = data ? Math.max(...Object.values(data.funnel.steps).map(s => s.count), 1) : 1
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/app" className="text-gray-500 hover:text-gray-700 text-sm">
-              ← Dashboard
-            </Link>
-            <span className="text-gray-300">/</span>
-            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-green-600" />
-              Quote Analytics
-            </h1>
+      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Link href="/app" className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                <Home className="h-5 w-5 text-primary" />
+              </Link>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-green-600" />
+                Analytics
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={days}
+                onChange={(e) => setDays(parseInt(e.target.value))}
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value={7}>7 days</option>
+                <option value={30}>30 days</option>
+                <option value={90}>90 days</option>
+              </select>
+              <button
+                onClick={fetchData}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={days}
-              onChange={(e) => setDays(parseInt(e.target.value))}
-              className="text-sm border rounded-lg px-3 py-1.5 bg-white"
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-            <button
-              onClick={fetchData}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <Link
-              href="https://newforestdevicerepairs.co.uk/link-builder/"
-              target="_blank"
-              className="flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700 font-medium px-3 py-1.5 bg-green-50 rounded-lg"
-            >
-              <Link2 className="w-4 h-4" />
-              Link Builder
-            </Link>
-          </div>
+          <Link
+            href="https://newforestdevicerepairs.co.uk/link-builder/"
+            target="_blank"
+            className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg w-fit"
+          >
+            <Link2 className="w-4 h-4" />
+            Link Builder
+          </Link>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main className="p-4 space-y-4 max-w-2xl mx-auto">
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
             Error loading analytics: {error}
+          </div>
+        )}
+
+        {data?.table_missing && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 text-sm text-yellow-800 dark:text-yellow-400 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            Analytics table not set up yet. Run the SQL migration to start collecting data.
           </div>
         )}
 
@@ -148,7 +158,7 @@ export default function AnalyticsPage() {
         {data && (
           <>
             {/* Top Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <StatCard
                 label="Total Sessions"
                 value={data.total_sessions}
@@ -180,7 +190,7 @@ export default function AnalyticsPage() {
 
             {/* Funnel */}
             <Section title="Quote Funnel" icon={<BarChart3 className="w-5 h-5" />}>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {Object.entries(data.funnel.steps).map(([step, info]) => {
                   const width = (info.count / maxStepCount) * 100
                   const prevCount = step > '1' ? data.funnel.steps[parseInt(step) - 1]?.count : 0
@@ -188,18 +198,18 @@ export default function AnalyticsPage() {
                   return (
                     <div key={step}>
                       <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="font-medium text-gray-700">
-                          Step {step}: {info.label}
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {info.label}
                         </span>
-                        <span className="text-gray-500">
+                        <span className="text-gray-500 dark:text-gray-400">
                           {info.count} {prevCount > 0 && dropOff > 0 && (
-                            <span className="text-red-500 ml-2">↓ {dropOff}% drop-off</span>
+                            <span className="text-red-500 ml-1">↓{dropOff}%</span>
                           )}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-8 overflow-hidden">
+                      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-7 overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-end px-3 transition-all"
+                          className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-end px-2 transition-all"
                           style={{ width: Math.max(width, 2) + '%' }}
                         >
                           <span className="text-xs text-white font-medium">{info.count}</span>
@@ -209,9 +219,9 @@ export default function AnalyticsPage() {
                   )
                 })}
                 {/* Post-form actions */}
-                <div className="pt-3 border-t">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Post-Form Actions</div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Post-Form Actions</div>
+                  <div className="grid grid-cols-2 gap-2">
                     <MiniStat label="Form Started" value={data.funnel.actions.Form_Started} />
                     <MiniStat label="Form Submitted" value={data.funnel.actions.Form_Submitted} />
                     <MiniStat label="Quote Revealed" value={data.funnel.actions.Quote_Revealed} />
@@ -221,19 +231,19 @@ export default function AnalyticsPage() {
               </div>
             </Section>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4">
               {/* Time per step */}
               <Section title="Time Per Step" icon={<Clock className="w-5 h-5" />}>
                 <div className="space-y-2">
                   {Object.entries(data.avg_step_times).map(([step, info]) => (
                     <div key={step} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">{info.label}</span>
+                      <span className="text-gray-700 dark:text-gray-300">{info.label}</span>
                       <div className="flex items-center gap-4">
-                        <span className="text-gray-500 text-xs">{info.count} samples</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-gray-500 dark:text-gray-400 text-xs">{info.count} samples</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
                           Avg {formatTime(info.avg_ms)}
                         </span>
-                        <span className="text-gray-400 text-xs">
+                        <span className="text-gray-400 dark:text-gray-500 text-xs">
                           Med {formatTime(info.median_ms)}
                         </span>
                       </div>
@@ -250,8 +260,8 @@ export default function AnalyticsPage() {
                   <div className="space-y-2">
                     {data.action_breakdown.map(([action, count]) => (
                       <div key={action} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 capitalize">{action.replace(/_/g, ' ')}</span>
-                        <span className="font-medium text-gray-900">{count}</span>
+                        <span className="text-gray-700 dark:text-gray-300 capitalize">{action.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -266,8 +276,8 @@ export default function AnalyticsPage() {
                   <div className="space-y-2">
                     {data.hesitation_breakdown.map(([reason, count]) => (
                       <div key={reason} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 capitalize">{reason.replace(/_/g, ' ')}</span>
-                        <span className="font-medium text-gray-900">{count}</span>
+                        <span className="text-gray-700 dark:text-gray-300 capitalize">{reason.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -280,15 +290,15 @@ export default function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-gray-400" />
                     <div>
-                      <div className="text-2xl font-bold text-gray-900">{data.device_breakdown.mobile}</div>
-                      <div className="text-xs text-gray-500">Mobile</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{data.device_breakdown.mobile}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Mobile</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Monitor className="w-5 h-5 text-gray-400" />
                     <div>
-                      <div className="text-2xl font-bold text-gray-900">{data.device_breakdown.desktop}</div>
-                      <div className="text-xs text-gray-500">Desktop</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{data.device_breakdown.desktop}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Desktop</div>
                     </div>
                   </div>
                 </div>
@@ -297,7 +307,7 @@ export default function AnalyticsPage() {
 
             {/* Traffic Sources */}
             <Section title="Traffic Sources" icon={<Users className="w-5 h-5" />}>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <SourceList title="UTM Sources" items={data.traffic_sources.utm_sources} />
                 <SourceList title="Mediums" items={data.traffic_sources.utm_mediums} />
                 <SourceList title="Source Tags" items={data.traffic_sources.source_tags} />
@@ -305,7 +315,7 @@ export default function AnalyticsPage() {
               </div>
             </Section>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4">
               {/* Popular devices */}
               <Section title="Popular Devices" icon={<BarChart3 className="w-5 h-5" />}>
                 <div className="space-y-4">
@@ -323,9 +333,9 @@ export default function AnalyticsPage() {
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {data.search_queries.map((q, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 truncate">"{q.query}"</span>
+                        <span className="text-gray-700 dark:text-gray-300 truncate">"{q.query}"</span>
                         <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="font-medium text-gray-900">{q.count}x</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{q.count}x</span>
                           {q.zero_results > 0 && (
                             <span className="text-xs text-orange-500">{q.zero_results} no results</span>
                           )}
@@ -342,10 +352,10 @@ export default function AnalyticsPage() {
               {data.popular.combos.length === 0 ? (
                 <EmptyState text="No quote submissions yet" />
               ) : (
-                <div className="grid md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {data.popular.combos.map(([combo, count], i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                      <span className="text-gray-700 truncate">{combo}</span>
+                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                      <span className="text-gray-700 dark:text-gray-300 truncate">{combo}</span>
                       <span className="font-medium text-gray-900 flex-shrink-0 ml-2">{count}x</span>
                     </div>
                   ))}
@@ -353,7 +363,7 @@ export default function AnalyticsPage() {
               )}
             </Section>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4">
               {/* Form errors */}
               <Section title="Form Validation Errors" icon={<TrendingDown className="w-5 h-5" />}>
                 {data.form_errors.length === 0 ? (
@@ -362,8 +372,8 @@ export default function AnalyticsPage() {
                   <div className="space-y-2">
                     {data.form_errors.map(([field, count]) => (
                       <div key={field} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 capitalize">{field.replace(/_/g, ' ')}</span>
-                        <span className="font-medium text-red-600">{count} errors</span>
+                        <span className="text-gray-700 dark:text-gray-300 capitalize">{field.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-red-600 dark:text-red-400">{count} errors</span>
                       </div>
                     ))}
                   </div>
@@ -378,8 +388,8 @@ export default function AnalyticsPage() {
                   <div className="space-y-2">
                     {data.additional_repairs.breakdown.map(([repair, count]) => (
                       <div key={repair} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 capitalize">{repair.replace(/_/g, ' ')}</span>
-                        <span className="font-medium text-gray-900">{count}x</span>
+                        <span className="text-gray-700 dark:text-gray-300 capitalize">{repair.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{count}x</span>
                       </div>
                     ))}
                   </div>
@@ -392,11 +402,11 @@ export default function AnalyticsPage() {
               <Section title="Budget vs Quoted Price" icon={<BarChart3 className="w-5 h-5" />}>
                 <div className="space-y-2">
                   {data.budget_comparisons.map((b, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                      <span className="text-gray-700">
+                    <div key={i} className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-700/50 rounded-lg px-3 py-2">
+                      <span className="text-gray-700 dark:text-gray-300">
                         Budget: <strong>£{b.budget}</strong>
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         {b.quoted_price ? `Quoted: £${b.quoted_price}` : 'No price quoted'}
                       </span>
                       {b.quoted_price && (
@@ -411,37 +421,37 @@ export default function AnalyticsPage() {
             )}
           </>
         )}
-      </div>
+      </main>
     </div>
   )
 }
 
 function StatCard({ label, value, sub, icon, color }: { label: string; value: number; sub?: string; icon: React.ReactNode; color: string }) {
   const colors: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    purple: 'bg-purple-50 text-purple-600',
-    orange: 'bg-orange-50 text-orange-600',
+    blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    green: 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400',
+    purple: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+    orange: 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
   }
   return (
-    <div className="bg-white rounded-xl border p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-gray-500">{label}</span>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors[color]}`}>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}</span>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colors[color]}`}>
           {icon}
         </div>
       </div>
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
-      {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
+      <div className="text-xl font-bold text-gray-900 dark:text-white">{value}</div>
+      {sub && <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</div>}
     </div>
   )
 }
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border p-5">
-      <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-        <span className="text-gray-400">{icon}</span>
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
+        <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         {title}
       </h2>
       {children}
@@ -451,9 +461,9 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-gray-50 rounded-lg p-3 text-center">
-      <div className="text-lg font-bold text-gray-900">{value}</div>
-      <div className="text-xs text-gray-500">{label}</div>
+    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2 text-center">
+      <div className="text-base font-bold text-gray-900 dark:text-white">{value}</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
     </div>
   )
 }
@@ -461,15 +471,15 @@ function MiniStat({ label, value }: { label: string; value: number }) {
 function SourceList({ title, items }: { title: string; items: [string, number][] }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
+      <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{title}</h3>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">No data</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">No data</p>
       ) : (
         <div className="space-y-1.5">
-          {items.slice(0, 10).map(([source, count]) => (
+          {items.slice(0, 8).map(([source, count]) => (
             <div key={source} className="flex items-center justify-between text-sm">
-              <span className="text-gray-700 truncate">{source}</span>
-              <span className="font-medium text-gray-900 flex-shrink-0 ml-2">{count}</span>
+              <span className="text-gray-700 dark:text-gray-300 truncate">{source}</span>
+              <span className="font-medium text-gray-900 dark:text-white flex-shrink-0 ml-2">{count}</span>
             </div>
           ))}
         </div>
@@ -481,16 +491,16 @@ function SourceList({ title, items }: { title: string; items: [string, number][]
 function RankList({ title, items }: { title: string; items: [string, number][] }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
+      <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{title}</h3>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">No data</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">No data</p>
       ) : (
         <div className="space-y-1">
           {items.map(([name, count], i) => (
             <div key={name} className="flex items-center gap-2 text-sm">
-              <span className="text-gray-400 w-5">{i + 1}.</span>
-              <span className="text-gray-700 flex-1 truncate capitalize">{name}</span>
-              <span className="font-medium text-gray-900">{count}</span>
+              <span className="text-gray-400 dark:text-gray-500 w-5">{i + 1}.</span>
+              <span className="text-gray-700 dark:text-gray-300 flex-1 truncate capitalize">{name}</span>
+              <span className="font-medium text-gray-900 dark:text-white">{count}</span>
             </div>
           ))}
         </div>
@@ -500,5 +510,5 @@ function RankList({ title, items }: { title: string; items: [string, number][] }
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <p className="text-sm text-gray-400 text-center py-6">{text}</p>
+  return <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">{text}</p>
 }

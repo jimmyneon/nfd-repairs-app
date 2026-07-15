@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X } from 'lucide-react'
 import Link from 'next/link'
+import { renderSmsTemplate, getFirstName } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
 interface Enquiry {
@@ -63,19 +64,19 @@ interface Enquiry {
   updated_at?: string | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  pending: { label: 'Quote Sent', bg: 'bg-yellow-500', text: 'text-white' },
-  approved: { label: 'Approved', bg: 'bg-green-600', text: 'text-white' },
-  rejected: { label: 'Rejected', bg: 'bg-red-600', text: 'text-white' },
-  more_info_requested: { label: 'Info Sent', bg: 'bg-blue-600', text: 'text-white' },
-  converted: { label: 'Accepted', bg: 'bg-green-600', text: 'text-white' },
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string }> = {
+  pending: { label: 'Quote Sent', color: 'border-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+  approved: { label: 'Approved', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+  rejected: { label: 'Rejected', color: 'border-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
+  more_info_requested: { label: 'Info Sent', color: 'border-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
+  converted: { label: 'Accepted', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
 }
 
-const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: string }> = {
-  repair_quote: { label: 'Repair', icon: Wrench, color: 'text-green-600' },
-  business: { label: 'Business', icon: Briefcase, color: 'text-blue-600' },
-  web_services: { label: 'Web', icon: Code, color: 'text-purple-600' },
-  home_services: { label: 'Home', icon: Home, color: 'text-orange-600' },
+const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: string; bg: string }> = {
+  repair_quote: { label: 'Repair', icon: Wrench, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
+  business: { label: 'Business', icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+  web_services: { label: 'Web', icon: Code, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+  home_services: { label: 'Home', icon: Home, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20' },
 }
 
 export default function EnquiriesPage() {
@@ -89,6 +90,10 @@ export default function EnquiriesPage() {
   const [responseText, setResponseText] = useState('')
   const [responding, setResponding] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [smsTemplates, setSmsTemplates] = useState<{key: string, body: string}[]>([])
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [smsMessage, setSmsMessage] = useState('')
+  const [sendingSms, setSendingSms] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -98,6 +103,16 @@ export default function EnquiriesPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, () => loadEnquiries())
       .subscribe()
     return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from('sms_templates')
+      .select('key, body')
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) setSmsTemplates(data)
+      })
   }, [])
 
   useEffect(() => {
@@ -175,11 +190,55 @@ export default function EnquiriesPage() {
     return e.service_type || 'Home service'
   }
 
+  const getStatusLabel = (e: Enquiry): string => {
+    if (isAccepted(e)) return 'Accepted'
+    if (isFollowUp(e)) return 'Follow-up'
+    if (e.enquiry_type !== 'repair_quote' && e.status === 'pending') return 'New Enquiry'
+    return STATUS_CONFIG[e.status]?.label || 'Pending'
+  }
+
   const getTileBadge = (e: Enquiry): { text: string; color: string } | null => {
     if (e.repair_reserved || e.proceed_with_repair) return { text: 'RESERVED', color: 'bg-green-500' }
     if (e.part_reserved) return { text: 'PART HELD', color: 'bg-blue-500' }
     if (e.hesitation_reason) return { text: 'HESITATING', color: 'bg-orange-500' }
     return null
+  }
+
+  const handleSendSms = async () => {
+    if (!selectedEnquiry || !smsMessage.trim()) return
+    setSendingSms(true)
+    try {
+      const res = await fetch('/api/enquiries/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiryId: selectedEnquiry.id,
+          message: smsMessage.trim(),
+          templateKey: 'ENQUIRY_CUSTOM',
+        }),
+      })
+      if (res.ok) {
+        setSmsMessage('')
+        setShowTemplatePicker(false)
+        loadEnquiries()
+      }
+    } catch (e) {
+      console.error('Failed to send SMS:', e)
+    }
+    setSendingSms(false)
+  }
+
+  const applySmsTemplate = (body: string) => {
+    if (!selectedEnquiry) return
+    const rendered = renderSmsTemplate(body, {
+      first_name: getFirstName(selectedEnquiry.customer_name),
+      customer_name: selectedEnquiry.customer_name,
+      device_make: selectedEnquiry.device_make || '',
+      device_model: selectedEnquiry.device_model || '',
+      job_ref: selectedEnquiry.enquiry_ref,
+    })
+    setSmsMessage(rendered)
+    setShowTemplatePicker(false)
   }
 
   const fmtDate = (d: string) => {
@@ -272,7 +331,7 @@ export default function EnquiriesPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {filteredEnquiries.map((enquiry) => {
               const typeCfg = TYPE_CONFIG[enquiry.enquiry_type] || TYPE_CONFIG.repair_quote
-              const statusCfg = STATUS_CONFIG[enquiry.status] || STATUS_CONFIG.pending
+              const statusLabel = getStatusLabel(enquiry)
               const summary = getTileSummary(enquiry)
               const badge = getTileBadge(enquiry)
               const TypeIcon = typeCfg.icon
@@ -281,17 +340,17 @@ export default function EnquiriesPage() {
                 <button
                   key={enquiry.id}
                   onClick={() => openDetail(enquiry)}
-                  className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-l-4 ${statusCfg.bg}`}
+                  className="relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-green-600"
                 >
-                  <div className="p-3 h-full flex flex-col text-white">
+                  <div className="p-3 h-full flex flex-col">
                     {/* Top row: type + badge */}
                     <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
                         <TypeIcon className="h-4 w-4" />
-                        <p className="font-black text-xs uppercase tracking-wide">{typeCfg.label}</p>
+                        <p className="font-bold text-xs uppercase tracking-wide">{typeCfg.label}</p>
                       </div>
                       {badge && (
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${badge.color}`}>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full text-white ${badge.color}`}>
                           {badge.text}
                         </span>
                       )}
@@ -299,17 +358,17 @@ export default function EnquiriesPage() {
 
                     {/* Main content: customer name + summary */}
                     <div className="flex-1 flex flex-col justify-center text-center">
-                      <p className="text-sm font-black leading-tight mb-1 truncate">{enquiry.customer_name}</p>
-                      <p className="text-xs font-semibold truncate opacity-90">{summary}</p>
+                      <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
+                      <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
                       {enquiry.quoted_price != null && (
-                        <p className="text-lg font-black mt-1">£{enquiry.quoted_price}</p>
+                        <p className="text-lg font-black mt-1 text-gray-900 dark:text-white">£{enquiry.quoted_price}</p>
                       )}
                     </div>
 
                     {/* Bottom row: status + date */}
-                    <div className="flex items-center justify-between text-xs border-t border-white/20 pt-1.5">
-                      <span className="font-bold uppercase">{statusCfg.label}</span>
-                      <span className="opacity-80">{fmtDate(enquiry.created_at)}</span>
+                    <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-1.5">
+                      <span className="font-bold text-gray-600 dark:text-gray-400">{statusLabel}</span>
+                      <span className="text-gray-400 dark:text-gray-500">{fmtDate(enquiry.created_at)}</span>
                     </div>
                   </div>
                 </button>
@@ -338,10 +397,11 @@ export default function EnquiriesPage() {
             <div className="flex items-center gap-2">
               {(() => {
                 const cfg = STATUS_CONFIG[selectedEnquiry.status] || STATUS_CONFIG.pending
-                return <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
+                const label = getStatusLabel(selectedEnquiry)
+                return <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${cfg.bg} ${cfg.text}`}>{label}</span>
               })()}
               {selectedEnquiry.enquiry_type === 'repair_quote' && selectedEnquiry.quoted_price != null && (
-                <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 text-green-700">£{selectedEnquiry.quoted_price}</span>
+                <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">£{selectedEnquiry.quoted_price}</span>
               )}
             </div>
 
@@ -494,6 +554,52 @@ export default function EnquiriesPage() {
                   className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
                 >
                   <CheckCircle className="h-4 w-4" /> Mark Handled
+                </button>
+              </div>
+            )}
+
+            {/* Send SMS section */}
+            {selectedEnquiry.customer_phone && (
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Send SMS to Customer</p>
+                  <button
+                    onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+                    className="text-xs font-bold text-primary hover:text-primary-dark"
+                  >
+                    {showTemplatePicker ? 'Hide' : 'Use Template'}
+                  </button>
+                </div>
+
+                {showTemplatePicker && (
+                  <div className="mb-2 max-h-40 overflow-y-auto space-y-1">
+                    {smsTemplates.map((tpl) => (
+                      <button
+                        key={tpl.key}
+                        onClick={() => applySmsTemplate(tpl.body)}
+                        className="w-full text-left p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+                      >
+                        <span className="font-bold text-xs text-gray-900 dark:text-white">{tpl.key}</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{tpl.body}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <textarea
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                  placeholder="Type a message to send via SMS..."
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  rows={3}
+                />
+                <button
+                  onClick={handleSendSms}
+                  disabled={sendingSms || !smsMessage.trim()}
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                  {sendingSms ? 'Sending...' : 'Send SMS'}
                 </button>
               </div>
             )}
