@@ -73,6 +73,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [diagnosticSmsMessage, setDiagnosticSmsMessage] = useState<string | null>(null)
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
+  const [showReviewPlatforms, setShowReviewPlatforms] = useState(false)
   const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const router = useRouter()
@@ -1001,18 +1002,17 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <span className="text-[10px] text-gray-700 dark:text-gray-300">Tracking</span>
           </button>
           <button
-            onClick={handleQuickReviewToggle}
+            onClick={() => setShowReviewPlatforms(true)}
             onContextMenu={(e) => { e.preventDefault(); setShowReviewReason(true) }}
-            disabled={reviewToggling}
-            className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 disabled:opacity-50 ${
+            className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 ${
               job.skip_review_request
                 ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
                 : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
             }`}
-            title="Tap to toggle review · Long-press for reason"
+            title="Tap for review platforms · Long-press for customer settings"
           >
             <Star className="h-5 w-5" />
-            <span className="text-[10px]">{job.skip_review_request ? 'No Review' : 'Review'}</span>
+            <span className="text-[10px]">Reviews</span>
           </button>
         </div>
 
@@ -2218,26 +2218,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         />
       )}
 
-      {/* Review Reason Modal (long-press on review button) */}
+      {/* Customer Management Slide-Up (long-press on review button) */}
       {showReviewReason && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-black text-gray-900 dark:text-white">Customer Management</h2>
-              <button
-                onClick={() => setShowReviewReason(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
-              >
-                ✕
-              </button>
-            </div>
-            <CustomerFlagControls job={job} onUpdate={() => { loadJobData(); setShowReviewReason(false) }} />
-            <div className="mt-4">
-              <ReviewPlatformControls job={job} onUpdate={loadJobData} />
-            </div>
-          </div>
-        </div>
+        <SlideUpPanel
+          isOpen={showReviewReason}
+          onClose={() => setShowReviewReason(false)}
+          title="Customer Management"
+          icon={<Star className="h-5 w-5 text-primary" />}
+        >
+          <CustomerFlagControls job={job} onUpdate={() => { loadJobData(); setShowReviewReason(false) }} />
+        </SlideUpPanel>
       )}
+
+      {/* Review Platforms Slide-Up */}
+      <ReviewPlatformControls
+        job={job}
+        isOpen={showReviewPlatforms}
+        onClose={() => setShowReviewPlatforms(false)}
+        onUpdate={loadJobData}
+      />
     </div>
   )
 }

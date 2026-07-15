@@ -28,7 +28,7 @@ VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- Insert SMS templates for Facebook and Trustpilot reviews
-INSERT INTO sms_templates (key, body, is_active, description)
+INSERT INTO sms_templates (key, body, is_active)
 VALUES
   (
     'POST_COLLECTION_REVIEW_FACEBOOK',
@@ -39,12 +39,11 @@ VALUES
 Every review helps us reach more local customers.
 
 – New Forest Device Repairs',
-    true,
-    'Sent when customer has already completed Google review, requesting Facebook review instead'
+    true
   )
 ON CONFLICT (key) DO NOTHING;
 
-INSERT INTO sms_templates (key, body, is_active, description)
+INSERT INTO sms_templates (key, body, is_active)
 VALUES
   (
     'POST_COLLECTION_REVIEW_TRUSTPILOT',
@@ -55,8 +54,7 @@ VALUES
 Thank you for supporting a local business!
 
 – New Forest Device Repairs',
-    true,
-    'Sent when customer has completed Google + Facebook reviews, requesting Trustpilot review instead'
+    true
   )
 ON CONFLICT (key) DO NOTHING;
 

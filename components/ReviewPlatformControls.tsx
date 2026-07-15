@@ -4,19 +4,22 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
 import { Star, CheckCircle2, Circle, Send, Loader2 } from 'lucide-react'
+import SlideUpPanel from '@/components/SlideUpPanel'
 
 interface ReviewPlatformControlsProps {
   job: Job
+  isOpen: boolean
+  onClose: () => void
   onUpdate: () => void
 }
 
 const PLATFORMS = [
-  { key: 'google', label: 'Google', color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-300', icon: '🔍' },
-  { key: 'facebook', label: 'Facebook', color: 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700 text-indigo-800 dark:text-indigo-300', icon: '📘' },
-  { key: 'trustpilot', label: 'Trustpilot', color: 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300', icon: '⭐' },
+  { key: 'google', label: 'Google', doneColor: 'bg-blue-600 text-white', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
+  { key: 'facebook', label: 'Facebook', doneColor: 'bg-indigo-600 text-white', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
+  { key: 'trustpilot', label: 'Trustpilot', doneColor: 'bg-green-600 text-white', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
 ]
 
-export default function ReviewPlatformControls({ job, onUpdate }: ReviewPlatformControlsProps) {
+export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate }: ReviewPlatformControlsProps) {
   const [saving, setSaving] = useState<string | null>(null)
   const [sendingReview, setSendingReview] = useState(false)
   const [sendResult, setSendResult] = useState<string | null>(null)
@@ -64,7 +67,7 @@ export default function ReviewPlatformControls({ job, onUpdate }: ReviewPlatform
   const sendReviewRequest = async () => {
     const nextPlatform = getNextPlatform()
     if (!nextPlatform) {
-      setSendResult('All review platforms completed! 🎉')
+      setSendResult('All review platforms completed!')
       return
     }
 
@@ -100,81 +103,91 @@ export default function ReviewPlatformControls({ job, onUpdate }: ReviewPlatform
   const nextPlatform = getNextPlatform()
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100 dark:border-gray-700">
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Review Platforms</h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-        Mark which platforms the customer has reviewed on. Next request will use the next un-ticked platform.
-      </p>
+    <SlideUpPanel
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Review Platforms"
+      icon={<Star className="h-5 w-5 text-primary" />}
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Mark which platforms the customer has reviewed on. Next request uses the next un-ticked platform.
+        </p>
 
-      <div className="space-y-2 mb-4">
-        {PLATFORMS.map((p) => {
-          const isDone = completed.includes(p.key)
-          const isSaving = saving === p.key
-          return (
-            <button
-              key={p.key}
-              onClick={() => togglePlatform(p.key)}
-              disabled={isSaving}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all active:scale-[0.98] ${p.color} ${
-                isDone ? 'opacity-100' : 'opacity-60 hover:opacity-100'
-              }`}
-            >
-              <span className="text-xl">{p.icon}</span>
-              <span className="font-bold text-sm flex-1 text-left">{p.label}</span>
-              {isSaving ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : isDone ? (
-                <CheckCircle2 className="h-5 w-5" />
-              ) : (
-                <Circle className="h-5 w-5" />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {nextPlatform ? (
-        <button
-          onClick={sendReviewRequest}
-          disabled={sendingReview || job.skip_review_request}
-          className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50"
-        >
-          {sendingReview ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4" />
-              Send {nextPlatform} Review Request
-            </>
-          )}
-        </button>
-      ) : (
-        <div className="w-full text-center py-3 bg-green-50 dark:bg-green-900/30 rounded-xl border-2 border-green-200 dark:border-green-700">
-          <Star className="h-5 w-5 text-green-600 inline mr-1" />
-          <span className="text-sm font-bold text-green-700 dark:text-green-300">
-            All platforms done — thank you!
-          </span>
+        {/* Big square toggle buttons */}
+        <div className="grid grid-cols-3 gap-3">
+          {PLATFORMS.map((p) => {
+            const isDone = completed.includes(p.key)
+            const isSaving = saving === p.key
+            return (
+              <button
+                key={p.key}
+                onClick={() => togglePlatform(p.key)}
+                disabled={isSaving}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 border-2 ${
+                  isDone
+                    ? `${p.doneColor} border-transparent`
+                    : `${p.pendingColor} border-gray-200 dark:border-gray-600`
+                }`}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : isDone ? (
+                  <CheckCircle2 className="h-6 w-6" />
+                ) : (
+                  <Circle className="h-6 w-6 opacity-40" />
+                )}
+                <span className="text-xs font-bold text-center leading-tight">{p.label}</span>
+                {isDone && <span className="text-[10px] font-semibold opacity-80">Done</span>}
+              </button>
+            )
+          })}
         </div>
-      )}
 
-      {job.skip_review_request && (
-        <p className="text-xs text-red-500 mt-2 text-center">
-          Review requests are disabled for this customer
-        </p>
-      )}
+        {/* Send button or all done message */}
+        {nextPlatform ? (
+          <button
+            onClick={sendReviewRequest}
+            disabled={sendingReview || job.skip_review_request}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50 active:scale-[0.98]"
+          >
+            {sendingReview ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="h-5 w-5" />
+                Send {nextPlatform} Review Request
+              </>
+            )}
+          </button>
+        ) : (
+          <div className="w-full text-center py-4 bg-green-50 dark:bg-green-900/30 rounded-xl border-2 border-green-200 dark:border-green-700">
+            <Star className="h-6 w-6 text-green-600 inline mb-1" />
+            <p className="text-sm font-bold text-green-700 dark:text-green-300">
+              All platforms done — thank you!
+            </p>
+          </div>
+        )}
 
-      {sendResult && (
-        <p className="text-xs text-center mt-2 text-gray-600 dark:text-gray-400">{sendResult}</p>
-      )}
+        {job.skip_review_request && (
+          <p className="text-xs text-red-500 text-center">
+            Review requests are disabled for this customer
+          </p>
+        )}
 
-      {job.last_review_platform_requested && (
-        <p className="text-xs text-gray-400 mt-2 text-center">
-          Last requested: {job.last_review_platform_requested}
-        </p>
-      )}
-    </div>
+        {sendResult && (
+          <p className="text-xs text-center text-gray-600 dark:text-gray-400">{sendResult}</p>
+        )}
+
+        {job.last_review_platform_requested && (
+          <p className="text-xs text-gray-400 text-center">
+            Last requested: {job.last_review_platform_requested}
+          </p>
+        )}
+      </div>
+    </SlideUpPanel>
   )
 }
