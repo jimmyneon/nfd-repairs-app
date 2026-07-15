@@ -464,6 +464,9 @@ export default function EnquiriesPage() {
                   {selectedEnquiry.help_type && <p><span className="font-semibold">Help:</span> {selectedEnquiry.help_type}</p>}
                   {selectedEnquiry.device_count && <p><span className="font-semibold">Devices:</span> {selectedEnquiry.device_count}</p>}
                   {selectedEnquiry.urgency && <p><span className="font-semibold">Urgency:</span> {selectedEnquiry.urgency}</p>}
+                  {selectedEnquiry.support_type && <p><span className="font-semibold">Support:</span> {selectedEnquiry.support_type}</p>}
+                  {selectedEnquiry.postcode && <p><span className="font-semibold">Postcode:</span> {selectedEnquiry.postcode}</p>}
+                  {selectedEnquiry.preferred_contact_method && <p><span className="font-semibold">Contact pref:</span> {selectedEnquiry.preferred_contact_method}</p>}
                 </div>
               </div>
             )}

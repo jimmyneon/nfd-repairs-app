@@ -27,13 +27,23 @@ export async function POST(request: NextRequest) {
       deviceCount,
       urgency,
       supportType,
+      postcode,
+      contactPref,
       message,
+      gdprConsent,
       source,
     } = body
 
     if (!name || !phone || !email) {
       return NextResponse.json(
         { error: 'Missing required fields: name, phone, email' },
+        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+      )
+    }
+
+    if (!gdprConsent) {
+      return NextResponse.json(
+        { error: 'GDPR consent is required' },
         { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       )
     }
@@ -58,6 +68,9 @@ export async function POST(request: NextRequest) {
         support_type: supportType || null,
         description: message || null,
         additional_info: message || null,
+        preferred_contact_method: contactPref || null,
+        gdpr_consent: gdprConsent || false,
+        postcode: postcode || null,
         status: 'pending',
       })
       .select()
@@ -92,6 +105,8 @@ export async function POST(request: NextRequest) {
       deviceCount,
       urgency,
       supportType,
+      postcode,
+      contactPref,
       message,
       enquiryRef: enquiry.enquiry_ref,
     })
@@ -128,6 +143,8 @@ function generateBusinessEnquiryEmail(data: {
   deviceCount?: string
   urgency?: string
   supportType?: string
+  postcode?: string
+  contactPref?: string
   message?: string
   enquiryRef: string
 }): string {
@@ -149,6 +166,8 @@ function generateBusinessEnquiryEmail(data: {
   addRow('Device Count', data.deviceCount)
   addRow('Urgency', data.urgency)
   addRow('Support Type', data.supportType)
+  addRow('Postcode', data.postcode)
+  addRow('Preferred Contact', data.contactPref)
   addRow('Message', data.message)
 
   return `<!DOCTYPE html>
