@@ -15,6 +15,7 @@ import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 import DelayReasonModal from '@/components/DelayReasonModal'
 import CancellationReasonModal from '@/components/CancellationReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
+import ReviewPlatformControls from '@/components/ReviewPlatformControls'
 import CustomerArrivedPrompt from '@/components/CustomerArrivedPrompt'
 import CustomerNotesEditor from '@/components/CustomerNotesEditor'
 import EditCustomerDetails from '@/components/EditCustomerDetails'
@@ -2231,6 +2232,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             </div>
             <CustomerFlagControls job={job} onUpdate={() => { loadJobData(); setShowReviewReason(false) }} />
+            <div className="mt-4">
+              <ReviewPlatformControls job={job} onUpdate={loadJobData} />
+            </div>
           </div>
         </div>
       )}

@@ -93,6 +93,10 @@ export interface Job {
   is_warranty?: boolean
   linked_warranty_ticket_id?: string | null
   
+  // Multi-platform review tracking
+  review_platforms_completed?: string[] | null
+  last_review_platform_requested?: string | null
+  
   // Action-oriented enhancements
   status_changed_at?: string | null
   tracking_link_expires_at?: string | null

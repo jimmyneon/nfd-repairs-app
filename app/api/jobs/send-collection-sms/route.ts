@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     )
 
     const body = await request.json()
-    const { jobId, manual } = body
+    const { jobId, manual, platform } = body
 
     if (!jobId) {
       return NextResponse.json(
@@ -61,23 +61,59 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get Google review link from settings
+    // Determine which review platform to use
+    const completedPlatforms: string[] = job.review_platforms_completed || []
+
+    const PLATFORM_ORDER = ['google', 'facebook', 'trustpilot']
+    const PLATFORM_TEMPLATE_KEYS: Record<string, string> = {
+      google: 'POST_COLLECTION_REVIEW',
+      facebook: 'POST_COLLECTION_REVIEW_FACEBOOK',
+      trustpilot: 'POST_COLLECTION_REVIEW_TRUSTPILOT',
+    }
+    const PLATFORM_SETTING_KEYS: Record<string, string> = {
+      google: 'google_review_link',
+      facebook: 'facebook_review_link',
+      trustpilot: 'trustpilot_review_link',
+    }
+
+    // Use specified platform, or auto-select next un-completed one
+    let selectedPlatform = platform
+    if (!selectedPlatform) {
+      selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'google'
+    }
+
+    // If the selected platform is already completed, find the next one
+    if (completedPlatforms.includes(selectedPlatform)) {
+      selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || null
+    }
+
+    if (!selectedPlatform) {
+      return NextResponse.json({
+        success: false,
+        message: 'All review platforms completed',
+        skipped: true,
+      })
+    }
+
+    // Get review link for the selected platform
+    const settingKey = PLATFORM_SETTING_KEYS[selectedPlatform] || 'google_review_link'
     const { data: reviewLinkSetting } = await supabase
       .from('admin_settings')
       .select('value')
-      .eq('key', 'google_review_link')
+      .eq('key', settingKey)
       .single()
 
-    const googleReviewLink = reviewLinkSetting?.value || 'https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review'
+    const reviewLink = reviewLinkSetting?.value || 'https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review'
 
     // Get first name from customer name, with a safe fallback
     const firstName = getFirstName(job.customer_name)
 
-    // Fetch the POST_COLLECTION_REVIEW template from the database
+    // Fetch the appropriate SMS template
+    const templateKey = PLATFORM_TEMPLATE_KEYS[selectedPlatform] || 'POST_COLLECTION_REVIEW'
     const { data: reviewTemplate } = await supabase
       .from('sms_templates')
       .select('*')
-      .eq('key', 'POST_COLLECTION_REVIEW')
+      .eq('key', templateKey)
       .eq('is_active', true)
       .single()
 
@@ -89,14 +125,15 @@ export async function POST(request: NextRequest) {
         customer_name: job.customer_name,
         device_make: job.device_make || '',
         device_model: job.device_model || '',
-        review_link: googleReviewLink,
+        review_link: reviewLink,
         tracking_link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/t/${job.tracking_token}`,
         job_ref: job.job_ref,
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs. If you're happy with your ${job.device_model} repair, we'd really appreciate a quick Google review:
-${googleReviewLink}
+      const platformLabel = selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)
+      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs. If you're happy with your ${job.device_model} repair, we'd really appreciate a ${platformLabel} review:
+${reviewLink}
 
 If anything isn't quite right, just reply to this message and we'll do our best to put it right.
 
@@ -135,7 +172,7 @@ If anything isn't quite right, just reply to this message and we'll do our best 
     if (job.customer_email) {
       const emailTemplate = generatePostCollectionEmail({
         job,
-        googleReviewLink
+        googleReviewLink: reviewLink
       })
 
       emailSubject = emailTemplate.subject
@@ -162,6 +199,7 @@ If anything isn't quite right, just reply to this message and we'll do our best 
         post_collection_sms_sent_at: now,
         post_collection_sms_delivery_status: smsDeliveryStatus,
         post_collection_sms_body: smsBody,
+        last_review_platform_requested: selectedPlatform,
         post_collection_email_sent_at: job.customer_email ? now : null,
         post_collection_email_delivery_status: emailDeliveryStatus,
         post_collection_email_subject: emailSubject,
@@ -176,7 +214,7 @@ If anything isn't quite right, just reply to this message and we'll do our best 
         {
           job_id: jobId,
           type: 'SYSTEM',
-          message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: Review request sent`
+          message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: ${selectedPlatform} review request sent`
         },
         job.customer_email ? {
           job_id: jobId,
