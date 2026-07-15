@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, Home, Plus, QrCode, Smartphone, Archive, Shield, Bell, Settings, Mail, Package, Clock, Wrench, ChevronDown, X } from 'lucide-react'
+import { Menu, Home, Plus, QrCode, Smartphone, Archive, Shield, Bell, Settings, Mail, Package, Clock, Wrench, ChevronDown, X, BarChart3 } from 'lucide-react'
 
 interface NavLink {
   href: string
@@ -46,6 +46,7 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
     { href: '/app/history', label: 'Job History', icon: Clock },
     { href: '/app/email-templates', label: 'Email Templates', icon: Mail },
     { href: '/app/qr-display', label: 'Walk-In QR', icon: Smartphone },
+    { href: '/app/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/app/settings', label: 'Settings', icon: Settings },
   ]
 

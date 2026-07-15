@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone } from 'lucide-react'
 import Link from 'next/link'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
@@ -64,11 +64,11 @@ interface Enquiry {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  pending: { label: 'Pending', bg: 'bg-yellow-500', text: 'text-white' },
+  pending: { label: 'Quote Sent', bg: 'bg-yellow-500', text: 'text-white' },
   approved: { label: 'Approved', bg: 'bg-green-600', text: 'text-white' },
   rejected: { label: 'Rejected', bg: 'bg-red-600', text: 'text-white' },
   more_info_requested: { label: 'Info Sent', bg: 'bg-blue-600', text: 'text-white' },
-  converted: { label: 'Converted', bg: 'bg-purple-600', text: 'text-white' },
+  converted: { label: 'Accepted', bg: 'bg-green-600', text: 'text-white' },
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: string }> = {
@@ -115,7 +115,13 @@ export default function EnquiriesPage() {
       )
     }
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(e => e.status === statusFilter)
+      if (statusFilter === 'follow_up') {
+        filtered = filtered.filter(e => isFollowUp(e))
+      } else if (statusFilter === 'accepted') {
+        filtered = filtered.filter(e => isAccepted(e))
+      } else {
+        filtered = filtered.filter(e => e.status === statusFilter)
+      }
     }
     setFilteredEnquiries(filtered)
   }, [enquiries, searchTerm, statusFilter])
@@ -158,6 +164,9 @@ export default function EnquiriesPage() {
   const pendingCount = enquiries.filter(e => e.status === 'pending').length
   const acceptedCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)).length
   const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
+
+  const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
+  const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
 
   const getTileSummary = (e: Enquiry): string => {
     if (e.enquiry_type === 'repair_quote') return `${e.device_make || ''} ${e.device_model || ''}`.trim() || 'Repair quote'
@@ -230,16 +239,16 @@ export default function EnquiriesPage() {
             )}
             {acceptedCount > 0 && (
               <button
-                onClick={() => setStatusFilter('converted')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'converted' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700'}`}
+                onClick={() => setStatusFilter('accepted')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'accepted' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700'}`}
               >
                 Accepted ({acceptedCount})
               </button>
             )}
             {followUpCount > 0 && (
               <button
-                onClick={() => setStatusFilter('more_info_requested')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'more_info_requested' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700'}`}
+                onClick={() => setStatusFilter('follow_up')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'follow_up' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700'}`}
               >
                 Follow-up ({followUpCount})
               </button>
@@ -428,8 +437,31 @@ export default function EnquiriesPage() {
               </div>
             </details>
 
-            {/* Status actions */}
-            {selectedEnquiry.status === 'pending' && (
+            {/* Transfer to Job button — for accepted repair quotes */}
+            {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    enquiry_ref: selectedEnquiry.enquiry_ref,
+                    customer_name: selectedEnquiry.customer_name,
+                    customer_phone: selectedEnquiry.customer_phone || '',
+                    device_make: selectedEnquiry.device_make || '',
+                    device_model: selectedEnquiry.device_model || '',
+                    issue: selectedEnquiry.repair_type || '',
+                    quoted_price: selectedEnquiry.quoted_price?.toString() || '',
+                    from_enquiry: '1',
+                  })
+                  window.location.href = `/app/jobs/create?${params.toString()}`
+                }}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 text-lg"
+              >
+                <ArrowRight className="h-5 w-5" />
+                Transfer to Job
+              </button>
+            )}
+
+            {/* Status actions — different for repair quotes vs business enquiries */}
+            {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type === 'repair_quote' && (
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
@@ -442,6 +474,26 @@ export default function EnquiriesPage() {
                   className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors active:scale-95"
                 >
                   ✕ Reject
+                </button>
+              </div>
+            )}
+
+            {/* Business/non-repair enquiries: Contact + Mark Handled */}
+            {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type !== 'repair_quote' && (
+              <div className="grid grid-cols-2 gap-3">
+                {selectedEnquiry.customer_phone && (
+                  <a
+                    href={`tel:${selectedEnquiry.customer_phone}`}
+                    className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95"
+                  >
+                    <Phone className="h-4 w-4" /> Call
+                  </a>
+                )}
+                <button
+                  onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
+                  className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
+                >
+                  <CheckCircle className="h-4 w-4" /> Mark Handled
                 </button>
               </div>
             )}

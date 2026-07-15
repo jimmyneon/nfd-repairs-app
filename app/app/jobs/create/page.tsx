@@ -73,6 +73,21 @@ function CreateJobContent() {
         return
       }
 
+      // Check for enquiry params (from enquiries page "Transfer to Job")
+      const fromEnquiry = searchParams.get('from_enquiry')
+      if (fromEnquiry === '1') {
+        setCustomerName(searchParams.get('customer_name') || '')
+        setCustomerPhone(searchParams.get('customer_phone') || '')
+        setFormData(prev => ({
+          ...prev,
+          device_make: searchParams.get('device_make') || '',
+          device_model: searchParams.get('device_model') || '',
+          issue: searchParams.get('issue') || '',
+          price_total: searchParams.get('quoted_price') || '',
+        }))
+        return
+      }
+
       const savedForm = sessionStorage.getItem('job_create_form_state')
       if (savedForm) {
         try {
