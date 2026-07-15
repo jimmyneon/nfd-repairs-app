@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       supportType,
       postcode,
       contactPref,
+      bestTime,
       message,
       gdprConsent,
       source,
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         preferred_contact_method: contactPref || null,
         gdpr_consent: gdprConsent || false,
         postcode: postcode || null,
+        best_time: bestTime || null,
         status: 'pending',
       })
       .select()
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest) {
       supportType,
       postcode,
       contactPref,
+      bestTime,
       message,
       enquiryRef: enquiry.enquiry_ref,
     })
@@ -145,6 +148,7 @@ function generateBusinessEnquiryEmail(data: {
   supportType?: string
   postcode?: string
   contactPref?: string
+  bestTime?: string
   message?: string
   enquiryRef: string
 }): string {
@@ -168,6 +172,7 @@ function generateBusinessEnquiryEmail(data: {
   addRow('Support Type', data.supportType)
   addRow('Postcode', data.postcode)
   addRow('Preferred Contact', data.contactPref)
+  addRow('Best Time', data.bestTime)
   addRow('Message', data.message)
 
   return `<!DOCTYPE html>
