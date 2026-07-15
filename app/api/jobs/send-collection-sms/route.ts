@@ -61,33 +61,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Determine which review platform to use
+    // The review link is now a single landing page that shows all platforms
+    // The ref parameter is the job_ref so the page can track which platforms were clicked
+    const reviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
+
+    // Track which platform was requested (for app display purposes)
     const completedPlatforms: string[] = job.review_platforms_completed || []
-
     const PLATFORM_ORDER = ['google', 'facebook', 'trustpilot']
-    const PLATFORM_TEMPLATE_KEYS: Record<string, string> = {
-      google: 'POST_COLLECTION_REVIEW',
-      facebook: 'POST_COLLECTION_REVIEW_FACEBOOK',
-      trustpilot: 'POST_COLLECTION_REVIEW_TRUSTPILOT',
-    }
-    const PLATFORM_SETTING_KEYS: Record<string, string> = {
-      google: 'google_review_link',
-      facebook: 'facebook_review_link',
-      trustpilot: 'trustpilot_review_link',
-    }
-
-    // Use specified platform, or auto-select next un-completed one
-    let selectedPlatform = platform
-    if (!selectedPlatform) {
-      selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'google'
-    }
-
-    // If the selected platform is already completed, find the next one
+    let selectedPlatform = platform || PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'google'
     if (completedPlatforms.includes(selectedPlatform)) {
-      selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || null
+      selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'all_done'
     }
 
-    if (!selectedPlatform) {
+    if (selectedPlatform === 'all_done') {
       return NextResponse.json({
         success: false,
         message: 'All review platforms completed',
@@ -95,25 +81,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get review link for the selected platform
-    const settingKey = PLATFORM_SETTING_KEYS[selectedPlatform] || 'google_review_link'
-    const { data: reviewLinkSetting } = await supabase
-      .from('admin_settings')
-      .select('value')
-      .eq('key', settingKey)
-      .single()
-
-    const reviewLink = reviewLinkSetting?.value || 'https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review'
-
     // Get first name from customer name, with a safe fallback
     const firstName = getFirstName(job.customer_name)
 
-    // Fetch the appropriate SMS template
-    const templateKey = PLATFORM_TEMPLATE_KEYS[selectedPlatform] || 'POST_COLLECTION_REVIEW'
+    // Fetch the review SMS template (single template now, links to review landing page)
     const { data: reviewTemplate } = await supabase
       .from('sms_templates')
       .select('*')
-      .eq('key', templateKey)
+      .eq('key', 'POST_COLLECTION_REVIEW')
       .eq('is_active', true)
       .single()
 
@@ -131,11 +106,10 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      const platformLabel = selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)
-      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs. If you're happy with your ${job.device_model} repair, we'd really appreciate a ${platformLabel} review:
+      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs! Could you spare 2 mins to leave us a review? It really helps our small business:
 ${reviewLink}
 
-If anything isn't quite right, just reply to this message and we'll do our best to put it right.
+If anything isn't quite right, just reply and we'll put it right.
 
 – New Forest Device Repairs`
     }
