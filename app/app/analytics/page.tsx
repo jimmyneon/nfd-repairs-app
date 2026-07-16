@@ -184,172 +184,103 @@ export default function AnalyticsPage() {
 
         {data && data.total_sessions > 0 && (
           <>
-            {/* Overview Stat Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <OverviewCard
-                label="Visitors"
-                value={data.total_sessions}
-                sub={`last ${data.period_days} days`}
-                icon={<Users className="w-5 h-5" />}
-                color="blue"
-              />
-              <OverviewCard
-                label="Conversion"
+            {/* Compact Grid of Tappable Tiles */}
+            <div className="grid grid-cols-3 gap-2.5">
+              <Tile
+                onClick={() => setActiveSheet('insights')}
+                icon={<Lightbulb className="w-4 h-4" />}
+                label="Insights"
                 value={`${data.conversion_rate}%`}
-                sub={`${data.funnel.actions.Form_Submitted} forms submitted`}
-                icon={<Target className="w-5 h-5" />}
+                color="amber"
+              />
+              <Tile
+                onClick={() => setActiveSheet('funnel')}
+                icon={<BarChart3 className="w-4 h-4" />}
+                label="Funnel"
+                value={data.funnel.actions.Form_Submitted}
                 color="green"
               />
-            </div>
-
-            {/* Tappable Summary Cards */}
-            <div className="space-y-2.5 pt-1">
-              {/* Key Insights - always first, most useful */}
-              <SummaryCard
-                onClick={() => setActiveSheet('insights')}
-                icon={<Lightbulb className="w-5 h-5 text-amber-500" />}
-                title="Key Insights"
-                subtitle={
-                  data.total_sessions > 0
-                    ? `${data.conversion_rate}% convert${data.popular.categories.length > 0 ? ` · ${data.popular.categories[0][0]} most popular` : ''}${biggestDropStep ? ` · drop-off at ${biggestDropStep.label}` : ''}`
-                    : 'No data yet'
-                }
-              />
-
-              {/* Funnel */}
-              <SummaryCard
-                onClick={() => setActiveSheet('funnel')}
-                icon={<BarChart3 className="w-5 h-5 text-green-600" />}
-                title="Quote Funnel"
-                subtitle={`${data.funnel.steps[1]?.count || 0} started · ${data.funnel.actions.Form_Submitted} submitted · ${data.funnel.actions.Quote_Revealed} saw quotes`}
-                progress={{
-                  current: data.funnel.actions.Form_Submitted,
-                  total: data.funnel.steps[1]?.count || 0,
-                }}
-              />
-
-              {/* Where People Leave */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('abandonment')}
-                icon={<LogOut className="w-5 h-5 text-red-500" />}
-                title="Where People Leave"
-                subtitle={
-                  data.abandonment.total_abandoned > 0
-                    ? `${data.abandonment.total_abandoned} left without completing${biggestDropStep ? ` · most at ${biggestDropStep.label}` : ''}`
-                    : 'No drop-off data yet'
-                }
-                badge={data.abandonment.total_abandoned > 0 ? data.abandonment.total_abandoned : undefined}
-                badgeColor="red"
+                icon={<LogOut className="w-4 h-4" />}
+                label="Drop-off"
+                value={data.abandonment.total_abandoned}
+                color="red"
               />
-
-              {/* Traffic Sources */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('traffic')}
-                icon={<Users className="w-5 h-5 text-teal-500" />}
-                title="Traffic Sources"
-                subtitle={
-                  data.traffic_sources.utm_sources.length > 0 || data.traffic_sources.referrers.length > 0
-                    ? `${data.traffic_sources.utm_sources[0]?.[0] || data.traffic_sources.referrers[0]?.[0] || 'various'} is top source`
-                    : 'No source data yet'
-                }
+                icon={<Users className="w-4 h-4" />}
+                label="Traffic"
+                value={data.traffic_sources.utm_sources.length + data.traffic_sources.referrers.length}
+                color="teal"
               />
-
-              {/* Popular Devices */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('devices')}
-                icon={<Smartphone className="w-5 h-5 text-indigo-500" />}
-                title="Popular Devices & Repairs"
-                subtitle={
-                  data.popular.categories.length > 0
-                    ? `${data.popular.categories[0][0]}${data.popular.brands.length > 0 ? ` · ${data.popular.brands[0][0]}` : ''}${data.popular.repairs.length > 0 ? ` · ${data.popular.repairs[0][0]}` : ''}`
-                    : 'No device data yet'
-                }
+                icon={<Smartphone className="w-4 h-4" />}
+                label="Devices"
+                value={data.popular.categories.length}
+                color="indigo"
               />
-
-              {/* Device Type */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('devices')}
-                icon={mobilePct >= 50 ? <Smartphone className="w-5 h-5 text-blue-500" /> : <Monitor className="w-5 h-5 text-gray-500" />}
-                title="Mobile vs Desktop"
-                subtitle={`${mobilePct}% mobile · ${100 - mobilePct}% desktop`}
-                progress={{ current: data.device_breakdown.mobile, total: totalDevices }}
+                icon={mobilePct >= 50 ? <Smartphone className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
+                label={mobilePct >= 50 ? 'Mobile' : 'Desktop'}
+                value={`${mobilePct}%`}
+                color="blue"
               />
-
-              {/* Post-Quote Actions */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('actions')}
-                icon={<MousePointerClick className="w-5 h-5 text-purple-500" />}
-                title="Post-Quote Actions"
-                subtitle={
-                  data.action_breakdown.length > 0
-                    ? `${data.action_breakdown[0][0].replace(/_/g, ' ')} is most common`
-                    : 'No actions recorded yet'
-                }
-                badge={data.funnel.actions.Action_Clicked > 0 ? data.funnel.actions.Action_Clicked : undefined}
-                badgeColor="purple"
+                icon={<MousePointerClick className="w-4 h-4" />}
+                label="Actions"
+                value={data.funnel.actions.Action_Clicked}
+                color="purple"
               />
-
-              {/* Behavior: Back nav, start again, exit intent */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('behavior')}
-                icon={<Undo2 className="w-5 h-5 text-orange-500" />}
-                title="User Behavior"
-                subtitle={[
-                  data.back_navigation.length > 0 ? `${data.back_navigation.length} back-nav patterns` : null,
-                  data.start_again.sessions > 0 ? `${data.start_again.sessions} restarts` : null,
-                  data.exit_intent.sessions > 0 ? `${data.exit_intent.sessions} exit intents` : null,
-                ].filter(Boolean).join(' · ') || 'No behavior data yet'}
+                icon={<Undo2 className="w-4 h-4" />}
+                label="Behavior"
+                value={data.back_navigation.length + data.start_again.sessions + data.exit_intent.sessions}
+                color="orange"
               />
-
-              {/* Search Queries */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('search')}
-                icon={<Search className="w-5 h-5 text-cyan-500" />}
-                title="Search Queries"
-                subtitle={
-                  data.search_queries.length > 0
-                    ? `${data.search_queries.length} unique searches · "${data.search_queries[0].query}" most common`
-                    : 'No searches recorded yet'
-                }
-                badge={data.search_queries.length > 0 ? data.search_queries.length : undefined}
-                badgeColor="cyan"
+                icon={<Search className="w-4 h-4" />}
+                label="Searches"
+                value={data.search_queries.length}
+                color="cyan"
               />
-
-              {/* Additional Repairs */}
-              <SummaryCard
+              <Tile
                 onClick={() => setActiveSheet('addons')}
-                icon={<TrendingDown className="w-5 h-5 text-orange-500" />}
-                title="Add-on Repairs"
-                subtitle={
-                  data.additional_repairs.total_added > 0
-                    ? `${data.additional_repairs.total_added} add-ons selected`
-                    : 'No add-ons selected yet'
-                }
-                badge={data.additional_repairs.total_added > 0 ? data.additional_repairs.total_added : undefined}
-                badgeColor="orange"
+                icon={<TrendingDown className="w-4 h-4" />}
+                label="Add-ons"
+                value={data.additional_repairs.total_added}
+                color="orange"
               />
-
-              {/* Form Errors */}
               {data.form_errors.length > 0 && (
-                <SummaryCard
+                <Tile
                   onClick={() => setActiveSheet('errors')}
-                  icon={<AlertCircle className="w-5 h-5 text-red-400" />}
-                  title="Form Errors"
-                  subtitle={`${data.form_errors.length} field${data.form_errors.length === 1 ? '' : 's'} causing issues`}
-                  badge={data.form_errors.reduce((s, [, c]) => s + c, 0)}
-                  badgeColor="red"
+                  icon={<AlertCircle className="w-4 h-4" />}
+                  label="Errors"
+                  value={data.form_errors.reduce((s, [, c]) => s + c, 0)}
+                  color="red"
                 />
               )}
-
-              {/* Budget vs Quoted */}
               {data.budget_comparisons.length > 0 && (
-                <SummaryCard
+                <Tile
                   onClick={() => setActiveSheet('budget')}
-                  icon={<BarChart3 className="w-5 h-5 text-green-500" />}
-                  title="Budget vs Quoted"
-                  subtitle={`${data.budget_comparisons.length} budget submission${data.budget_comparisons.length === 1 ? '' : 's'}`}
+                  icon={<BarChart3 className="w-4 h-4" />}
+                  label="Budget"
+                  value={data.budget_comparisons.length}
+                  color="green"
                 />
               )}
+              <Tile
+                onClick={() => setActiveSheet('insights')}
+                icon={<ExternalLink className="w-4 h-4" />}
+                label="Accept"
+                value={data.accept_page.views}
+                color="purple"
+              />
             </div>
           </>
         )}
@@ -417,77 +348,36 @@ function sheetIcon(sheet: SheetType): React.ReactNode {
 // UI Components
 // ============================================
 
-function OverviewCard({ label, value, sub, icon, color }: { label: string; value: string | number; sub?: string; icon: React.ReactNode; color: string }) {
-  const colors: Record<string, string> = {
-    blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-    green: 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-  }
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}</span>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colors[color] || colors.blue}`}>
-          {icon}
-        </div>
-      </div>
-      <div className="text-xl font-bold text-gray-900 dark:text-white">{value}</div>
-      {sub && <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</div>}
-    </div>
-  )
-}
-
-function SummaryCard({
-  onClick, icon, title, subtitle, progress, badge, badgeColor,
+function Tile({
+  onClick, icon, label, value, color,
 }: {
   onClick: () => void
   icon: React.ReactNode
-  title: string
-  subtitle: string
-  progress?: { current: number; total: number }
-  badge?: number
-  badgeColor?: string
+  label: string
+  value: string | number
+  color: string
 }) {
-  const badgeColors: Record<string, string> = {
-    red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-    cyan: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-    green: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  const colors: Record<string, string> = {
+    amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+    green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+    red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+    teal: 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400',
+    indigo: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400',
+    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    purple: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
+    orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
+    cyan: 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400',
   }
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 text-left hover:border-gray-300 dark:hover:border-gray-600 active:scale-[0.98] transition-all"
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-center active:scale-95 transition-transform"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center">
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{title}</h3>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {badge !== undefined && badge > 0 && (
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeColors[badgeColor || 'green'] || badgeColors.green}`}>
-                  {badge}
-                </span>
-              )}
-              <svg className="w-4 h-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{subtitle}</p>
-          {progress && progress.total > 0 && (
-            <div className="mt-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="h-full bg-green-500 rounded-full transition-all"
-                style={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
-              />
-            </div>
-          )}
-        </div>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-1.5 ${colors[color] || colors.blue}`}>
+        {icon}
       </div>
+      <div className="text-lg font-bold text-gray-900 dark:text-white leading-tight">{value}</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
     </button>
   )
 }
@@ -501,7 +391,7 @@ function BottomSheet({ onClose, title, icon, children }: { onClose: () => void; 
         onClick={onClose}
       />
       {/* Sheet */}
-      <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col animate-[slideUp_0.3s_ease]">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-t-2xl shadow-2xl max-h-[85vh] min-h-[33vh] flex flex-col animate-[slideUp_0.3s_ease]">
         {/* Handle */}
         <div className="flex justify-center pt-2 pb-1">
           <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full" />
