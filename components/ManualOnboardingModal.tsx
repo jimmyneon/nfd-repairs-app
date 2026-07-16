@@ -30,6 +30,7 @@ export default function ManualOnboardingModal({
     devicePassword: '',
     passwordNA: false,
     termsAccepted: false,
+    marketingOptIn: false,
   })
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -122,6 +123,8 @@ export default function ManualOnboardingModal({
           customer_signature: signature || null,
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
+          marketing_opt_in: formData.marketingOptIn,
+          marketing_opt_in_at: formData.marketingOptIn ? new Date().toISOString() : null,
           onboarding_completed: true,
           onboarding_completed_at: new Date().toISOString(),
         } as any)
@@ -282,6 +285,25 @@ export default function ManualOnboardingModal({
               >
                 Clear Signature
               </button>
+            </div>
+          </div>
+
+          {/* Marketing Opt-In */}
+          <div className="border-2 border-gray-200 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <input
+                type="checkbox"
+                id="marketingOptIn"
+                checked={formData.marketingOptIn}
+                onChange={(e) => setFormData({ ...formData, marketingOptIn: e.target.checked })}
+                className="w-5 h-5 text-primary focus:ring-primary border-gray-300 rounded mt-0.5"
+              />
+              <label htmlFor="marketingOptIn" className="text-sm text-gray-700 flex-1">
+                <strong>Send me special prices, deals & offers</strong>
+                <p className="text-xs text-gray-500 mt-1">
+                  Customer consents to receiving occasional messages about special prices, deals and promotions from New Forest Device Repairs.
+                </p>
+              </label>
             </div>
           </div>
         </form>

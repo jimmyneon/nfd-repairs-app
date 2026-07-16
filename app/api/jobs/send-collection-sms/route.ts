@@ -302,6 +302,15 @@ export async function GET(request: NextRequest) {
       .lte('aftercare_sms_scheduled_at', new Date().toISOString())
       .order('aftercare_sms_scheduled_at', { ascending: true })
 
+    // Also get jobs with scheduled review reminder SMS that haven't been sent yet
+    const { data: reviewReminderJobs, error: reviewReminderError } = await supabase
+      .from('jobs')
+      .select('id, job_ref, customer_phone, customer_name, review_platforms_completed')
+      .not('review_reminder_sms_scheduled_at', 'is', null)
+      .is('review_reminder_sms_sent_at', null)
+      .lte('review_reminder_sms_scheduled_at', new Date().toISOString())
+      .order('review_reminder_sms_scheduled_at', { ascending: true })
+
     if (error) {
       console.error('Error fetching scheduled SMS:', error)
       return NextResponse.json(
@@ -314,7 +323,11 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching aftercare SMS:', aftercareError)
     }
 
-    if ((!jobs || jobs.length === 0) && (!aftercareJobs || aftercareJobs.length === 0)) {
+    if (reviewReminderError) {
+      console.error('Error fetching review reminder SMS:', reviewReminderError)
+    }
+
+    if ((!jobs || jobs.length === 0) && (!aftercareJobs || aftercareJobs.length === 0) && (!reviewReminderJobs || reviewReminderJobs.length === 0)) {
       return NextResponse.json({
         success: true,
         message: 'No scheduled SMS to send',
@@ -353,7 +366,7 @@ export async function GET(request: NextRequest) {
         const result = await response.json()
         results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review', ...result })
 
-        if (i < uniqueJobs.length - 1 || (aftercareJobs && aftercareJobs.length > 0)) {
+        if (i < uniqueJobs.length - 1 || (aftercareJobs && aftercareJobs.length > 0) || (reviewReminderJobs && reviewReminderJobs.length > 0)) {
           console.log('Waiting 30 seconds before next SMS...')
           await delay(30000)
         }
@@ -376,7 +389,7 @@ export async function GET(request: NextRequest) {
         .in('id', duplicateJobIds)
     }
 
-    // Send aftercare SMS directly (simple check-in, no review link)
+    // Send aftercare SMS directly (check-in with review link)
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (aftercareJobs && aftercareJobs.length > 0 && webhookUrl) {
       // Fetch the AFTERCARE_CHECKIN template
@@ -394,6 +407,7 @@ export async function GET(request: NextRequest) {
 
         try {
           const firstName = getFirstName(job.customer_name)
+          const aftercareReviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
           let aftercareBody: string
 
           if (aftercareTemplate) {
@@ -403,10 +417,14 @@ export async function GET(request: NextRequest) {
               device_make: job.device_make || '',
               device_model: job.device_model || '',
               job_ref: job.job_ref,
+              review_link: aftercareReviewLink,
             })
           } else {
-            // Fallback if template not in database
+            // Fallback if template not in database - includes review link
             aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
+
+If you're happy with the repair, a quick review really helps us:
+${aftercareReviewLink}
 
 New Forest Device Repairs`
           }
@@ -442,7 +460,7 @@ New Forest Device Repairs`
 
           results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: smsResponse.ok, deliveryStatus })
 
-          if (i < aftercareJobs.length - 1) {
+          if (i < aftercareJobs.length - 1 || (reviewReminderJobs && reviewReminderJobs.length > 0)) {
             console.log('Waiting 30 seconds before next SMS...')
             await delay(30000)
           }
@@ -453,10 +471,111 @@ New Forest Device Repairs`
       }
     }
 
+    // Send review reminder SMS (only if no review link has been clicked)
+    if (reviewReminderJobs && reviewReminderJobs.length > 0 && webhookUrl) {
+      // Filter out jobs where the customer has already clicked a review link
+      const jobsNeedingReminder = reviewReminderJobs.filter(job => {
+        const clicked: string[] = job.review_platforms_completed || []
+        if (clicked.length > 0) {
+          console.log(`Skipping review reminder for ${job.job_ref} - already clicked review link(s): ${clicked.join(', ')}`)
+          return false
+        }
+        return true
+      })
+
+      // Mark skipped jobs as sent (no need to remind them)
+      const skippedJobIds = reviewReminderJobs.filter(job => !jobsNeedingReminder.includes(job)).map(j => j.id)
+      if (skippedJobIds.length > 0) {
+        await supabase
+          .from('jobs')
+          .update({
+            review_reminder_sms_sent_at: new Date().toISOString(),
+            review_reminder_sms_delivery_status: 'SKIPPED_REVIEW_CLICKED',
+            review_reminder_sms_body: 'Skipped - customer already clicked a review link',
+          })
+          .in('id', skippedJobIds)
+      }
+
+      // Fetch the REVIEW_REMINDER template
+      const { data: reminderTemplate } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('key', 'REVIEW_REMINDER')
+        .eq('is_active', true)
+        .single()
+
+      console.log(`Processing ${jobsNeedingReminder.length} review reminder SMS (${skippedJobIds.length} skipped - already clicked)`)
+
+      for (let i = 0; i < jobsNeedingReminder.length; i++) {
+        const job = jobsNeedingReminder[i]
+
+        try {
+          const firstName = getFirstName(job.customer_name)
+          const reminderReviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
+          let reminderBody: string
+
+          if (reminderTemplate) {
+            reminderBody = renderSmsTemplate(reminderTemplate.body, {
+              first_name: firstName,
+              customer_name: job.customer_name,
+              review_link: reminderReviewLink,
+              job_ref: job.job_ref,
+            })
+          } else {
+            // Fallback if template not in database
+            reminderBody = `Hi ${firstName}, just a quick follow-up — if you haven't had a chance yet, we'd really appreciate a review. It takes 2 mins and means a lot to our small business:
+${reminderReviewLink}
+
+– New Forest Device Repairs`
+          }
+
+          console.log(`Sending review reminder SMS ${i + 1}/${jobsNeedingReminder.length} for job ${job.job_ref} to ${job.customer_name}`)
+
+          const smsResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: job.customer_phone,
+              message: reminderBody,
+            }),
+          })
+
+          const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+          const now = new Date().toISOString()
+
+          await supabase
+            .from('jobs')
+            .update({
+              review_reminder_sms_sent_at: now,
+              review_reminder_sms_delivery_status: deliveryStatus,
+              review_reminder_sms_body: reminderBody,
+            })
+            .eq('id', job.id)
+
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'SYSTEM',
+            message: `Review reminder SMS ${deliveryStatus.toLowerCase()}: sent (no review clicked within 5 days)`,
+          })
+
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: smsResponse.ok, deliveryStatus })
+
+          if (i < jobsNeedingReminder.length - 1) {
+            console.log('Waiting 30 seconds before next SMS...')
+            await delay(30000)
+          }
+        } catch (err) {
+          console.error(`Error sending review reminder SMS for job ${job.job_ref}:`, err)
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: false, error: 'Failed to send' })
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       reviewCount: uniqueJobs.length,
       aftercareCount: aftercareJobs?.length || 0,
+      reviewReminderCount: reviewReminderJobs?.length || 0,
       duplicatesSkipped: (jobs || []).length - uniqueJobs.length,
       results
     })

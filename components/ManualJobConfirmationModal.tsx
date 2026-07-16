@@ -28,6 +28,7 @@ export default function ManualJobConfirmationModal({
 }: ManualJobConfirmationModalProps) {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [diagnosticFeeAcknowledged, setDiagnosticFeeAcknowledged] = useState(false)
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
 
   if (!isOpen) return null
 
@@ -152,6 +153,23 @@ export default function ManualJobConfirmationModal({
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                 By checking this box, the customer agrees to our repair terms and conditions, 
                 including warranty coverage, liability limitations, and diagnostic fee policy.
+              </p>
+            </label>
+          </div>
+
+          {/* Marketing Opt-In */}
+          <div className="flex items-start space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border-2 border-gray-200 dark:border-gray-600">
+            <input
+              type="checkbox"
+              checked={marketingOptIn}
+              onChange={(e) => setMarketingOptIn(e.target.checked)}
+              className="w-6 h-6 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 cursor-pointer"
+              id="marketing_opt_in"
+            />
+            <label htmlFor="marketing_opt_in" className="text-sm text-gray-900 dark:text-white cursor-pointer">
+              <strong>Send me special prices, deals & offers</strong>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Customer consents to receiving occasional messages about special prices, deals and promotions from New Forest Device Repairs.
               </p>
             </label>
           </div>

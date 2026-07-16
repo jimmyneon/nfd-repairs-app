@@ -110,17 +110,23 @@ export interface Job {
   post_collection_sms_delivery_status?: string | null
   post_collection_sms_body?: string | null
   
-  // Aftercare SMS tracking (sent 2 days after collection)
+  // Aftercare SMS tracking (sent 3 days after collection, includes review link)
   aftercare_sms_scheduled_at?: string | null
   aftercare_sms_sent_at?: string | null
   aftercare_sms_delivery_status?: string | null
   aftercare_sms_body?: string | null
   
+  // Review reminder SMS tracking (sent 5 days after collection, only if no review clicked)
+  review_reminder_sms_scheduled_at?: string | null
+  review_reminder_sms_sent_at?: string | null
+  review_reminder_sms_delivery_status?: string | null
+  review_reminder_sms_body?: string | null
+  
   // Collection reminder tracking (aligned to T&Cs: 30 days collect, 90 days dispose)
-  collection_reminder_1_sent_at?: string | null  // Day 5
-  collection_reminder_2_sent_at?: string | null  // Day 14
-  collection_reminder_3_sent_at?: string | null  // Day 20
-  collection_reminder_4_sent_at?: string | null  // Day 28
+  collection_reminder_1_sent_at?: string | null  // Day 3
+  collection_reminder_2_sent_at?: string | null  // Day 10
+  collection_reminder_3_sent_at?: string | null  // Day 15
+  collection_reminder_4_sent_at?: string | null  // Day 25
   collection_reminder_5_sent_at?: string | null  // Day 60 (in storage)
   collection_reminder_6_sent_at?: string | null  // Day 85 (final notice)
   storage_moved_at?: string | null               // Day 30

@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       password_not_applicable,
       customer_signature,
       terms_accepted,
+      marketing_opt_in,
       onboarding_completed,
       
       // Device possession tracking
@@ -125,6 +126,8 @@ export async function POST(request: NextRequest) {
       customer_signature: customer_signature || null,
       terms_accepted: terms_accepted || false,
       terms_accepted_at: terms_accepted ? new Date().toISOString() : null,
+      marketing_opt_in: marketing_opt_in || false,
+      marketing_opt_in_at: marketing_opt_in ? new Date().toISOString() : null,
       onboarding_completed: onboarding_completed || false,
       onboarding_completed_at: onboarding_completed ? new Date().toISOString() : null,
       

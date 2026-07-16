@@ -6,8 +6,9 @@ import { createClient } from '@supabase/supabase-js'
  * Called when job status changes to COLLECTED.
  *
  * 1. Sends review request SMS immediately (via POST to send-collection-sms)
- * 2. Schedules aftercare SMS for 2 days later
- * 3. Schedules post-collection email for 1-3 hours later (existing behaviour)
+ * 2. Schedules aftercare SMS (with review link) for 3 days later
+ * 3. Schedules review reminder SMS for 5 days later (only sent if no review clicked)
+ * 4. Schedules post-collection email for 1-3 hours later (existing behaviour)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -37,15 +38,6 @@ export async function POST(request: NextRequest) {
         { error: 'Job not found' },
         { status: 404 }
       )
-    }
-
-    // Check if SMS already sent
-    if (job.post_collection_sms_sent_at) {
-      return NextResponse.json({
-        success: true,
-        message: 'Post-collection SMS already sent',
-        alreadySent: true
-      })
     }
 
     // Check if review request should be skipped
@@ -87,36 +79,64 @@ export async function POST(request: NextRequest) {
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+    const updates: Record<string, string> = {}
+    const eventMessages: string[] = []
 
-    // 1. Send review SMS immediately
-    const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId }),
-    })
+    // 1. Send review SMS immediately (if not already sent)
+    if (!job.post_collection_sms_sent_at) {
+      try {
+        const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId }),
+        })
 
-    const reviewResult = await reviewResponse.json()
-    console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
+        const reviewResult = await reviewResponse.json()
+        console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
+        eventMessages.push(`Review SMS sent - ${reviewResult.smsDeliveryStatus || 'unknown'}`)
+      } catch (err) {
+        console.error(`Failed to send review SMS for ${job.job_ref}:`, err)
+        eventMessages.push('Review SMS send failed')
+      }
+    } else {
+      eventMessages.push('Review SMS already sent')
+    }
 
-    // 2. Schedule aftercare SMS for 3-5 days later
-    const aftercareTime = calculateAftercareTime()
-    await supabase.from('jobs').update({ aftercare_sms_scheduled_at: aftercareTime.toISOString() }).eq('id', jobId)
+    // 2. Schedule aftercare SMS for 3 days later (if not already scheduled)
+    if (!job.aftercare_sms_scheduled_at) {
+      const aftercareTime = calculateAftercareTime()
+      updates.aftercare_sms_scheduled_at = aftercareTime.toISOString()
+      eventMessages.push(`Aftercare scheduled for ${aftercareTime.toLocaleString()}`)
+    }
 
-    // 3. Schedule email for 1-3 hours later
-    const emailTime = calculateEmailTime()
-    await supabase.from('jobs').update({ post_collection_email_scheduled_at: emailTime.toISOString() }).eq('id', jobId)
+    // 3. Schedule review reminder SMS for 5 days later (if not already scheduled)
+    if (!job.review_reminder_sms_scheduled_at) {
+      const reviewReminderTime = calculateReviewReminderTime()
+      updates.review_reminder_sms_scheduled_at = reviewReminderTime.toISOString()
+      eventMessages.push(`Review reminder scheduled for ${reviewReminderTime.toLocaleString()}`)
+    }
+
+    // 4. Schedule email for 1-3 hours later (if not already scheduled)
+    if (!job.post_collection_email_scheduled_at) {
+      const emailTime = calculateEmailTime()
+      updates.post_collection_email_scheduled_at = emailTime.toISOString()
+    }
+
+    // Apply all scheduled updates in one call
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('jobs').update(updates).eq('id', jobId)
+    }
 
     await supabase.from('job_events').insert({
       job_id: jobId, type: 'SYSTEM',
-      message: `Review SMS sent - ${reviewResult.smsDeliveryStatus || 'unknown'}. Aftercare scheduled for ${aftercareTime.toLocaleString()}`
+      message: eventMessages.join('. ')
     })
 
     return NextResponse.json({
       success: true,
-      reviewSent: reviewResult.success || false,
-      reviewDeliveryStatus: reviewResult.smsDeliveryStatus,
-      aftercareScheduledAt: aftercareTime.toISOString(),
-      message: 'Review SMS sent, aftercare scheduled',
+      message: 'Post-collection SMS scheduled',
+      aftercareScheduledAt: updates.aftercare_sms_scheduled_at || null,
+      reviewReminderScheduledAt: updates.review_reminder_sms_scheduled_at || null,
     })
 
   } catch (error) {
@@ -129,15 +149,14 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Calculate when to send aftercare SMS (3-5 days from now, within 8am-8pm)
+ * Calculate when to send aftercare SMS (3 days from now, within 8am-8pm)
  */
 function calculateAftercareTime(): Date {
   const now = new Date()
   const aftercare = new Date(now)
 
-  // Randomize between 3-5 days
-  const daysToAdd = 3 + Math.floor(Math.random() * 3) // 3, 4, or 5
-  aftercare.setDate(aftercare.getDate() + daysToAdd)
+  // Fixed at 3 days
+  aftercare.setDate(aftercare.getDate() + 3)
 
   // Randomize between 10am-2pm for natural spread
   const randomHour = 10 + Math.floor(Math.random() * 4)
@@ -153,6 +172,33 @@ function calculateAftercareTime(): Date {
   }
 
   return aftercare
+}
+
+/**
+ * Calculate when to send review reminder SMS (5 days from now, within 8am-8pm)
+ * Only sent if customer hasn't clicked any review link by then
+ */
+function calculateReviewReminderTime(): Date {
+  const now = new Date()
+  const reminder = new Date(now)
+
+  // Fixed at 5 days
+  reminder.setDate(reminder.getDate() + 5)
+
+  // Randomize between 10am-2pm for natural spread
+  const randomHour = 10 + Math.floor(Math.random() * 4)
+  const randomMinute = Math.floor(Math.random() * 60)
+  reminder.setHours(randomHour, randomMinute, 0, 0)
+
+  // Guardrail: ensure within 8am-8pm
+  const hour = reminder.getHours()
+  if (hour < 8) {
+    reminder.setHours(8, 0, 0, 0)
+  } else if (hour >= 20) {
+    reminder.setHours(10, 0, 0, 0)
+  }
+
+  return reminder
 }
 
 /**

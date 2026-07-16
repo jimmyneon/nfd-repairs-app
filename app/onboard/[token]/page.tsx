@@ -37,6 +37,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
     passwordNA: false,
     termsAccepted: false,
     diagnosticFeeAcknowledged: false,
+    marketingOptIn: false,
   })
 
   const supabase = createClient()
@@ -73,6 +74,7 @@ export default function OnboardingPage({ params }: { params: { token: string } }
       passwordNA: data.password_not_applicable || false,
       termsAccepted: data.terms_accepted || false,
       diagnosticFeeAcknowledged: false,
+      marketingOptIn: false,
     })
     setLoading(false)
   }
@@ -116,6 +118,8 @@ export default function OnboardingPage({ params }: { params: { token: string } }
           customer_signature: null,
           terms_accepted: true,
           terms_accepted_at: new Date().toISOString(),
+          marketing_opt_in: formData.marketingOptIn,
+          marketing_opt_in_at: formData.marketingOptIn ? new Date().toISOString() : null,
           onboarding_completed: true,
           onboarding_completed_at: new Date().toISOString(),
         } as any)
@@ -370,6 +374,23 @@ export default function OnboardingPage({ params }: { params: { token: string } }
                   >
                     View full terms
                   </button>
+                </p>
+              </label>
+            </div>
+
+            {/* Marketing Opt-In */}
+            <div className="flex items-start space-x-3 p-4 bg-gray-50 border-2 border-gray-200 rounded-xl">
+              <input
+                type="checkbox"
+                id="marketingOptIn"
+                checked={formData.marketingOptIn}
+                onChange={(e) => setFormData({ ...formData, marketingOptIn: e.target.checked })}
+                className="w-6 h-6 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 cursor-pointer"
+              />
+              <label htmlFor="marketingOptIn" className="text-sm text-gray-900 cursor-pointer">
+                <strong>Send me special prices, deals & offers</strong>
+                <p className="text-xs text-gray-600 mt-1">
+                  I'd like to receive occasional messages about special prices, deals and promotions from New Forest Device Repairs.
                 </p>
               </label>
             </div>

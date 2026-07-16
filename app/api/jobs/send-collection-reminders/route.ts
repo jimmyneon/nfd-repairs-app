@@ -9,10 +9,10 @@ import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
  * Aligned to T&Cs: 30 days to collect, 90 days to disposal
  *
  * Reminder schedule (READY_TO_COLLECT):
- * - Day 5:  Reminder 1 (friendly nudge)
- * - Day 14: Reminder 2 (mention 30-day timeframe)
- * - Day 20: Reminder 3 (warning about storage transition)
- * - Day 28: Reminder 4 (final pre-storage reminder)
+ * - Day 3:  Reminder 1 (friendly nudge)
+ * - Day 10: Reminder 2 (mention 30-day timeframe)
+ * - Day 15: Reminder 3 (warning about storage transition)
+ * - Day 25: Reminder 4 (final pre-storage reminder)
  * - Day 30: Auto-move to IN_STORAGE
  *
  * Reminder schedule (IN_STORAGE):
@@ -96,16 +96,16 @@ export async function GET(request: NextRequest) {
       let templateKey = ''
 
       if (job.status === 'READY_TO_COLLECT') {
-        if (daysInStatus >= 5 && daysInStatus < 14 && !job.collection_reminder_1_sent_at) {
+        if (daysInStatus >= 3 && daysInStatus < 10 && !job.collection_reminder_1_sent_at) {
           reminderNumber = 1
           templateKey = 'COLLECTION_REMINDER_1'
-        } else if (daysInStatus >= 14 && daysInStatus < 20 && !job.collection_reminder_2_sent_at) {
+        } else if (daysInStatus >= 10 && daysInStatus < 15 && !job.collection_reminder_2_sent_at) {
           reminderNumber = 2
           templateKey = 'COLLECTION_REMINDER_2'
-        } else if (daysInStatus >= 20 && daysInStatus < 28 && !job.collection_reminder_3_sent_at) {
+        } else if (daysInStatus >= 15 && daysInStatus < 25 && !job.collection_reminder_3_sent_at) {
           reminderNumber = 3
           templateKey = 'COLLECTION_REMINDER_3'
-        } else if (daysInStatus >= 28 && daysInStatus < 30 && !job.collection_reminder_4_sent_at) {
+        } else if (daysInStatus >= 25 && daysInStatus < 30 && !job.collection_reminder_4_sent_at) {
           reminderNumber = 4
           templateKey = 'COLLECTION_REMINDER_4'
         }

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     if (!jobs || jobs.length === 0) {
       // Still check for aftercare jobs even if no review jobs need scheduling
-      const aftercareTime = new Date(Date.now() + (3 + Math.floor(Math.random() * 3)) * 24 * 60 * 60 * 1000)
+      const aftercareTime = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
       const { data: aftercareJobsOnly } = await supabase
         .from('jobs')
         .select('id, job_ref')
@@ -52,10 +52,41 @@ export async function POST(request: NextRequest) {
           .update({ aftercare_sms_scheduled_at: aftercareTime.toISOString() })
           .in('id', aftercareJobsOnly.map(j => j.id))
         console.log(`Backup scheduled ${aftercareJobsOnly.length} aftercare jobs (no review jobs needed)`)
-        return NextResponse.json({ message: 'Aftercare only', reviewCount: 0, aftercareCount: aftercareJobsOnly.length })
       }
 
-      return NextResponse.json({ message: 'No jobs to schedule', reviewCount: 0, aftercareCount: 0 })
+      // Also schedule review reminders for COLLECTED jobs that have review sent but no reminder scheduled
+      const reviewReminderTime = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) // 5 days from now
+      const { data: reminderJobsOnly } = await supabase
+        .from('jobs')
+        .select('id, job_ref')
+        .eq('status', 'COLLECTED')
+        .is('review_reminder_sms_scheduled_at', null)
+        .is('review_reminder_sms_sent_at', null)
+        .not('post_collection_sms_sent_at', 'is', null)
+        .is('skip_review_request', false)
+        .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
+        .or('repair_outcome.is.null,repair_outcome.eq.repaired')
+
+      let reminderCount = 0
+      if (reminderJobsOnly && reminderJobsOnly.length > 0) {
+        await supabase
+          .from('jobs')
+          .update({ review_reminder_sms_scheduled_at: reviewReminderTime.toISOString() })
+          .in('id', reminderJobsOnly.map(j => j.id))
+        reminderCount = reminderJobsOnly.length
+        console.log(`Backup scheduled ${reminderCount} review reminder jobs`)
+      }
+
+      if ((aftercareJobsOnly && aftercareJobsOnly.length > 0) || reminderCount > 0) {
+        return NextResponse.json({
+          message: 'Aftercare/reminders only',
+          reviewCount: 0,
+          aftercareCount: aftercareJobsOnly?.length || 0,
+          reviewReminderCount: reminderCount,
+        })
+      }
+
+      return NextResponse.json({ message: 'No jobs to schedule', reviewCount: 0, aftercareCount: 0, reviewReminderCount: 0 })
     }
 
     // Schedule each job - review SMS sent immediately by cron GET
@@ -73,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Also schedule aftercare for COLLECTED jobs that have review sent but no aftercare
-    const aftercareTime = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // 2 days from now
+    const aftercareTime = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days from now
     const { data: aftercareJobs } = await supabase
       .from('jobs')
       .select('id, job_ref')
@@ -100,11 +131,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Also schedule review reminders for COLLECTED jobs that have review sent but no reminder
+    const reviewReminderTime = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) // 5 days from now
+    const { data: reminderJobs } = await supabase
+      .from('jobs')
+      .select('id, job_ref')
+      .eq('status', 'COLLECTED')
+      .is('review_reminder_sms_scheduled_at', null)
+      .is('review_reminder_sms_sent_at', null)
+      .not('post_collection_sms_sent_at', 'is', null)
+      .is('skip_review_request', false)
+      .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
+      .or('repair_outcome.is.null,repair_outcome.eq.repaired')
+
+    let reminderCount = 0
+    if (reminderJobs && reminderJobs.length > 0) {
+      const { error: reminderError } = await supabase
+        .from('jobs')
+        .update({
+          review_reminder_sms_scheduled_at: reviewReminderTime.toISOString(),
+        })
+        .in('id', reminderJobs.map(j => j.id))
+
+      if (!reminderError) {
+        reminderCount = reminderJobs.length
+        console.log(`Backup scheduled ${reminderCount} review reminder jobs:`, reminderJobs.map(j => j.job_ref))
+      }
+    }
+
     console.log(`Backup scheduled ${jobs.length} review jobs:`, jobs.map(j => j.job_ref))
-    return NextResponse.json({ 
-      message: 'Backup scheduling completed', 
+    return NextResponse.json({
+      message: 'Backup scheduling completed',
       reviewCount: jobs.length,
       aftercareCount,
+      reviewReminderCount: reminderCount,
       jobs: jobs.map(j => j.job_ref)
     })
   } catch (error) {

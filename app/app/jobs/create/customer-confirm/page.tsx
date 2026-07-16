@@ -16,6 +16,7 @@ function CustomerConfirmContent() {
   const [passcodeMethod, setPasscodeMethod] = useState('provided')
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [repairAgreementAccepted, setRepairAgreementAccepted] = useState(false)
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [shakeTerms, setShakeTerms] = useState(false)
@@ -253,6 +254,7 @@ function CustomerConfirmContent() {
         passcode_method: passcodeMethod,
         customer_signature: null,
         terms_accepted: true,
+        marketing_opt_in: marketingOptIn,
         onboarding_completed: true,
         device_in_shop: jobData.device_left_with_us,
         linked_quote_id: jobData.linked_quote_id,
@@ -292,6 +294,8 @@ function CustomerConfirmContent() {
             passcode_method: payload.passcode_method,
             terms_accepted: true,
             terms_accepted_at: new Date().toISOString(),
+            marketing_opt_in: marketingOptIn,
+            marketing_opt_in_at: marketingOptIn ? new Date().toISOString() : null,
             onboarding_completed: true,
             onboarding_completed_at: new Date().toISOString(),
             device_in_shop: true,
@@ -647,6 +651,20 @@ function CustomerConfirmContent() {
                 Diagnostic fees may apply. Back up your data. Storage fees for uncollected devices.{' '}
                 <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">View full terms</a>
               </p>
+            </div>
+
+            <div className="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-4 bg-gray-50 dark:bg-gray-700">
+              <div className="flex items-start gap-3">
+                <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="w-6 h-6 text-primary focus:ring-primary border-2 rounded mt-0.5 flex-shrink-0 border-gray-300" />
+                <div>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Send me special prices, deals & offers
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    I'd like to receive occasional messages about special prices, deals and promotions from New Forest Device Repairs.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">
