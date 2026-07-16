@@ -2,14 +2,47 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30
+
+function emptyResponse(days: number, tableMissing = false) {
+  return NextResponse.json({
+    success: true,
+    period_days: days,
+    total_sessions: 0,
+    funnel: {
+      steps: { 1: { count: 0, label: 'Category' }, 2: { count: 0, label: 'Brand' }, 3: { count: 0, label: 'Model' }, 4: { count: 0, label: 'Repair' }, 5: { count: 0, label: 'Quote Details' } },
+      actions: { Form_Started: 0, Form_Submitted: 0, Quote_Revealed: 0, Action_Clicked: 0 },
+    },
+    action_breakdown: [],
+    hesitation_breakdown: [],
+    traffic_sources: { utm_sources: [], utm_mediums: [], source_tags: [], referrers: [] },
+    avg_step_times: {},
+    popular: { categories: [], brands: [], repairs: [], combos: [] },
+    search_queries: [],
+    additional_repairs: { total_added: 0, breakdown: [] },
+    device_breakdown: { mobile: 0, desktop: 0 },
+    accept_page: { views: 0, clicks: 0, conversion_rate: 0 },
+    form_errors: [],
+    budget_comparisons: [] as Array<{ budget: number; quoted_price: number | null }>,
+    table_missing: tableMissing,
+  })
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    // Validate environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error', details: 'Missing Supabase environment variables' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
 
     const searchParams = request.nextUrl.searchParams
     const days = parseInt(searchParams.get('days') || '30', 10)
@@ -24,130 +57,102 @@ export async function GET(request: NextRequest) {
       .limit(1)
 
     if (tableCheckError) {
-      // Table doesn't exist or isn't accessible — return empty data
-      return NextResponse.json({
-        success: true,
-        period_days: days,
-        total_sessions: 0,
-        funnel: {
-          steps: { 1: { count: 0, label: 'Category' }, 2: { count: 0, label: 'Brand' }, 3: { count: 0, label: 'Model' }, 4: { count: 0, label: 'Repair' }, 5: { count: 0, label: 'Quote Details' } },
-          actions: { Form_Started: 0, Form_Submitted: 0, Quote_Revealed: 0, Action_Clicked: 0 },
-        },
-        action_breakdown: [],
-        hesitation_breakdown: [],
-        traffic_sources: { utm_sources: [], utm_mediums: [], source_tags: [], referrers: [] },
-        avg_step_times: {},
-        popular: { categories: [], brands: [], repairs: [], combos: [] },
-        search_queries: [],
-        additional_repairs: { total_added: 0, breakdown: [] },
-        device_breakdown: { mobile: 0, desktop: 0 },
-        accept_page: { views: 0, clicks: 0, conversion_rate: 0 },
-        form_errors: [],
-        budget_comparisons: [] as Array<{ budget: number; quoted_price: number | null }>,
-        table_missing: true,
-      })
+      console.error('Analytics table check error:', tableCheckError.message)
+      return emptyResponse(days, true)
     }
 
-    // 1. Funnel — count distinct sessions per event type
-    const { data: funnelData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_type, session_id')
-      .gte('created_at', startDateISO)
+    // Run all queries in parallel for speed
+    const [
+      funnelRes, stepEnterRes, actionRes, hesitationRes, sourceRes,
+      timeRes, popularRes, searchRes, addonRes, deviceRes,
+      acceptRes, errorRes, budgetRes,
+    ] = await Promise.all([
+      supabase.from('quote_analytics_events').select('event_type, session_id').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_action_click').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_hesitation_reason').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, referrer, utm_source, utm_medium, source_tag').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_type, event_data, created_at').in('event_type', ['quote_step_enter', 'quote_form_submit']).gte('created_at', startDateISO).order('created_at', { ascending: true }),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_form_submit').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_search').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_additional_repair_added').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, is_mobile').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_type, session_id').in('event_type', ['quote_accept_page_view', 'quote_accept_clicked']).gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_form_error').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_budget_submitted').gte('created_at', startDateISO),
+    ])
+
+    // Helper: safely get array from Supabase response
+    const arr = (res: { data: any[] | null }): any[] => Array.isArray(res?.data) ? res.data : []
+
+    const funnelData = arr(funnelRes)
+    const stepEnterData = arr(stepEnterRes)
+    const actionData = arr(actionRes)
+    const hesitationData = arr(hesitationRes)
+    const sourceData = arr(sourceRes)
+    const timeData = arr(timeRes)
+    const popularData = arr(popularRes)
+    const searchData = arr(searchRes)
+    const addonData = arr(addonRes)
+    const deviceData = arr(deviceRes)
+    const acceptData = arr(acceptRes)
+    const errorData = arr(errorRes)
+    const budgetData = arr(budgetRes)
 
     // Build funnel counts
-    const funnelSteps = [
-      'quote_step_enter',
-      'quote_form_start',
-      'quote_form_submit',
-      'quote_reveal',
-      'quote_action_click',
-    ]
-    const stepLabels: Record<string, string> = {
-      'quote_step_enter': 'Step 1 (Category)',
-      'quote_form_start': 'Form Started',
-      'quote_form_submit': 'Form Submitted',
-      'quote_reveal': 'Quote Revealed',
-      'quote_action_click': 'Action Clicked',
-    }
+    const funnelSteps = ['quote_step_enter', 'quote_form_start', 'quote_form_submit', 'quote_reveal', 'quote_action_click']
 
-    // Count distinct sessions per step, and also per step number for quote_step_enter
     const stepSessions: Record<string, Set<string>> = {}
-    const stepNumberSessions: Record<number, Set<string>> = {}
-    funnelSteps.forEach(s => { stepSessions[s] = new Set() })
+    for (const s of funnelSteps) { stepSessions[s] = new Set() }
 
-    (funnelData || []).forEach((row: any) => {
+    for (const row of funnelData) {
       if (row.event_type === 'quote_step_enter') {
         stepSessions['quote_step_enter'].add(row.session_id)
-        // Also track by step number from event_data — but we don't have event_data here
       } else if (stepSessions[row.event_type]) {
         stepSessions[row.event_type].add(row.session_id)
       }
-    })
+    }
 
-    // Get step-level funnel (step 1 through 5)
-    const { data: stepEnterData } = await supabase
-      .from('quote_analytics_events')
-      .select('session_id, event_data')
-      .eq('event_type', 'quote_step_enter')
-      .gte('created_at', startDateISO)
-
+    // Step-level funnel (step 1 through 5)
     const stepFunnel: Record<number, { count: number; label: string }> = {}
     const stepSessionSets: Record<number, Set<string>> = {}
     for (let i = 1; i <= 5; i++) {
       stepSessionSets[i] = new Set()
       stepFunnel[i] = { count: 0, label: ['', 'Category', 'Brand', 'Model', 'Repair', 'Quote Details'][i] }
     }
-    (stepEnterData || []).forEach((row: any) => {
+    for (const row of stepEnterData) {
       const stepNum = row.event_data?.step || 1
       if (stepNum >= 1 && stepNum <= 5) {
         stepSessionSets[stepNum].add(row.session_id)
       }
-    })
+    }
     for (let i = 1; i <= 5; i++) {
       stepFunnel[i].count = stepSessionSets[i].size
     }
 
     // 2. Action breakdown
-    const { data: actionData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_action_click')
-      .gte('created_at', startDateISO)
-
     const actionBreakdown: Record<string, number> = {}
-    ;(actionData || []).forEach((row: any) => {
+    for (const row of actionData) {
       const action = row.event_data?.action || 'unknown'
       actionBreakdown[action] = (actionBreakdown[action] || 0) + 1
-    })
+    }
 
     // 3. Hesitation reasons
-    const { data: hesitationData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_hesitation_reason')
-      .gte('created_at', startDateISO)
-
     const hesitationBreakdown: Record<string, number> = {}
-    ;(hesitationData || []).forEach((row: any) => {
+    for (const row of hesitationData) {
       const reason = row.event_data?.reason || 'unknown'
       hesitationBreakdown[reason] = (hesitationBreakdown[reason] || 0) + 1
-    })
+    }
 
     // 4. Traffic sources
-    const { data: sourceData } = await supabase
-      .from('quote_analytics_events')
-      .select('session_id, referrer, utm_source, utm_medium, source_tag')
-      .eq('event_type', 'quote_step_enter')
-      .gte('created_at', startDateISO)
-
     const sourceBreakdown: Record<string, number> = {}
     const mediumBreakdown: Record<string, number> = {}
     const referrerBreakdown: Record<string, number> = {}
     const sourceTagBreakdown: Record<string, number> = {}
     const seenSessions = new Set<string>()
 
-    ;(sourceData || []).forEach((row: any) => {
-      if (seenSessions.has(row.session_id)) return
+    for (const row of sourceData) {
+      if (seenSessions.has(row.session_id)) continue
       seenSessions.add(row.session_id)
 
       const utm = row.utm_source || 'organic'
@@ -170,39 +175,31 @@ export async function GET(request: NextRequest) {
       } else {
         referrerBreakdown['direct'] = (referrerBreakdown['direct'] || 0) + 1
       }
-    })
+    }
 
-    // 5. Time per step (average time between step enters)
-    const { data: timeData } = await supabase
-      .from('quote_analytics_events')
-      .select('session_id, event_type, event_data, created_at')
-      .in('event_type', ['quote_step_enter', 'quote_form_submit'])
-      .gte('created_at', startDateISO)
-      .order('created_at', { ascending: true })
-
-    // Group by session, then calculate time between consecutive step enters
+    // 5. Time per step
     const sessionTimes: Record<string, any[]> = {}
-    ;(timeData || []).forEach((row: any) => {
+    for (const row of timeData) {
       if (!sessionTimes[row.session_id]) sessionTimes[row.session_id] = []
       sessionTimes[row.session_id].push(row)
-    })
+    }
 
     const stepTimes: Record<number, number[]> = {}
     for (let i = 1; i <= 5; i++) stepTimes[i] = []
 
-    Object.values(sessionTimes).forEach((events) => {
+    for (const events of Object.values(sessionTimes)) {
       const stepEnters = events.filter(e => e.event_type === 'quote_step_enter')
-      stepEnters.forEach((evt, idx) => {
+      for (let idx = 0; idx < stepEnters.length; idx++) {
+        const evt = stepEnters[idx]
         const step = evt.event_data?.step || 1
         if (idx < stepEnters.length - 1) {
           const next = stepEnters[idx + 1]
           const diff = new Date(next.created_at).getTime() - new Date(evt.created_at).getTime()
-          if (diff > 0 && diff < 600000) { // cap at 10 minutes
+          if (diff > 0 && diff < 600000) {
             if (step >= 1 && step <= 5) stepTimes[step].push(diff)
           }
         }
-      })
-      // Time from last step enter to form submit
+      }
       const lastStep = stepEnters[stepEnters.length - 1]
       const formSubmit = events.find(e => e.event_type === 'quote_form_submit')
       if (lastStep && formSubmit) {
@@ -212,7 +209,7 @@ export async function GET(request: NextRequest) {
           if (step >= 1 && step <= 5) stepTimes[step].push(diff)
         }
       }
-    })
+    }
 
     const avgStepTimes: Record<number, { avg_ms: number; median_ms: number; count: number; label: string }> = {}
     for (let i = 1; i <= 5; i++) {
@@ -227,18 +224,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 6. Popular device/repair combos (from form submit events)
-    const { data: popularData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_form_submit')
-      .gte('created_at', startDateISO)
-
+    // 6. Popular device/repair combos
     const popularCombos: Record<string, number> = {}
     const popularCategories: Record<string, number> = {}
     const popularBrands: Record<string, number> = {}
     const popularRepairs: Record<string, number> = {}
-    ;(popularData || []).forEach((row: any) => {
+    for (const row of popularData) {
       const d = row.event_data || {}
       const cat = d.device_category || 'Unknown'
       const brand = d.device_make || 'Unknown'
@@ -248,100 +239,64 @@ export async function GET(request: NextRequest) {
       popularRepairs[repair] = (popularRepairs[repair] || 0) + 1
       const combo = `${cat} → ${brand} → ${d.device_model || 'Unknown'} → ${repair}`
       popularCombos[combo] = (popularCombos[combo] || 0) + 1
-    })
+    }
 
     // 7. Search queries
-    const { data: searchData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_search')
-      .gte('created_at', startDateISO)
-
     const searchQueries: Record<string, { count: number; zero_results: number }> = {}
-    ;(searchData || []).forEach((row: any) => {
+    for (const row of searchData) {
       const query = (row.event_data?.query || '').toLowerCase().trim()
-      if (!query) return
+      if (!query) continue
       if (!searchQueries[query]) searchQueries[query] = { count: 0, zero_results: 0 }
       searchQueries[query].count++
       if (row.event_data?.result_count === 0) searchQueries[query].zero_results++
-    })
+    }
 
     // 8. Additional repairs uptake
-    const { data: addonData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_additional_repair_added')
-      .gte('created_at', startDateISO)
-
     const addonBreakdown: Record<string, number> = {}
     let totalAddons = 0
-    ;(addonData || []).forEach((row: any) => {
+    for (const row of addonData) {
       const repair = row.event_data?.repair || 'unknown'
       addonBreakdown[repair] = (addonBreakdown[repair] || 0) + 1
       totalAddons++
-    })
+    }
 
     // 9. Device type breakdown
-    const { data: deviceData } = await supabase
-      .from('quote_analytics_events')
-      .select('session_id, is_mobile')
-      .eq('event_type', 'quote_step_enter')
-      .gte('created_at', startDateISO)
-
     const deviceSessions = new Set<string>()
     let mobileCount = 0
     let desktopCount = 0
-    ;(deviceData || []).forEach((row: any) => {
-      if (deviceSessions.has(row.session_id)) return
+    for (const row of deviceData) {
+      if (deviceSessions.has(row.session_id)) continue
       deviceSessions.add(row.session_id)
       if (row.is_mobile) mobileCount++
       else desktopCount++
-    })
+    }
 
     // 10. Accept page funnel
-    const { data: acceptData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_type, session_id')
-      .in('event_type', ['quote_accept_page_view', 'quote_accept_clicked'])
-      .gte('created_at', startDateISO)
-
     const acceptViews = new Set<string>()
     const acceptClicks = new Set<string>()
-    ;(acceptData || []).forEach((row: any) => {
+    for (const row of acceptData) {
       if (row.event_type === 'quote_accept_page_view') acceptViews.add(row.session_id)
       if (row.event_type === 'quote_accept_clicked') acceptClicks.add(row.session_id)
-    })
+    }
 
     // 11. Total unique sessions
     const totalSessions = seenSessions.size || deviceSessions.size
 
     // 12. Form errors
-    const { data: errorData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_form_error')
-      .gte('created_at', startDateISO)
-
     const formErrors: Record<string, number> = {}
-    ;(errorData || []).forEach((row: any) => {
+    for (const row of errorData) {
       const field = row.event_data?.field || 'unknown'
       formErrors[field] = (formErrors[field] || 0) + 1
-    })
+    }
 
     // 13. Budget vs quoted price
-    const { data: budgetData } = await supabase
-      .from('quote_analytics_events')
-      .select('event_data')
-      .eq('event_type', 'quote_budget_submitted')
-      .gte('created_at', startDateISO)
-
     const budgetComparisons: Array<{ budget: number; quoted_price: number | null }> = []
-    ;(budgetData || []).forEach((row: any) => {
+    for (const row of budgetData) {
       budgetComparisons.push({
         budget: row.event_data?.budget || 0,
         quoted_price: row.event_data?.quoted_price || null,
       })
-    })
+    }
 
     // Sort helper
     const sortDesc = (obj: Record<string, number>) =>
