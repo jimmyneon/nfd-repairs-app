@@ -22,12 +22,14 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Find COLLECTED jobs that haven't been scheduled (and shouldn't be skipped)
+    // Find COLLECTED or COMPLETED jobs that haven't been scheduled (and shouldn't be skipped)
+    // Include COMPLETED to catch jobs that were auto-closed before review was scheduled
     const { data: jobs } = await supabase
       .from('jobs')
       .select('id, job_ref, repair_outcome')
-      .eq('status', 'COLLECTED')
+      .in('status', ['COLLECTED', 'COMPLETED'])
       .is('post_collection_sms_scheduled_at', null)
+      .is('post_collection_sms_sent_at', null)
       .is('skip_review_request', false)
       .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
       .or('repair_outcome.is.null,repair_outcome.eq.repaired')
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       const { data: aftercareJobsOnly } = await supabase
         .from('jobs')
         .select('id, job_ref')
-        .eq('status', 'COLLECTED')
+        .in('status', ['COLLECTED', 'COMPLETED'])
         .is('aftercare_sms_scheduled_at', null)
         .is('aftercare_sms_sent_at', null)
         .not('post_collection_sms_sent_at', 'is', null)
@@ -59,7 +61,7 @@ export async function POST(request: NextRequest) {
       const { data: reminderJobsOnly } = await supabase
         .from('jobs')
         .select('id, job_ref')
-        .eq('status', 'COLLECTED')
+        .in('status', ['COLLECTED', 'COMPLETED'])
         .is('review_reminder_sms_scheduled_at', null)
         .is('review_reminder_sms_sent_at', null)
         .not('post_collection_sms_sent_at', 'is', null)
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: aftercareJobs } = await supabase
       .from('jobs')
       .select('id, job_ref')
-      .eq('status', 'COLLECTED')
+      .in('status', ['COLLECTED', 'COMPLETED'])
       .is('aftercare_sms_scheduled_at', null)
       .is('aftercare_sms_sent_at', null)
       .not('post_collection_sms_sent_at', 'is', null)
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
     const { data: reminderJobs } = await supabase
       .from('jobs')
       .select('id, job_ref')
-      .eq('status', 'COLLECTED')
+      .in('status', ['COLLECTED', 'COMPLETED'])
       .is('review_reminder_sms_scheduled_at', null)
       .is('review_reminder_sms_sent_at', null)
       .not('post_collection_sms_sent_at', 'is', null)

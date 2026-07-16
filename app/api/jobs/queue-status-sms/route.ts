@@ -101,6 +101,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Special handling for COMPLETED status - if no review request was sent at COLLECTED,
+    // trigger it now (covers cases where COLLECTED was skipped via manual status change)
+    if (status === 'COMPLETED' && !job.post_collection_sms_sent_at && !job.skip_review_request) {
+      // Only trigger if customer isn't flagged and repair was fixed (or outcome not set)
+      const shouldSendReview = job.customer_flag !== 'sensitive' && job.customer_flag !== 'awkward' && job.repair_outcome !== 'unrepaired'
+      
+      if (shouldSendReview) {
+        try {
+          const appUrl = 'https://nfd-repairs-app.vercel.app'
+          await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobId })
+          })
+          console.log('Post-collection SMS scheduled for COMPLETED job (missed at COLLECTED):', job.job_ref)
+        } catch (error) {
+          console.error('Failed to schedule post-collection SMS for COMPLETED job:', error)
+        }
+      }
+    }
+
     // Only send SMS for key status changes
     const smsStatuses = ['QUOTE_APPROVED', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED', 'DELAYED']
     

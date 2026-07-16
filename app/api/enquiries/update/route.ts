@@ -81,9 +81,13 @@ export async function POST(request: NextRequest) {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl && enquiry.customer_phone) {
             // SMS with line breaks for readability
+            // Build additional repairs text for SMS
+            const addRepairsText = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
+              ? `\n\nAlso booked:\n${enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n')}\nTotal: £${(enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)}`
+              : ''
             const smsMessage = isInstant
-              ? `Hi ${enquiry.customer_name},\n\nYour ${deviceName} ${repairName} quote:\n${priceText}\n\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nView & reserve:\n${quoteUrl}\n\nValid 14 days. No obligation.\nNFD Repairs`
-              : `Hi ${enquiry.customer_name},\n\nThanks for your ${deviceName} repair enquiry.\n\nWe'll get back to you with a personalised quote within working hours.\n\nYour ref: ${enquiry.enquiry_ref}\nNFD Repairs`
+              ? `Hi ${enquiry.customer_name},\n\nThanks for filling in the form online. Here's your quote:\n\n${deviceName} ${repairName}: ${priceText}${addRepairsText}\n\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nTo proceed, click here:\n${quoteUrl}\n\nValid 14 days. No obligation.\n\nMany thanks,\nNew Forest Device Repairs`
+              : `Hi ${enquiry.customer_name},\n\nThanks for filling in the form online about your ${deviceName}.\n\nWe'll get back to you with a personalised quote within working hours (Mon–Fri 10–5, Sat 10–3).\n\nMany thanks,\nNew Forest Device Repairs`
             try {
               await fetch(webhookUrl, {
                 method: 'POST',
@@ -152,10 +156,14 @@ ${enquiry.screen_option ? `<tr>
 <td style="padding:8px 0;color:#888;font-size:14px;">Turnaround</td>
 <td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${turnaround}</td>
 </tr>
+${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.additional_repairs.map((r: any) => `<tr>
+<td style="padding:8px 0;color:#888;font-size:14px;">+ ${r.display_name || r.repair}</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">£${r.price}</td>
+</tr>`).join('') : ''}
 <tr><td colspan="2" style="padding:16px 0 0;border-top:2px solid #e0e0e0;margin-top:8px;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-top:14px;color:#888;font-size:14px;">Total price</td>
-<td align="right" style="padding-top:14px;color:#009B4D;font-size:28px;font-weight:700;">${priceText}</td>
+<td style="padding-top:14px;color:#888;font-size:14px;">${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? 'Grand total' : 'Total price'}</td>
+<td align="right" style="padding-top:14px;color:#009B4D;font-size:28px;font-weight:700;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
 </tr></table>
 </td></tr>
 </table>
@@ -175,14 +183,13 @@ ${enquiry.issue_description ? `<table width="100%" cellpadding="0" cellspacing="
 <p style="color:#888;font-size:13px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Your description</p>
 <p style="color:#555;font-size:14px;line-height:1.6;margin:0;">${enquiry.issue_description}</p>
 </td></tr></table>` : ''}
-
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 24px;">
-<tr><td style="padding:20px;text-align:center;">
-<p style="color:#888;font-size:13px;margin:0 0 4px;">Your reference</p>
-<p style="color:#1a1a2e;font-size:18px;font-weight:700;margin:0;">${enquiry.enquiry_ref}</p>
-</td></tr>
-</table>
 `}
+</td></tr>
+
+<!-- Sign-off -->
+<tr><td style="padding:0 30px 24px;">
+<p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 8px;">Many thanks,</p>
+<p style="color:#1a1a2e;font-size:15px;font-weight:600;margin:0;">New Forest Device Repairs</p>
 </td></tr>
 
 <!-- Footer -->
@@ -205,8 +212,8 @@ Web: <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-de
 </body></html>`
 
             const emailText = isInstant
-              ? `Hi ${enquiry.customer_name},\n\nYour quote for ${deviceName} ${repairName}: ${priceText}\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nReserve your repair: ${quoteUrl}\n\nValid for 14 days. No obligation — we'll confirm everything before any work starts.\n\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
-              : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours (Mon–Fri 10–5, Sat 10–3).\n\nYour ref: ${enquiry.enquiry_ref}\n\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
+              ? `Hi ${enquiry.customer_name},\n\nThanks for filling in the form online. Here's your quote:\n\n${deviceName} ${repairName}: ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}\n\nWarranty: ${warranty}\nTurnaround: ${turnaround}\n\nTo proceed, click here:\n${quoteUrl}\n\nValid for 14 days. No obligation — we'll confirm everything before any work starts.\n\nMany thanks,\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
+              : `Hi ${enquiry.customer_name},\n\nThanks for filling in the form online about your ${deviceName}. We'll get back to you with a personalised quote within working hours (Mon–Fri 10–5, Sat 10–3).\n\nMany thanks,\nNew Forest Device Repairs\n07410 381247\nnewforestdevicerepairs.co.uk`
             try {
               await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
               try {
