@@ -73,7 +73,14 @@ export default function AnalyticsPage() {
     setError(null)
     try {
       const res = await fetch(`/api/analytics/summary?days=${days}`)
-      if (!res.ok) throw new Error('Failed to fetch analytics')
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`
+        try {
+          const errJson = await res.json()
+          detail = errJson.details || errJson.error || errJson.message || detail
+        } catch {}
+        throw new Error(detail)
+      }
       const json = await res.json()
       setData(json)
     } catch (err) {
@@ -124,8 +131,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
           <Link
-            href="https://newforestdevicerepairs.co.uk/link-builder/"
-            target="_blank"
+            href="/app/link-builder"
             className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg w-fit"
           >
             <Link2 className="w-4 h-4" />
