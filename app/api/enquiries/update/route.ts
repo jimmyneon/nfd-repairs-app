@@ -65,18 +65,58 @@ export async function POST(request: NextRequest) {
       case 'send_quote': {
         const method = data?.method || 'sms'
         updateFields.quote_sent_method = method
+
+        // Update enquiry with the latest quote state from the client
+        // (user may have selected an option after initial submit)
+        if (data?.quoted_price !== undefined) {
+          updateFields.quoted_price = data.quoted_price
+          enquiry.quoted_price = data.quoted_price
+        }
+        if (data?.quote_type) {
+          updateFields.quote_type = data.quote_type
+          enquiry.quote_type = data.quote_type
+        }
+        if (data?.quote_key) {
+          updateFields.quote_key = data.quote_key
+          enquiry.quote_key = data.quote_key
+          // Also try to get warranty/part_option from catalogue via quote_key
+          if (data?.part_option) {
+            updateFields.part_option = data.part_option
+            enquiry.part_option = data.part_option
+          }
+          if (data?.warranty) {
+            updateFields.warranty = data.warranty
+            enquiry.warranty = data.warranty
+          }
+        }
+        if (data?.additional_repairs !== undefined) {
+          updateFields.additional_repairs = data.additional_repairs
+          enquiry.additional_repairs = data.additional_repairs
+        }
+
         notificationTitle = `Quote Sent: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
         notificationBody = `${enquiry.customer_name} asked to receive their quote via ${method}.`
+
+        // Guard: don't send the personalized fallback email if this should be an instant quote
+        // but the user hasn't selected an option yet
+        if (enquiry.quote_type === 'instant' && !enquiry.quoted_price) {
+          return NextResponse.json(
+            { error: 'Cannot send quote: no price selected. Please select a repair option first.' },
+            { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+          )
+        }
 
         // Actually send the quote
         const quoteUrl = `https://newforestdevicerepairs.co.uk/quote/accept/?ref=${enquiry.enquiry_ref}`
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
-        const warranty = enquiry.screen_option || 'Standard warranty'
+        const warranty = enquiry.warranty || enquiry.screen_option || 'Standard warranty'
         const turnaround = '30–60 mins'
         const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim()
         const repairName = enquiry.repair_type || 'repair'
 
+        // Only send SMS/email if method is not 'none' (used for silent enquiry updates)
+        if (method !== 'none') {
         if (method === 'sms' || method === 'both') {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl && enquiry.customer_phone) {
@@ -144,9 +184,9 @@ ${isInstant ? `
 <td style="padding:8px 0;color:#888;font-size:14px;">Repair</td>
 <td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${repairName}</td>
 </tr>
-${enquiry.screen_option ? `<tr>
+${(enquiry.part_option || enquiry.screen_option) ? `<tr>
 <td style="padding:8px 0;color:#888;font-size:14px;">Option</td>
-<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.screen_option}</td>
+<td style="padding:8px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.part_option || enquiry.screen_option}</td>
 </tr>` : ''}
 <tr>
 <td style="padding:8px 0;color:#888;font-size:14px;">Warranty</td>
@@ -226,6 +266,7 @@ Web: <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-de
             } catch (e) { console.error('Quote email failed:', e) }
           }
         }
+        } // end if method !== 'none'
         break
       }
 

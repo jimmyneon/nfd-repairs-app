@@ -58,6 +58,12 @@ export async function POST(request: NextRequest) {
       proceed_with_repair,
       marketing_consent,
       quote_source,
+      additional_repairs,
+      part_option,
+      display_price,
+      warranty,
+      estimated_time,
+      quote_key,
       // Common
       additional_info,
     } = body
@@ -140,6 +146,12 @@ export async function POST(request: NextRequest) {
         proceed_with_repair: proceed_with_repair || false,
         marketing_consent: marketing_consent || false,
         quote_source: quote_source || null,
+        additional_repairs: additional_repairs || null,
+        part_option: part_option || null,
+        display_price: display_price || null,
+        warranty: warranty || null,
+        estimated_time: estimated_time || null,
+        quote_key: quote_key || null,
         // Common
         additional_info: additional_info || null,
         status: 'pending',
