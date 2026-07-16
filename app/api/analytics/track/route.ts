@@ -12,6 +12,35 @@ export async function OPTIONS(request: NextRequest) {
   })
 }
 
+export async function GET() {
+  // Simple test endpoint to verify analytics tracking is working
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ error: 'Missing env vars' }, { status: 500 })
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+    const { count, error } = await supabase
+      .from('quote_analytics_events')
+      .select('*', { count: 'exact', head: true })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json({
+      success: true,
+      total_events: count,
+      endpoint: 'POST to this URL with JSON array of events',
+    }, {
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    })
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -23,11 +52,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No events provided' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Analytics track: missing env vars')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
 
     // Parse and validate events
     const rows = events.map((evt: any) => {
