@@ -105,4 +105,14 @@
   .animate-bounce-subtle {
     animation: bounce-subtle 1.5s ease-in-out infinite;
   }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
