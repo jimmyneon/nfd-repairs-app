@@ -24,6 +24,12 @@ function emptyResponse(days: number, tableMissing = false) {
     accept_page: { views: 0, clicks: 0, conversion_rate: 0 },
     form_errors: [],
     budget_comparisons: [] as Array<{ budget: number; quoted_price: number | null }>,
+    exit_intent: { sessions: 0, total_events: 0 },
+    abandonment: { by_step: [], total_abandoned: 0 },
+    back_navigation: [],
+    start_again: { sessions: 0, by_step: [] },
+    option_selections: { total: 0, breakdown: [] },
+    conversion_rate: 0,
     table_missing: tableMissing,
   })
 }
@@ -66,6 +72,7 @@ export async function GET(request: NextRequest) {
       funnelRes, stepEnterRes, actionRes, hesitationRes, sourceRes,
       timeRes, popularRes, searchRes, addonRes, deviceRes,
       acceptRes, errorRes, budgetRes,
+      exitIntentRes, backNavRes, startAgainRes, optionSelectedRes,
     ] = await Promise.all([
       supabase.from('quote_analytics_events').select('event_type, session_id').gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
@@ -80,6 +87,10 @@ export async function GET(request: NextRequest) {
       supabase.from('quote_analytics_events').select('event_type, session_id').in('event_type', ['quote_accept_page_view', 'quote_accept_clicked']).gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_form_error').gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_budget_submitted').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_exit_intent').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_back_navigation').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_start_again').gte('created_at', startDateISO),
+      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_option_selected').gte('created_at', startDateISO),
     ])
 
     // Helper: safely get array from Supabase response
@@ -98,6 +109,10 @@ export async function GET(request: NextRequest) {
     const acceptData = arr(acceptRes)
     const errorData = arr(errorRes)
     const budgetData = arr(budgetRes)
+    const exitIntentData = arr(exitIntentRes)
+    const backNavData = arr(backNavRes)
+    const startAgainData = arr(startAgainRes)
+    const optionSelectedData = arr(optionSelectedRes)
 
     // Build funnel counts
     const funnelSteps = ['quote_step_enter', 'quote_form_start', 'quote_form_submit', 'quote_reveal', 'quote_action_click']
@@ -298,6 +313,63 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // 14. Exit intent & abandonment
+    const exitIntentSessions = new Set<string>()
+    for (const row of exitIntentData) {
+      exitIntentSessions.add(row.session_id)
+    }
+
+    // Find the last step each session reached (for abandonment analysis)
+    const lastStepBySession: Record<string, number> = {}
+    for (const row of stepEnterData) {
+      const stepNum = row.event_data?.step || 1
+      const sid = row.session_id
+      if (!lastStepBySession[sid] || stepNum > lastStepBySession[sid]) {
+        lastStepBySession[sid] = stepNum
+      }
+    }
+    // Count how many sessions abandoned at each step
+    const abandonmentByStep: Record<number, number> = {}
+    for (const sid of Object.keys(lastStepBySession)) {
+      const lastStep = lastStepBySession[sid]
+      // Only count as abandoned if they didn't submit the form
+      if (!stepSessions['quote_form_submit'].has(sid)) {
+        abandonmentByStep[lastStep] = (abandonmentByStep[lastStep] || 0) + 1
+      }
+    }
+
+    // 15. Back navigation
+    const backNavBreakdown: Record<string, number> = {}
+    for (const row of backNavData) {
+      const fromStep = row.event_data?.from_step || '?'
+      const toStep = row.event_data?.to_step || '?'
+      const key = `Step ${fromStep} → Step ${toStep}`
+      backNavBreakdown[key] = (backNavBreakdown[key] || 0) + 1
+    }
+
+    // 16. Start again
+    const startAgainSessions = new Set<string>()
+    const startAgainByStep: Record<number, number> = {}
+    for (const row of startAgainData) {
+      startAgainSessions.add(row.session_id)
+      const step = row.event_data?.current_step || 1
+      startAgainByStep[step] = (startAgainByStep[step] || 0) + 1
+    }
+
+    // 17. Quote option selections
+    const optionBreakdown: Record<string, number> = {}
+    let totalOptionsSelected = 0
+    for (const row of optionSelectedData) {
+      const d = row.event_data || {}
+      const key = d.quote_key || d.option_label || 'unknown'
+      optionBreakdown[key] = (optionBreakdown[key] || 0) + 1
+      totalOptionsSelected++
+    }
+
+    // 18. Overall conversion rate
+    const formSubmitCount = stepSessions['quote_form_submit'].size
+    const overallConversionRate = totalSessions > 0 ? Math.round((formSubmitCount / totalSessions) * 100) : 0
+
     // Sort helper
     const sortDesc = (obj: Record<string, number>) =>
       Object.entries(obj).sort((a, b) => b[1] - a[1])
@@ -346,6 +418,28 @@ export async function GET(request: NextRequest) {
       },
       form_errors: sortDesc(formErrors),
       budget_comparisons: budgetComparisons,
+      exit_intent: {
+        sessions: exitIntentSessions.size,
+        total_events: exitIntentData.length,
+      },
+      abandonment: {
+        by_step: Object.entries(abandonmentByStep)
+          .map(([step, count]) => ({ step: parseInt(step), label: ['', 'Category', 'Brand', 'Model', 'Repair', 'Quote Details'][parseInt(step)] || 'Unknown', count }))
+          .sort((a, b) => a.step - b.step),
+        total_abandoned: Object.values(abandonmentByStep).reduce((s, c) => s + c, 0),
+      },
+      back_navigation: sortDesc(backNavBreakdown),
+      start_again: {
+        sessions: startAgainSessions.size,
+        by_step: Object.entries(startAgainByStep)
+          .map(([step, count]) => ({ step: parseInt(step), label: ['', 'Category', 'Brand', 'Model', 'Repair', 'Quote Details'][parseInt(step)] || 'Unknown', count }))
+          .sort((a, b) => a.step - b.step),
+      },
+      option_selections: {
+        total: totalOptionsSelected,
+        breakdown: sortDesc(optionBreakdown),
+      },
+      conversion_rate: overallConversionRate,
     })
   } catch (error) {
     console.error('Analytics summary error:', error)

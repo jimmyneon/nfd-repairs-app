@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { BarChart3, TrendingDown, Clock, Search, Users, Smartphone, Monitor, ArrowRight, RefreshCw, ExternalLink, Link2, Home, AlertCircle } from 'lucide-react'
+import { BarChart3, TrendingDown, Clock, Search, Users, Smartphone, Monitor, ArrowRight, RefreshCw, ExternalLink, Link2, Home, AlertCircle, Lightbulb, LogOut, Undo2, RotateCcw, MousePointerClick, Target } from 'lucide-react'
 import Link from 'next/link'
 
 interface AnalyticsData {
@@ -45,6 +45,12 @@ interface AnalyticsData {
   }
   form_errors: [string, number][]
   budget_comparisons: { budget: number; quoted_price: number | null }[]
+  exit_intent: { sessions: number; total_events: number }
+  abandonment: { by_step: { step: number; label: string; count: number }[]; total_abandoned: number }
+  back_navigation: [string, number][]
+  start_again: { sessions: number; by_step: { step: number; label: string; count: number }[] }
+  option_selections: { total: number; breakdown: [string, number][] }
+  conversion_rate: number
   table_missing?: boolean
 }
 
@@ -174,7 +180,7 @@ export default function AnalyticsPage() {
               <StatCard
                 label="Forms Submitted"
                 value={data.funnel.actions.Form_Submitted}
-                sub={pct(data.funnel.actions.Form_Submitted, data.total_sessions) + ' of sessions'}
+                sub={`${data.conversion_rate}% conversion rate`}
                 icon={<BarChart3 className="w-5 h-5" />}
                 color="green"
               />
@@ -194,7 +200,73 @@ export default function AnalyticsPage() {
               />
             </div>
 
-            {/* Funnel */}
+            {/* Key Insights Summary */}
+            <Section title="Key Insights" icon={<Lightbulb className="w-5 h-5" />}>
+              <div className="space-y-2 text-sm">
+                {data.total_sessions === 0 ? (
+                  <EmptyState text="No data yet — start using the quote form to see insights here" />
+                ) : (
+                  <>
+                    <InsightRow
+                      icon={<Users className="w-4 h-4 text-blue-500" />}
+                      text={`${data.total_sessions} ${data.total_sessions === 1 ? 'person has' : 'people have'} visited the quote form in the last ${data.period_days} days`}
+                    />
+                    <InsightRow
+                      icon={<Target className="w-4 h-4 text-green-500" />}
+                      text={`${data.conversion_rate}% of visitors completed and submitted the form (${data.funnel.actions.Form_Submitted} out of ${data.total_sessions})`}
+                    />
+                    {data.popular.categories.length > 0 && (
+                      <InsightRow
+                        icon={<BarChart3 className="w-4 h-4 text-purple-500" />}
+                        text={`Most popular device category: ${data.popular.categories[0][0]} (${data.popular.categories[0][1]} ${data.popular.categories[0][1] === 1 ? 'quote' : 'quotes'})`}
+                      />
+                    )}
+                    {data.popular.brands.length > 0 && (
+                      <InsightRow
+                        icon={<Smartphone className="w-4 h-4 text-indigo-500" />}
+                        text={`Most popular brand: ${data.popular.brands[0][0]} (${data.popular.brands[0][1]} ${data.popular.brands[0][1] === 1 ? 'quote' : 'quotes'})`}
+                      />
+                    )}
+                    {data.popular.repairs.length > 0 && (
+                      <InsightRow
+                        icon={<ArrowRight className="w-4 h-4 text-orange-500" />}
+                        text={`Most requested repair type: ${data.popular.repairs[0][0]} (${data.popular.repairs[0][1]} ${data.popular.repairs[0][1] === 1 ? 'request' : 'requests'})`}
+                      />
+                    )}
+                    {data.traffic_sources.utm_sources.length > 0 && data.traffic_sources.utm_sources[0][0] !== 'organic' && (
+                      <InsightRow
+                        icon={<Users className="w-4 h-4 text-teal-500" />}
+                        text={`Top traffic source: ${data.traffic_sources.utm_sources[0][0]} (${data.traffic_sources.utm_sources[0][1]} ${data.traffic_sources.utm_sources[0][1] === 1 ? 'visit' : 'visits'})`}
+                      />
+                    )}
+                    {data.traffic_sources.referrers.length > 0 && (
+                      <InsightRow
+                        icon={<ExternalLink className="w-4 h-4 text-cyan-500" />}
+                        text={`Top referrer: ${data.traffic_sources.referrers[0][0]} (${data.traffic_sources.referrers[0][1]} ${data.traffic_sources.referrers[0][1] === 1 ? 'visit' : 'visits'})`}
+                      />
+                    )}
+                    {data.abandonment.total_abandoned > 0 && data.abandonment.by_step.length > 0 && (
+                      <InsightRow
+                        icon={<LogOut className="w-4 h-4 text-red-500" />}
+                        text={`${data.abandonment.total_abandoned} ${data.abandonment.total_abandoned === 1 ? 'person left' : 'people left'} without completing — most dropped off at ${data.abandonment.by_step.reduce((max, s) => s.count > max.count ? s : max, data.abandonment.by_step[0])?.label || 'unknown'}`}
+                      />
+                    )}
+                    {data.device_breakdown.mobile + data.device_breakdown.desktop > 0 && (
+                      <InsightRow
+                        icon={data.device_breakdown.mobile > data.device_breakdown.desktop ? <Smartphone className="w-4 h-4 text-blue-500" /> : <Monitor className="w-4 h-4 text-gray-500" />}
+                        text={`${Math.round((data.device_breakdown.mobile / (data.device_breakdown.mobile + data.device_breakdown.desktop)) * 100)}% on mobile, ${Math.round((data.device_breakdown.desktop / (data.device_breakdown.mobile + data.device_breakdown.desktop)) * 100)}% on desktop`}
+                      />
+                    )}
+                    {data.exit_intent.sessions > 0 && (
+                      <InsightRow
+                        icon={<LogOut className="w-4 h-4 text-amber-500" />}
+                        text={`${data.exit_intent.sessions} ${data.exit_intent.sessions === 1 ? 'person showed' : 'people showed'} exit intent (mouse moved to leave)`}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </Section>
             <Section title="Quote Funnel" icon={<BarChart3 className="w-5 h-5" />}>
               <div className="space-y-2">
                 {Object.entries(data.funnel.steps).map(([step, info]) => {
@@ -425,6 +497,97 @@ export default function AnalyticsPage() {
                 </div>
               </Section>
             )}
+
+            {/* Exit & Abandonment */}
+            <Section title="Where People Leave" icon={<LogOut className="w-5 h-5" />}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <MiniStat label="Left Without Completing" value={data.abandonment.total_abandoned} />
+                  <MiniStat label="Showed Exit Intent" value={data.exit_intent.sessions} />
+                </div>
+                {data.abandonment.by_step.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Drop-off by Step</div>
+                    {data.abandonment.by_step.map((s) => {
+                      const maxAbandon = Math.max(...data.abandonment.by_step.map(x => x.count), 1)
+                      const width = (s.count / maxAbandon) * 100
+                      return (
+                        <div key={s.step}>
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-gray-700 dark:text-gray-300">{s.label}</span>
+                            <span className="text-red-500 font-medium">{s.count} {s.count === 1 ? 'person' : 'people'}</span>
+                          </div>
+                          <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-red-300 to-red-500 rounded-full transition-all"
+                              style={{ width: Math.max(width, 2) + '%' }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState text="No abandonment data yet" />
+                )}
+              </div>
+            </Section>
+
+            <div className="grid grid-cols-1 gap-4">
+              {/* Quote Option Selections */}
+              <Section title="Quote Options Chosen" icon={<MousePointerClick className="w-5 h-5" />}>
+                {data.option_selections.total === 0 ? (
+                  <EmptyState text="No quote options selected yet" />
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      {data.option_selections.total} {data.option_selections.total === 1 ? 'option' : 'options'} selected in total
+                    </div>
+                    {data.option_selections.breakdown.map(([option, count]) => (
+                      <div key={option} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700 dark:text-gray-300 capitalize">{option.replace(/_/g, ' ')}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              {/* Back Navigation */}
+              <Section title="People Going Back" icon={<Undo2 className="w-5 h-5" />}>
+                {data.back_navigation.length === 0 ? (
+                  <EmptyState text="No back navigation recorded yet" />
+                ) : (
+                  <div className="space-y-2">
+                    {data.back_navigation.map(([nav, count]) => (
+                      <div key={nav} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700 dark:text-gray-300">{nav}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              {/* Start Again */}
+              <Section title="People Starting Over" icon={<RotateCcw className="w-5 h-5" />}>
+                {data.start_again.sessions === 0 ? (
+                  <EmptyState text="No restarts recorded yet" />
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      {data.start_again.sessions} {data.start_again.sessions === 1 ? 'person' : 'people'} restarted their quote
+                    </div>
+                    {data.start_again.by_step.map((s) => (
+                      <div key={s.step} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700 dark:text-gray-300">Restarted at {s.label}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{s.count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+            </div>
           </>
         )}
       </main>
@@ -517,4 +680,13 @@ function RankList({ title, items }: { title: string; items: [string, number][] }
 
 function EmptyState({ text }: { text: string }) {
   return <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">{text}</p>
+}
+
+function InsightRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex items-start gap-2.5 text-gray-700 dark:text-gray-300">
+      <span className="flex-shrink-0 mt-0.5">{icon}</span>
+      <span>{text}</span>
+    </div>
+  )
 }
