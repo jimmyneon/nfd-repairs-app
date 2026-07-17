@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
           enquiry.additional_repairs = data.additional_repairs
         }
 
-        notificationTitle = `Quote Sent: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
-        notificationBody = `${enquiry.customer_name} asked to receive their quote via ${method}.`
+        notificationTitle = method === 'none' ? '' : `Quote Sent: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
+        notificationBody = method === 'none' ? '' : `${enquiry.customer_name} asked to receive their quote via ${method}.`
 
         // Guard: don't send the personalized fallback email if this should be an instant quote
         // but the user hasn't selected an option yet
