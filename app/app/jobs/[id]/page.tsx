@@ -80,6 +80,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [partsTrackingNumber, setPartsTrackingNumber] = useState('')
   const [partsTrackingUrl, setPartsTrackingUrl] = useState('')
   const [partsExpectedAt, setPartsExpectedAt] = useState('')
+  const [showTrackingToCustomer, setShowTrackingToCustomer] = useState(false)
   const [savingPartsInfo, setSavingPartsInfo] = useState(false)
   const [showTrackingPanel, setShowTrackingPanel] = useState(false)
   const [checkingTracking, setCheckingTracking] = useState(false)
@@ -196,6 +197,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       setPartsSupplier(jobData.parts_supplier || '')
       setPartsTrackingNumber(jobData.parts_tracking_number || '')
       setPartsTrackingUrl(jobData.parts_tracking_url || '')
+      setShowTrackingToCustomer(jobData.show_tracking_to_customer || false)
       if (jobData.parts_expected_at) {
         const d = new Date(jobData.parts_expected_at)
         const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
@@ -313,6 +315,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         parts_tracking_number: partsTrackingNumber.trim() || null,
         parts_tracking_url: partsTrackingUrl.trim() || null,
         parts_expected_at: partsExpectedAt ? new Date(partsExpectedAt).toISOString() : null,
+        show_tracking_to_customer: showTrackingToCustomer,
       }
       await supabase.from('jobs').update(updateData).eq('id', job.id)
       await supabase.from('job_events').insert({
@@ -1417,7 +1420,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     <Package className="h-4 w-4" />
                     Parts Tracking Details
                   </h3>
-                  <p className="text-xs text-purple-700 dark:text-purple-300">Enter tracking info so customers can see it on their tracking page.</p>
+                  <p className="text-xs text-purple-700 dark:text-purple-300">Enter tracking info for internal use. Toggle below to show on customer tracking page.</p>
                   <div className="space-y-2">
                     <input
                       type="text"
@@ -1446,6 +1449,15 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       onChange={(e) => setPartsExpectedAt(e.target.value)}
                       className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showTrackingToCustomer}
+                        onChange={(e) => setShowTrackingToCustomer(e.target.checked)}
+                        className="w-4 h-4 rounded accent-purple-600"
+                      />
+                      <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Show tracking on customer page</span>
+                    </label>
                     <button
                       onClick={handleSavePartsInfo}
                       disabled={savingPartsInfo}

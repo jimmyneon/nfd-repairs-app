@@ -125,7 +125,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, parts_supplier, parts_tracking_number, parts_tracking_url, parts_expected_at')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
@@ -563,43 +563,17 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
             </div>
 
-            {/* Parts Tracking Info */}
-            {job.status === 'PARTS_ORDERED' && (job.parts_supplier || job.parts_tracking_number || job.parts_tracking_url || job.parts_expected_at) && (
-              <div className="mt-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4">
-                <h3 className="font-bold text-purple-900 dark:text-purple-200 text-sm mb-3 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Parts Tracking
-                </h3>
-                <div className="space-y-2 text-sm">
-                  {job.parts_supplier && (
-                    <div className="flex justify-between">
-                      <span className="text-purple-700 dark:text-purple-300 font-medium">Supplier:</span>
-                      <span className="text-gray-900 dark:text-white font-semibold">{job.parts_supplier}</span>
-                    </div>
-                  )}
-                  {job.parts_tracking_number && (
-                    <div className="flex justify-between">
-                      <span className="text-purple-700 dark:text-purple-300 font-medium">Tracking #:</span>
-                      <span className="text-gray-900 dark:text-white font-semibold">{job.parts_tracking_number}</span>
-                    </div>
-                  )}
-                  {job.parts_expected_at && (
-                    <div className="flex justify-between">
-                      <span className="text-purple-700 dark:text-purple-300 font-medium">Expected:</span>
-                      <span className="text-gray-900 dark:text-white font-semibold">{new Date(job.parts_expected_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                    </div>
-                  )}
-                  {job.parts_tracking_url && (
-                    <a
-                      href={job.parts_tracking_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block mt-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-center text-sm transition-all active:scale-95"
-                    >
-                      Track Parts Delivery
-                    </a>
-                  )}
-                </div>
+            {/* Parts Tracking - only shown if staff toggle is on */}
+            {job.status === 'PARTS_ORDERED' && job.show_tracking_to_customer && job.parts_tracking_status && (
+              <div className="mt-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-3 text-center">
+                <p className="text-sm text-purple-800 dark:text-purple-200 font-medium">
+                  {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
+                   job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
+                   job.parts_tracking_status === 'InTransit' ? 'Parts on the way' :
+                   job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed' :
+                   job.parts_tracking_status === 'AvailableForPickup' ? 'Parts ready for collection' :
+                   `Parts status: ${job.parts_tracking_status}`}
+                </p>
               </div>
             )}
 
