@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { trackPackage, detectCarrier } from '@/lib/trackers'
+import { trackPackage } from '@/lib/trackers'
 
 /**
  * POST /api/tracking/check
@@ -12,7 +12,7 @@ import { trackPackage, detectCarrier } from '@/lib/trackers'
 
 export async function POST(request: NextRequest) {
   try {
-    const { jobId } = await request.json()
+    const { jobId, carrierOverride } = await request.json()
 
     if (!jobId) {
       return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
@@ -40,11 +40,10 @@ export async function POST(request: NextRequest) {
     }
 
     const trackingNumber = job.parts_tracking_number
-    const carrier = detectCarrier(trackingNumber)
 
-    console.log(`🔍 Tracking check for ${job.job_ref}: ${trackingNumber} (carrier: ${carrier})`)
+    console.log(`🔍 Tracking check for ${job.job_ref}: ${trackingNumber}${carrierOverride ? ` (carrier override: ${carrierOverride})` : ''}`)
 
-    const result = await trackPackage(trackingNumber)
+    const result = await trackPackage(trackingNumber, undefined, carrierOverride)
 
     console.log(`✅ Tracking result: ${result.status} - ${result.lastEvent}`)
 

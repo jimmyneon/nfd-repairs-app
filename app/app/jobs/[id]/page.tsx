@@ -76,11 +76,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showReviewPlatforms, setShowReviewPlatforms] = useState(false)
   const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
-  const [partsSupplier, setPartsSupplier] = useState('')
+  const [partsCarrier, setPartsCarrier] = useState<'auto' | 'royalmail' | 'dpd' | 'evri'>('auto')
   const [partsTrackingNumber, setPartsTrackingNumber] = useState('')
-  const [partsTrackingUrl, setPartsTrackingUrl] = useState('')
-  const [partsExpectedAt, setPartsExpectedAt] = useState('')
   const [showTrackingToCustomer, setShowTrackingToCustomer] = useState(false)
+  const [showPartsTrackingForm, setShowPartsTrackingForm] = useState(false)
   const [savingPartsInfo, setSavingPartsInfo] = useState(false)
   const [showTrackingPanel, setShowTrackingPanel] = useState(false)
   const [checkingTracking, setCheckingTracking] = useState(false)
@@ -194,16 +193,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     if (jobData) {
       setJob(jobData)
-      setPartsSupplier(jobData.parts_supplier || '')
       setPartsTrackingNumber(jobData.parts_tracking_number || '')
-      setPartsTrackingUrl(jobData.parts_tracking_url || '')
       setShowTrackingToCustomer(jobData.show_tracking_to_customer || false)
-      if (jobData.parts_expected_at) {
-        const d = new Date(jobData.parts_expected_at)
-        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-        setPartsExpectedAt(local)
-      } else {
-        setPartsExpectedAt('')
+      if (jobData.parts_tracking_carrier) {
+        const c = jobData.parts_tracking_carrier.toLowerCase()
+        if (c.includes('royal')) setPartsCarrier('royalmail')
+        else if (c.includes('dpd')) setPartsCarrier('dpd')
+        else if (c.includes('evri') || c.includes('hermes')) setPartsCarrier('evri')
+        else setPartsCarrier('auto')
       }
     }
     if (eventsData) setEvents(eventsData)
@@ -311,17 +308,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setSavingPartsInfo(true)
     try {
       const updateData: any = {
-        parts_supplier: partsSupplier.trim() || null,
         parts_tracking_number: partsTrackingNumber.trim() || null,
-        parts_tracking_url: partsTrackingUrl.trim() || null,
-        parts_expected_at: partsExpectedAt ? new Date(partsExpectedAt).toISOString() : null,
         show_tracking_to_customer: showTrackingToCustomer,
       }
       await supabase.from('jobs').update(updateData).eq('id', job.id)
       await supabase.from('job_events').insert({
         job_id: job.id,
         type: 'SYSTEM',
-        message: `Parts tracking info updated${partsSupplier ? ` - Supplier: ${partsSupplier}` : ''}${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber}` : ''}${partsExpectedAt ? ` - Expected: ${new Date(partsExpectedAt).toLocaleDateString('en-GB')}` : ''}`,
+        message: `Parts tracking info updated${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber} (${partsCarrier === 'auto' ? 'auto-detect' : partsCarrier})` : ''}${showTrackingToCustomer ? ' - Visible to customer' : ''}`,
       })
 
       // Auto-check tracking immediately when tracking number is saved
@@ -330,7 +324,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           await fetch('/api/tracking/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jobId: job.id }),
+            body: JSON.stringify({ jobId: job.id, carrierOverride: partsCarrier !== 'auto' ? partsCarrier : undefined }),
           })
         } catch (checkError) {
           console.error('Failed to auto-check tracking:', checkError)
@@ -1414,63 +1408,63 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'PARTS_ORDERED' && (
               <>
-                {/* Parts Tracking Info Entry */}
-                <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
-                  <h3 className="font-bold text-purple-900 dark:text-purple-200 text-sm flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Parts Tracking Details
-                  </h3>
-                  <p className="text-xs text-purple-700 dark:text-purple-300">Enter tracking info for internal use. Toggle below to show on customer tracking page.</p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Supplier (e.g. iParts, eBay, AliExpress)"
-                      value={partsSupplier}
-                      onChange={(e) => setPartsSupplier(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Tracking number (e.g. RM123456789GB)"
-                      value={partsTrackingNumber}
-                      onChange={(e) => setPartsTrackingNumber(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="url"
-                      placeholder="Tracking URL (optional, e.g. https://royalmail.com/track/RM123)"
-                      value={partsTrackingUrl}
-                      onChange={(e) => setPartsTrackingUrl(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="datetime-local"
-                      value={partsExpectedAt}
-                      onChange={(e) => setPartsExpectedAt(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                {/* Parts Tracking Button - expands to show input form */}
+                <button
+                  onClick={() => setShowPartsTrackingForm(!showPartsTrackingForm)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  <Package className="h-5 w-5" />
+                  {showPartsTrackingForm ? 'Hide Parts Tracking' : 'Add Parts Tracking'}
+                  {job.parts_tracking_number && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-white/20">
+                      {job.parts_tracking_number}
+                    </span>
+                  )}
+                </button>
+
+                {showPartsTrackingForm && (
+                  <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
+                    <div className="space-y-2">
+                      <select
+                        value={partsCarrier}
+                        onChange={(e) => setPartsCarrier(e.target.value as 'auto' | 'royalmail' | 'dpd' | 'evri')}
+                        className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      >
+                        <option value="auto">Auto-detect carrier</option>
+                        <option value="royalmail">Royal Mail</option>
+                        <option value="dpd">DPD</option>
+                        <option value="evri">Evri</option>
+                      </select>
                       <input
-                        type="checkbox"
-                        checked={showTrackingToCustomer}
-                        onChange={(e) => setShowTrackingToCustomer(e.target.checked)}
-                        className="w-4 h-4 rounded accent-purple-600"
+                        type="text"
+                        placeholder="Tracking number"
+                        value={partsTrackingNumber}
+                        onChange={(e) => setPartsTrackingNumber(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
-                      <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Show tracking on customer page</span>
-                    </label>
-                    <button
-                      onClick={handleSavePartsInfo}
-                      disabled={savingPartsInfo}
-                      className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      {savingPartsInfo ? (
-                        <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
-                      ) : (
-                        <><Package className="h-4 w-4" /> Save Parts Info</>
-                      )}
-                    </button>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={showTrackingToCustomer}
+                          onChange={(e) => setShowTrackingToCustomer(e.target.checked)}
+                          className="w-4 h-4 rounded accent-purple-600"
+                        />
+                        <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Show tracking on customer page</span>
+                      </label>
+                      <button
+                        onClick={handleSavePartsInfo}
+                        disabled={savingPartsInfo}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                      >
+                        {savingPartsInfo ? (
+                          <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
+                        ) : (
+                          <><Package className="h-4 w-4" /> Save</>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Tracking Toggle Button - shows whenever job has a tracking number */}
                 {job.parts_tracking_number && (
@@ -1579,17 +1573,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                           <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                             No tracking data yet. Click "Check Again" to fetch live tracking.
                           </p>
-                        )}
-
-                        {job.parts_tracking_url && (
-                          <a
-                            href={job.parts_tracking_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-center text-sm transition-all"
-                          >
-                            Open Carrier Tracking Page
-                          </a>
                         )}
                       </div>
                     )}

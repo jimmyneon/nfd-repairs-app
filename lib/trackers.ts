@@ -442,8 +442,8 @@ export async function scrapeEvri(trackingNumber: string): Promise<TrackingResult
 /**
  * Main tracking function - detects carrier and calls appropriate scraper
  */
-export async function trackPackage(trackingNumber: string, postcode?: string): Promise<TrackingResult> {
-  const carrier = detectCarrier(trackingNumber)
+export async function trackPackage(trackingNumber: string, postcode?: string, carrierOverride?: string): Promise<TrackingResult> {
+  const carrier = carrierOverride as CarrierType || detectCarrier(trackingNumber)
 
   switch (carrier) {
     case 'royalmail':
