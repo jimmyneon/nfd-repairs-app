@@ -42,7 +42,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid quote type' }, { status: 400 })
     }
 
-    return NextResponse.json({ enquiry }, {
+    // Expiry check: quote valid for 14 days from submission
+    if (enquiry.created_at) {
+      const created = new Date(enquiry.created_at)
+      const expiry = new Date(created.getTime() + 14 * 24 * 60 * 60 * 1000)
+      if (new Date() > expiry) {
+        return NextResponse.json({ error: 'This quote has expired. Quotes are valid for 14 days.' }, { status: 410 })
+      }
+    }
+
+    // Only return non-sensitive fields — no customer name, phone, or email
+    const safeEnquiry = {
+      enquiry_ref: enquiry.enquiry_ref,
+      device_make: enquiry.device_make,
+      device_model: enquiry.device_model,
+      repair_type: enquiry.repair_type,
+      quoted_price: enquiry.quoted_price,
+      quote_type: enquiry.quote_type,
+      part_option: enquiry.part_option || enquiry.screen_option,
+      display_price: enquiry.display_price,
+      warranty: enquiry.warranty,
+      estimated_time: enquiry.estimated_time,
+      additional_repairs: enquiry.additional_repairs,
+      status: enquiry.status,
+    }
+
+    return NextResponse.json({ enquiry: safeEnquiry }, {
       headers: { 'Access-Control-Allow-Origin': '*' },
     })
   } catch (error) {

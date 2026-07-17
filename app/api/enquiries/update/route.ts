@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Actually send the quote
-        const quoteUrl = `https://newforestdevicerepairs.co.uk/quote/accept/?ref=${enquiry.enquiry_ref}`
+        const quoteUrl = `https://nfdl.uk/q/${enquiry.enquiry_ref}`
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
         const warranty = enquiry.warranty || enquiry.screen_option || 'Standard warranty'
