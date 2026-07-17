@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { trackPackage, detectCarrier } from '@/lib/trackers'
 
 /**
  * POST /api/tracking/check
- * Manually fetches the latest tracking info from 17TRACK for a single tracking number.
+ * Manually fetches the latest tracking info by scraping the carrier website.
  * Called by staff via the "Check Again" button on the job detail page.
  *
  * Body: { jobId: string }
@@ -15,11 +16,6 @@ export async function POST(request: NextRequest) {
 
     if (!jobId) {
       return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
-    }
-
-    const apiKey = process.env.TRACKING_17TRACK_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'TRACKING_17TRACK_API_KEY not configured' }, { status: 500 })
     }
 
     const supabase = createClient(
@@ -43,52 +39,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tracking number on this job' }, { status: 400 })
     }
 
-    // Fetch tracking info from 17TRACK
-    const trackingItems: any[] = [{ number: job.parts_tracking_number }]
-    if (job.parts_tracking_carrier) {
-      trackingItems[0].carrier = parseInt(job.parts_tracking_carrier)
-    }
+    const trackingNumber = job.parts_tracking_number
+    const carrier = detectCarrier(trackingNumber)
 
-    const response = await fetch('https://api.17track.net/track/v2.4/gettrackinfo', {
-      method: 'POST',
-      headers: {
-        '17token': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(trackingItems),
-    })
+    console.log(`🔍 Tracking check for ${job.job_ref}: ${trackingNumber} (carrier: ${carrier})`)
 
-    const result = await response.json()
+    const result = await trackPackage(trackingNumber)
 
-    if (result.code !== 0) {
-      console.error('17TRACK gettrackinfo error:', result)
-      return NextResponse.json({ error: '17TRACK API error', details: result }, { status: 400 })
-    }
+    console.log(`✅ Tracking result: ${result.status} - ${result.lastEvent}`)
 
-    const accepted = result.data?.accepted || []
-    if (accepted.length === 0) {
-      return NextResponse.json({ error: 'No tracking data returned' }, { status: 404 })
-    }
-
-    const trackData = accepted[0]
-    const trackInfo = trackData.track_info || {}
-    const latestStatus = trackInfo.latest_status || {}
-    const latestEvent = trackInfo.latest_event || {}
-    const timeMetrics = trackInfo.time_metrics || {}
-
-    const status = latestStatus.status || 'Unknown'
-    const eventDescription = latestEvent.description || ''
-    const eventLocation = latestEvent.location || ''
-
-    let eta: string | null = null
-    if (timeMetrics.estimated_delivery_date) {
-      const etaObj = timeMetrics.estimated_delivery_date
-      if (etaObj.from) {
-        eta = etaObj.from
-      } else if (etaObj.to) {
-        eta = etaObj.to
-      }
-    }
+    const status = result.status
+    const eventDescription = result.lastEvent
+    const eventLocation = result.lastLocation
+    const eta = result.eta
 
     // Update job with fresh tracking data
     const updateData: any = {
@@ -96,14 +59,11 @@ export async function POST(request: NextRequest) {
       parts_tracking_last_event: eventDescription,
       parts_tracking_last_location: eventLocation,
       parts_tracking_updated_at: new Date().toISOString(),
+      parts_tracking_carrier: result.carrier,
     }
 
     if (eta) {
       updateData.parts_tracking_eta = eta
-    }
-
-    if (trackData.carrier) {
-      updateData.parts_tracking_carrier = String(trackData.carrier)
     }
 
     await supabase.from('jobs').update(updateData).eq('id', jobId)
@@ -112,7 +72,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('job_events').insert({
       job_id: jobId,
       type: 'SYSTEM',
-      message: `Manual tracking check: ${status} - ${eventDescription}${eventLocation ? ` (${eventLocation})` : ''}`,
+      message: `Manual tracking check (${result.carrier}): ${status} - ${eventDescription}${eventLocation ? ` (${eventLocation})` : ''}`,
     })
 
     // If delivered, auto-update to PARTS_ARRIVED
@@ -139,7 +99,8 @@ export async function POST(request: NextRequest) {
 
       // Queue SMS
       try {
-        await fetch('https://nfd-repairs-app.vercel.app/api/jobs/queue-status-sms', {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+        await fetch(`${appUrl}/api/jobs/queue-status-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jobId, status: 'PARTS_ARRIVED' }),
@@ -151,15 +112,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      carrier: result.carrier,
       status,
       event: eventDescription,
       location: eventLocation,
       eta,
-      carrier: trackData.carrier ? String(trackData.carrier) : job.parts_tracking_carrier,
       autoChangedToPartsArrived: status === 'Delivered' && currentJob?.status === 'PARTS_ORDERED',
     })
   } catch (error) {
     console.error('Error in tracking check:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

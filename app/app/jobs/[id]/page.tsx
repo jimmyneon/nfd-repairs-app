@@ -321,19 +321,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         message: `Parts tracking info updated${partsSupplier ? ` - Supplier: ${partsSupplier}` : ''}${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber}` : ''}${partsExpectedAt ? ` - Expected: ${new Date(partsExpectedAt).toLocaleDateString('en-GB')}` : ''}`,
       })
 
-      // Register tracking number with 17TRACK for live updates
+      // Auto-check tracking immediately when tracking number is saved
       if (partsTrackingNumber.trim()) {
         try {
-          await fetch('/api/tracking/register', {
+          await fetch('/api/tracking/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jobId: job.id,
-              trackingNumber: partsTrackingNumber.trim(),
-            }),
+            body: JSON.stringify({ jobId: job.id }),
           })
-        } catch (regError) {
-          console.error('Failed to register with 17TRACK:', regError)
+        } catch (checkError) {
+          console.error('Failed to auto-check tracking:', checkError)
         }
       }
 

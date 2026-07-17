@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { trackPackage } from '@/lib/trackers'
 
 /**
  * GET /api/tracking/sync
  * Cron endpoint - runs daily via pg_cron
  *
- * Polls 17TRACK for tracking updates on all jobs with a tracking number
- * that are still in PARTS_ORDERED status. This is a backup to the webhook
- * in case webhook pushes fail.
+ * Scrapes carrier websites (Royal Mail, DPD, Evri) for tracking updates
+ * on all jobs with a tracking number that are still in PARTS_ORDERED status.
  *
- * Requires TRACKING_17TRACK_API_KEY environment variable.
+ * Requires CRON_SECRET environment variable.
  */
 
 export async function GET(request: NextRequest) {
@@ -24,11 +24,6 @@ export async function GET(request: NextRequest) {
     const cronSecret = request.headers.get('Authorization')
     if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const apiKey = process.env.TRACKING_17TRACK_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'TRACKING_17TRACK_API_KEY not configured' }, { status: 500 })
     }
 
     // Find all jobs in PARTS_ORDERED with a tracking number
@@ -49,124 +44,84 @@ export async function GET(request: NextRequest) {
 
     const results: any[] = []
     let updatedCount = 0
+    let errorCount = 0
 
-    // 17TRACK allows 40 tracking numbers per request
-    const batchSize = 40
-    for (let i = 0; i < jobs.length; i += batchSize) {
-      const batch = jobs.slice(i, i + batchSize)
-
-      // Build request payload
-      const trackingItems = batch.map((job: any) => ({
-        number: job.parts_tracking_number,
-        ...(job.parts_tracking_carrier ? { carrier: parseInt(job.parts_tracking_carrier) } : {}),
-      }))
-
+    // Process each job individually (scraping, not batch API)
+    for (const job of jobs) {
       try {
-        const response = await fetch('https://api.17track.net/track/v2.4/gettrackinfo', {
-          method: 'POST',
-          headers: {
-            '17token': apiKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(trackingItems),
-        })
+        console.log(`🔍 Sync tracking for ${job.job_ref}: ${job.parts_tracking_number}`)
+        const result = await trackPackage(job.parts_tracking_number)
 
-        const result = await response.json()
+        const status = result.status
+        const eventDescription = result.lastEvent
+        const eventLocation = result.lastLocation
+        const eta = result.eta
 
-        if (result.code !== 0) {
-          console.error('17TRACK gettrackinfo error:', result)
-          continue
+        const updateData: any = {
+          parts_tracking_status: status,
+          parts_tracking_last_event: eventDescription,
+          parts_tracking_last_location: eventLocation,
+          parts_tracking_updated_at: new Date().toISOString(),
+          parts_tracking_carrier: result.carrier,
         }
 
-        // Process each tracking result
-        const accepted = result.data?.accepted || []
-        for (const trackData of accepted) {
-          const trackingNumber = trackData.number
-          const job = batch.find((j: any) => j.parts_tracking_number === trackingNumber)
-          if (!job) continue
-
-          const trackInfo = trackData.track_info || {}
-          const latestStatus = trackInfo.latest_status || {}
-          const latestEvent = trackInfo.latest_event || {}
-          const timeMetrics = trackInfo.time_metrics || {}
-
-          const status = latestStatus.status || 'Unknown'
-          const eventDescription = latestEvent.description || ''
-          const eventLocation = latestEvent.location || ''
-
-          let eta: string | null = null
-          if (timeMetrics.estimated_delivery_date) {
-            const etaObj = timeMetrics.estimated_delivery_date
-            if (etaObj.from) {
-              eta = etaObj.from
-            } else if (etaObj.to) {
-              eta = etaObj.to
-            }
-          }
-
-          const updateData: any = {
-            parts_tracking_status: status,
-            parts_tracking_last_event: eventDescription,
-            parts_tracking_last_location: eventLocation,
-            parts_tracking_updated_at: new Date().toISOString(),
-          }
-
-          if (eta) {
-            updateData.parts_tracking_eta = eta
-          }
-
-          if (trackData.carrier) {
-            updateData.parts_tracking_carrier = String(trackData.carrier)
-          }
+        if (eta) {
+          updateData.parts_tracking_eta = eta
+        }
 
           await supabase
             .from('jobs')
             .update(updateData)
             .eq('id', job.id)
 
-          // If delivered, auto-update to PARTS_ARRIVED
-          if (status === 'Delivered') {
-            await supabase
-              .from('jobs')
-              .update({
-                status: 'PARTS_ARRIVED',
-                status_changed_at: new Date().toISOString(),
-              })
-              .eq('id', job.id)
-
-            await supabase.from('job_events').insert({
-              job_id: job.id,
-              type: 'STATUS_CHANGE',
-              message: 'Status changed to Parts Arrived (auto - tracking sync shows delivered)',
+        // If delivered, auto-update to PARTS_ARRIVED
+        if (status === 'Delivered') {
+          await supabase
+            .from('jobs')
+            .update({
+              status: 'PARTS_ARRIVED',
+              status_changed_at: new Date().toISOString(),
             })
+            .eq('id', job.id)
 
-            // Queue SMS
-            try {
-              await fetch('https://nfd-repairs-app.vercel.app/api/jobs/queue-status-sms', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId: job.id, status: 'PARTS_ARRIVED' }),
-              })
-            } catch (smsError) {
-              console.error(`Failed to queue PARTS_ARRIVED SMS for ${job.job_ref}:`, smsError)
-            }
-          }
-
-          updatedCount++
-          results.push({
-            jobRef: job.job_ref,
-            trackingNumber,
-            status,
-            event: eventDescription,
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'STATUS_CHANGE',
+            message: 'Status changed to Parts Arrived (auto - tracking sync shows delivered)',
           })
+
+          // Queue SMS
+          try {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+            await fetch(`${appUrl}/api/jobs/queue-status-sms`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ jobId: job.id, status: 'PARTS_ARRIVED' }),
+            })
+          } catch (smsError) {
+            console.error(`Failed to queue PARTS_ARRIVED SMS for ${job.job_ref}:`, smsError)
+          }
         }
 
-        // Rate limit: 3 requests per second
-        if (i + batchSize < jobs.length) {
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        }
+        updatedCount++
+        results.push({
+          jobRef: job.job_ref,
+          trackingNumber: job.parts_tracking_number,
+          carrier: result.carrier,
+          status,
+          event: eventDescription,
+        })
+
+        // Rate limit: wait 2 seconds between requests to be polite to carrier websites
+        await new Promise((resolve) => setTimeout(resolve, 2000))
       } catch (err) {
-        console.error('Error fetching tracking batch:', err)
+        console.error(`Error tracking ${job.job_ref}:`, err)
+        errorCount++
+        results.push({
+          jobRef: job.job_ref,
+          trackingNumber: job.parts_tracking_number,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        })
       }
     }
 
@@ -174,6 +129,7 @@ export async function GET(request: NextRequest) {
       success: true,
       totalJobs: jobs.length,
       updated: updatedCount,
+      errors: errorCount,
       results,
     })
   } catch (error) {
