@@ -1565,7 +1565,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                           </>
                         ) : (
                           <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                            No tracking data yet. Click "Check Again" to fetch from 17TRACK.
+                            No tracking data yet. Click "Check Again" to fetch live tracking.
                           </p>
                         )}
 
