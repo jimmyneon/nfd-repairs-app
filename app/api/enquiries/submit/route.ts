@@ -109,58 +109,114 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert enquiry into database
-    const { data: enquiry, error: enquiryError } = await supabase
-      .from('enquiries')
-      .insert({
-        enquiry_type,
-        customer_name,
-        customer_email: customer_email || null,
-        customer_phone: customer_phone || null,
-        // Web Services fields
-        project_type: project_type || null,
-        sector: sector || null,
-        number_pages: number_pages || null,
-        goals: goals || null,
-        project_description: project_description || null,
-        existing_website: existing_website || null,
-        existing_url: existing_url || null,
-        budget: budget || null,
-        timeline: timeline || null,
-        // Home Services fields
-        service_type: service_type || null,
-        address: address || null,
-        address_type: address_type || null,
-        preferred_date: preferred_date || null,
-        preferred_time: preferred_time || null,
-        description: description || null,
-        // Repair Quote fields
-        device_category: device_category || null,
-        device_make: device_make || null,
-        device_model: device_model || null,
-        repair_type: repair_type || null,
-        screen_option: screen_option || null,
-        quoted_price: quoted_price || null,
-        quote_type: quote_type || null,
-        issue_description: issue_description || null,
-        terms_accepted: terms_accepted || false,
-        proceed_with_repair: proceed_with_repair || false,
-        marketing_consent: marketing_consent || false,
-        quote_source: quote_source || null,
-        additional_repairs: additional_repairs || null,
-        part_option: part_option || null,
-        display_price: display_price || null,
-        warranty: warranty || null,
-        estimated_time: estimated_time || null,
-        quote_key: quote_key || null,
-        // Common
-        additional_info: additional_info || null,
-        status: 'pending',
-      })
-      .select()
-      .single() as any
+    let enquiryRef: string = ''
+    try {
+      const { data: enquiry, error: enquiryError } = await supabase
+        .from('enquiries')
+        .insert({
+          enquiry_type,
+          customer_name,
+          customer_email: customer_email || null,
+          customer_phone: customer_phone || null,
+          // Web Services fields
+          project_type: project_type || null,
+          sector: sector || null,
+          number_pages: number_pages || null,
+          goals: goals || null,
+          project_description: project_description || null,
+          existing_website: existing_website || null,
+          existing_url: existing_url || null,
+          budget: budget || null,
+          timeline: timeline || null,
+          // Home Services fields
+          service_type: service_type || null,
+          address: address || null,
+          address_type: address_type || null,
+          preferred_date: preferred_date || null,
+          preferred_time: preferred_time || null,
+          description: description || null,
+          // Repair Quote fields
+          device_category: device_category || null,
+          device_make: device_make || null,
+          device_model: device_model || null,
+          repair_type: repair_type || null,
+          screen_option: screen_option || null,
+          quoted_price: quoted_price || null,
+          quote_type: quote_type || null,
+          issue_description: issue_description || null,
+          terms_accepted: terms_accepted || false,
+          proceed_with_repair: proceed_with_repair || false,
+          marketing_consent: marketing_consent || false,
+          quote_source: quote_source || null,
+          additional_repairs: additional_repairs || null,
+          part_option: part_option || null,
+          display_price: display_price || null,
+          warranty: warranty || null,
+          estimated_time: estimated_time || null,
+          quote_key: quote_key || null,
+          // Common
+          additional_info: additional_info || null,
+          status: 'pending',
+        })
+        .select()
+        .single() as any
 
-    if (enquiryError) {
-      console.error('Failed to create enquiry:', enquiryError)
+      if (enquiryError) {
+        console.error('Failed to create enquiry:', enquiryError)
+        // Try again without the new columns that may not exist in DB yet
+        const { data: enquiry2, error: enquiryError2 } = await supabase
+          .from('enquiries')
+          .insert({
+            enquiry_type,
+            customer_name,
+            customer_email: customer_email || null,
+            customer_phone: customer_phone || null,
+            project_type: project_type || null,
+            sector: sector || null,
+            number_pages: number_pages || null,
+            goals: goals || null,
+            project_description: project_description || null,
+            existing_website: existing_website || null,
+            existing_url: existing_url || null,
+            budget: budget || null,
+            timeline: timeline || null,
+            service_type: service_type || null,
+            address: address || null,
+            address_type: address_type || null,
+            preferred_date: preferred_date || null,
+            preferred_time: preferred_time || null,
+            description: description || null,
+            device_category: device_category || null,
+            device_make: device_make || null,
+            device_model: device_model || null,
+            repair_type: repair_type || null,
+            screen_option: screen_option || null,
+            quoted_price: quoted_price || null,
+            quote_type: quote_type || null,
+            issue_description: issue_description || null,
+            terms_accepted: terms_accepted || false,
+            proceed_with_repair: proceed_with_repair || false,
+            marketing_consent: marketing_consent || false,
+            quote_source: quote_source || null,
+            additional_info: additional_info || null,
+            status: 'pending',
+          })
+          .select()
+          .single() as any
+
+        if (enquiryError2) {
+          console.error('Fallback insert also failed:', enquiryError2)
+          return NextResponse.json(
+            { error: 'Failed to create enquiry' },
+            { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
+          )
+        }
+        enquiryRef = enquiry2.enquiry_ref
+      } else {
+        enquiryRef = enquiry.enquiry_ref
+      }
+    } catch (insertErr: any) {
+      console.error('Insert exception:', insertErr)
       return NextResponse.json(
         { error: 'Failed to create enquiry' },
         { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
@@ -185,7 +241,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      enquiry_ref: enquiry.enquiry_ref,
+      enquiry_ref: enquiryRef,
       message: 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
     }, {
       headers: {
