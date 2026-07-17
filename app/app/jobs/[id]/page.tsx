@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -76,6 +76,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showReviewPlatforms, setShowReviewPlatforms] = useState(false)
   const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
+  const [partsSupplier, setPartsSupplier] = useState('')
+  const [partsTrackingNumber, setPartsTrackingNumber] = useState('')
+  const [partsTrackingUrl, setPartsTrackingUrl] = useState('')
+  const [partsExpectedAt, setPartsExpectedAt] = useState('')
+  const [savingPartsInfo, setSavingPartsInfo] = useState(false)
+  const [showTrackingPanel, setShowTrackingPanel] = useState(false)
+  const [checkingTracking, setCheckingTracking] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -184,7 +191,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('job_id', params.id)
       .order('created_at', { ascending: false })
 
-    if (jobData) setJob(jobData)
+    if (jobData) {
+      setJob(jobData)
+      setPartsSupplier(jobData.parts_supplier || '')
+      setPartsTrackingNumber(jobData.parts_tracking_number || '')
+      setPartsTrackingUrl(jobData.parts_tracking_url || '')
+      if (jobData.parts_expected_at) {
+        const d = new Date(jobData.parts_expected_at)
+        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+        setPartsExpectedAt(local)
+      } else {
+        setPartsExpectedAt('')
+      }
+    }
     if (eventsData) setEvents(eventsData)
     if (smsData) setSmsLogs(smsData)
     if (emailData) setEmailLogs(emailData)
@@ -282,6 +301,68 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       console.error('Failed to update email:', err)
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleSavePartsInfo = async () => {
+    if (!job) return
+    setSavingPartsInfo(true)
+    try {
+      const updateData: any = {
+        parts_supplier: partsSupplier.trim() || null,
+        parts_tracking_number: partsTrackingNumber.trim() || null,
+        parts_tracking_url: partsTrackingUrl.trim() || null,
+        parts_expected_at: partsExpectedAt ? new Date(partsExpectedAt).toISOString() : null,
+      }
+      await supabase.from('jobs').update(updateData).eq('id', job.id)
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'SYSTEM',
+        message: `Parts tracking info updated${partsSupplier ? ` - Supplier: ${partsSupplier}` : ''}${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber}` : ''}${partsExpectedAt ? ` - Expected: ${new Date(partsExpectedAt).toLocaleDateString('en-GB')}` : ''}`,
+      })
+
+      // Register tracking number with 17TRACK for live updates
+      if (partsTrackingNumber.trim()) {
+        try {
+          await fetch('/api/tracking/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobId: job.id,
+              trackingNumber: partsTrackingNumber.trim(),
+            }),
+          })
+        } catch (regError) {
+          console.error('Failed to register with 17TRACK:', regError)
+        }
+      }
+
+      await loadJobData()
+    } catch (err) {
+      console.error('Failed to save parts info:', err)
+    } finally {
+      setSavingPartsInfo(false)
+    }
+  }
+
+  const handleCheckTracking = async () => {
+    if (!job) return
+    setCheckingTracking(true)
+    try {
+      const res = await fetch('/api/tracking/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Tracking check failed:', data.error)
+      }
+      await loadJobData()
+    } catch (err) {
+      console.error('Failed to check tracking:', err)
+    } finally {
+      setCheckingTracking(false)
     }
   }
 
@@ -1332,14 +1413,189 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {job.status === 'PARTS_ORDERED' && (
-              <button
-                onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
-                disabled={actionLoading}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <Package className="h-8 w-8" />
-                <span>Parts Arrived</span>
-              </button>
+              <>
+                {/* Parts Tracking Info Entry */}
+                <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
+                  <h3 className="font-bold text-purple-900 dark:text-purple-200 text-sm flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Parts Tracking Details
+                  </h3>
+                  <p className="text-xs text-purple-700 dark:text-purple-300">Enter tracking info so customers can see it on their tracking page.</p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Supplier (e.g. iParts, eBay, AliExpress)"
+                      value={partsSupplier}
+                      onChange={(e) => setPartsSupplier(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Tracking number (e.g. RM123456789GB)"
+                      value={partsTrackingNumber}
+                      onChange={(e) => setPartsTrackingNumber(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="url"
+                      placeholder="Tracking URL (optional, e.g. https://royalmail.com/track/RM123)"
+                      value={partsTrackingUrl}
+                      onChange={(e) => setPartsTrackingUrl(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={partsExpectedAt}
+                      onChange={(e) => setPartsExpectedAt(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    <button
+                      onClick={handleSavePartsInfo}
+                      disabled={savingPartsInfo}
+                      className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      {savingPartsInfo ? (
+                        <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
+                      ) : (
+                        <><Package className="h-4 w-4" /> Save Parts Info</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tracking Toggle Button - shows whenever job has a tracking number */}
+                {job.parts_tracking_number && (
+                  <>
+                    <button
+                      onClick={() => setShowTrackingPanel(!showTrackingPanel)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Truck className="h-5 w-5" />
+                      {showTrackingPanel ? 'Hide Tracking' : 'Show Tracking'}
+                      {job.parts_tracking_status && (
+                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
+                          job.parts_tracking_status === 'Delivered'
+                            ? 'bg-green-200 text-green-900'
+                            : job.parts_tracking_status === 'OutForDelivery'
+                            ? 'bg-blue-200 text-blue-900'
+                            : job.parts_tracking_status === 'InTransit'
+                            ? 'bg-yellow-200 text-yellow-900'
+                            : 'bg-white/20 text-white'
+                        }`}>
+                          {job.parts_tracking_status === 'InfoReceived' ? 'Label Created' :
+                           job.parts_tracking_status === 'InTransit' ? 'In Transit' :
+                           job.parts_tracking_status === 'OutForDelivery' ? 'Out for Delivery' :
+                           job.parts_tracking_status === 'Delivered' ? 'Delivered' :
+                           job.parts_tracking_status === 'AvailableForPickup' ? 'Ready for Pickup' :
+                           job.parts_tracking_status === 'Exception' ? 'Exception' :
+                           job.parts_tracking_status === 'Expired' ? 'Expired' :
+                           job.parts_tracking_status === 'Stopped' ? 'Stopped' :
+                           job.parts_tracking_status}
+                        </span>
+                      )}
+                    </button>
+
+                    {showTrackingPanel && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-blue-900 dark:text-blue-200 text-sm flex items-center gap-2">
+                            <Truck className="h-4 w-4" />
+                            Live Tracking
+                          </h4>
+                          <button
+                            onClick={handleCheckTracking}
+                            disabled={checkingTracking}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition-all flex items-center gap-1.5"
+                          >
+                            {checkingTracking ? (
+                              <><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</>
+                            ) : (
+                              <><RefreshCw className="h-3 w-3" /> Check Again</>
+                            )}
+                          </button>
+                        </div>
+
+                        {job.parts_tracking_number && (
+                          <div className="text-sm">
+                            <span className="text-blue-700 dark:text-blue-300 font-medium">Tracking #: </span>
+                            <span className="text-gray-900 dark:text-white font-semibold">{job.parts_tracking_number}</span>
+                          </div>
+                        )}
+
+                        {job.parts_tracking_status ? (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Status:</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                job.parts_tracking_status === 'Delivered'
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                                  : job.parts_tracking_status === 'OutForDelivery'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+                                  : job.parts_tracking_status === 'InTransit'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                              }`}>
+                                {job.parts_tracking_status === 'InfoReceived' ? 'Label Created' :
+                                 job.parts_tracking_status === 'InTransit' ? 'In Transit' :
+                                 job.parts_tracking_status === 'OutForDelivery' ? 'Out for Delivery' :
+                                 job.parts_tracking_status === 'Delivered' ? 'Delivered' :
+                                 job.parts_tracking_status === 'AvailableForPickup' ? 'Available for Pickup' :
+                                 job.parts_tracking_status === 'Exception' ? 'Delivery Exception' :
+                                 job.parts_tracking_status === 'Expired' ? 'Tracking Expired' :
+                                 job.parts_tracking_status === 'Stopped' ? 'Tracking Stopped' :
+                                 job.parts_tracking_status}
+                              </span>
+                            </div>
+
+                            {job.parts_tracking_last_event && (
+                              <p className="text-sm text-gray-700 dark:text-gray-300">
+                                {job.parts_tracking_last_event}
+                                {job.parts_tracking_last_location && ` - ${job.parts_tracking_last_location}`}
+                              </p>
+                            )}
+
+                            {job.parts_tracking_eta && job.parts_tracking_status !== 'Delivered' && (
+                              <p className="text-sm text-blue-600 dark:text-blue-400">
+                                Est. delivery: {new Date(job.parts_tracking_eta).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                              </p>
+                            )}
+
+                            {job.parts_tracking_updated_at && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500">
+                                Last checked: {new Date(job.parts_tracking_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                            No tracking data yet. Click "Check Again" to fetch from 17TRACK.
+                          </p>
+                        )}
+
+                        {job.parts_tracking_url && (
+                          <a
+                            href={job.parts_tracking_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-center text-sm transition-all"
+                          >
+                            Open Carrier Tracking Page
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <button
+                  onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
+                  disabled={actionLoading}
+                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <Package className="h-8 w-8" />
+                  <span>Parts Arrived</span>
+                </button>
+              </>
             )}
 
             {job.status === 'PARTS_ARRIVED' && (

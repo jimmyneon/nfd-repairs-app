@@ -102,6 +102,16 @@ export interface Job {
   tracking_link_expires_at?: string | null
   parts_ordered_at?: string | null
   parts_expected_at?: string | null
+  parts_supplier?: string | null
+  parts_tracking_number?: string | null
+  parts_tracking_url?: string | null
+  parts_reassurance_sms_sent_at?: string | null
+  parts_tracking_carrier?: string | null
+  parts_tracking_status?: string | null
+  parts_tracking_last_event?: string | null
+  parts_tracking_last_location?: string | null
+  parts_tracking_updated_at?: string | null
+  parts_tracking_eta?: string | null
   customer_arrived_at?: string | null
   
   // Post-collection SMS tracking (review request sent immediately)

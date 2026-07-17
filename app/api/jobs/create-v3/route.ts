@@ -136,6 +136,13 @@ export async function POST(request: NextRequest) {
       linked_warranty_ticket_id: linked_warranty_ticket_id || null,
     }
 
+    // If parts are required and job starts in RECEIVED or AWAITING_DEPOSIT,
+    // set parts_ordered_at to 1 hour from now so the cron job auto-changes to PARTS_ORDERED
+    if (jobData.requires_parts_order && ['RECEIVED', 'AWAITING_DEPOSIT'].includes(jobData.status)) {
+      const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
+      ;(jobData as any).parts_ordered_at = oneHourFromNow.toISOString()
+    }
+
     // Validate required fields
     if (!jobData.customer_name || !jobData.customer_phone || jobData.price_total === undefined || jobData.price_total === null) {
       return NextResponse.json(
@@ -331,6 +338,8 @@ export async function POST(request: NextRequest) {
         templateKey = 'QUICK_INTAKE'
       } else if (jobData.deposit_required) {
         templateKey = 'DEPOSIT_REQUIRED'
+      } else if (jobData.requires_parts_order) {
+        templateKey = 'RECEIVED_WITH_PARTS'
       } else {
         templateKey = 'RECEIVED'
       }
@@ -428,9 +437,9 @@ export async function POST(request: NextRequest) {
       })
 
       // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
-      if (templateKey === 'RECEIVED' && jobData.customer_email) {
+      if ((templateKey === 'RECEIVED' || templateKey === 'RECEIVED_WITH_PARTS') && jobData.customer_email) {
         smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
-      } else if (templateKey === 'RECEIVED' && !jobData.customer_email) {
+      } else if ((templateKey === 'RECEIVED' || templateKey === 'RECEIVED_WITH_PARTS') && !jobData.customer_email) {
         smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
       }
 

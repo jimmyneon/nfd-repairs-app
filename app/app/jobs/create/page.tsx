@@ -1122,13 +1122,18 @@ function CreateJobContent() {
                   onClick={() => setFormData(prev => ({ ...prev, requires_parts_order: !prev.requires_parts_order }))}
                   className={`w-full py-3 rounded-xl border-2 font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 ${
                     formData.requires_parts_order
-                      ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                      ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
                       : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
                   }`}
                 >
                   <Wrench className="h-5 w-5" />
-                  {formData.requires_parts_order ? 'Parts Needed' : 'Mark as Parts Needed'}
+                  {formData.requires_parts_order ? 'Parts Needed (auto-orders in 1hr)' : 'Mark as Parts Needed'}
                 </button>
+                {formData.requires_parts_order && (
+                  <p className="text-xs text-purple-600 dark:text-purple-400 text-center">
+                    Status will auto-change to &quot;Parts Ordered&quot; in 1 hour and notify the customer.
+                  </p>
+                )}
               </div>
             </div>
           )}

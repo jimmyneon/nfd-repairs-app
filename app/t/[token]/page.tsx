@@ -125,7 +125,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, parts_supplier, parts_tracking_number, parts_tracking_url, parts_expected_at')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
@@ -562,6 +562,63 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
             </div>
+
+            {/* Parts Tracking Info */}
+            {job.status === 'PARTS_ORDERED' && (job.parts_supplier || job.parts_tracking_number || job.parts_tracking_url || job.parts_expected_at) && (
+              <div className="mt-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4">
+                <h3 className="font-bold text-purple-900 dark:text-purple-200 text-sm mb-3 flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Parts Tracking
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {job.parts_supplier && (
+                    <div className="flex justify-between">
+                      <span className="text-purple-700 dark:text-purple-300 font-medium">Supplier:</span>
+                      <span className="text-gray-900 dark:text-white font-semibold">{job.parts_supplier}</span>
+                    </div>
+                  )}
+                  {job.parts_tracking_number && (
+                    <div className="flex justify-between">
+                      <span className="text-purple-700 dark:text-purple-300 font-medium">Tracking #:</span>
+                      <span className="text-gray-900 dark:text-white font-semibold">{job.parts_tracking_number}</span>
+                    </div>
+                  )}
+                  {job.parts_expected_at && (
+                    <div className="flex justify-between">
+                      <span className="text-purple-700 dark:text-purple-300 font-medium">Expected:</span>
+                      <span className="text-gray-900 dark:text-white font-semibold">{new Date(job.parts_expected_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                    </div>
+                  )}
+                  {job.parts_tracking_url && (
+                    <a
+                      href={job.parts_tracking_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block mt-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-center text-sm transition-all active:scale-95"
+                    >
+                      Track Parts Delivery
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Reassurance Banner - shown for PARTS_ORDERED, DELAYED, and long-running statuses */}
+            {(job.status === 'PARTS_ORDERED' || job.status === 'DELAYED' || job.status === 'DIAGNOSTIC' || job.status === 'IN_REPAIR') && (
+              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-900 dark:text-blue-200 font-semibold">
+                      We&apos;ll update you at every step of your repair.
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      If something doesn&apos;t look right or you have a question, send us a text — we&apos;re here to help.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Customer Notes - Display prominently at top */}
             {job.customer_notes && (
