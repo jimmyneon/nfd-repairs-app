@@ -34,6 +34,7 @@ export async function POST(
     const updateData: any = {
       quoted_price,
       requires_parts_order: requires_parts_order || false,
+      quoted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 

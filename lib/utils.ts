@@ -73,6 +73,10 @@ export function shortReviewLink(jobRef: string): string {
   return `${SHORT_LINK_BASE}/r/${jobRef}`
 }
 
+export function shortHoursLink(): string {
+  return `${SHORT_LINK_BASE}/h`
+}
+
 export function getAppUrl(): string {
   return APP_URL
 }

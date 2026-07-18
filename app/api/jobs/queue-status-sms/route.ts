@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
-import { shortTrackingLink } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const googleMapsLink = mapsSettings?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
-    const hoursLink = hoursSettings?.value || googleMapsLink
+    const hoursLink = hoursSettings?.value || shortHoursLink()
 
     // Only show the maps link when the customer actually needs to travel
     // (device not in shop, or it's ready to collect)

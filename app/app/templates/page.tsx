@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { SMSTemplate } from '@/lib/types'
 import { SMS_TEMPLATE_VARIABLES } from '@/lib/constants'
@@ -16,6 +16,7 @@ export default function TemplatesPage() {
   const [editActive, setEditActive] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showVariableModal, setShowVariableModal] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -76,8 +77,22 @@ export default function TemplatesPage() {
   }
 
   const insertVariable = (variable: string) => {
-    setEditBody(prev => prev + variable)
-    setShowVariableModal(false)
+    const ta = textareaRef.current
+    if (ta) {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const newText = editBody.slice(0, start) + variable + editBody.slice(end)
+      setEditBody(newText)
+      setShowVariableModal(false)
+      requestAnimationFrame(() => {
+        ta.focus()
+        const cursorPos = start + variable.length
+        ta.setSelectionRange(cursorPos, cursorPos)
+      })
+    } else {
+      setEditBody(prev => prev + variable)
+      setShowVariableModal(false)
+    }
   }
 
   if (loading) {
@@ -160,6 +175,7 @@ export default function TemplatesPage() {
                 Message Template
               </label>
               <textarea
+                ref={textareaRef}
                 value={editBody}
                 onChange={(e) => setEditBody(e.target.value)}
                 rows={6}

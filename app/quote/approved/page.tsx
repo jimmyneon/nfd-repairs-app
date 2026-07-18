@@ -44,6 +44,15 @@ function ApprovedContent() {
                   <span>If parts are required, bring £20.00 deposit</span>
                 </li>
               </ul>
+              <a
+                href="https://nfdr.uk/h"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors w-full"
+              >
+                <MapPin className="h-5 w-5" />
+                Check Live Hours & Location
+              </a>
             </div>
           )}
 

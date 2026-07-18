@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle, Lock } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
 import { getFirstName } from '@/lib/sms-template'
-import { shortTrackingLink } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import SlideUpPanel from './SlideUpPanel'
 
 interface CustomSmsComposerProps {
@@ -25,14 +25,22 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const trackingUrl = shortTrackingLink(job.tracking_token)
+  const hoursLink = shortHoursLink()
   const charCount = message.length
 
   const insertText = (text: string) => {
     setMessage((prev) => {
-      if (prev && !prev.endsWith('\n')) {
-        return prev + '\n' + text
-      }
-      return (prev || '') + text
+      const newText = (prev && !prev.endsWith('\n')) ? prev + '\n' + text : (prev || '') + text
+      // Move cursor to end after state update
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current
+        if (ta) {
+          ta.focus()
+          const len = newText.length
+          ta.setSelectionRange(len, len)
+        }
+      })
+      return newText
     })
   }
 
@@ -41,8 +49,16 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
 
   const messageTemplates = [
     {
+      label: 'Parts In Stock',
+      text: `Hi ${firstName}, we've got the parts for your ${deviceName} in stock! Pop it in any time at your convenience and we'll get it sorted.\n\nPlease check our live hours before setting off: ${hoursLink}`,
+    },
+    {
+      label: 'Special Order Parts',
+      text: `Hi ${firstName}, thanks for approving the quote for your ${deviceName}! I'm ordering the parts in now — they usually arrive next day. We just need a £20 deposit to get the order placed.\n\nPay online here: ${process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'}\n\nOr pop in to the shop to pay. Please check our live hours before setting off: ${hoursLink}`,
+    },
+    {
       label: 'Parts Arrived',
-      text: `Hi ${firstName}, the parts for your ${deviceName} have arrived. Pop it into me at your convenience and I'll get the repair started right away.`,
+      text: `Hi ${firstName}, the parts for your ${deviceName} have arrived. Pop it into me at your convenience and I'll get the repair started right away.\n\nPlease check our live hours before setting off: ${hoursLink}`,
     },
     {
       label: 'Diagnostic Done',
@@ -51,22 +67,22 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
     {
       label: 'Ready to Collect',
       text: job.is_warranty
-        ? `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`
-        : `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}.\n\nPlease check our opening times before setting off:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nPop in whenever we're open.`,
+        ? `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection.\n\nPlease check our live hours before setting off: ${hoursLink}\n\nPop in whenever we're open.`
+        : `Hi ${firstName}, your ${deviceName} is all fixed and ready for collection. The total is £${job.price_total?.toFixed(2) || '0.00'}.\n\nPlease check our live hours before setting off: ${hoursLink}\n\nPop in whenever we're open.`,
     },
     ...(job.is_warranty ? [] : [
       {
         label: 'Deposit Needed',
-        text: `Hi ${firstName}, I need to order parts for your ${deviceName}. A £20 deposit is required - please pop into the shop when you can to get this sorted.`,
+        text: `Hi ${firstName}, I need to order parts for your ${deviceName}. A £20 deposit is required - please pop into the shop when you can to get this sorted.\n\nPlease check our live hours before setting off: ${hoursLink}`,
       },
     ]),
     {
       label: 'Chase Collection',
-      text: `Hi ${firstName}, just a friendly reminder that your ${deviceName} is ready for collection. It's been a while so please pop in soon to pick it up.`,
+      text: `Hi ${firstName}, just a friendly reminder that your ${deviceName} is ready for collection. It's been a while so please pop in soon to pick it up.\n\nPlease check our live hours before setting off: ${hoursLink}`,
     },
     {
       label: 'Final Pickup Reminder',
-      text: `Hi ${firstName}, this is a final reminder that your ${deviceName} is ready for collection. Please collect it within 5 days, otherwise we may need to recycle it.\n\nOur opening times:\nhttps://maps.app.goo.gl/oVczouUePXkRbrKb7\n\nMany thanks,\nNew Forest Device Repairs`,
+      text: `Hi ${firstName}, this is a final reminder that your ${deviceName} is ready for collection. Please collect it within 5 days, otherwise we may need to recycle it.\n\nPlease check our live hours before setting off: ${hoursLink}\n\nMany thanks,\nNew Forest Device Repairs`,
     },
     ...(job.is_warranty ? [] : [
       {
@@ -162,7 +178,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
     { label: 'Price', icon: DollarSign, action: () => job.price_total && insertText(`Total: £${job.price_total.toFixed(2)}`), show: !!job.price_total && !job.is_warranty },
     { label: 'Diagnostic', icon: FileText, action: () => job.diagnostic_report && insertText(`\nDiagnostic report:\n${job.diagnostic_report}\n`), show: !!job.diagnostic_report },
     { label: 'Tracking', icon: LinkIcon, action: () => insertText(`Track your repair: ${trackingUrl}`) },
-    { label: 'Hours', icon: Clock, action: () => insertText('Opening times: https://maps.app.goo.gl/oVczouUePXkRbrKb7') },
+    { label: 'Hours', icon: Clock, action: () => insertText(`Please check our live hours before setting off: ${hoursLink}`) },
   ].filter((b) => b.show !== false)
 
   const squareButtons = [

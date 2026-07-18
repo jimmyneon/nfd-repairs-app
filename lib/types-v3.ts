@@ -50,6 +50,7 @@ export interface Job {
   quoted_price?: number | null
   price_total: number
   quoted_at?: string | null
+  quote_approved_at?: string | null
   
   // Status reasons
   delay_reason?: string | null

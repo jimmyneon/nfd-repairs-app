@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
-import { shortTrackingLink } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
@@ -1071,6 +1071,74 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </button>
         </div>
 
+        {/* Mini Action Buttons Row 3 - contextual (parts tracking) */}
+        {(job.status === 'PARTS_ORDERED' || job.status === 'PARTS_ARRIVED') && (
+        <div className="grid grid-cols-5 gap-2">
+          <button
+            onClick={() => setShowPartsTrackingForm(!showPartsTrackingForm)}
+            className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 ${
+              showPartsTrackingForm
+                ? 'bg-purple-600 text-white border-purple-700'
+                : job.parts_tracking_number
+                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+            }`}
+            title={job.parts_tracking_number ? `Tracking: ${job.parts_tracking_number}` : 'Add parts tracking'}
+          >
+            <Truck className="h-5 w-5" />
+            <span className="text-[10px]">{job.parts_tracking_number ? 'Parcel' : 'Parts'}</span>
+          </button>
+          {job.parts_tracking_number && (
+            <a
+              href={getCarrierTrackingUrl(partsCarrier === 'auto' ? (getCarrierFromJob() || 'auto') : partsCarrier, job.parts_tracking_number)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95"
+              title="Open carrier tracking page"
+            >
+              <ExternalLink className="h-5 w-5" />
+              <span className="text-[10px]">Track</span>
+            </a>
+          )}
+        </div>
+        )}
+
+        {/* Parts Tracking Slide-up Panel */}
+        {showPartsTrackingForm && (job.status === 'PARTS_ORDERED' || job.status === 'PARTS_ARRIVED') && (
+          <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
+            <div className="space-y-2">
+              <select
+                value={partsCarrier}
+                onChange={(e) => setPartsCarrier(e.target.value as 'auto' | 'royalmail' | 'dpd' | 'evri')}
+                className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="auto">Auto-detect carrier</option>
+                <option value="royalmail">Royal Mail</option>
+                <option value="dpd">DPD</option>
+                <option value="evri">Evri</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Tracking number"
+                value={partsTrackingNumber}
+                onChange={(e) => setPartsTrackingNumber(e.target.value)}
+                className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+              <button
+                onClick={handleSavePartsInfo}
+                disabled={savingPartsInfo}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+              >
+                {savingPartsInfo ? (
+                  <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><Package className="h-4 w-4" /> Save</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
         {!job.onboarding_completed && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">
@@ -1222,9 +1290,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="space-y-4">
             {job.status === 'QUOTE_REQUESTED' && (
               <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                {job.quoted_at && (
+                  <div className="mb-4 bg-amber-50 border-2 border-amber-200 rounded-lg p-3 flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-bold text-amber-900 text-sm">Quote Sent — Waiting for Customer</p>
+                      <p className="text-xs text-amber-700">
+                        Sent {new Date(job.quoted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {job.quoted_price && ` · £${job.quoted_price.toFixed(2)}`}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
-                  Add Quote Price
+                  {job.quoted_at ? 'Update & Re-send Quote' : 'Add Quote Price'}
                 </h3>
                 <div className="space-y-3">
                   <div>
@@ -1236,14 +1316,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       step="0.01"
                       min="0"
                       id="quotePrice"
+                      defaultValue={job.quoted_price || ''}
                       className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
+                      placeholder="Enter price"
                     />
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       id="requiresParts"
+                      defaultChecked={job.requires_parts_order}
                       className="w-5 h-5 text-blue-600 rounded"
                     />
                     <span className="text-sm font-semibold text-gray-700">
@@ -1300,46 +1382,86 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'QUOTE_APPROVED' && (
               <>
+                {/* Highlighted banner - customer approved the quote */}
+                <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <span className="font-black text-green-900 dark:text-green-200 text-lg">Quote Approved by Customer</span>
+                  </div>
+                  <p className="text-sm text-green-800 dark:text-green-300">
+                    {job.quote_approved_at
+                      ? `Approved ${new Date(job.quote_approved_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                      : 'Customer has approved this quote.'}
+                    {job.quoted_price && ` — £${job.quoted_price.toFixed(2)}`}
+                  </p>
+                </div>
+
+                {/* Action buttons: decide what to tell the customer */}
+                <p className="text-sm font-bold text-gray-700 dark:text-gray-300 text-center">Choose next step:</p>
+                <button
+                  onClick={async () => {
+                    setActionLoading(true)
+                    try {
+                      const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
+                      const firstName = job.customer_name?.split(' ')[0] || 'there'
+                      const smsMessage = `Hi ${firstName}, we've got the parts for your ${deviceName} in stock! Pop it in any time at your convenience and we'll get it sorted.\n\nPlease check our live hours before setting off: ${shortHoursLink()}`
+                      await fetch('/api/sms/send-custom', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jobId: job.id, message: smsMessage, sendEmail: true }),
+                      })
+                      await handleWorkflowStatusChange('RECEIVED')
+                    } catch (err) {
+                      console.error('Failed to send parts in stock message:', err)
+                    }
+                    setActionLoading(false)
+                  }}
+                  disabled={actionLoading}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Package className="h-5 w-5" />
+                  <span>Parts In Stock — Bring It In</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    setActionLoading(true)
+                    try {
+                      const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
+                      const firstName = job.customer_name?.split(' ')[0] || 'there'
+                      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+                      const smsMessage = `Hi ${firstName}, thanks for approving the quote for your ${deviceName}! I'm ordering the parts in now — they usually arrive next day. We just need a £20 deposit to get the order placed.\n\nPay online here: ${depositUrl}\n\nOr pop in to the shop to pay. Please check our live hours before setting off: ${shortHoursLink()}`
+                      await fetch('/api/sms/send-custom', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jobId: job.id, message: smsMessage, sendEmail: true }),
+                      })
+                      // Set deposit required and move to AWAITING_DEPOSIT
+                      await supabase.from('jobs').update({
+                        deposit_required: true,
+                        deposit_amount: 20.00,
+                        requires_parts_order: true,
+                      }).eq('id', job.id)
+                      await handleWorkflowStatusChange('AWAITING_DEPOSIT')
+                    } catch (err) {
+                      console.error('Failed to send special order message:', err)
+                    }
+                    setActionLoading(false)
+                  }}
+                  disabled={actionLoading}
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Coins className="h-5 w-5" />
+                  <span>Special Order Parts — £20 Deposit</span>
+                </button>
+
                 <button
                   onClick={() => handleWorkflowStatusChange('RECEIVED')}
                   disabled={actionLoading}
-                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                  className="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-900 dark:text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
                 >
-                  <CheckCircle className="h-7 w-7" />
-                  <span>Mark as Received</span>
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Just Mark as Received</span>
                 </button>
-                {job.requires_parts_order && (
-                  <>
-                    <button
-                      onClick={async () => {
-                        setActionLoading(true)
-                        const response = await fetch(`/api/jobs/${params.id}/request-deposit`, { method: 'POST' })
-                        if (response.ok) loadJobData()
-                        else alert('Failed to request deposit')
-                        setActionLoading(false)
-                      }}
-                      disabled={actionLoading}
-                      className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
-                    >
-                      <Coins className="h-5 w-5" />
-                      <span>Request Deposit</span>
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setActionLoading(true)
-                        const response = await fetch(`/api/jobs/${params.id}/notify-parts`, { method: 'POST' })
-                        if (response.ok) alert('Parts notification sent')
-                        else alert('Failed to send notification')
-                        setActionLoading(false)
-                      }}
-                      disabled={actionLoading}
-                      className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
-                    >
-                      <MessageSquare className="h-5 w-5" />
-                      <span>Notify About Parts</span>
-                    </button>
-                  </>
-                )}
               </>
             )}
             
@@ -1387,78 +1509,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {job.status === 'PARTS_ORDERED' && (
-              <>
-                {/* Parts Tracking Button - expands to show input form */}
-                <button
-                  onClick={() => setShowPartsTrackingForm(!showPartsTrackingForm)}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
-                >
-                  <Package className="h-5 w-5" />
-                  {showPartsTrackingForm ? 'Hide Parts Tracking' : 'Add Parts Tracking'}
-                  {job.parts_tracking_number && (
-                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-white/20">
-                      {job.parts_tracking_number}
-                    </span>
-                  )}
-                </button>
-
-                {showPartsTrackingForm && (
-                  <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
-                    <div className="space-y-2">
-                      <select
-                        value={partsCarrier}
-                        onChange={(e) => setPartsCarrier(e.target.value as 'auto' | 'royalmail' | 'dpd' | 'evri')}
-                        className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      >
-                        <option value="auto">Auto-detect carrier</option>
-                        <option value="royalmail">Royal Mail</option>
-                        <option value="dpd">DPD</option>
-                        <option value="evri">Evri</option>
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Tracking number"
-                        value={partsTrackingNumber}
-                        onChange={(e) => setPartsTrackingNumber(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
-                      <button
-                        onClick={handleSavePartsInfo}
-                        disabled={savingPartsInfo}
-                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
-                      >
-                        {savingPartsInfo ? (
-                          <><RefreshCw className="h-4 w-4 animate-spin" /> Saving...</>
-                        ) : (
-                          <><Package className="h-4 w-4" /> Save</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Track Parcel link - opens carrier tracking page directly */}
-                {job.parts_tracking_number && (
-                  <a
-                    href={getCarrierTrackingUrl(partsCarrier === 'auto' ? (getCarrierFromJob() || 'auto') : partsCarrier, job.parts_tracking_number)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    <Truck className="h-5 w-5" />
-                    Track Parcel
-                  </a>
-                )}
-
-                <button
-                  onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
-                  disabled={actionLoading}
-                  className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-                >
-                  <Package className="h-8 w-8" />
-                  <span>Parts Arrived</span>
-                </button>
-              </>
+              <button
+                onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
+                disabled={actionLoading}
+                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+              >
+                <Package className="h-8 w-8" />
+                <span>Parts Arrived</span>
+              </button>
             )}
 
             {job.status === 'PARTS_ARRIVED' && (

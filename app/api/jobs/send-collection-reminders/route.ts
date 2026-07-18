@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
-import { shortTrackingLink } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 
 /**
  * GET /api/jobs/send-collection-reminders
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       .eq('key', 'opening_hours_link')
       .single()
 
-    const hoursLink = hoursSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
+    const hoursLink = hoursSetting?.value || shortHoursLink()
 
     // Fetch all READY_TO_COLLECT and IN_STORAGE jobs
     const { data: jobs, error } = await supabase

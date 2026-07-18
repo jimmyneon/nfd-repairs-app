@@ -21,7 +21,7 @@ export default function PriceSetterModal({
   depositRequired = false, depositReceived = false, depositAmount = null,
   onClose, onSaved,
 }: PriceSetterModalProps) {
-  const [price, setPrice] = useState(currentPrice.toString())
+  const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toString() : '')
   const [payLoading, setPayLoading] = useState(false)
   const [isPaid, setIsPaid] = useState(paymentReceived)
   const supabase = createClient()
@@ -102,7 +102,7 @@ export default function PriceSetterModal({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className="w-full px-4 py-3 text-2xl font-bold border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            placeholder="0.00"
+            placeholder="Enter price"
             autoFocus
           />
         </div>

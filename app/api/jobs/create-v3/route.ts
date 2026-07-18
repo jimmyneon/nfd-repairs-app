@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
-import { shortTrackingLink, shortOnboardingLink, getAppUrl } from '@/lib/utils'
+import { shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
         .single()
       
       const locationLink = locationSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
-      const hoursLink = hoursSetting?.value || locationLink // Fallback to location link if hours link not set
+      const hoursLink = hoursSetting?.value || shortHoursLink()
       
       let smsBody = renderSmsTemplate(template.body, {
         customer_name: jobData.customer_name,

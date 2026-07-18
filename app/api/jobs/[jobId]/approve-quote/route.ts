@@ -24,11 +24,11 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    // Update job status to AWAITING_ARRIVAL
+    // Update job status to QUOTE_APPROVED
     const { error: updateError } = await supabase
       .from('jobs')
       .update({
-        status: 'AWAITING_ARRIVAL',
+        status: 'QUOTE_APPROVED',
         status_changed_at: new Date().toISOString(),
         quote_approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -54,6 +54,20 @@ export async function POST(
 
     if (eventError) {
       console.error('Failed to create quote approval event:', eventError)
+    }
+
+    // Create notification for staff
+    const { error: notifError } = await supabase
+      .from('notifications')
+      .insert({
+        type: 'QUOTE_APPROVED',
+        title: 'Quote Approved',
+        body: `${job.job_ref}: ${job.device_make} ${job.device_model} - Customer approved the quote (£${job.quoted_price || job.price_total})`,
+        job_id: jobId,
+      })
+
+    if (notifError) {
+      console.error('Failed to create notification:', notifError)
     }
 
     return NextResponse.json({ success: true })
