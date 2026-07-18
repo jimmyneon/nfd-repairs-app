@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
 
       const trackingUrl = shortTrackingLink(job.tracking_token)
 
-      const smsBody = renderSmsTemplate(template.body, {
+      const smsBody = renderSmsTemplate(template.body || '', {
         first_name: getFirstName(job.customer_name),
         device_model: job.device_model,
         hours_link: hoursLink,
@@ -216,6 +216,17 @@ export async function GET(request: NextRequest) {
       if (smsError) {
         console.error(`Failed to queue reminder SMS for ${job.job_ref}:`, smsError)
         results.push({ jobRef: job.job_ref, action: `reminder_${reminderNumber}`, success: false, error: 'Queue failed' })
+        continue
+      }
+
+      // Guard: don't send empty SMS to MacroDroid
+      if (!smsBody || !smsBody.trim()) {
+        console.error(`Collection reminder SMS body is empty for job ${job.job_ref} - skipping`)
+        await supabase.from('sms_logs').update({
+          status: 'FAILED',
+          error_message: 'SMS body is empty - template may be missing or malformed',
+        }).eq('id', smsLog.id)
+        results.push({ jobRef: job.job_ref, action: `reminder_${reminderNumber}`, success: false, error: 'Empty SMS body' })
         continue
       }
 

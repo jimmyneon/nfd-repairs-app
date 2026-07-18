@@ -80,6 +80,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Guard: don't send empty/null message to MacroDroid (causes MacroDroid failures)
+    if (!smsLog.body_rendered || !smsLog.body_rendered.trim()) {
+      console.error(`SMS body_rendered is empty for sms_log ${sms_log_id} - not sending to MacroDroid`)
+      await supabase
+        .from('sms_logs')
+        .update({ 
+          status: 'FAILED',
+          error_message: 'SMS body is empty - template may be missing or malformed'
+        })
+        .eq('id', sms_log_id)
+
+      return NextResponse.json(
+        { error: 'SMS body is empty - not sending to MacroDroid' },
+        { status: 500 }
+      )
+    }
+
     const smsPayload = {
       phone: smsLog.jobs.customer_phone,
       message: smsLog.body_rendered,

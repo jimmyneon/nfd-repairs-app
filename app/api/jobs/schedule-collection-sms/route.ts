@@ -79,8 +79,17 @@ export async function POST(request: NextRequest) {
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
-    const updates: Record<string, string> = {}
     const eventMessages: string[] = []
+
+    // 0. Set post_collection_sms_scheduled_at IMMEDIATELY and save to DB before
+    // attempting the send, so the cron GET handler can retry if the immediate
+    // send below fails (network error, timeout, etc.)
+    if (!job.post_collection_sms_scheduled_at) {
+      await supabase
+        .from('jobs')
+        .update({ post_collection_sms_scheduled_at: new Date().toISOString() })
+        .eq('id', jobId)
+    }
 
     // 1. Send review SMS immediately (if not already sent)
     if (!job.post_collection_sms_sent_at) {
@@ -96,11 +105,14 @@ export async function POST(request: NextRequest) {
         eventMessages.push(`Review SMS sent - ${reviewResult.smsDeliveryStatus || 'unknown'}`)
       } catch (err) {
         console.error(`Failed to send review SMS for ${job.job_ref}:`, err)
-        eventMessages.push('Review SMS send failed')
+        eventMessages.push('Review SMS send failed - cron will retry')
       }
     } else {
       eventMessages.push('Review SMS already sent')
     }
+
+    // Schedule remaining follow-up SMS and email
+    const updates: Record<string, string> = {}
 
     // 2. Schedule aftercare SMS for 3 days later (if not already scheduled)
     if (!job.aftercare_sms_scheduled_at) {

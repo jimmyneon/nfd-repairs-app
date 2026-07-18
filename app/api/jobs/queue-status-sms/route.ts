@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
       .single()
 
-    if (!template) {
+    if (!template || !template.body) {
       console.log(`No active SMS template found for status: ${status}`)
       return NextResponse.json({ success: true, message: 'No template for this status' })
     }
@@ -246,6 +246,15 @@ export async function POST(request: NextRequest) {
       smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
     } else if (status === 'RECEIVED' && !job.customer_email) {
       smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
+    }
+
+    // Guard: don't queue empty SMS (causes MacroDroid failures)
+    if (!smsBody || !smsBody.trim()) {
+      console.error(`SMS body is empty for job ${job.job_ref}, status ${status} - not queuing`)
+      return NextResponse.json(
+        { error: 'SMS body is empty - template may be missing or malformed' },
+        { status: 500 }
+      )
     }
 
     // Queue SMS

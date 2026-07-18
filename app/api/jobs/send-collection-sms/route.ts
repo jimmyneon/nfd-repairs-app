@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // Build SMS message from template, or fall back to hardcoded default
     let smsBody: string
-    if (reviewTemplate) {
+    if (reviewTemplate && reviewTemplate.body) {
       smsBody = renderSmsTemplate(reviewTemplate.body, {
         first_name: firstName,
         customer_name: job.customer_name,
@@ -113,6 +113,15 @@ ${reviewLink}
 If anything isn't quite right, just reply and we'll put it right.
 
 – New Forest Device Repairs`
+    }
+
+    // Guard: don't send empty SMS to MacroDroid (causes MacroDroid failures)
+    if (!smsBody || !smsBody.trim()) {
+      console.error(`Post-collection SMS body is empty for job ${job.job_ref} - not sending to MacroDroid`)
+      return NextResponse.json(
+        { error: 'SMS body is empty - template may be missing or malformed' },
+        { status: 500 }
+      )
     }
 
     // Send SMS via MacroDroid
@@ -411,7 +420,7 @@ export async function GET(request: NextRequest) {
           const aftercareReviewLink = shortReviewLink(job.job_ref)
           let aftercareBody: string
 
-          if (aftercareTemplate) {
+          if (aftercareTemplate && aftercareTemplate.body) {
             aftercareBody = renderSmsTemplate(aftercareTemplate.body, {
               first_name: firstName,
               customer_name: job.customer_name,
@@ -428,6 +437,18 @@ If you're happy with the repair, a quick review really helps us:
 ${aftercareReviewLink}
 
 New Forest Device Repairs`
+          }
+
+          // Guard: don't send empty SMS to MacroDroid
+          if (!aftercareBody || !aftercareBody.trim()) {
+            console.error(`Aftercare SMS body is empty for job ${job.job_ref} - skipping`)
+            await supabase.from('jobs').update({
+              aftercare_sms_sent_at: new Date().toISOString(),
+              aftercare_sms_delivery_status: 'FAILED_EMPTY_BODY',
+              aftercare_sms_body: '',
+            }).eq('id', job.id)
+            results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: false, error: 'Empty SMS body' })
+            continue
           }
 
           console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
@@ -515,7 +536,7 @@ New Forest Device Repairs`
           const reminderReviewLink = shortReviewLink(job.job_ref)
           let reminderBody: string
 
-          if (reminderTemplate) {
+          if (reminderTemplate && reminderTemplate.body) {
             reminderBody = renderSmsTemplate(reminderTemplate.body, {
               first_name: firstName,
               customer_name: job.customer_name,
@@ -528,6 +549,18 @@ New Forest Device Repairs`
 ${reminderReviewLink}
 
 – New Forest Device Repairs`
+          }
+
+          // Guard: don't send empty SMS to MacroDroid
+          if (!reminderBody || !reminderBody.trim()) {
+            console.error(`Review reminder SMS body is empty for job ${job.job_ref} - skipping`)
+            await supabase.from('jobs').update({
+              review_reminder_sms_sent_at: new Date().toISOString(),
+              review_reminder_sms_delivery_status: 'FAILED_EMPTY_BODY',
+              review_reminder_sms_body: '',
+            }).eq('id', job.id)
+            results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: false, error: 'Empty SMS body' })
+            continue
           }
 
           console.log(`Sending review reminder SMS ${i + 1}/${jobsNeedingReminder.length} for job ${job.job_ref} to ${job.customer_name}`)

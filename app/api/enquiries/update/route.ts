@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
+import { shortQuoteApprovalLink } from '@/lib/utils'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Actually send the quote
-        const quoteUrl = `https://nfdl.uk/q/${enquiry.enquiry_ref}`
+        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
         const warranty = enquiry.warranty || enquiry.screen_option || 'Standard warranty'

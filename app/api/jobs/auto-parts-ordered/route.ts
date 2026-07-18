@@ -158,13 +158,19 @@ export async function GET(request: NextRequest) {
 
           const trackingUrl = shortTrackingLink(job.tracking_token)
 
-          const smsBody = renderSmsTemplate(template.body, {
+          const smsBody = renderSmsTemplate(template.body || '', {
             first_name: getFirstName(job.customer_name),
             device_make: job.device_make,
             device_model: job.device_model,
             job_ref: job.job_ref,
             tracking_link: trackingUrl,
           })
+
+          // Guard: don't queue empty SMS
+          if (!smsBody || !smsBody.trim()) {
+            console.error(`Parts reassurance SMS body is empty for job ${job.job_ref} - skipping`)
+            continue
+          }
 
           // Queue SMS
           const { data: smsLog, error: smsError } = await supabase

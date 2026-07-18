@@ -420,7 +420,7 @@ export async function POST(request: NextRequest) {
       const locationLink = locationSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
       const hoursLink = hoursSetting?.value || shortHoursLink()
       
-      let smsBody = renderSmsTemplate(template.body, {
+      let smsBody = renderSmsTemplate(template.body || '', {
         customer_name: jobData.customer_name,
         first_name: getFirstName(jobData.customer_name),
         device_make: jobData.device_make,
@@ -443,51 +443,61 @@ export async function POST(request: NextRequest) {
         smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
       }
 
-      console.log('📝 Creating SMS log...')
-      const { data: smsLog, error: smsLogError } = await supabase.from('sms_logs').insert({
-        job_id: job.id,
-        template_key: templateKey,
-        body_rendered: smsBody,
-        status: 'PENDING',
-      } as any)
-      .select()
-      .single()
-
-      if (smsLogError) {
-        console.error('❌ SMS log insert failed:', smsLogError)
+      // Guard: don't queue empty SMS
+      if (!smsBody || !smsBody.trim()) {
+        console.error(`SMS body is empty for new job ${job.job_ref} - not queuing`)
         await supabase.from('job_events').insert({
           job_id: job.id,
           type: 'ERROR',
-          message: `Failed to create SMS log: ${smsLogError.message}`,
+          message: 'SMS body is empty - template may be missing or malformed',
         } as any)
       } else {
-        console.log('✅ SMS log created:', smsLog?.id)
-      }
+        console.log('📝 Creating SMS log...')
+        const { data: smsLog, error: smsLogError } = await supabase.from('sms_logs').insert({
+          job_id: job.id,
+          template_key: templateKey,
+          body_rendered: smsBody,
+          status: 'PENDING',
+        } as any)
+        .select()
+        .single()
 
-      // Automatically send the SMS
-      if (smsLog) {
-        console.log('📤 Triggering SMS send...')
-        try {
-          const sendResponse = await fetch(`${appUrl}/api/sms/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          })
-          console.log('📤 SMS send response:', sendResponse.status, sendResponse.ok)
-        } catch (error) {
-          console.error('❌ Failed to trigger SMS send:', error)
+        if (smsLogError) {
+          console.error('❌ SMS log insert failed:', smsLogError)
           await supabase.from('job_events').insert({
             job_id: job.id,
             type: 'ERROR',
-            message: `Failed to trigger SMS send: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            message: `Failed to create SMS log: ${smsLogError.message}`,
           } as any)
+        } else {
+          console.log('✅ SMS log created:', smsLog?.id)
+
+          // Automatically send the SMS
+          if (smsLog) {
+            console.log('📤 Triggering SMS send...')
+            try {
+              const sendResponse = await fetch(`${appUrl}/api/sms/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              })
+              console.log('📤 SMS send response:', sendResponse.status, sendResponse.ok)
+            } catch (error) {
+              console.error('❌ Failed to trigger SMS send:', error)
+              await supabase.from('job_events').insert({
+                job_id: job.id,
+                type: 'ERROR',
+                message: `Failed to trigger SMS send: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              } as any)
+            }
+          } else {
+            console.error('❌ No SMS log created, cannot send')
+            await supabase.from('job_events').insert({
+              job_id: job.id,
+              type: 'ERROR',
+              message: 'No SMS log created, cannot send',
+            } as any)
+          }
         }
-      } else {
-        console.error('❌ No SMS log created, cannot send')
-        await supabase.from('job_events').insert({
-          job_id: job.id,
-          type: 'ERROR',
-          message: 'No SMS log created, cannot send',
-        } as any)
       }
     }
 
