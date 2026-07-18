@@ -8,6 +8,7 @@ import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, 
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
+import { shortTrackingLink } from '@/lib/utils'
 
 export default function TrackingPage({ params }: { params: { token: string } }) {
   const [job, setJob] = useState<any>(null)
@@ -857,7 +858,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               <div className="flex justify-center mb-4">
                 <div className="bg-white p-4 rounded-xl shadow-inner border-2 border-gray-100">
                   <QRCodeDisplay 
-                    value={`${process.env.NEXT_PUBLIC_APP_URL}/t/${params.token}`} 
+                    value={shortTrackingLink(params.token)} 
                     size={200} 
                   />
                 </div>

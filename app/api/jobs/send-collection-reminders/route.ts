@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 
 /**
  * GET /api/jobs/send-collection-reminders
@@ -58,7 +59,6 @@ export async function GET(request: NextRequest) {
       .single()
 
     const hoursLink = hoursSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
-    const appUrl = 'https://nfd-repairs-app.vercel.app'
 
     // Fetch all READY_TO_COLLECT and IN_STORAGE jobs
     const { data: jobs, error } = await supabase
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+      const trackingUrl = shortTrackingLink(job.tracking_token)
 
       const smsBody = renderSmsTemplate(template.body, {
         first_name: getFirstName(job.customer_name),

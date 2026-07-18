@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (template) {
-        const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`
+        const trackingUrl = shortTrackingLink(job.tracking_token)
         const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.example.com'
 
         const smsBody = renderSmsTemplate(template.body, {
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       success: true,
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
-      tracking_url: `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`,
+      tracking_url: shortTrackingLink(job.tracking_token),
     })
   } catch (error) {
     console.error('Error in create job:', error)

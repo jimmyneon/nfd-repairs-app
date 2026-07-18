@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle, Lock } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
 import { getFirstName } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 import SlideUpPanel from './SlideUpPanel'
 
 interface CustomSmsComposerProps {
@@ -23,8 +24,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
   const [sendingPasswordRequest, setSendingPasswordRequest] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const appUrl = 'https://nfd-repairs-app.vercel.app'
-  const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+  const trackingUrl = shortTrackingLink(job.tracking_token)
   const charCount = message.length
 
   const insertText = (text: string) => {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink, getAppUrl } from '@/lib/utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,8 +60,7 @@ export async function POST(
     // Send SMS using DEPOSIT_REQUEST template from database
     try {
       const firstName = getFirstName(job.customer_name)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
-      const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+      const trackingUrl = shortTrackingLink(job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
       const depositAmount = (job.deposit_amount || 20.00).toFixed(2)
 

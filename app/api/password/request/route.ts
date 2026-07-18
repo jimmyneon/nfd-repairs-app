@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortPasswordLink } from '@/lib/utils'
 
 /**
  * POST /api/password/request
@@ -58,8 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the secure link
-    const appUrl = 'https://nfd-repairs-app.vercel.app'
-    const passwordLink = `${appUrl}/password/${token}`
+    const passwordLink = shortPasswordLink(token)
 
     // Fetch the PASSWORD_REQUEST template
     const { data: template } = await supabase

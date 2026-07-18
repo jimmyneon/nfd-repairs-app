@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { shortTrackingLink } from '@/lib/utils'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
           phone: normalizedPhone,
           jobs: altJobs.map(job => ({
             ...job,
-            tracking_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/t/${job.tracking_token}`,
+            tracking_url: shortTrackingLink(job.tracking_token),
             status_label: getStatusLabel(job.status),
           }))
         })
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
       phone: normalizedPhone,
       jobs: jobs?.map(job => ({
         ...job,
-        tracking_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/t/${job.tracking_token}`,
+        tracking_url: shortTrackingLink(job.tracking_token),
         status_label: getStatusLabel(job.status),
       })) || []
     })

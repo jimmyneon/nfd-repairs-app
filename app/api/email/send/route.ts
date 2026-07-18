@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
+import { shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,8 +65,7 @@ export async function POST(request: NextRequest) {
       console.log('✓ Email enabled for this status')
     }
 
-    const appUrl = 'https://nfd-repairs-app.vercel.app'
-    const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+    const trackingUrl = shortTrackingLink(job.tracking_token)
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     const statusMessages: Record<string, string> = {

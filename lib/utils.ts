@@ -49,3 +49,30 @@ export function getStatusLabel(status: string): string {
   }
   return statusLabels[status] || status
 }
+
+const SHORT_LINK_BASE = process.env.NEXT_PUBLIC_SHORT_LINK_BASE || 'https://nfdr.uk'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+
+export function shortTrackingLink(token: string): string {
+  return `${SHORT_LINK_BASE}/t/${token}`
+}
+
+export function shortOnboardingLink(token: string): string {
+  return `${SHORT_LINK_BASE}/o/${token}`
+}
+
+export function shortPasswordLink(token: string): string {
+  return `${SHORT_LINK_BASE}/p/${token}`
+}
+
+export function shortQuoteApprovalLink(jobId: string): string {
+  return `${SHORT_LINK_BASE}/q/${jobId}`
+}
+
+export function shortReviewLink(jobRef: string): string {
+  return `${SHORT_LINK_BASE}/r/${jobRef}`
+}
+
+export function getAppUrl(): string {
+  return APP_URL
+}

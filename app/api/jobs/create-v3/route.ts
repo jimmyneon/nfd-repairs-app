@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink, shortOnboardingLink, getAppUrl } from '@/lib/utils'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
         job_id: existingJob.id,
         job_ref: existingJob.job_ref,
         tracking_token: existingJob.tracking_token,
-        tracking_url: `${process.env.NEXT_PUBLIC_APP_URL}/t/${existingJob.tracking_token}`,
+        tracking_url: shortTrackingLink(existingJob.tracking_token),
         status: existingJob.status,
         duplicate_prevented: true,
       })
@@ -398,11 +399,10 @@ export async function POST(request: NextRequest) {
         })
       }
       
-      // Use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes
-      const appUrl = 'https://nfd-repairs-app.vercel.app'
-      const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+      const appUrl = getAppUrl()
+      const trackingUrl = shortTrackingLink(job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
-      const onboardingUrl = `${appUrl}/onboard/${job.onboarding_token}`
+      const onboardingUrl = shortOnboardingLink(job.onboarding_token)
       
       // Fetch location and hours links from admin_settings
       const { data: locationSetting } = await supabase
@@ -515,7 +515,7 @@ export async function POST(request: NextRequest) {
       job_id: job.id,
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
-      tracking_url: `${process.env.NEXT_PUBLIC_APP_URL}/t/${job.tracking_token}`,
+      tracking_url: shortTrackingLink(job.tracking_token),
       status: job.status,
     })
   } catch (error) {

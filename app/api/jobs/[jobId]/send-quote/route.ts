@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { shortQuoteApprovalLink } from '@/lib/utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,7 +69,7 @@ export async function POST(
     }
 
     // Send SMS with quote approval link
-    const quoteApprovalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quote/approve?jobId=${jobId}`
+    const quoteApprovalUrl = shortQuoteApprovalLink(jobId)
     
     const smsMessage = `Your repair quote for ${job.device_make} ${job.device_model} is ready: £${quoted_price.toFixed(2)}. ${requires_parts_order ? '(Parts required - £20 deposit)' : ''} Approve: ${quoteApprovalUrl}`
 

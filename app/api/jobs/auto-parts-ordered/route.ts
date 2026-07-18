@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 
 /**
  * GET /api/jobs/auto-parts-ordered
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
             continue
           }
 
-          const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+          const trackingUrl = shortTrackingLink(job.tracking_token)
 
           const smsBody = renderSmsTemplate(template.body, {
             first_name: getFirstName(job.customer_name),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,8 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build tracking URL
-    const appUrl = 'https://nfd-repairs-app.vercel.app'
-    const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+    const trackingUrl = shortTrackingLink(job.tracking_token)
 
     // Replace variables in template
     const smsBody = template.body

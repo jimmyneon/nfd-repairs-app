@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,8 +148,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build tracking URL (use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes)
-    const appUrl = 'https://nfd-repairs-app.vercel.app'
-    const trackingUrl = `${appUrl}/t/${job.tracking_token}`
+    const trackingUrl = shortTrackingLink(job.tracking_token)
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     // Fetch links from admin settings (never hardcode location or hours)

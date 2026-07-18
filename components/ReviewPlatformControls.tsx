@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
 import { Star, CheckCircle2, Circle, Send, Loader2, MousePointerClick } from 'lucide-react'
 import SlideUpPanel from '@/components/SlideUpPanel'
+import { shortReviewLink } from '@/lib/utils'
 
 interface ReviewPlatformControlsProps {
   job: Job
@@ -198,7 +199,7 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
 
         {/* Review page link */}
         <a
-          href={`https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`}
+          href={shortReviewLink(job.job_ref)}
           target="_blank"
           rel="noopener"
           className="block text-center text-xs text-primary hover:underline"

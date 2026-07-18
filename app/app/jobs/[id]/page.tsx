@@ -8,6 +8,7 @@ import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, Refr
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
+import { shortTrackingLink } from '@/lib/utils'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
@@ -2004,13 +2005,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer Tracking Link</h3>
               
               <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-gray-900 dark:text-white mb-4 border border-gray-200 dark:border-gray-600">
-                https://nfd-repairs-app.vercel.app/t/{job.tracking_token}
+                {shortTrackingLink(job.tracking_token)}
               </div>
 
               <div className="space-y-2 mb-4">
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`)
+                    navigator.clipboard.writeText(shortTrackingLink(job.tracking_token))
                     setLinkCopied(true)
                     setTimeout(() => setLinkCopied(false), 2000)
                   }}
@@ -2021,7 +2022,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 
                 <button
                   onClick={() => {
-                    window.open(`https://nfd-repairs-app.vercel.app/t/${job.tracking_token}`, '_blank')
+                    window.open(shortTrackingLink(job.tracking_token), '_blank')
                     setShowTrackingLinkModal(false)
                   }}
                   className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-4 rounded transition-colors"

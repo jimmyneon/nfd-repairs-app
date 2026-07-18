@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
 
 /**
  * POST /api/jobs/send-collection-sms
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // The review link is now a single landing page that shows all platforms
     // The ref parameter is the job_ref so the page can track which platforms were clicked
-    const reviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
+    const reviewLink = shortReviewLink(job.job_ref)
 
     // Track which platform was requested (for app display purposes)
     const completedPlatforms: string[] = job.review_platforms_completed || []
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
         device_make: job.device_make || '',
         device_model: job.device_model || '',
         review_link: reviewLink,
-        tracking_link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'}/t/${job.tracking_token}`,
+        tracking_link: shortTrackingLink(job.tracking_token),
         job_ref: job.job_ref,
       })
     } else {
@@ -407,7 +408,7 @@ export async function GET(request: NextRequest) {
 
         try {
           const firstName = getFirstName(job.customer_name)
-          const aftercareReviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
+          const aftercareReviewLink = shortReviewLink(job.job_ref)
           let aftercareBody: string
 
           if (aftercareTemplate) {
@@ -511,7 +512,7 @@ New Forest Device Repairs`
 
         try {
           const firstName = getFirstName(job.customer_name)
-          const reminderReviewLink = `https://newforestdevicerepairs.co.uk/review/?ref=${job.job_ref}`
+          const reminderReviewLink = shortReviewLink(job.job_ref)
           let reminderBody: string
 
           if (reminderTemplate) {
