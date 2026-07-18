@@ -79,11 +79,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const [partsCarrier, setPartsCarrier] = useState<'auto' | 'royalmail' | 'dpd' | 'evri'>('auto')
   const [partsTrackingNumber, setPartsTrackingNumber] = useState('')
-  const [showTrackingToCustomer, setShowTrackingToCustomer] = useState(false)
   const [showPartsTrackingForm, setShowPartsTrackingForm] = useState(false)
   const [savingPartsInfo, setSavingPartsInfo] = useState(false)
-  const [showTrackingPanel, setShowTrackingPanel] = useState(false)
-  const [checkingTracking, setCheckingTracking] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -195,14 +192,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (jobData) {
       setJob(jobData)
       setPartsTrackingNumber(jobData.parts_tracking_number || '')
-      setShowTrackingToCustomer(jobData.show_tracking_to_customer || false)
-      if (jobData.parts_tracking_carrier) {
-        const c = jobData.parts_tracking_carrier.toLowerCase()
-        if (c.includes('royal')) setPartsCarrier('royalmail')
-        else if (c.includes('dpd')) setPartsCarrier('dpd')
-        else if (c.includes('evri') || c.includes('hermes')) setPartsCarrier('evri')
-        else setPartsCarrier('auto')
-      }
     }
     if (eventsData) setEvents(eventsData)
     if (smsData) setSmsLogs(smsData)
@@ -310,27 +299,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     try {
       const updateData: any = {
         parts_tracking_number: partsTrackingNumber.trim() || null,
-        show_tracking_to_customer: showTrackingToCustomer,
       }
       await supabase.from('jobs').update(updateData).eq('id', job.id)
       await supabase.from('job_events').insert({
         job_id: job.id,
         type: 'SYSTEM',
-        message: `Parts tracking info updated${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber} (${partsCarrier === 'auto' ? 'auto-detect' : partsCarrier})` : ''}${showTrackingToCustomer ? ' - Visible to customer' : ''}`,
+        message: `Parts tracking info updated${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber} (${partsCarrier === 'auto' ? 'auto-detect' : partsCarrier})` : ''}`,
       })
-
-      // Auto-check tracking immediately when tracking number is saved
-      if (partsTrackingNumber.trim()) {
-        try {
-          await fetch('/api/tracking/check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ jobId: job.id, carrierOverride: partsCarrier !== 'auto' ? partsCarrier : undefined }),
-          })
-        } catch (checkError) {
-          console.error('Failed to auto-check tracking:', checkError)
-        }
-      }
 
       await loadJobData()
     } catch (err) {
@@ -340,25 +315,29 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const handleCheckTracking = async () => {
-    if (!job) return
-    setCheckingTracking(true)
-    try {
-      const res = await fetch('/api/tracking/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        console.error('Tracking check failed:', data.error)
-      }
-      await loadJobData()
-    } catch (err) {
-      console.error('Failed to check tracking:', err)
-    } finally {
-      setCheckingTracking(false)
+  const getCarrierTrackingUrl = (carrier: string, trackingNumber: string) => {
+    const tn = trackingNumber.trim().toUpperCase()
+    switch (carrier) {
+      case 'royalmail':
+        return `https://www.royalmail.com/track-your-item?trackNumber=${tn}`
+      case 'dpd':
+        return `https://track.dpd.co.uk/search?parcelRef=${trackingNumber.trim()}`
+      case 'evri':
+        return `https://www.evri.com/track/${trackingNumber.trim()}`
+      default:
+        // Auto-detect from tracking number format
+        if (/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(tn)) return `https://www.royalmail.com/track-your-item?trackNumber=${tn}`
+        if (/^\d{14,15}$/.test(tn)) return `https://track.dpd.co.uk/search?parcelRef=${trackingNumber.trim()}`
+        return `https://www.evri.com/track/${trackingNumber.trim()}`
     }
+  }
+
+  const getCarrierFromJob = () => {
+    if (!job?.parts_tracking_number) return null
+    const tn = job.parts_tracking_number.trim().toUpperCase()
+    if (/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(tn)) return 'royalmail'
+    if (/^\d{14,15}$/.test(tn)) return 'dpd'
+    return 'evri'
   }
 
   const handleQuickReviewToggle = async () => {
@@ -1443,15 +1422,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                         onChange={(e) => setPartsTrackingNumber(e.target.value)}
                         className="w-full px-3 py-2 text-sm border-2 border-purple-200 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={showTrackingToCustomer}
-                          onChange={(e) => setShowTrackingToCustomer(e.target.checked)}
-                          className="w-4 h-4 rounded accent-purple-600"
-                        />
-                        <span className="text-xs text-purple-700 dark:text-purple-300 font-medium">Show tracking on customer page</span>
-                      </label>
                       <button
                         onClick={handleSavePartsInfo}
                         disabled={savingPartsInfo}
@@ -1467,117 +1437,17 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   </div>
                 )}
 
-                {/* Tracking Toggle Button - shows whenever job has a tracking number */}
+                {/* Track Parcel link - opens carrier tracking page directly */}
                 {job.parts_tracking_number && (
-                  <>
-                    <button
-                      onClick={() => setShowTrackingPanel(!showTrackingPanel)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <Truck className="h-5 w-5" />
-                      {showTrackingPanel ? 'Hide Tracking' : 'Show Tracking'}
-                      {job.parts_tracking_status && (
-                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-bold ${
-                          job.parts_tracking_status === 'Delivered'
-                            ? 'bg-green-200 text-green-900'
-                            : job.parts_tracking_status === 'OutForDelivery'
-                            ? 'bg-blue-200 text-blue-900'
-                            : job.parts_tracking_status === 'InTransit'
-                            ? 'bg-yellow-200 text-yellow-900'
-                            : 'bg-white/20 text-white'
-                        }`}>
-                          {job.parts_tracking_status === 'InfoReceived' ? 'Label Created' :
-                           job.parts_tracking_status === 'InTransit' ? 'In Transit' :
-                           job.parts_tracking_status === 'OutForDelivery' ? 'Out for Delivery' :
-                           job.parts_tracking_status === 'Delivered' ? 'Delivered' :
-                           job.parts_tracking_status === 'AvailableForPickup' ? 'Ready for Pickup' :
-                           job.parts_tracking_status === 'Exception' ? 'Exception' :
-                           job.parts_tracking_status === 'Expired' ? 'Expired' :
-                           job.parts_tracking_status === 'Stopped' ? 'Stopped' :
-                           job.parts_tracking_status}
-                        </span>
-                      )}
-                    </button>
-
-                    {showTrackingPanel && (
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold text-blue-900 dark:text-blue-200 text-sm flex items-center gap-2">
-                            <Truck className="h-4 w-4" />
-                            Live Tracking
-                          </h4>
-                          <button
-                            onClick={handleCheckTracking}
-                            disabled={checkingTracking}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg text-xs transition-all flex items-center gap-1.5"
-                          >
-                            {checkingTracking ? (
-                              <><RefreshCw className="h-3 w-3 animate-spin" /> Checking...</>
-                            ) : (
-                              <><RefreshCw className="h-3 w-3" /> Check Again</>
-                            )}
-                          </button>
-                        </div>
-
-                        {job.parts_tracking_number && (
-                          <div className="text-sm">
-                            <span className="text-blue-700 dark:text-blue-300 font-medium">Tracking #: </span>
-                            <span className="text-gray-900 dark:text-white font-semibold">{job.parts_tracking_number}</span>
-                          </div>
-                        )}
-
-                        {job.parts_tracking_status ? (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Status:</span>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                job.parts_tracking_status === 'Delivered'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                                  : job.parts_tracking_status === 'OutForDelivery'
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                                  : job.parts_tracking_status === 'InTransit'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
-                                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                              }`}>
-                                {job.parts_tracking_status === 'InfoReceived' ? 'Label Created' :
-                                 job.parts_tracking_status === 'InTransit' ? 'In Transit' :
-                                 job.parts_tracking_status === 'OutForDelivery' ? 'Out for Delivery' :
-                                 job.parts_tracking_status === 'Delivered' ? 'Delivered' :
-                                 job.parts_tracking_status === 'AvailableForPickup' ? 'Available for Pickup' :
-                                 job.parts_tracking_status === 'Exception' ? 'Delivery Exception' :
-                                 job.parts_tracking_status === 'Expired' ? 'Tracking Expired' :
-                                 job.parts_tracking_status === 'Stopped' ? 'Tracking Stopped' :
-                                 job.parts_tracking_status}
-                              </span>
-                            </div>
-
-                            {job.parts_tracking_last_event && (
-                              <p className="text-sm text-gray-700 dark:text-gray-300">
-                                {job.parts_tracking_last_event}
-                                {job.parts_tracking_last_location && ` - ${job.parts_tracking_last_location}`}
-                              </p>
-                            )}
-
-                            {job.parts_tracking_eta && job.parts_tracking_status !== 'Delivered' && (
-                              <p className="text-sm text-blue-600 dark:text-blue-400">
-                                Est. delivery: {new Date(job.parts_tracking_eta).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                              </p>
-                            )}
-
-                            {job.parts_tracking_updated_at && (
-                              <p className="text-xs text-gray-400 dark:text-gray-500">
-                                Last checked: {new Date(job.parts_tracking_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                            No tracking data yet. Click "Check Again" to fetch live tracking.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </>
+                  <a
+                    href={getCarrierTrackingUrl(partsCarrier === 'auto' ? (getCarrierFromJob() || 'auto') : partsCarrier, job.parts_tracking_number)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <Truck className="h-5 w-5" />
+                    Track Parcel
+                  </a>
                 )}
 
                 <button
@@ -1695,7 +1565,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             customerName={job.customer_name}
             onComplete={() => {
               setShowManualOnboarding(false)
-              loadJob()
+              loadJobData()
             }}
             onClose={() => setShowManualOnboarding(false)}
           />
