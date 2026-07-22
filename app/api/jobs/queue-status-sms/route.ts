@@ -189,13 +189,18 @@ export async function POST(request: NextRequest) {
       first_name: getFirstName(job.customer_name),
       device_make: job.device_make,
       device_model: job.device_model,
+      device_summary: `${job.device_make} ${job.device_model}`.trim(),
+      repair_summary: job.issue || '',
       price_total: priceValue,
       balance_remaining: balanceRemaining,
       deposit_paid: depositPaidStr,
       tracking_link: trackingUrl,
       job_ref: job.job_ref,
       google_maps_link: mapsLink,
+      location_link: mapsLink,
       hours_link: includeMapsLink ? hoursLink : '',
+      shop_address: includeMapsLink ? 'Lymington, Hampshire' : '',
+      opening_times: includeMapsLink ? 'Mon-Fri 9am-5:30pm' : '',
       deposit_amount: job.deposit_required ? (job.deposit_amount?.toString() || '20.00') : '',
       deposit_link: job.deposit_required ? depositUrl : '',
       delay_reason: status === 'DELAYED' ? (job.delay_reason || '') : '',
@@ -246,6 +251,11 @@ export async function POST(request: NextRequest) {
       smsBody += '\n\nYou\'ll receive updates by text and email throughout the repair. Please check your junk folder if you don\'t see our emails.'
     } else if (status === 'RECEIVED' && !job.customer_email) {
       smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
+    }
+
+    // Add footer to READY_TO_COLLECT SMS so customers who already collected can ignore it
+    if (status === 'READY_TO_COLLECT' && smsBody && smsBody.trim()) {
+      smsBody += "\n\nIf you've already collected your device, please ignore this message."
     }
 
     // Guard: don't queue empty SMS (causes MacroDroid failures)

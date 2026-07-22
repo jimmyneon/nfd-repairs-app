@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('notifications').insert({
         type: 'QUOTE_ACCEPTED',
         title: `Quote Accepted: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`,
-        body: `${enquiry.customer_name} accepted their quote${enquiry.quoted_price ? ' (£' + enquiry.quoted_price + ')' : ''}. Call them to arrange the repair.`,
+        body: `${enquiry.customer_name} accepted their quote${enquiry.quoted_price ? ' (£' + enquiry.quoted_price + ')' : ''}. Text them to arrange the repair.`,
         is_read: false,
       } as any)
     } catch (e) {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Send confirmation SMS to customer
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (webhookUrl && enquiry.customer_phone) {
-      const smsMessage = `Great choice, ${enquiry.customer_name}! We've got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll text you shortly to arrange a time. Any questions? Call 07410 381247. - NFD Repairs`
+      const smsMessage = `Great choice, ${enquiry.customer_name}! We've got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll be in touch ASAP to let you know what to do next. - NFD Repairs`
 
       try {
         await fetch(webhookUrl, {

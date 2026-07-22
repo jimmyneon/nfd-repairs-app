@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
@@ -35,6 +35,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const actionLoadingRef = useRef(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showStatusSelector, setShowStatusSelector] = useState(false)
   const [showSimpleConfirm, setShowSimpleConfirm] = useState(false)
@@ -119,19 +120,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
 
     // Real-time subscription for this job
+    // Skip loadJobData when an action is in progress to prevent race conditions
+    // where stale data overwrites optimistic updates
     const jobSubscription = supabase
       .channel(`job-${params.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: `id=eq.${params.id}` }, () => {
-        loadJobData()
+        if (!actionLoadingRef.current) loadJobData()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_events', filter: `job_id=eq.${params.id}` }, () => {
-        loadJobData()
+        if (!actionLoadingRef.current) loadJobData()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sms_logs', filter: `job_id=eq.${params.id}` }, () => {
-        loadJobData()
+        if (!actionLoadingRef.current) loadJobData()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'email_logs', filter: `job_id=eq.${params.id}` }, () => {
-        loadJobData()
+        if (!actionLoadingRef.current) loadJobData()
       })
       .subscribe()
 
@@ -386,6 +389,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   const confirmWorkflowStatusChange = async () => {
     if (!job || !pendingWorkflowStatus) return
+    actionLoadingRef.current = true
     setActionLoading(true)
     setShowSimpleConfirm(false)
 
@@ -476,6 +480,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
 
     await loadJobData()
+    actionLoadingRef.current = false
     setActionLoading(false)
     setPendingWorkflowStatus(null)
   }
@@ -667,6 +672,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const confirmStatusChange = async (overrideSMSParam: boolean, overrideEmailParam: boolean) => {
     if (!job || !newStatus) return
     
+    actionLoadingRef.current = true
     setActionLoading(true)
     setShowStatusModal(false)
 
@@ -745,6 +751,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     }
 
     await loadJobData()
+    actionLoadingRef.current = false
     setActionLoading(false)
     setNewStatus(null)
   }

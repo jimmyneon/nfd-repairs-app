@@ -194,12 +194,21 @@ export async function GET(request: NextRequest) {
 
       const trackingUrl = shortTrackingLink(job.tracking_token)
 
-      const smsBody = renderSmsTemplate(template.body || '', {
+      let smsBody = renderSmsTemplate(template.body || '', {
         first_name: getFirstName(job.customer_name),
+        customer_name: job.customer_name,
+        device_make: job.device_make,
         device_model: job.device_model,
+        device_summary: `${job.device_make} ${job.device_model}`.trim(),
+        job_ref: job.job_ref,
         hours_link: hoursLink,
         tracking_link: trackingUrl,
       })
+
+      // Add footer to all collection reminders
+      if (smsBody && smsBody.trim()) {
+        smsBody += "\n\nIf you've already collected your device, please ignore this message."
+      }
 
       // Queue SMS
       const { data: smsLog, error: smsError } = await supabase

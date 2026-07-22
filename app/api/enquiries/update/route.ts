@@ -331,8 +331,8 @@ Web: <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-de
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl && enquiry.customer_phone) {
         const smsMessage = action === 'reserve_repair'
-          ? `Great choice, ${enquiry.customer_name}! We've reserved your repair slot for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll text you very shortly to confirm the details. Any questions? Call 07410 381247. - NFD Repairs`
-          : `No problem, ${enquiry.customer_name}! We'll look into reserving a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair. We'll be in touch to confirm. Any questions? Call 07410 381247. - NFD Repairs`
+          ? `Great choice, ${enquiry.customer_name}! We've reserved your repair slot for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll be in touch ASAP to confirm the details. - NFD Repairs`
+          : `No problem, ${enquiry.customer_name}! We'll look into reserving a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair. We'll be in touch to confirm. - NFD Repairs`
         try {
           await fetch(webhookUrl, {
             method: 'POST',

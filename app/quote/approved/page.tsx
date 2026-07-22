@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, MapPin } from 'lucide-react'
+import { CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 function ApprovedContent() {
@@ -22,44 +22,28 @@ function ApprovedContent() {
           </h1>
           
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-            Thank you for approving the quote. You can now bring your device to our shop.
+            Thanks for approving your quote. We&apos;ll be in touch ASAP to let you know what to do next.
           </p>
 
           {jobId && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8">
-              <p className="text-sm text-blue-900 dark:text-blue-100 mb-4">
-                <strong>What to do next:</strong>
+            <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-6 mb-8">
+              <p className="text-sm text-green-900 dark:text-green-100">
+                <strong>What happens next:</strong>
               </p>
-              <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100 text-left">
+              <ul className="space-y-2 text-sm text-green-900 dark:text-green-100 text-left mt-3">
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                  <span>Bring your device to our shop during opening hours</span>
+                  <span>We&apos;ll text you shortly to arrange everything</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                  <span>Mention your reference number when you arrive</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
-                  <span>If parts are required, bring £20.00 deposit</span>
+                  <span>No deposit needed until we&apos;ve confirmed the details with you</span>
                 </li>
               </ul>
-              <a
-                href="https://nfdr.uk/h"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors w-full"
-              >
-                <MapPin className="h-5 w-5" />
-                Check Live Hours & Location
-              </a>
             </div>
           )}
 
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            <p className="mb-4">
-              If you have any questions, please don't hesitate to contact us.
-            </p>
             <Link 
               href="/"
               className="inline-block bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded-lg transition-colors"

@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         customer_name: job.customer_name,
         device_make: job.device_make || '',
         device_model: job.device_model || '',
+        device_summary: `${job.device_make || ''} ${job.device_model || ''}`.trim(),
         review_link: reviewLink,
         tracking_link: shortTrackingLink(job.tracking_token),
         job_ref: job.job_ref,
@@ -426,6 +427,7 @@ export async function GET(request: NextRequest) {
               customer_name: job.customer_name,
               device_make: job.device_make || '',
               device_model: job.device_model || '',
+              device_summary: `${job.device_make || ''} ${job.device_model || ''}`.trim(),
               job_ref: job.job_ref,
               review_link: aftercareReviewLink,
             })

@@ -48,5 +48,11 @@ export function renderSmsTemplate(
     // Trim leading/trailing whitespace
     .trim()
 
+  // Safety net: strip any remaining unresolved {variable} placeholders
+  // This catches variables not passed to the function (e.g. device_summary, shop_address)
+  result = result.replace(/\{[a-z_]+\}/gi, '')
+  // Clean up any double spaces or orphaned punctuation left behind
+  result = result.replace(/  +/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+
   return result
 }
