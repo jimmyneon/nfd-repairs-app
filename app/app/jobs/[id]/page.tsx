@@ -409,7 +409,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       }
     }
 
-    const { error: updateError } = await supabase
+    let { error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
       .eq('id', job.id)
@@ -419,8 +419,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       // If repair_outcome column doesn't exist yet, retry without it
       if (updateError.message.includes('repair_outcome') || updateError.message.includes('Could not find')) {
         const { repair_outcome, ...dataWithoutOutcome } = updateData
-        await supabase.from('jobs').update(dataWithoutOutcome).eq('id', job.id)
+        const { error: retryError } = await supabase.from('jobs').update(dataWithoutOutcome).eq('id', job.id)
+        updateError = retryError
       }
+    }
+
+    // If the update still failed, abort — don't proceed with events/SMS/email
+    if (updateError) {
+      console.error('Status update failed, aborting:', updateError)
+      alert(`Failed to update status: ${updateError.message}`)
+      await loadJobData()
+      actionLoadingRef.current = false
+      setActionLoading(false)
+      setPendingWorkflowStatus(null)
+      return
     }
 
     // Optimistic update - update local state immediately
@@ -689,10 +701,20 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       updateData.customer_arrived_at = null  // Clear arrival indicator
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
       .eq('id', job.id)
+
+    if (updateError) {
+      console.error('Status update failed, aborting:', updateError)
+      alert(`Failed to update status: ${updateError.message}`)
+      await loadJobData()
+      actionLoadingRef.current = false
+      setActionLoading(false)
+      setNewStatus(null)
+      return
+    }
 
     // Optimistic update - update local state immediately
     setJob({ ...job, ...updateData } as Job)

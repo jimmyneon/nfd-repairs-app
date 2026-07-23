@@ -84,7 +84,12 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
       updateData.customer_arrived_at = null
     }
 
-    await supabase.from('jobs').update(updateData).eq('id', job.id)
+    const { error: updateError } = await supabase.from('jobs').update(updateData).eq('id', job.id)
+    if (updateError) {
+      console.error('Status update failed:', updateError)
+      alert(`Failed to update status: ${updateError.message}`)
+      return
+    }
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'STATUS_CHANGE',
