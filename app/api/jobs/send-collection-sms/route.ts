@@ -55,9 +55,40 @@ export async function POST(request: NextRequest) {
 
     // Check repair outcome - skip review if not fixed
     if (job.repair_outcome === 'unrepaired') {
+      // Mark as sent so cron doesn't keep retrying
+      await supabase.from('jobs').update({
+        post_collection_sms_sent_at: new Date().toISOString(),
+        post_collection_sms_delivery_status: 'SKIPPED_UNREPAIRED',
+      }).eq('id', jobId)
       return NextResponse.json({
         success: false,
         message: `Review skipped - repair outcome: ${job.repair_outcome}`,
+        skipped: true
+      })
+    }
+
+    // Check if review request was disabled after scheduling
+    if (job.skip_review_request) {
+      await supabase.from('jobs').update({
+        post_collection_sms_sent_at: new Date().toISOString(),
+        post_collection_sms_delivery_status: 'SKIPPED_REVIEW_DISABLED',
+      }).eq('id', jobId)
+      return NextResponse.json({
+        success: false,
+        message: 'Review request disabled for this job',
+        skipped: true
+      })
+    }
+
+    // Check if customer was flagged as sensitive/awkward after scheduling
+    if (job.customer_flag === 'sensitive' || job.customer_flag === 'awkward') {
+      await supabase.from('jobs').update({
+        post_collection_sms_sent_at: new Date().toISOString(),
+        post_collection_sms_delivery_status: `SKIPPED_${job.customer_flag.toUpperCase()}`,
+      }).eq('id', jobId)
+      return NextResponse.json({
+        success: false,
+        message: `Review skipped - customer flagged as ${job.customer_flag}`,
         skipped: true
       })
     }
@@ -309,21 +340,29 @@ export async function GET(request: NextRequest) {
       .order('post_collection_sms_scheduled_at', { ascending: true })
 
     // Also get jobs with scheduled aftercare SMS that haven't been sent yet
+    // (exclude flagged/skipped customers and unrepaired devices)
     const { data: aftercareJobs, error: aftercareError } = await supabase
       .from('jobs')
       .select('id, job_ref, customer_phone, customer_name, device_make, device_model')
       .not('aftercare_sms_scheduled_at', 'is', null)
       .is('aftercare_sms_sent_at', null)
       .lte('aftercare_sms_scheduled_at', new Date().toISOString())
+      .is('skip_review_request', false)
+      .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
+      .or('repair_outcome.is.null,repair_outcome.eq.repaired')
       .order('aftercare_sms_scheduled_at', { ascending: true })
 
     // Also get jobs with scheduled review reminder SMS that haven't been sent yet
+    // (exclude flagged/skipped customers and unrepaired devices)
     const { data: reviewReminderJobs, error: reviewReminderError } = await supabase
       .from('jobs')
       .select('id, job_ref, customer_phone, customer_name, review_platforms_completed')
       .not('review_reminder_sms_scheduled_at', 'is', null)
       .is('review_reminder_sms_sent_at', null)
       .lte('review_reminder_sms_scheduled_at', new Date().toISOString())
+      .is('skip_review_request', false)
+      .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
+      .or('repair_outcome.is.null,repair_outcome.eq.repaired')
       .order('review_reminder_sms_scheduled_at', { ascending: true })
 
     if (error) {
