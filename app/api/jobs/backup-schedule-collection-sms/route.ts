@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+/**
+ * GET /api/jobs/backup-schedule-collection-sms
+ * Cron endpoint — runs daily to catch any COLLECTED/COMPLETED jobs
+ * that were missed by the main schedule-collection-sms POST handler.
+ * Verifies via Vercel Cron Authorization header.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const cronSecret = request.headers.get('Authorization')
+    if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    return await runBackupSchedule()
+  } catch (error) {
+    console.error('Backup scheduling error (GET):', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { secret } = await request.json()
@@ -10,6 +30,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    return await runBackupSchedule()
+  } catch (error) {
+    console.error('Backup scheduling error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+async function runBackupSchedule() {
     // Use service role key for server-side operations
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +52,8 @@ export async function POST(request: NextRequest) {
 
     // Find COLLECTED or COMPLETED jobs that haven't been scheduled (and shouldn't be skipped)
     // Include COMPLETED to catch jobs that were auto-closed before review was scheduled
+    // Only look at jobs updated in the last 14 days to avoid scheduling very old jobs
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: jobs } = await supabase
       .from('jobs')
       .select('id, job_ref, repair_outcome')
@@ -33,6 +63,7 @@ export async function POST(request: NextRequest) {
       .is('skip_review_request', false)
       .or('customer_flag.is.null,customer_flag.neq.sensitive,customer_flag.neq.awkward')
       .or('repair_outcome.is.null,repair_outcome.eq.repaired')
+      .gte('updated_at', fourteenDaysAgo)
 
     if (!jobs || jobs.length === 0) {
       // Still check for aftercare jobs even if no review jobs need scheduling
@@ -174,8 +205,4 @@ export async function POST(request: NextRequest) {
       reviewReminderCount: reminderCount,
       jobs: jobs.map(j => j.job_ref)
     })
-  } catch (error) {
-    console.error('Backup scheduling error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
 }
