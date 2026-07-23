@@ -201,10 +201,10 @@ export function generatePostCollectionEmail(data: PostCollectionEmailData): {
               <div style="background-color: #EFF6FF; border: 2px solid #3B82F6; border-radius: 8px; padding: 25px; margin: 25px 0; text-align: center;">
                 <h3 style="color: #1E40AF; margin: 0 0 15px 0; font-size: 20px; font-weight: bold;">Everything Working Well?</h3>
                 <p style="color: #1E3A8A; margin: 0 0 20px 0; font-size: 15px; line-height: 1.6;">
-                  We'd really appreciate a quick 5-star review. It helps other local customers know they can rely on us for quality repairs.
+                  A 5-star Google review helps our small business so much. It takes less than a minute.
                 </p>
                 <a href="${googleReviewLink}" style="display: inline-block; background-color: #3B82F6; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
-                  Leave a 5-Star Review
+                  Leave a Google Review
                 </a>
                 <p style="color: #6B7280; margin: 15px 0 0 0; font-size: 13px; font-style: italic;">
                   Takes less than 60 seconds
@@ -289,9 +289,9 @@ NEED HELP?
 If you notice any problems at all with your repair, please don't hesitate to get in touch. Just reply to this email or give us a call, and we'll sort it out straight away.
 
 EVERYTHING WORKING WELL?
-We'd really appreciate a quick 5-star review. It helps other local customers know they can rely on us for quality repairs.
+A 5-star Google review helps our small business so much. It takes less than a minute.
 
-Leave a review here: ${googleReviewLink}
+Leave a Google review here: ${googleReviewLink}
 
 ${crossSell.heading.toUpperCase()}
 

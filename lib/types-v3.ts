@@ -97,6 +97,7 @@ export interface Job {
   // Multi-platform review tracking
   review_platforms_completed?: string[] | null
   last_review_platform_requested?: string | null
+  review_link_opened_at?: string | null
   
   // Action-oriented enhancements
   status_changed_at?: string | null

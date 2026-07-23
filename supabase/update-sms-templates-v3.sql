@@ -216,48 +216,56 @@ WHERE key = 'DEPOSIT_REQUEST';
 -- via /api/jobs/send-collection-sms (delayed, aftercare-first with review link)
 DELETE FROM sms_templates WHERE key = 'COLLECTED';
 
--- POST_COLLECTION_REVIEW - Sent shortly after collection
--- Uses {review_link} which is populated from admin_settings.google_review_link
+-- POST_COLLECTION_REVIEW - Sent at 6pm evening after collection
+-- Uses {review_link} which points to the review landing page
+-- Arrow character (→) draws the eye to the link without emoji
 INSERT INTO sms_templates (key, body, is_active)
 SELECT 'POST_COLLECTION_REVIEW',
-'Hi {first_name}, thanks for choosing New Forest Device Repairs. If you''re happy with your {device_model} repair, we''d really appreciate a quick Google review:
+'Hi {first_name}, hope you''re happy with your {device_model} repair!
 
+If so, a 5-star Google review would mean the world to our small business →
 {review_link}
 
-If anything isn''t quite right, just reply to this message and we''ll do our best to put it right.
+(Takes 60 seconds — just tap the link above)
+
+If anything''s not right, just reply here.
 
 – New Forest Device Repairs', true
 WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'POST_COLLECTION_REVIEW');
 
 -- Update if already exists
 UPDATE sms_templates SET body =
-'Hi {first_name}, thanks for choosing New Forest Device Repairs. If you''re happy with your {device_model} repair, we''d really appreciate a quick Google review:
+'Hi {first_name}, hope you''re happy with your {device_model} repair!
 
+If so, a 5-star Google review would mean the world to our small business →
 {review_link}
 
-If anything isn''t quite right, just reply to this message and we''ll do our best to put it right.
+(Takes 60 seconds — just tap the link above)
+
+If anything''s not right, just reply here.
 
 – New Forest Device Repairs'
 WHERE key = 'POST_COLLECTION_REVIEW';
 
--- AFTERCARE_CHECKIN - Sent 3-5 days after collection (simple check-in, no review link)
--- Only sent if customer hasn't replied or left a review
+-- AFTERCARE_CHECKIN - Sent 3 days after collection (check-in with review link)
 INSERT INTO sms_templates (key, body, is_active)
 SELECT 'AFTERCARE_CHECKIN',
-'Hi {first_name}, just checking in to make sure your {device_model} is working as expected.
+'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
 
-If you''ve had any issues at all, just reply to this message and we''ll do our best to put it right.
+If you''re happy with the repair, a quick review really helps us →
+{review_link}
 
-Thanks, New Forest Device Repairs', true
+New Forest Device Repairs', true
 WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'AFTERCARE_CHECKIN');
 
 -- Update if already exists
 UPDATE sms_templates SET body =
-'Hi {first_name}, just checking in to make sure your {device_model} is working as expected.
+'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
 
-If you''ve had any issues at all, just reply to this message and we''ll do our best to put it right.
+If you''re happy with the repair, a quick review really helps us →
+{review_link}
 
-Thanks, New Forest Device Repairs'
+New Forest Device Repairs'
 WHERE key = 'AFTERCARE_CHECKIN';
 
 -- Ensure all templates are active

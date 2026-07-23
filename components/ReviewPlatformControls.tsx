@@ -16,7 +16,6 @@ interface ReviewPlatformControlsProps {
 
 const PLATFORMS = [
   { key: 'google', label: 'Google', doneColor: 'bg-blue-600 text-white', clickedColor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
-  { key: 'facebook', label: 'Facebook', doneColor: 'bg-indigo-600 text-white', clickedColor: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
   { key: 'trustpilot', label: 'Trustpilot', doneColor: 'bg-green-600 text-white', clickedColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700', pendingColor: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
 ]
 
@@ -109,14 +108,15 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
       onClose={onClose}
       title="Review Platforms"
       icon={<Star className="h-5 w-5 text-primary" />}
+      minHeight="auto"
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Customer clicks are tracked automatically from the review page. Tap a button to manually confirm a review.
         </p>
 
-        {/* Big square toggle buttons */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Toggle buttons */}
+        <div className="grid grid-cols-2 gap-3">
           {PLATFORMS.map((p) => {
             const isDone = completed.includes(p.key)
             const isSaving = saving === p.key
@@ -125,7 +125,7 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
                 key={p.key}
                 onClick={() => togglePlatform(p.key)}
                 disabled={isSaving}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 border-2 ${
+                className={`rounded-xl flex flex-col items-center justify-center gap-1.5 py-5 transition-all active:scale-95 border-2 ${
                   isDone
                     ? `${p.doneColor} border-transparent`
                     : `${p.clickedColor} border-2`
@@ -176,7 +176,7 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
           <div className="w-full text-center py-4 bg-green-50 dark:bg-green-900/30 rounded-xl border-2 border-green-200 dark:border-green-700">
             <Star className="h-6 w-6 text-green-600 inline mb-1" />
             <p className="text-sm font-bold text-green-700 dark:text-green-300">
-              All platforms done — thank you!
+              Both platforms done — thank you!
             </p>
           </div>
         )}
@@ -194,6 +194,18 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
         {job.last_review_platform_requested && (
           <p className="text-xs text-gray-400 text-center">
             Last SMS sent for: {job.last_review_platform_requested}
+          </p>
+        )}
+
+        {job.review_link_opened_at && (
+          <p className="text-xs text-green-600 dark:text-green-400 text-center">
+            Customer opened review link: {new Date(job.review_link_opened_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+
+        {!job.review_link_opened_at && job.post_collection_sms_sent_at && (
+          <p className="text-xs text-gray-400 text-center">
+            Review link not opened yet
           </p>
         )}
 

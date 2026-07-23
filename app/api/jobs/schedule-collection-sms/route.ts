@@ -3,12 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 
 /**
  * POST /api/jobs/schedule-collection-sms
- * Called when job status changes to COLLECTED.
+ * Called when job status changes to COLLECTED or COMPLETED.
  *
- * 1. Sends review request SMS immediately (via POST to send-collection-sms)
+ * 1. Schedules review request SMS for 6pm evening (via cron GET handler on send-collection-sms)
  * 2. Schedules aftercare SMS (with review link) for 3 days later
  * 3. Schedules review reminder SMS for 5 days later (only sent if no review clicked)
- * 4. Schedules post-collection email for 1-3 hours later (existing behaviour)
+ * 4. Schedules post-collection email for same evening as SMS
  */
 export async function POST(request: NextRequest) {
   try {
@@ -78,36 +78,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Skipped - device not fixed', skipped: true })
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
     const eventMessages: string[] = []
 
-    // 0. Set post_collection_sms_scheduled_at IMMEDIATELY and save to DB before
-    // attempting the send, so the cron GET handler can retry if the immediate
-    // send below fails (network error, timeout, etc.)
-    if (!job.post_collection_sms_scheduled_at) {
+    // 1. Schedule review SMS for 6pm evening (if not already scheduled or sent)
+    // The cron GET handler on send-collection-sms will pick it up and send it.
+    // Sending in the evening catches people when they're relaxed and sat down.
+    if (!job.post_collection_sms_scheduled_at && !job.post_collection_sms_sent_at) {
+      const reviewTime = calculateReviewSMSTime()
       await supabase
         .from('jobs')
-        .update({ post_collection_sms_scheduled_at: new Date().toISOString() })
+        .update({ post_collection_sms_scheduled_at: reviewTime.toISOString() })
         .eq('id', jobId)
-    }
-
-    // 1. Send review SMS immediately (if not already sent)
-    if (!job.post_collection_sms_sent_at) {
-      try {
-        const reviewResponse = await fetch(`${appUrl}/api/jobs/send-collection-sms`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId }),
-        })
-
-        const reviewResult = await reviewResponse.json()
-        console.log(`Review SMS sent immediately for ${job.job_ref}:`, reviewResult.smsDeliveryStatus || reviewResult.message)
-        eventMessages.push(`Review SMS sent - ${reviewResult.smsDeliveryStatus || 'unknown'}`)
-      } catch (err) {
-        console.error(`Failed to send review SMS for ${job.job_ref}:`, err)
-        eventMessages.push('Review SMS send failed - cron will retry')
-      }
-    } else {
+      eventMessages.push(`Review SMS scheduled for ${reviewTime.toLocaleString()}`)
+    } else if (job.post_collection_sms_sent_at) {
       eventMessages.push('Review SMS already sent')
     }
 
@@ -128,7 +111,7 @@ export async function POST(request: NextRequest) {
       eventMessages.push(`Review reminder scheduled for ${reviewReminderTime.toLocaleString()}`)
     }
 
-    // 4. Schedule email for 1-3 hours later (if not already scheduled)
+    // 4. Schedule email for same evening as SMS (if not already scheduled)
     if (!job.post_collection_email_scheduled_at) {
       const emailTime = calculateEmailTime()
       updates.post_collection_email_scheduled_at = emailTime.toISOString()
@@ -158,6 +141,28 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/**
+ * Calculate when to send the initial review SMS — 6pm evening.
+ * If it's already after 5pm, schedule for 6pm today (cron will pick it up soon).
+ * If it's after 8pm, schedule for 6pm tomorrow (too late to text tonight).
+ */
+function calculateReviewSMSTime(): Date {
+  const now = new Date()
+  const reviewTime = new Date(now)
+  const hour = now.getHours()
+
+  if (hour >= 20) {
+    // After 8pm — schedule for 6pm tomorrow
+    reviewTime.setDate(reviewTime.getDate() + 1)
+    reviewTime.setHours(18, 0, 0, 0)
+  } else {
+    // Before 8pm — schedule for 6pm today
+    reviewTime.setHours(18, 0, 0, 0)
+  }
+
+  return reviewTime
 }
 
 /**
@@ -214,21 +219,21 @@ function calculateReviewReminderTime(): Date {
 }
 
 /**
- * Calculate when to send post-collection email (1-3 hours later, within 8am-8pm)
+ * Calculate when to send post-collection email — same evening as SMS, 7pm.
+ * Email goes out slightly after the SMS so the customer has already seen the text.
  */
 function calculateEmailTime(): Date {
   const now = new Date()
-  const minDelay = 60 * 60 * 1000
-  const maxDelay = 3 * 60 * 60 * 1000
-  const randomDelay = minDelay + Math.random() * (maxDelay - minDelay)
-  const emailTime = new Date(now.getTime() + randomDelay)
+  const emailTime = new Date(now)
+  const hour = now.getHours()
 
-  const hour = emailTime.getHours()
-  if (hour < 8) {
-    emailTime.setHours(8, 0, 0, 0)
-  } else if (hour >= 20) {
+  if (hour >= 20) {
+    // After 8pm — schedule for 7pm tomorrow
     emailTime.setDate(emailTime.getDate() + 1)
-    emailTime.setHours(10, 0, 0, 0)
+    emailTime.setHours(19, 0, 0, 0)
+  } else {
+    // Before 8pm — schedule for 7pm today
+    emailTime.setHours(19, 0, 0, 0)
   }
 
   return emailTime

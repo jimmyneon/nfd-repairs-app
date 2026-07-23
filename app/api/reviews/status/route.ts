@@ -81,7 +81,7 @@ async function getReviewLinks(supabase: ReturnType<typeof createClient>) {
   const { data: settings } = await supabase
     .from('admin_settings')
     .select('key, value')
-    .in('key', ['google_review_link', 'facebook_review_link', 'trustpilot_review_link'])
+    .in('key', ['google_review_link', 'trustpilot_review_link'])
 
   const links: Record<string, string> = {}
   for (const s of settings || []) {
@@ -90,7 +90,6 @@ async function getReviewLinks(supabase: ReturnType<typeof createClient>) {
 
   return {
     google: links.google || 'https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review',
-    facebook: links.facebook || 'https://www.facebook.com/NFDrepairs/reviews/',
     trustpilot: links.trustpilot || 'https://uk.trustpilot.com/review/newforestdevicerepairs.co.uk',
   }
 }

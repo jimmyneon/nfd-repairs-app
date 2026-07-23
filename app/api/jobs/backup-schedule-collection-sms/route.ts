@@ -91,8 +91,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'No jobs to schedule', reviewCount: 0, aftercareCount: 0, reviewReminderCount: 0 })
     }
 
-    // Schedule each job - review SMS sent immediately by cron GET
+    // Schedule each job for 6pm evening (matching schedule-collection-sms behaviour)
     const scheduledTime = new Date()
+    const hour = scheduledTime.getHours()
+    if (hour >= 20) {
+      scheduledTime.setDate(scheduledTime.getDate() + 1)
+    }
+    scheduledTime.setHours(18, 0, 0, 0)
     const { error } = await supabase
       .from('jobs')
       .update({

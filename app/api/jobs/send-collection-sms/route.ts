@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Track which platform was requested (for app display purposes)
     const completedPlatforms: string[] = job.review_platforms_completed || []
-    const PLATFORM_ORDER = ['google', 'facebook', 'trustpilot']
+    const PLATFORM_ORDER = ['google', 'trustpilot']
     let selectedPlatform = platform || PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'google'
     if (completedPlatforms.includes(selectedPlatform)) {
       selectedPlatform = PLATFORM_ORDER.find(p => !completedPlatforms.includes(p)) || 'all_done'
@@ -108,10 +108,14 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}, thanks for choosing New Forest Device Repairs! Could you spare 2 mins to leave us a review? It really helps our small business:
+      smsBody = `Hi ${firstName}, hope you're happy with your ${job.device_model || 'device'} repair!
+
+If so, a 5-star Google review would mean the world to our small business →
 ${reviewLink}
 
-If anything isn't quite right, just reply and we'll put it right.
+(Takes 60 seconds — just tap the link above)
+
+If anything's not right, just reply here.
 
 – New Forest Device Repairs`
     }
@@ -435,7 +439,7 @@ export async function GET(request: NextRequest) {
             // Fallback if template not in database - includes review link
             aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
 
-If you're happy with the repair, a quick review really helps us:
+If you're happy with the repair, a quick review really helps us →
 ${aftercareReviewLink}
 
 New Forest Device Repairs`
@@ -547,7 +551,7 @@ New Forest Device Repairs`
             })
           } else {
             // Fallback if template not in database
-            reminderBody = `Hi ${firstName}, just a quick follow-up — if you haven't had a chance yet, we'd really appreciate a review. It takes 2 mins and means a lot to our small business:
+            reminderBody = `Hi ${firstName}, just a quick follow-up — if you haven't had a chance yet, we'd really appreciate a review. It takes 2 mins and means a lot to our small business →
 ${reminderReviewLink}
 
 – New Forest Device Repairs`

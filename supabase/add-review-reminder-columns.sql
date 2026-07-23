@@ -18,7 +18,7 @@ ADD COLUMN IF NOT EXISTS aftercare_sms_body TEXT;
 INSERT INTO sms_templates (key, body, is_active)
 VALUES (
   'REVIEW_REMINDER',
-  'Hi {first_name}, just a quick follow-up — if you haven''t had a chance yet, we''d really appreciate a review. It takes 2 mins and means a lot to our small business:
+  'Hi {first_name}, just a quick follow-up — if you haven''t had a chance yet, we''d really appreciate a review. It takes 2 mins and means a lot to our small business →
 {review_link}
 
 – New Forest Device Repairs',
@@ -33,7 +33,7 @@ SET body = EXCLUDED.body,
 UPDATE sms_templates
 SET body = 'Hi {first_name}, just checking in — how''s your {device_model} getting on? Any issues at all, just reply here and we''ll sort it.
 
-If you''re happy with the repair, a quick review really helps us:
+If you''re happy with the repair, a quick review really helps us →
 {review_link}
 
 New Forest Device Repairs'

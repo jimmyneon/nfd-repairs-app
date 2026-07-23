@@ -99,7 +99,7 @@ export default function SlideUpPanel({
         } ${mounted && dragY === 0 ? 'translate-y-0' : dragY > 0 ? '' : 'translate-y-full'}`}
         style={{
           maxHeight: '90dvh',
-          minHeight,
+          minHeight: minHeight === 'auto' ? undefined : minHeight,
           transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
         }}
       >
