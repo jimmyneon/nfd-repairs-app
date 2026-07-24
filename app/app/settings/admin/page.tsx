@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Save, Loader2, Link as LinkIcon, Star, Plus } from 'lucide-react'
+import { ArrowLeft, Home, Save, Loader2, Link as LinkIcon, Star, Plus, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 interface AdminSetting {
@@ -23,6 +23,17 @@ export default function AdminSettingsPage() {
   const [shopLatitude, setShopLatitude] = useState('')
   const [shopLongitude, setShopLongitude] = useState('')
   const [gpsRadius, setGpsRadius] = useState('100')
+  const [openingHours, setOpeningHours] = useState<Record<string, { isOpen: boolean; open: string; close: string }>>({
+    Sunday:    { isOpen: false, open: '10:00', close: '17:00' },
+    Monday:    { isOpen: true,  open: '10:00', close: '17:00' },
+    Tuesday:   { isOpen: true,  open: '10:00', close: '17:00' },
+    Wednesday: { isOpen: true,  open: '10:00', close: '17:00' },
+    Thursday:  { isOpen: true,  open: '10:00', close: '17:00' },
+    Friday:    { isOpen: true,  open: '10:00', close: '17:00' },
+    Saturday:  { isOpen: true,  open: '10:00', close: '15:00' },
+  })
+  const [specialHoursActive, setSpecialHoursActive] = useState(false)
+  const [specialHoursNote, setSpecialHoursNote] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -57,6 +68,54 @@ export default function AdminSettingsPage() {
       setShopLatitude(gpsData.shop_latitude?.toString() || '')
       setShopLongitude(gpsData.shop_longitude?.toString() || '')
       setGpsRadius(gpsData.gps_radius_meters?.toString() || '100')
+    }
+
+    // Load opening hours and special hours from admin_settings
+    const { data: hoursData } = await supabase
+      .from('admin_settings')
+      .select('key, value')
+      .in('key', ['opening_hours', 'special_hours'])
+
+    if (hoursData) {
+      const hoursSetting = hoursData.find(s => s.key === 'opening_hours')
+      if (hoursSetting?.value) {
+        try {
+          const parsed = typeof hoursSetting.value === 'string' 
+            ? JSON.parse(hoursSetting.value) 
+            : hoursSetting.value
+          if (parsed && typeof parsed === 'object') {
+            const newHours: Record<string, { isOpen: boolean; open: string; close: string }> = {}
+            for (const [day, data] of Object.entries(parsed)) {
+              const d = data as any
+              newHours[day] = {
+                isOpen: d.isOpen ?? false,
+                open: d.open ?? '10:00',
+                close: d.close ?? '17:00',
+              }
+            }
+            if (Object.keys(newHours).length > 0) {
+              setOpeningHours(newHours)
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse opening_hours:', e)
+        }
+      }
+
+      const specialSetting = hoursData.find(s => s.key === 'special_hours')
+      if (specialSetting?.value) {
+        try {
+          const parsed = typeof specialSetting.value === 'string' 
+            ? JSON.parse(specialSetting.value) 
+            : specialSetting.value
+          if (parsed && typeof parsed === 'object') {
+            setSpecialHoursActive(parsed.active ?? false)
+            setSpecialHoursNote(parsed.note ?? '')
+          }
+        } catch (e) {
+          console.error('Failed to parse special_hours:', e)
+        }
+      }
     }
 
     setLoading(false)
@@ -149,6 +208,44 @@ export default function AdminSettingsPage() {
       alert('GPS coordinates saved successfully!')
     } else {
       alert('Failed to save: ' + error.message)
+    }
+    setSaving(false)
+  }
+
+  const saveOpeningHours = async () => {
+    setSaving(true)
+
+    // Build the JSONB object with formatted display strings
+    const hoursData: Record<string, any> = {}
+    for (const [day, hrs] of Object.entries(openingHours)) {
+      const formatTime = (t: string) => {
+        if (!t) return ''
+        const [h, m] = t.split(':').map(Number)
+        const period = h >= 12 ? 'PM' : 'AM'
+        const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h)
+        return `${displayH}:${String(m).padStart(2, '0')} ${period}`
+      }
+      hoursData[day] = {
+        isOpen: hrs.isOpen,
+        formatted: hrs.isOpen ? `${formatTime(hrs.open)} - ${formatTime(hrs.close)}` : 'Closed',
+        open: hrs.isOpen ? hrs.open : null,
+        close: hrs.isOpen ? hrs.close : null,
+      }
+    }
+
+    const { error: hoursError } = await supabase
+      .from('admin_settings')
+      .upsert({ key: 'opening_hours', value: hoursData, description: 'Weekly opening hours for shop status API' }, { onConflict: 'key' })
+
+    const specialData = { active: specialHoursActive, note: specialHoursNote || null }
+    const { error: specialError } = await supabase
+      .from('admin_settings')
+      .upsert({ key: 'special_hours', value: specialData, description: 'Special hours for holidays/closures' }, { onConflict: 'key' })
+
+    if (!hoursError && !specialError) {
+      alert('Opening hours saved successfully!')
+    } else {
+      alert('Failed to save: ' + (hoursError?.message || specialError?.message))
     }
     setSaving(false)
   }
@@ -330,6 +427,99 @@ export default function AdminSettingsPage() {
                 Save GPS Coordinates
               </>
             )}
+          </button>
+        </div>
+
+        {/* Opening Hours */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center mb-4">
+            <Clock className="h-6 w-6 text-primary mr-2" />
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Opening Hours</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            These hours are shown on the website contact page and home page via the shop status API. Changes take effect within 1 minute.
+          </p>
+          <div className="space-y-3 mb-4">
+            {Object.entries(openingHours).map(([day, hrs]) => (
+              <div key={day} className="flex items-center gap-3 flex-wrap">
+                <div className="w-28 flex-shrink-0">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hrs.isOpen}
+                      onChange={(e) => setOpeningHours(prev => ({
+                        ...prev,
+                        [day]: { ...prev[day], isOpen: e.target.checked }
+                      }))}
+                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{day}</span>
+                  </label>
+                </div>
+                {hrs.isOpen ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="time"
+                      value={hrs.open}
+                      onChange={(e) => setOpeningHours(prev => ({
+                        ...prev,
+                        [day]: { ...prev[day], open: e.target.value }
+                      }))}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                    <span className="text-gray-500">to</span>
+                    <input
+                      type="time"
+                      value={hrs.close}
+                      onChange={(e) => setOpeningHours(prev => ({
+                        ...prev,
+                        [day]: { ...prev[day], close: e.target.value }
+                      }))}
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-400 italic">Closed</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Special hours / holiday notice */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="checkbox"
+                checked={specialHoursActive}
+                onChange={(e) => setSpecialHoursActive(e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Show special hours / holiday notice
+              </label>
+            </div>
+            {specialHoursActive && (
+              <input
+                type="text"
+                value={specialHoursNote}
+                onChange={(e) => setSpecialHoursNote(e.target.value)}
+                placeholder="e.g., Closed for Christmas Dec 24-Jan 2"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm mb-3"
+              />
+            )}
+          </div>
+
+          <button
+            onClick={saveOpeningHours}
+            disabled={saving}
+            className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            {saving ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Save className="h-5 w-5" />
+            )}
+            <span>Save Opening Hours</span>
           </button>
         </div>
 
