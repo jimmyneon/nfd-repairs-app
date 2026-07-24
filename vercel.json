@@ -3,19 +3,5 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["lhr1"],
-  "crons": [
-    {
-      "path": "/api/jobs/send-collection-sms",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/jobs/send-collection-reminders",
-      "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/jobs/backup-schedule-collection-sms",
-      "schedule": "30 10 * * *"
-    }
-  ]
+  "regions": ["lhr1"]
 }
