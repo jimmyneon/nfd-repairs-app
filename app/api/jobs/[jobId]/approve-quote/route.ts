@@ -43,11 +43,30 @@ export async function POST(
 
       // Create notification for staff
       const totalPrice = (enquiry.quoted_price || 0) + allAddOns.reduce((s: number, r: any) => s + r.price, 0)
+      const notifBody = `${enquiry.enquiry_ref}: ${enquiry.device_make} ${enquiry.device_model} - Customer approved the quote (£${totalPrice})${newAddOns.length > 0 ? ` (+${newAddOns.length} add-on${newAddOns.length > 1 ? 's' : ''})` : ''}`
       await supabase.from('notifications').insert({
         type: 'QUOTE_APPROVED',
         title: 'Quote Approved',
-        body: `${enquiry.enquiry_ref}: ${enquiry.device_make} ${enquiry.device_model} - Customer approved the quote (£${totalPrice})${newAddOns.length > 0 ? ` (+${newAddOns.length} add-on${newAddOns.length > 1 ? 's' : ''})` : ''}`,
+        body: notifBody,
       })
+
+      // Send push notification to NF Hub app
+      try {
+        await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            app_id: 'nfd-repairs',
+            title: 'Quote Approved',
+            body: notifBody,
+            category: 'status_update',
+            priority: 'high',
+            deep_link: `https://nfd-repairs-app.vercel.app/admin`,
+          }),
+        })
+      } catch (e) {
+        console.error('[Notify] Failed to send push:', e)
+      }
 
       return NextResponse.json({ success: true })
     }
@@ -99,12 +118,31 @@ export async function POST(
     })
 
     // Create notification for staff
+    const jobNotifBody = `${job.job_ref}: ${job.device_make} ${job.device_model} - Customer approved the quote (£${job.quoted_price || job.price_total})${newAddOns.length > 0 ? ` (+${newAddOns.length} add-on${newAddOns.length > 1 ? 's' : ''})` : ''}`
     await supabase.from('notifications').insert({
       type: 'QUOTE_APPROVED',
       title: 'Quote Approved',
-      body: `${job.job_ref}: ${job.device_make} ${job.device_model} - Customer approved the quote (£${job.quoted_price || job.price_total})${newAddOns.length > 0 ? ` (+${newAddOns.length} add-on${newAddOns.length > 1 ? 's' : ''})` : ''}`,
+      body: jobNotifBody,
       job_id: jobId,
     })
+
+    // Send push notification to NF Hub app
+    try {
+      await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: 'nfd-repairs',
+          title: 'Quote Approved',
+          body: jobNotifBody,
+          category: 'status_update',
+          priority: 'high',
+          deep_link: `https://nfd-repairs-app.vercel.app/admin`,
+        }),
+      })
+    } catch (e) {
+      console.error('[Notify] Failed to send push:', e)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

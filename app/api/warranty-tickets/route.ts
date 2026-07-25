@@ -167,6 +167,24 @@ export async function POST(request: NextRequest) {
         job_id: autoMatch?.jobId || null,
       })
 
+    // Send push notification to NF Hub app
+    try {
+      await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: 'nfd-repairs',
+          title: 'New Warranty Claim',
+          body: `${ticket.customer_name} - ${ticket.device_model || 'Device'} - ${ticket.issue_description.substring(0, 100)}`,
+          category: 'warranty',
+          priority: 'high',
+          deep_link: `https://nfd-repairs-app.vercel.app/admin/warranty`,
+        }),
+      })
+    } catch (e) {
+      console.error('[Notify] Failed to send push:', e)
+    }
+
     console.log('Warranty ticket created:', ticket.ticket_ref, `(${suggestions.length} suggestions)`)
 
     return NextResponse.json({
