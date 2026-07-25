@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 
+// Server-side price verification: fetch catalogue and look up the real price by quote_key
+async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
+  try {
+    const res = await fetch('https://newforestdevicerepairs.co.uk/data/quote-catalogue.json', {
+      headers: { 'Cache-Control': 'no-store' },
+    })
+    if (!res.ok) return { verifiedPrice: null, displayPrice: null, partOption: null }
+    const catalogue = await res.json()
+    const match = (catalogue.quotes || []).find((q: any) => q.quoteKey === quoteKey)
+    if (!match) return { verifiedPrice: null, displayPrice: null, partOption: null }
+    return {
+      verifiedPrice: match.customerPriceGbp ?? null,
+      displayPrice: match.displayPrice ?? null,
+      partOption: match.partOption ?? null,
+    }
+  } catch {
+    return { verifiedPrice: null, displayPrice: null, partOption: null }
+  }
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
@@ -108,6 +128,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Server-side price verification for repair quotes
+    // If a quote_key is provided, look up the real price from the catalogue
+    // and override the client-sent price to prevent tampering
+    let verifiedQuotedPrice = quoted_price
+    let verifiedDisplayPrice = display_price
+    let verifiedPartOption = part_option
+    let priceTampered = false
+    if (enquiry_type === 'repair_quote' && quote_key) {
+      const verification = await verifyQuotePrice(quote_key, quoted_price)
+      if (verification.verifiedPrice !== null) {
+        if (quoted_price !== null && quoted_price !== verification.verifiedPrice) {
+          console.warn(`[PRICE VERIFICATION] Tampered price detected for quote_key=${quote_key}: client sent ${quoted_price}, catalogue says ${verification.verifiedPrice}`)
+          priceTampered = true
+        }
+        verifiedQuotedPrice = verification.verifiedPrice
+        verifiedDisplayPrice = verification.displayPrice
+        verifiedPartOption = verification.partOption
+      }
+    }
+
     // Insert enquiry into database
     let enquiryRef: string = ''
     try {
@@ -141,7 +181,7 @@ export async function POST(request: NextRequest) {
           device_model: device_model || null,
           repair_type: repair_type || null,
           screen_option: screen_option || null,
-          quoted_price: quoted_price || null,
+          quoted_price: verifiedQuotedPrice || null,
           quote_type: quote_type || null,
           issue_description: issue_description || null,
           terms_accepted: terms_accepted || false,
@@ -149,8 +189,8 @@ export async function POST(request: NextRequest) {
           marketing_consent: marketing_consent || false,
           quote_source: quote_source || null,
           additional_repairs: additional_repairs || null,
-          part_option: part_option || null,
-          display_price: display_price || null,
+          part_option: verifiedPartOption || null,
+          display_price: verifiedDisplayPrice || null,
           warranty: warranty || null,
           estimated_time: estimated_time || null,
           quote_key: quote_key || null,
@@ -230,7 +270,7 @@ export async function POST(request: NextRequest) {
         ? `New Repair Quote: ${device_make || ''} ${device_model || ''}`
         : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`,
       body: enquiry_type === 'repair_quote'
-        ? `${customer_name} - ${repair_type || 'Repair'}${quoted_price ? ' - £' + quoted_price : ' - Personalized quote'}`
+        ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${priceTampered ? ' - ⚠️ PRICE TAMPERED (client sent £' + quoted_price + ', corrected to £' + verifiedQuotedPrice + ')' : ''}`
         : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`,
       is_read: false,
     } as any)
