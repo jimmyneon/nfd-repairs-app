@@ -4,7 +4,8 @@
   "description": "Device repair management system",
   "icon": "https://repairs.nfd.com.au/icon-192.png",
   "color": "#2563eb",
-  "notify_endpoint": "https://repairs.nfd.com.au/api/notify/register-device",
+  "notify_endpoint": "https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/register-device",
+  "send_endpoint": "https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send",
   "categories": [
     { "id": "new_booking", "label": "New Bookings", "icon": "add-circle-outline" },
     { "id": "status_update", "label": "Status Updates", "icon": "sync-outline" },
