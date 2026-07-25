@@ -7,11 +7,7 @@
   "notify_endpoint": "https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/register-device",
   "send_endpoint": "https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send",
   "categories": [
-    { "id": "new_booking", "label": "New Bookings", "icon": "add-circle-outline", "color": "#2563eb" },
-    { "id": "status_update", "label": "Status Updates", "icon": "sync-outline", "color": "#0891b2" },
-    { "id": "parts_arrived", "label": "Parts Arrived", "icon": "cube-outline", "color": "#7c3aed" },
-    { "id": "ready_to_collect", "label": "Ready to Collect", "icon": "checkmark-circle-outline", "color": "#16a34a" },
-    { "id": "warranty", "label": "Warranty Claims", "icon": "shield-outline", "color": "#dc2626" },
-    { "id": "customer_arrived", "label": "Customer Arrived", "icon": "walk-outline", "color": "#ea580c" }
+    { "id": "status_update", "label": "Quote Approved", "icon": "checkmark-circle-outline", "color": "#16a34a" },
+    { "id": "warranty", "label": "Warranty Claims", "icon": "shield-outline", "color": "#dc2626" }
   ]
 }
