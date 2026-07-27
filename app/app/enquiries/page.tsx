@@ -55,6 +55,7 @@ interface Enquiry {
   quote_sent_method?: string | null
   repair_reserved?: boolean
   part_reserved?: boolean
+  converted_to_job_id?: string | null
   preferred_contact_method?: string | null
   customer_notes?: string | null
   quote_valid_until?: string | null
@@ -69,7 +70,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   approved: { label: 'Approved', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
   rejected: { label: 'Rejected', color: 'border-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
   more_info_requested: { label: 'Info Sent', color: 'border-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
-  converted: { label: 'Accepted', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+  converted: { label: 'Booked In', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: string; bg: string }> = {
@@ -94,6 +95,11 @@ function EnquiriesContent() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [smsMessage, setSmsMessage] = useState('')
   const [sendingSms, setSendingSms] = useState(false)
+  const [converting, setConverting] = useState(false)
+  const [convertStep, setConvertStep] = useState<'main' | 'deposit_confirm'>('main')
+  const [convertResult, setConvertResult] = useState<{ job_ref: string; tracking_url: string } | null>(null)
+  const [showMessageComposer, setShowMessageComposer] = useState(false)
+  const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
   const supabase = createClient()
 
   useEffect(() => {
@@ -194,12 +200,6 @@ function EnquiriesContent() {
     setResponding(false)
   }
 
-  const openDetail = (enquiry: Enquiry) => {
-    setSelectedEnquiry(enquiry)
-    setResponseText(enquiry.staff_notes || '')
-    setShowDetail(true)
-  }
-
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
   const isActionNeeded = (e: Enquiry) => e.status === 'approved' || isAccepted(e)
@@ -223,6 +223,7 @@ function EnquiriesContent() {
   }
 
   const getStatusLabel = (e: Enquiry): string => {
+    if (e.converted_to_job_id) return 'Booked In'
     if (isAccepted(e)) return 'Accepted'
     if (isFollowUp(e)) return 'Follow-up'
     if (e.enquiry_type !== 'repair_quote' && e.status === 'pending') return 'New Enquiry'
@@ -236,30 +237,6 @@ function EnquiriesContent() {
     return null
   }
 
-  const handleSendSms = async () => {
-    if (!selectedEnquiry || !smsMessage.trim()) return
-    setSendingSms(true)
-    try {
-      const res = await fetch('/api/enquiries/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enquiryId: selectedEnquiry.id,
-          message: smsMessage.trim(),
-          templateKey: 'ENQUIRY_CUSTOM',
-        }),
-      })
-      if (res.ok) {
-        setSmsMessage('')
-        setShowTemplatePicker(false)
-        loadEnquiries()
-      }
-    } catch (e) {
-      console.error('Failed to send SMS:', e)
-    }
-    setSendingSms(false)
-  }
-
   const applySmsTemplate = (body: string) => {
     if (!selectedEnquiry) return
     const rendered = renderSmsTemplate(body, {
@@ -271,6 +248,80 @@ function EnquiriesContent() {
     })
     setSmsMessage(rendered)
     setShowTemplatePicker(false)
+  }
+
+  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_deposit_paid') => {
+    if (!selectedEnquiry) return
+    setConverting(true)
+    try {
+      const res = await fetch('/api/enquiries/convert-to-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiry_id: selectedEnquiry.id,
+          stock_status: stockStatus,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setConvertResult({ job_ref: data.job_ref, tracking_url: data.tracking_url })
+        setConvertStep('main')
+        loadEnquiries()
+      } else {
+        alert(data.error || 'Failed to convert enquiry')
+      }
+    } catch (e) {
+      console.error('Conversion failed:', e)
+      alert('Failed to convert enquiry to job')
+    }
+    setConverting(false)
+  }
+
+  const handleSendMessage = async () => {
+    if (!selectedEnquiry || !smsMessage.trim()) return
+    setSendingSms(true)
+    try {
+      if (messageMethod === 'sms' || messageMethod === 'both') {
+        await fetch('/api/enquiries/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enquiryId: selectedEnquiry.id,
+            message: smsMessage.trim(),
+            templateKey: 'ENQUIRY_CUSTOM',
+          }),
+        })
+      }
+      if (messageMethod === 'email' || messageMethod === 'both') {
+        if (selectedEnquiry.customer_email) {
+          await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: selectedEnquiry.customer_email,
+              subject: `New Forest Device Repairs - ${selectedEnquiry.device_make || ''} ${selectedEnquiry.device_model || ''}`,
+              message: smsMessage.trim(),
+              type: 'CUSTOM',
+            }),
+          })
+        }
+      }
+      setSmsMessage('')
+      setShowMessageComposer(false)
+      loadEnquiries()
+    } catch (e) {
+      console.error('Failed to send message:', e)
+    }
+    setSendingSms(false)
+  }
+
+  const openDetail = (enquiry: Enquiry) => {
+    setSelectedEnquiry(enquiry)
+    setResponseText(enquiry.staff_notes || '')
+    setConvertStep('main')
+    setConvertResult(null)
+    setShowMessageComposer(false)
+    setShowDetail(true)
   }
 
   const fmtDate = (d: string) => {
@@ -378,7 +429,7 @@ function EnquiriesContent() {
                     <h2 className="font-black text-lg text-green-700 dark:text-green-400">
                       Approved - Action Needed ({filteredEnquiries.filter(e => isActionNeeded(e)).length})
                     </h2>
-                    <p className="text-xs text-green-600 dark:text-green-500">Customers waiting - check parts & arrange deposit</p>
+                    <p className="text-xs text-green-600 dark:text-green-500">Customer wants this booked in — check stock & convert to job</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -488,7 +539,7 @@ function EnquiriesContent() {
       {/* Detail Slide-Up Panel */}
       <SlideUpPanel
         isOpen={showDetail}
-        onClose={() => setShowDetail(false)}
+        onClose={() => { setShowDetail(false); setConvertStep('main'); setConvertResult(null); setShowMessageComposer(false) }}
         title={selectedEnquiry?.customer_name || 'Enquiry'}
         icon={<Mail className="h-5 w-5 text-primary" />}
       >
@@ -500,8 +551,8 @@ function EnquiriesContent() {
               <span className="text-sm text-gray-500">{new Date(selectedEnquiry.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
             </div>
 
-            {/* Status badge */}
-            <div className="flex items-center gap-2">
+            {/* Status badge + price */}
+            <div className="flex items-center gap-2 flex-wrap">
               {(() => {
                 const cfg = STATUS_CONFIG[selectedEnquiry.status] || STATUS_CONFIG.pending
                 const label = getStatusLabel(selectedEnquiry)
@@ -510,169 +561,70 @@ function EnquiriesContent() {
               {selectedEnquiry.enquiry_type === 'repair_quote' && selectedEnquiry.quoted_price != null && (
                 <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">£{selectedEnquiry.quoted_price}</span>
               )}
-            </div>
-
-            {/* Contact buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              {selectedEnquiry.customer_phone && (
-                <a href={`sms:${selectedEnquiry.customer_phone}`} className="flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                  <MessageSquare className="h-4 w-4" /> Text
-                </a>
-              )}
-              {selectedEnquiry.customer_email && (
-                <a href={`mailto:${selectedEnquiry.customer_email}`} className="flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                  <Mail className="h-4 w-4" /> Email
-                </a>
+              {selectedEnquiry.repair_reserved && (
+                <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Reserved</span>
               )}
             </div>
 
-            {/* Repair quote details */}
-            {selectedEnquiry.enquiry_type === 'repair_quote' && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-bold text-gray-900 dark:text-white">Repair Details</p>
-                <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                  <p><span className="font-semibold">Device:</span> {selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
-                  <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
-                  {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Quoted:</span> £{selectedEnquiry.quoted_price}</p>}
-                  {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
-                  {selectedEnquiry.screen_option && <p><span className="font-semibold">Part:</span> {selectedEnquiry.screen_option}</p>}
+            {/* Conversion success screen */}
+            {convertResult ? (
+              <div className="text-center py-6 space-y-4">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
-              </div>
-            )}
-
-            {/* Post-quote journey */}
-            {selectedEnquiry.enquiry_type === 'repair_quote' && (selectedEnquiry.repair_reserved || selectedEnquiry.part_reserved || selectedEnquiry.hesitation_reason || selectedEnquiry.customer_notes) && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 space-y-1">
-                <p className="text-sm font-bold text-blue-900 dark:text-blue-300">Customer Actions</p>
-                <div className="text-sm text-blue-800 dark:text-blue-400 space-y-1">
-                  {selectedEnquiry.repair_reserved && <p>✓ Repair reserved</p>}
-                  {selectedEnquiry.part_reserved && <p>✓ Part reserved (waiting until payday)</p>}
-                  {selectedEnquiry.hesitation_reason && <p>⚠ Hesitation: {selectedEnquiry.hesitation_reason.replace(/_/g, ' ')}</p>}
-                  {selectedEnquiry.customer_budget != null && <p>Budget: £{selectedEnquiry.customer_budget}</p>}
-                  {selectedEnquiry.customer_notes && <p className="italic">"{selectedEnquiry.customer_notes}"</p>}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Job Created!</h3>
+                  <p className="text-sm text-gray-500 mt-1">Job ref: <span className="font-mono font-bold">{convertResult.job_ref}</span></p>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-2">Customer has been messaged automatically.</p>
                 </div>
-              </div>
-            )}
-
-            {/* Issue description */}
-            {selectedEnquiry.issue_description && (
-              <div>
-                <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Issue Description</p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
-              </div>
-            )}
-
-            {/* Business enquiry details */}
-            {selectedEnquiry.enquiry_type === 'business' && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
-                <p className="text-sm font-bold text-gray-900 dark:text-white">Business Details</p>
-                <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                  {selectedEnquiry.company && <p><span className="font-semibold">Company:</span> {selectedEnquiry.company}</p>}
-                  {selectedEnquiry.help_type && <p><span className="font-semibold">Help:</span> {selectedEnquiry.help_type}</p>}
-                  {selectedEnquiry.device_count && <p><span className="font-semibold">Devices:</span> {selectedEnquiry.device_count}</p>}
-                  {selectedEnquiry.urgency && <p><span className="font-semibold">Urgency:</span> {selectedEnquiry.urgency}</p>}
-                  {selectedEnquiry.support_type && <p><span className="font-semibold">Support:</span> {selectedEnquiry.support_type}</p>}
-                  {selectedEnquiry.postcode && <p><span className="font-semibold">Postcode:</span> {selectedEnquiry.postcode}</p>}
-                  {selectedEnquiry.preferred_contact_method && <p><span className="font-semibold">Contact pref:</span> {selectedEnquiry.preferred_contact_method}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Web services details */}
-            {selectedEnquiry.enquiry_type === 'web_services' && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
-                <p className="text-sm font-bold text-gray-900 dark:text-white">Project Details</p>
-                <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                  {selectedEnquiry.project_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.project_type}</p>}
-                  {selectedEnquiry.budget && <p><span className="font-semibold">Budget:</span> {selectedEnquiry.budget}</p>}
-                  {selectedEnquiry.timeline && <p><span className="font-semibold">Timeline:</span> {selectedEnquiry.timeline}</p>}
-                  {selectedEnquiry.project_description && <p><span className="font-semibold">Description:</span> {selectedEnquiry.project_description}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Collapsible more details */}
-            <details className="group">
-              <summary className="cursor-pointer text-sm font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-2 py-2">
-                <ChevronDown className="h-4 w-4 group-open:rotate-180 transition-transform" />
-                More Details
-              </summary>
-              <div className="mt-2 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                {selectedEnquiry.terms_accepted !== undefined && <p><span className="font-semibold">Terms:</span> {selectedEnquiry.terms_accepted ? 'Yes' : 'No'}</p>}
-                {selectedEnquiry.marketing_consent !== undefined && <p><span className="font-semibold">Marketing:</span> {selectedEnquiry.marketing_consent ? 'Yes' : 'No'}</p>}
-                {selectedEnquiry.quote_source && <p><span className="font-semibold">Source:</span> {selectedEnquiry.quote_source}</p>}
-                {selectedEnquiry.preferred_contact_method && <p><span className="font-semibold">Preferred contact:</span> {selectedEnquiry.preferred_contact_method}</p>}
-                {selectedEnquiry.additional_info && <p><span className="font-semibold">Additional info:</span> {selectedEnquiry.additional_info}</p>}
-                {selectedEnquiry.staff_notes && <p><span className="font-semibold">Staff notes:</span> {selectedEnquiry.staff_notes}</p>}
-              </div>
-            </details>
-
-            {/* Transfer to Job button — for accepted repair quotes */}
-            {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
-              <button
-                onClick={() => {
-                  const params = new URLSearchParams({
-                    enquiry_ref: selectedEnquiry.enquiry_ref,
-                    customer_name: selectedEnquiry.customer_name,
-                    customer_phone: selectedEnquiry.customer_phone || '',
-                    device_make: selectedEnquiry.device_make || '',
-                    device_model: selectedEnquiry.device_model || '',
-                    issue: selectedEnquiry.repair_type || '',
-                    quoted_price: selectedEnquiry.quoted_price?.toString() || '',
-                    from_enquiry: '1',
-                  })
-                  window.location.href = `/app/jobs/create?${params.toString()}`
-                }}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 text-lg"
-              >
-                <ArrowRight className="h-5 w-5" />
-                Transfer to Job
-              </button>
-            )}
-
-            {/* Status actions — different for repair quotes vs business enquiries */}
-            {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type === 'repair_quote' && (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
-                  className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
-                >
-                  <CheckCircle className="h-4 w-4" /> Approve
-                </button>
-                <button
-                  onClick={() => handleStatusChange(selectedEnquiry.id, 'rejected')}
-                  className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors active:scale-95"
-                >
-                  ✕ Reject
-                </button>
-              </div>
-            )}
-
-            {/* Business/non-repair enquiries: Contact + Mark Handled */}
-            {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type !== 'repair_quote' && (
-              <div className="grid grid-cols-2 gap-3">
-                {selectedEnquiry.customer_phone && (
-                  <a
-                    href={`tel:${selectedEnquiry.customer_phone}`}
-                    className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95"
+                <div className="flex gap-3">
+                  <Link
+                    href={`/app/jobs/${convertResult.job_ref}`}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
                   >
-                    <Phone className="h-4 w-4" /> Call
-                  </a>
-                )}
-                <button
-                  onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
-                  className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
-                >
-                  <CheckCircle className="h-4 w-4" /> Mark Handled
-                </button>
+                    <ArrowRight className="h-4 w-4" /> View Job
+                  </Link>
+                  <button
+                    onClick={() => { setShowDetail(false); setConvertResult(null) }}
+                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
-            )}
+            ) : showMessageComposer ? (
+              /* Message composer */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Send Message</h3>
+                  <button
+                    onClick={() => setShowMessageComposer(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
 
-            {/* Send SMS section */}
-            {selectedEnquiry.customer_phone && (
-              <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">Send SMS to Customer</p>
+                {/* Method selector */}
+                <div className="grid grid-cols-3 gap-2">
+                  {(['sms', 'email', 'both'] as const).map((method) => (
+                    <button
+                      key={method}
+                      onClick={() => setMessageMethod(method)}
+                      className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                        messageMethod === method
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      }`}
+                    >
+                      {method === 'sms' ? 'Text' : method === 'email' ? 'Email' : 'Both'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Template picker */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-gray-900 dark:text-white">Message</p>
                   <button
                     onClick={() => setShowTemplatePicker(!showTemplatePicker)}
                     className="text-xs font-bold text-primary hover:text-primary-dark"
@@ -682,15 +634,15 @@ function EnquiriesContent() {
                 </div>
 
                 {showTemplatePicker && (
-                  <div className="mb-2 max-h-40 overflow-y-auto space-y-1">
+                  <div className="max-h-40 overflow-y-auto space-y-1">
                     {smsTemplates.map((tpl) => (
                       <button
                         key={tpl.key}
                         onClick={() => applySmsTemplate(tpl.body)}
-                        className="w-full text-left p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
+                        className="w-full text-left p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
-                        <span className="font-bold text-xs text-gray-900 dark:text-white">{tpl.key}</span>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{tpl.body}</p>
+                        <span className="font-bold text-xs text-primary">{tpl.key}</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{tpl.body}</p>
                       </button>
                     ))}
                   </div>
@@ -699,48 +651,190 @@ function EnquiriesContent() {
                 <textarea
                   value={smsMessage}
                   onChange={(e) => setSmsMessage(e.target.value)}
-                  placeholder="Type a message to send via SMS..."
+                  placeholder="Type your message..."
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  rows={3}
+                  rows={5}
                 />
+
                 <button
-                  onClick={handleSendSms}
+                  onClick={handleSendMessage}
                   disabled={sendingSms || !smsMessage.trim()}
-                  className="mt-2 w-full flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  {sendingSms ? 'Sending...' : 'Send SMS'}
+                  {sendingSms ? 'Sending...' : `Send ${messageMethod === 'both' ? 'Text + Email' : messageMethod === 'sms' ? 'Text' : 'Email'}`}
                 </button>
               </div>
-            )}
+            ) : convertStep === 'deposit_confirm' ? (
+              /* Deposit confirmation step for Need Parts flow */
+              <div className="space-y-4 py-4">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Parts Need Ordering</h3>
+                  <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
+                    Has the customer paid the £20 deposit? Once confirmed, the part will be ordered and the job will be created.
+                  </p>
+                </div>
 
-            {/* Staff response */}
-            {selectedEnquiry.staff_response && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4">
-                <p className="text-sm font-bold text-blue-900 dark:text-blue-300 mb-1">Staff Response</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{selectedEnquiry.staff_response}</p>
-                {selectedEnquiry.responded_at && <p className="text-xs text-gray-400 mt-2">{new Date(selectedEnquiry.responded_at).toLocaleString()}</p>}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 text-sm text-yellow-800 dark:text-yellow-400 space-y-1">
+                  <p>• £20 deposit required for special parts</p>
+                  <p>• Customer receives: "Deposit received, part ordered"</p>
+                  <p>• Job status: <span className="font-bold">Parts Ordered</span></p>
+                  <p>• Job won't proceed until deposit is paid</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setConvertStep('main')}
+                    className="py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => handleConvertToJob('parts_deposit_paid')}
+                    disabled={converting}
+                    className="py-4 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
+                  >
+                    {converting ? 'Processing...' : '✓ Deposit Paid'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Repair details — compact */}
+                {selectedEnquiry.enquiry_type === 'repair_quote' && (
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1.5">
+                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
+                      <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
+                      {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
+                      {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> £{selectedEnquiry.quoted_price}</p>}
+                      {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer info */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                    <p><span className="font-semibold">Name:</span> {selectedEnquiry.customer_name}</p>
+                    <p><span className="font-semibold">Phone:</span> {selectedEnquiry.customer_phone || '—'}</p>
+                    {selectedEnquiry.customer_email && <p><span className="font-semibold">Email:</span> {selectedEnquiry.customer_email}</p>}
+                  </div>
+                </div>
+
+                {/* Customer notes */}
+                {selectedEnquiry.customer_notes && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3">
+                    <p className="text-xs font-bold text-blue-900 dark:text-blue-300 mb-1">Customer Notes</p>
+                    <p className="text-sm text-blue-800 dark:text-blue-400 italic">"{selectedEnquiry.customer_notes}"</p>
+                  </div>
+                )}
+
+                {/* Issue description */}
+                {selectedEnquiry.issue_description && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 mb-1">Issue Description</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
+                  </div>
+                )}
+
+                {/* === MAIN ACTIONS === */}
+                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
+                  <div className="space-y-3 pt-2">
+                    <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Check stock — what do we need?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleConvertToJob('in_stock')}
+                        disabled={converting}
+                        className="flex flex-col items-center justify-center gap-2 py-6 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
+                      >
+                        <CheckCircle className="h-7 w-7" />
+                        <span className="text-sm">In Stock</span>
+                        <span className="text-xs opacity-80">Book it in →</span>
+                      </button>
+                      <button
+                        onClick={() => setConvertStep('deposit_confirm')}
+                        disabled={converting}
+                        className="flex flex-col items-center justify-center gap-2 py-6 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
+                      >
+                        <Clock className="h-7 w-7" />
+                        <span className="text-sm">Need Parts</span>
+                        <span className="text-xs opacity-80">£20 deposit →</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message button */}
+                <button
+                  onClick={() => setShowMessageComposer(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                >
+                  <MessageSquare className="h-4 w-4" /> Message Customer
+                </button>
+
+                {/* Non-repair enquiry actions */}
+                {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type !== 'repair_quote' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedEnquiry.customer_phone && (
+                      <a
+                        href={`tel:${selectedEnquiry.customer_phone}`}
+                        className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95"
+                      >
+                        <Phone className="h-4 w-4" /> Call
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleStatusChange(selectedEnquiry.id, 'approved')}
+                      className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
+                    >
+                      <CheckCircle className="h-4 w-4" /> Mark Handled
+                    </button>
+                  </div>
+                )}
+
+                {/* Collapsible more details */}
+                <details className="group">
+                  <summary className="cursor-pointer text-sm font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-2 py-2">
+                    <ChevronDown className="h-4 w-4 group-open:rotate-180 transition-transform" />
+                    More Details
+                  </summary>
+                  <div className="mt-2 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                    {selectedEnquiry.terms_accepted !== undefined && <p><span className="font-semibold">Terms:</span> {selectedEnquiry.terms_accepted ? 'Yes' : 'No'}</p>}
+                    {selectedEnquiry.marketing_consent !== undefined && <p><span className="font-semibold">Marketing:</span> {selectedEnquiry.marketing_consent ? 'Yes' : 'No'}</p>}
+                    {selectedEnquiry.quote_source && <p><span className="font-semibold">Source:</span> {selectedEnquiry.quote_source}</p>}
+                    {selectedEnquiry.preferred_contact_method && <p><span className="font-semibold">Preferred contact:</span> {selectedEnquiry.preferred_contact_method}</p>}
+                    {selectedEnquiry.additional_info && <p><span className="font-semibold">Additional info:</span> {selectedEnquiry.additional_info}</p>}
+                    {selectedEnquiry.staff_notes && <p><span className="font-semibold">Staff notes:</span> {selectedEnquiry.staff_notes}</p>}
+                    {selectedEnquiry.hesitation_reason && <p><span className="font-semibold">Hesitation:</span> {selectedEnquiry.hesitation_reason.replace(/_/g, ' ')}</p>}
+                    {selectedEnquiry.customer_budget != null && <p><span className="font-semibold">Budget:</span> £{selectedEnquiry.customer_budget}</p>}
+                  </div>
+                </details>
+
+                {/* Staff notes */}
+                <div>
+                  <textarea
+                    value={responseText}
+                    onChange={(e) => setResponseText(e.target.value)}
+                    placeholder="Add staff notes..."
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    rows={2}
+                  />
+                  <button
+                    onClick={handleRespond}
+                    disabled={responding || !responseText.trim()}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                  >
+                    <Send className="h-4 w-4" />
+                    {responding ? 'Saving...' : 'Save Notes'}
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Add staff notes */}
-            <div>
-              <textarea
-                value={responseText}
-                onChange={(e) => setResponseText(e.target.value)}
-                placeholder="Add staff notes..."
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                rows={3}
-              />
-              <button
-                onClick={handleRespond}
-                disabled={responding || !responseText.trim()}
-                className="mt-2 w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-                {responding ? 'Saving...' : 'Save Notes'}
-              </button>
-            </div>
           </div>
         )}
       </SlideUpPanel>
