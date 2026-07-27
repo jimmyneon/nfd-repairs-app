@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
       estimated_time: enquiry.estimated_time,
       additional_repairs: enquiry.additional_repairs,
       status: enquiry.status,
+      repair_reserved: enquiry.repair_reserved,
     }
 
     return NextResponse.json({ enquiry: safeEnquiry }, {

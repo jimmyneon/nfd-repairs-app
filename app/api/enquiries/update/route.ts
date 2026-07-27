@@ -48,6 +48,16 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'reserve_repair': {
+        if (enquiry.repair_reserved) {
+          return NextResponse.json({
+            success: true,
+            action: 'reserve_repair',
+            enquiry_ref: enquiry.enquiry_ref,
+            already_reserved: true,
+          }, {
+            headers: { 'Access-Control-Allow-Origin': '*' },
+          })
+        }
         updateFields.repair_reserved = true
         updateFields.status = 'converted'
         updateFields.proceed_with_repair = true
