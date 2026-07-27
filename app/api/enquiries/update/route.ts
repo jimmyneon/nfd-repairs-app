@@ -299,34 +299,12 @@ export async function POST(request: NextRequest) {
 ${isInstant ? `
 <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready.</p>
 
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 20px;">
-<tr><td style="padding:20px;">
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;width:120px;">Device</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${deviceName}</td>
-</tr>
-<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">Repair</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${repairName}</td>
-</tr>
-${(enquiry.part_option || enquiry.screen_option) ? `<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">Option</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.part_option || enquiry.screen_option}</td>
-</tr>` : ''}
-${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.additional_repairs.map((r: any) => `<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">+ ${r.display_name || r.repair}</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">£${r.price}</td>
-</tr>`).join('') : ''}
-<tr><td colspan="2" style="padding:14px 0 0;border-top:2px solid #e0e0e0;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-top:12px;color:#888;font-size:14px;vertical-align:middle;">Total</td>
-<td align="right" style="padding-top:12px;color:#009B4D;font-size:26px;font-weight:700;vertical-align:middle;text-align:right;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
-</tr></table>
-</td></tr>
-</table>
-</td></tr>
-</table>
+<div style="background:#f8fdf9;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px;">
+<p style="color:#888;font-size:14px;margin:0 0 4px;">${deviceName} — ${repairName}</p>
+${(enquiry.part_option || enquiry.screen_option) ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${enquiry.part_option || enquiry.screen_option}</p>` : ''}
+${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${enquiry.additional_repairs.map((r: any) => r.display_name || r.repair).join(', ')}</p>` : ''}
+<p style="color:#009B4D;font-size:32px;font-weight:800;margin:8px 0 0;">${priceText}</p>
+</div>
 
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td align="center">
 <a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Get This Repair Started</a>

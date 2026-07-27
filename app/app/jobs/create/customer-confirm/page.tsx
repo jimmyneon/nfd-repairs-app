@@ -658,10 +658,10 @@ function CustomerConfirmContent() {
                 <input type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} className="w-6 h-6 text-primary focus:ring-primary border-2 rounded mt-0.5 flex-shrink-0 border-gray-300" />
                 <div>
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Send me special prices, deals & offers
+                    Yes! Send me exclusive repair deals &amp; money-saving tips
                   </span>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                    I'd like to receive occasional messages about special prices, deals and promotions from New Forest Device Repairs.
+                    Be first to hear about price drops, seasonal offers, and free repair tips. Max 1–2 messages a month — unsubscribe anytime.
                   </p>
                 </div>
               </div>
