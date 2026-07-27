@@ -264,16 +264,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Create notification for staff
+    const notifTitle = enquiry_type === 'repair_quote'
+      ? `New Repair Quote: ${device_make || ''} ${device_model || ''}`
+      : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
+    const notifBody = enquiry_type === 'repair_quote'
+      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
+      : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
+
     await supabase.from('notifications').insert({
       type: 'NEW_ENQUIRY',
-      title: enquiry_type === 'repair_quote'
-        ? `New Repair Quote: ${device_make || ''} ${device_model || ''}`
-        : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`,
-      body: enquiry_type === 'repair_quote'
-        ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${priceTampered ? ' - ⚠️ PRICE TAMPERED (client sent £' + quoted_price + ', corrected to £' + verifiedQuotedPrice + ')' : ''}`
-        : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`,
+      title: notifTitle,
+      body: notifBody,
       is_read: false,
     } as any)
+
+    // Send notification via MacroDroid webhook (repair quotes only)
+    if (enquiry_type === 'repair_quote') {
+      try {
+        await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
+          method: 'POST',
+          body: `https://nfd-repairs-app.vercel.app/app/enquiries`,
+        })
+      } catch (e) {
+        console.error('[MacroDroid] Failed to send webhook:', e)
+      }
+    }
 
     // Note: Quote SMS/email is NOT sent here — it's only sent when the customer
     // explicitly clicks "Send Me This Quote" via the /api/enquiries/update endpoint

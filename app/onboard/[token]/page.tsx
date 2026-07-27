@@ -388,9 +388,9 @@ export default function OnboardingPage({ params }: { params: { token: string } }
                 className="w-6 h-6 text-primary focus:ring-primary border-gray-300 rounded mt-0.5 cursor-pointer"
               />
               <label htmlFor="marketingOptIn" className="text-sm text-gray-900 cursor-pointer">
-                <strong>Send me special prices, deals & offers</strong>
+                <strong>Save me money on future repairs</strong>
                 <p className="text-xs text-gray-600 mt-1">
-                  I'd like to receive occasional messages about special prices, deals and promotions from New Forest Device Repairs.
+                  Tick this and we'll send you exclusive deals, price drop alerts, and repair tips (max 1-2 per month). We'll never share your details. Unsubscribe anytime.
                 </p>
               </label>
             </div>

@@ -50,6 +50,16 @@ export async function POST(
         body: notifBody,
       })
 
+      // Send notification via MacroDroid webhook
+      try {
+        await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
+          method: 'POST',
+          body: `https://nfd-repairs-app.vercel.app/admin`,
+        })
+      } catch (e) {
+        console.error('[MacroDroid] Failed to send webhook:', e)
+      }
+
       // Send push notification to NF Hub app
       try {
         await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
@@ -125,6 +135,16 @@ export async function POST(
       body: jobNotifBody,
       job_id: jobId,
     })
+
+    // Send notification via MacroDroid webhook
+    try {
+      await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
+        method: 'POST',
+        body: `https://nfd-repairs-app.vercel.app/admin`,
+      })
+    } catch (e) {
+      console.error('[MacroDroid] Failed to send webhook:', e)
+    }
 
     // Send push notification to NF Hub app
     try {

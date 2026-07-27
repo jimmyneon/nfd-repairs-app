@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X } from 'lucide-react'
 import Link from 'next/link'
@@ -79,12 +80,13 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: s
   home_services: { label: 'Home', icon: Home, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20' },
 }
 
-export default function EnquiriesPage() {
+function EnquiriesContent() {
+  const searchParams = useSearchParams()
   const [enquiries, setEnquiries] = useState<Enquiry[]>([])
   const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('action_needed')
   const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [responseText, setResponseText] = useState('')
@@ -104,6 +106,19 @@ export default function EnquiriesPage() {
       .subscribe()
     return () => subscription.unsubscribe()
   }, [])
+
+  // Deep link: auto-open enquiry if ?ref= is in URL
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref && enquiries.length > 0) {
+      const found = enquiries.find(e => e.enquiry_ref === ref)
+      if (found) {
+        setSelectedEnquiry(found)
+        setResponseText(found.staff_notes || '')
+        setShowDetail(true)
+      }
+    }
+  }, [searchParams, enquiries])
 
   useEffect(() => {
     supabase
@@ -130,7 +145,9 @@ export default function EnquiriesPage() {
       )
     }
     if (statusFilter !== 'all') {
-      if (statusFilter === 'follow_up') {
+      if (statusFilter === 'action_needed') {
+        filtered = filtered.filter(e => isActionNeeded(e))
+      } else if (statusFilter === 'follow_up') {
         filtered = filtered.filter(e => isFollowUp(e))
       } else if (statusFilter === 'accepted') {
         filtered = filtered.filter(e => isAccepted(e))
@@ -138,6 +155,13 @@ export default function EnquiriesPage() {
         filtered = filtered.filter(e => e.status === statusFilter)
       }
     }
+    // Sort by priority: action needed first, then pending, then everything else
+    filtered.sort((a, b) => {
+      const aPriority = getPriority(a)
+      const bPriority = getPriority(b)
+      if (aPriority !== bPriority) return aPriority - bPriority
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
     setFilteredEnquiries(filtered)
   }, [enquiries, searchTerm, statusFilter])
 
@@ -182,6 +206,13 @@ export default function EnquiriesPage() {
 
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
+  const isActionNeeded = (e: Enquiry) => e.status === 'approved' || isAccepted(e)
+  const getPriority = (e: Enquiry) => {
+    if (isActionNeeded(e)) return 0
+    if (e.status === 'pending' && e.enquiry_type === 'repair_quote') return 1
+    if (e.status === 'pending') return 2
+    return 3
+  }
 
   const getTileSummary = (e: Enquiry): string => {
     if (e.enquiry_type === 'repair_quote') return `${e.device_make || ''} ${e.device_model || ''}`.trim() || 'Repair quote'
