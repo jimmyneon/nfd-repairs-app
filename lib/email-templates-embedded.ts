@@ -258,7 +258,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                 </tr>
                 <tr>
                   <td align="center" style="padding-top: 12px;">
-                    <a href="https://www.newforestdevicerepairs.co.uk/start" style="display: inline-block; background-color: #ffffff; color: #009B4D; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; border: 2px solid #009B4D;">Contact Us</a>
+                    <a href="https://nfdr.uk/start" style="display: inline-block; background-color: #ffffff; color: #009B4D; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; border: 2px solid #009B4D;">Contact Us</a>
                   </td>
                 </tr>
               </table>
@@ -277,11 +277,11 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                 New Forest Device Repairs
               </p>
               <p style="color: #666666; font-size: 13px; margin: 0 0 8px 0;">
-                🌐 <a href="https://www.newforestdevicerepairs.co.uk" style="color: #009B4D; text-decoration: none; font-weight: 500;">newforestdevicerepairs.co.uk</a>
+                🌐 <a href="https://nfdr.uk" style="color: #009B4D; text-decoration: none; font-weight: 500;">nfdr.uk</a>
               </p>
               <p style="color: #999999; font-size: 11px; margin: 15px 0 0 0; line-height: 1.4;">
                 Job Reference: ${job.job_ref}<br>
-                This is an automated notification from newforestdevicerepairs.co.uk
+                This is an automated notification from nfdr.uk
               </p>
             </td>
           </tr>
@@ -322,14 +322,14 @@ Pay here: ${depositUrl}
 
 View full tracking page: ${trackingUrl}
 
-Contact us: https://www.newforestdevicerepairs.co.uk/start
+Contact us: https://nfdr.uk/start
 
 ---
 ⚠️ DO NOT REPLY TO THIS EMAIL
 This is an automated notification. For questions or support, please use the contact link above.
 
 New Forest Device Repairs
-Web: newforestdevicerepairs.co.uk
+Web: nfdr.uk
 Job Reference: ${job.job_ref}
   `
 

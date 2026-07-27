@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     let updateFields: Record<string, any> = { updated_at: now }
     let notificationTitle = ''
     let notificationBody = ''
+    let pendingQuoteSend: { method: string; quoteUrl: string; isInstant: boolean; priceText: string; deviceName: string; repairName: string } | null = null
 
     switch (action) {
       case 'reserve_repair': {
@@ -107,155 +108,16 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // Actually send the quote
+        // Store quote send info — SMS/email sent AFTER DB update to ensure data is committed
         const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
-        const warranty = enquiry.warranty || enquiry.screen_option || 'Standard warranty'
-        const turnaround = '30–60 mins'
         const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim()
         const repairName = enquiry.repair_type || 'repair'
 
-        // Only send SMS/email if method is not 'none' (used for silent enquiry updates)
         if (method !== 'none') {
-        if (method === 'sms' || method === 'both') {
-          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (!webhookUrl) {
-            console.error('[SMS] MACRODROID_WEBHOOK_URL not set — SMS will not be sent')
-          } else if (!enquiry.customer_phone) {
-            console.error('[SMS] No customer phone on enquiry — cannot send SMS')
-          } else {
-            // SMS with line breaks for readability
-            // Build additional repairs text for SMS
-            const addRepairsText = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
-              ? `\n\nAlso booked:\n${enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n')}\nTotal: £${(enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)}`
-              : ''
-            const smsMessage = isInstant
-              ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
-              : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
-            try {
-              await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: enquiry.customer_phone, message: smsMessage }),
-              })
-              try {
-                await supabase.from('sms_logs').insert({
-                  template_key: 'QUOTE_SENT',
-                  body_rendered: smsMessage,
-                  status: 'SENT',
-                  sent_at: now,
-                } as any)
-              } catch (e) { console.error('SMS log failed:', e) }
-            } catch (e) { console.error('Quote SMS failed:', e) }
-          }
+          pendingQuoteSend = { method, quoteUrl, isInstant, priceText, deviceName, repairName }
         }
-
-        if (method === 'email' || method === 'both') {
-          if (enquiry.customer_email) {
-            const emailSubject = isInstant
-              ? `Your Repair Quote: ${deviceName} ${repairName} — ${priceText}`
-              : `Your Repair Enquiry: ${deviceName} — We'll be in touch`
-
-            const emailHtml = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#FAF5E9;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF5E9;padding:24px 0;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:600px;">
-
-<!-- Header -->
-<tr><td style="background:linear-gradient(135deg,#009B4D,#007a3d);padding:28px 30px;text-align:center;">
-<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;letter-spacing:0.5px;">New Forest Device Repairs</h1>
-</td></tr>
-
-<!-- Body -->
-<tr><td style="padding:32px 30px 20px;">
-<h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${enquiry.customer_name},</h2>
-${isInstant ? `
-<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready.</p>
-
-<!-- Quote card -->
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 20px;">
-<tr><td style="padding:20px;">
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;width:120px;">Device</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${deviceName}</td>
-</tr>
-<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">Repair</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${repairName}</td>
-</tr>
-${(enquiry.part_option || enquiry.screen_option) ? `<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">Option</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.part_option || enquiry.screen_option}</td>
-</tr>` : ''}
-${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.additional_repairs.map((r: any) => `<tr>
-<td style="padding:6px 0;color:#888;font-size:14px;">+ ${r.display_name || r.repair}</td>
-<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">£${r.price}</td>
-</tr>`).join('') : ''}
-<tr><td colspan="2" style="padding:14px 0 0;border-top:2px solid #e0e0e0;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-top:12px;color:#888;font-size:14px;vertical-align:middle;">Total</td>
-<td align="right" style="padding-top:12px;color:#009B4D;font-size:26px;font-weight:700;vertical-align:middle;text-align:right;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
-</tr></table>
-</td></tr>
-</table>
-</td></tr>
-</table>
-
-<!-- CTA button -->
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td align="center">
-<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Get This Repair Started</a>
-</td></tr></table>
-
-<p style="color:#999;font-size:13px;line-height:1.5;text-align:center;margin:0;">No obligation — we'll confirm everything before any work starts.</p>
-` : `
-<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Thanks for your enquiry about your <strong style="color:#1a1a2e;">${deviceName}</strong>. We'll get back to you with a personalised quote within working hours.</p>
-
-${enquiry.issue_description ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:10px;margin:0 0 20px;"><tr><td style="padding:16px 20px;">
-<p style="color:#888;font-size:13px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Your description</p>
-<p style="color:#555;font-size:14px;line-height:1.6;margin:0;">${enquiry.issue_description}</p>
-</td></tr></table>` : ''}
-`}
-</td></tr>
-
-<!-- Footer -->
-<tr><td style="background:#f8f9fa;padding:20px 30px;border-top:1px solid #eee;">
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr><td align="center">
-<p style="color:#aaa;font-size:13px;margin:0 0 8px;line-height:1.5;">
-Questions? Reply to our text message.<br>
-<a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-decoration:none;">newforestdevicerepairs.co.uk</a>
-</p>
-<p style="color:#bbb;font-size:12px;margin:0;">Lymington, New Forest &nbsp;|&nbsp; <a href="https://newforestdevicerepairs.co.uk/hours" style="color:#bbb;text-decoration:none;">Opening hours</a></p>
-</td></tr>
-</table>
-</td></tr>
-
-</table>
-</td></tr>
-</table>
-</body></html>`
-
-            const emailText = isInstant
-              ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}\n\nTo proceed, click here:\n${quoteUrl}\n\nNo obligation — we'll confirm everything before any work starts.\n\nQuestions? Reply to our text message.\n\nNew Forest Device Repairs\nnewforestdevicerepairs.co.uk`
-              : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to our text message.\n\nNew Forest Device Repairs\nnewforestdevicerepairs.co.uk`
-            try {
-              await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
-              try {
-                await supabase.from('email_logs').insert({
-                  subject: emailSubject,
-                  body: emailText,
-                  status: 'SENT',
-                } as any)
-              } catch (e) { console.error('Email log failed:', e) }
-            } catch (e) { console.error('Quote email failed:', e) }
-          }
-        }
-        } // end if method !== 'none'
         break
       }
 
@@ -349,8 +211,8 @@ Questions? Reply to our text message.<br>
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl && enquiry.customer_phone) {
         const smsMessage = action === 'reserve_repair'
-          ? `Great choice, ${enquiry.customer_name}! We've reserved your repair slot for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll be in touch ASAP to confirm the details. - NFD Repairs`
-          : `No problem, ${enquiry.customer_name}! We'll look into reserving a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair. We'll be in touch to confirm. - NFD Repairs`
+          ? `Thanks ${enquiry.customer_name}!\n\nWe've got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request.\n\nWe'll be in touch ASAP with next steps.\n\nNew Forest Device Repairs\nnfdr.uk/h`
+          : `Thanks ${enquiry.customer_name}!\n\nWe'll look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe'll be in touch to confirm.\n\nNew Forest Device Repairs\nnfdr.uk/h`
         try {
           await fetch(webhookUrl, {
             method: 'POST',
@@ -366,6 +228,133 @@ Questions? Reply to our text message.<br>
             } as any)
           } catch (e) { console.error('SMS log failed:', e) }
         } catch (e) { console.error('Confirmation SMS failed:', e) }
+      }
+    }
+
+    // Send quote SMS/email — AFTER DB update so data is committed first
+    if (pendingQuoteSend) {
+      const { method, quoteUrl, isInstant, priceText, deviceName, repairName } = pendingQuoteSend
+
+      if (method === 'sms' || method === 'both') {
+        const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+        if (!webhookUrl) {
+          console.error('[SMS] MACRODROID_WEBHOOK_URL not set — SMS will not be sent')
+        } else if (!enquiry.customer_phone) {
+          console.error('[SMS] No customer phone on enquiry — cannot send SMS')
+        } else {
+          const addRepairsText = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
+            ? `\n\nAlso booked:\n${enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n')}\nTotal: £${(enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)}`
+            : ''
+          const smsMessage = isInstant
+            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
+            : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
+          try {
+            await fetch(webhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: enquiry.customer_phone, message: smsMessage }),
+            })
+            try {
+              await supabase.from('sms_logs').insert({
+                template_key: 'QUOTE_SENT',
+                body_rendered: smsMessage,
+                status: 'SENT',
+                sent_at: now,
+              } as any)
+            } catch (e) { console.error('SMS log failed:', e) }
+          } catch (e) { console.error('Quote SMS failed:', e) }
+        }
+      }
+
+      if (method === 'email' || method === 'both') {
+        if (enquiry.customer_email) {
+          const emailSubject = isInstant
+            ? `Your Repair Quote: ${deviceName} ${repairName} — ${priceText}`
+            : `Your Repair Enquiry: ${deviceName} — We'll be in touch`
+
+          const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#FAF5E9;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF5E9;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:600px;">
+
+<tr><td style="background:linear-gradient(135deg,#009B4D,#007a3d);padding:28px 30px;text-align:center;">
+<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;letter-spacing:0.5px;">New Forest Device Repairs</h1>
+</td></tr>
+
+<tr><td style="padding:32px 30px 20px;">
+<h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${enquiry.customer_name},</h2>
+${isInstant ? `
+<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready.</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 20px;">
+<tr><td style="padding:20px;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td style="padding:6px 0;color:#888;font-size:14px;width:120px;">Device</td>
+<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${deviceName}</td>
+</tr>
+<tr>
+<td style="padding:6px 0;color:#888;font-size:14px;">Repair</td>
+<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${repairName}</td>
+</tr>
+${(enquiry.part_option || enquiry.screen_option) ? `<tr>
+<td style="padding:6px 0;color:#888;font-size:14px;">Option</td>
+<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">${enquiry.part_option || enquiry.screen_option}</td>
+</tr>` : ''}
+${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.additional_repairs.map((r: any) => `<tr>
+<td style="padding:6px 0;color:#888;font-size:14px;">+ ${r.display_name || r.repair}</td>
+<td style="padding:6px 0;color:#1a1a2e;font-size:15px;font-weight:600;">£${r.price}</td>
+</tr>`).join('') : ''}
+<tr><td colspan="2" style="padding:14px 0 0;border-top:2px solid #e0e0e0;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="padding-top:12px;color:#888;font-size:14px;vertical-align:middle;">Total</td>
+<td align="right" style="padding-top:12px;color:#009B4D;font-size:26px;font-weight:700;vertical-align:middle;text-align:right;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
+</tr></table>
+</td></tr>
+</table>
+</td></tr>
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td align="center">
+<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Get This Repair Started</a>
+</td></tr></table>
+` : `
+<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Thanks for your enquiry about your <strong style="color:#1a1a2e;">${deviceName}</strong>. We'll be in touch with a personalised quote.</p>
+`}
+</td></tr>
+
+<tr><td style="background:#f8f9fa;padding:20px 30px;border-top:1px solid #eee;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center">
+<p style="color:#aaa;font-size:13px;margin:0 0 8px;line-height:1.5;">
+<a href="https://nfdr.uk/h" style="color:#009B4D;text-decoration:none;">Opening hours</a> &nbsp;|&nbsp; <a href="https://nfdr.uk" style="color:#009B4D;text-decoration:none;">nfdr.uk</a>
+</p>
+</td></tr>
+</table>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>`
+
+          const emailText = isInstant
+            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}\n\nTo proceed, click here:\n${quoteUrl}\n\nNew Forest Device Repairs\nnfdr.uk/h`
+            : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll be in touch with a personalised quote.\n\nNew Forest Device Repairs\nnfdr.uk/h`
+          try {
+            await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
+            try {
+              await supabase.from('email_logs').insert({
+                subject: emailSubject,
+                body: emailText,
+                status: 'SENT',
+              } as any)
+            } catch (e) { console.error('Email log failed:', e) }
+          } catch (e) { console.error('Quote email failed:', e) }
+        }
       }
     }
 

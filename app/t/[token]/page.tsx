@@ -349,7 +349,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
 
           <a
-            href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+            href="https://nfdr.uk/start-repair/"
             target="_blank"
             rel="noopener noreferrer"
             className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
@@ -357,7 +357,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
             <p className="text-white/90 text-sm mb-3">Start a new repair request online</p>
             <div className="inline-flex items-center text-white font-bold">
-              <span>www.newforestdevicerepairs.co.uk</span>
+              <span>nfdr.uk</span>
             </div>
           </a>
 
@@ -397,7 +397,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
           </div>
           <a
-            href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+            href="https://nfdr.uk/start-repair/"
             target="_blank"
             rel="noopener noreferrer"
             className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
@@ -927,7 +927,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </div>
             </a>
             <a
-              href="https://www.newforestdevicerepairs.co.uk/start-repair/"
+              href="https://nfdr.uk/start-repair/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/90 rounded-xl p-4 transition-all active:scale-95 hover:from-primary/90 hover:to-primary"
@@ -935,7 +935,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               <Smartphone className="h-6 w-6 text-white flex-shrink-0" />
               <div>
                 <p className="font-bold text-white text-sm">Start a New Repair</p>
-                <p className="text-xs text-white/80">www.newforestdevicerepairs.co.uk</p>
+                <p className="text-xs text-white/80">nfdr.uk</p>
               </div>
             </a>
           </div>

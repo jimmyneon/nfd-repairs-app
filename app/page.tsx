@@ -30,7 +30,7 @@ export default function Home() {
             <Link href="/auth/login" className="btn-primary text-lg">
               Access My Repair
             </Link>
-            <a href="https://newforestdevicerepairs.co.uk" className="btn-secondary text-lg">
+            <a href="https://nfdr.uk" className="btn-secondary text-lg">
               Visit Main Site
             </a>
           </div>
@@ -78,7 +78,7 @@ export default function Home() {
               © {new Date().getFullYear()} New Forest Device Repairs. All rights reserved.
             </p>
             <div className="mt-4 space-x-6">
-              <a href="https://newforestdevicerepairs.co.uk" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://nfdr.uk" className="text-gray-400 hover:text-white transition-colors">
                 Main Website
               </a>
               <a href="tel:07410381247" className="text-gray-400 hover:text-white transition-colors">

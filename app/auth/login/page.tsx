@@ -111,7 +111,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-sm text-gray-600">
           <p>
             Don't have a repair with us?{' '}
-            <a href="https://newforestdevicerepairs.co.uk" className="text-primary hover:text-primary-dark font-medium">
+            <a href="https://nfdr.uk" className="text-primary hover:text-primary-dark font-medium">
               Visit our main site
             </a>
           </p>

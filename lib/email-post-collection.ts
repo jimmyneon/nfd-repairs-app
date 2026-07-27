@@ -239,7 +239,7 @@ export function generatePostCollectionEmail(data: PostCollectionEmailData): {
                 <p style="color: #6B7280; margin: 0 0 15px 0; font-size: 15px;">
                   Got another device that needs fixing?
                 </p>
-                <a href="https://www.newforestdevicerepairs.co.uk/start" style="display: inline-block; background-color: #009B4D; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 155, 77, 0.25);">
+                <a href="https://nfdr.uk/start" style="display: inline-block; background-color: #009B4D; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 8px rgba(0, 155, 77, 0.25);">
                   Get in Touch
                 </a>
               </div>
@@ -264,7 +264,7 @@ export function generatePostCollectionEmail(data: PostCollectionEmailData): {
                 📞 07410 381247
               </p>
               <p style="color: #666666; font-size: 13px; margin: 0 0 8px 0;">
-                🌐 <a href="https://www.newforestdevicerepairs.co.uk" style="color: #009B4D; text-decoration: none; font-weight: 500;">newforestdevicerepairs.co.uk</a>
+                🌐 <a href="https://nfdr.uk" style="color: #009B4D; text-decoration: none; font-weight: 500;">nfdr.uk</a>
               </p>
               <p style="color: #999999; font-size: 11px; margin: 15px 0 0 0; line-height: 1.4;">
                 Thanks for supporting a local business!
@@ -301,7 +301,7 @@ ${service.description}
 `).join('\n')}
 
 Got another device that needs fixing?
-Get in touch: https://www.newforestdevicerepairs.co.uk/start
+Get in touch: https://nfdr.uk/start
 
 ---
 Job Reference: ${job.job_ref}
@@ -309,7 +309,7 @@ Device: ${job.device_make} ${job.device_model}
 
 New Forest Device Repairs
 Phone: 07410 381247
-Web: newforestdevicerepairs.co.uk
+Web: nfdr.uk
 
 Thanks for supporting a local business!
   `

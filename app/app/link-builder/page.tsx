@@ -15,7 +15,7 @@ const PRESETS = [
   { source: 'word', medium: 'word_of_mouth', label: 'Word of Mouth', icon: '👥' },
 ]
 
-const SITE_DOMAIN = 'https://newforestdevicerepairs.co.uk'
+const SITE_DOMAIN = 'https://nfdr.uk'
 
 export default function LinkBuilderPage() {
   const [selectedPreset, setSelectedPreset] = useState<typeof PRESETS[0] | null>(null)

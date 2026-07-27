@@ -131,7 +131,7 @@ export function generateJobCreatedEmail(
               <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;">
                 <strong>New Forest Device Repairs</strong><br>
                 Phone: 07410 381247<br>
-                Web: <a href="https://newforestdevicerepairs.co.uk" style="color: #009B4D;">newforestdevicerepairs.co.uk</a>
+                Web: <a href="https://nfdr.uk" style="color: #009B4D;">nfdr.uk</a>
               </p>
             </td>
           </tr>
@@ -165,7 +165,7 @@ If you have any questions, please don't hesitate to contact us.
 
 New Forest Device Repairs
 Phone: 07410 381247
-Web: newforestdevicerepairs.co.uk
+Web: nfdr.uk
   `
 
   return { subject, html, text }
@@ -241,7 +241,7 @@ export function generateStatusUpdateEmail(
               <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;">
                 <strong>New Forest Device Repairs</strong><br>
                 Phone: 07410 381247<br>
-                Web: <a href="https://newforestdevicerepairs.co.uk" style="color: #009B4D;">newforestdevicerepairs.co.uk</a>
+                Web: <a href="https://nfdr.uk" style="color: #009B4D;">nfdr.uk</a>
               </p>
             </td>
           </tr>
@@ -268,7 +268,7 @@ Job Reference: ${jobRef}
 
 New Forest Device Repairs
 Phone: 07410 381247
-Web: newforestdevicerepairs.co.uk
+Web: nfdr.uk
   `
 
   return { subject, html, text }

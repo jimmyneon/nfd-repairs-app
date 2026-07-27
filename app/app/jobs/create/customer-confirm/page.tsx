@@ -649,7 +649,7 @@ function CustomerConfirmContent() {
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-9 leading-relaxed">
                 Diagnostic fees may apply. Back up your data. Storage fees for uncollected devices.{' '}
-                <a href="https://www.newforestdevicerepairs.co.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">View full terms</a>
+                <a href="https://nfdr.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">View full terms</a>
               </p>
             </div>
 
