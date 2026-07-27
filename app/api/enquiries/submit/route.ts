@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
       try {
         await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
           method: 'POST',
-          body: `https://nfd-repairs-app.vercel.app/app/enquiries`,
+          body: `https://nfd-repairs-app.vercel.app/app/enquiries?ref=${enquiryRef}`,
         })
       } catch (e) {
         console.error('[MacroDroid] Failed to send webhook:', e)

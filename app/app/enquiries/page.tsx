@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X } from 'lucide-react'
 import Link from 'next/link'
@@ -81,7 +80,6 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: s
 }
 
 function EnquiriesContent() {
-  const searchParams = useSearchParams()
   const [enquiries, setEnquiries] = useState<Enquiry[]>([])
   const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,7 +107,9 @@ function EnquiriesContent() {
 
   // Deep link: auto-open enquiry if ?ref= is in URL
   useEffect(() => {
-    const ref = searchParams.get('ref')
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
     if (ref && enquiries.length > 0) {
       const found = enquiries.find(e => e.enquiry_ref === ref)
       if (found) {
@@ -118,7 +118,7 @@ function EnquiriesContent() {
         setShowDetail(true)
       }
     }
-  }, [searchParams, enquiries])
+  }, [enquiries])
 
   useEffect(() => {
     supabase
@@ -203,6 +203,7 @@ function EnquiriesContent() {
   const pendingCount = enquiries.filter(e => e.status === 'pending').length
   const acceptedCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)).length
   const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
+  const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
 
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
@@ -313,6 +314,14 @@ function EnquiriesContent() {
 
           {/* Filter chips */}
           <div className="flex gap-2 overflow-x-auto pb-1">
+            {actionNeededCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('action_needed')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'action_needed' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700'}`}
+              >
+                Action Needed ({actionNeededCount})
+              </button>
+            )}
             <button
               onClick={() => setStatusFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
@@ -359,53 +368,120 @@ function EnquiriesContent() {
             <p className="mt-2 text-gray-500">No enquiries found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {filteredEnquiries.map((enquiry) => {
-              const typeCfg = TYPE_CONFIG[enquiry.enquiry_type] || TYPE_CONFIG.repair_quote
-              const statusLabel = getStatusLabel(enquiry)
-              const summary = getTileSummary(enquiry)
-              const badge = getTileBadge(enquiry)
-              const TypeIcon = typeCfg.icon
-
-              return (
-                <button
-                  key={enquiry.id}
-                  onClick={() => openDetail(enquiry)}
-                  className="relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-green-600"
-                >
-                  <div className="p-3 h-full flex flex-col">
-                    {/* Top row: type + badge */}
-                    <div className="flex items-center justify-between mb-1">
-                      <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
-                        <TypeIcon className="h-4 w-4" />
-                        <p className="font-bold text-xs uppercase tracking-wide">{typeCfg.label}</p>
-                      </div>
-                      {badge && (
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full text-white ${badge.color}`}>
-                          {badge.text}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Main content: customer name + summary */}
-                    <div className="flex-1 flex flex-col justify-center text-center">
-                      <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
-                      <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
-                      {enquiry.quoted_price != null && (
-                        <p className="text-lg font-black mt-1 text-gray-900 dark:text-white">£{enquiry.quoted_price}</p>
-                      )}
-                    </div>
-
-                    {/* Bottom row: status + date */}
-                    <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-1.5">
-                      <span className="font-bold text-gray-600 dark:text-gray-400">{statusLabel}</span>
-                      <span className="text-gray-400 dark:text-gray-500">{fmtDate(enquiry.created_at)}</span>
-                    </div>
+          <>
+            {/* Approved Section - highlighted at top */}
+            {filteredEnquiries.filter(e => isActionNeeded(e)).length > 0 && (
+              <section className="mb-6">
+                <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-green-100 dark:bg-green-900/30 border-2 border-green-500">
+                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <div className="flex-1">
+                    <h2 className="font-black text-lg text-green-700 dark:text-green-400">
+                      Approved - Action Needed ({filteredEnquiries.filter(e => isActionNeeded(e)).length})
+                    </h2>
+                    <p className="text-xs text-green-600 dark:text-green-500">Customers waiting - check parts & arrange deposit</p>
                   </div>
-                </button>
-              )
-            })}
-          </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {filteredEnquiries.filter(e => isActionNeeded(e)).map((enquiry) => {
+                    const typeCfg = TYPE_CONFIG[enquiry.enquiry_type] || TYPE_CONFIG.repair_quote
+                    const statusLabel = getStatusLabel(enquiry)
+                    const summary = getTileSummary(enquiry)
+                    const badge = getTileBadge(enquiry)
+                    const TypeIcon = typeCfg.icon
+
+                    return (
+                      <button
+                        key={enquiry.id}
+                        onClick={() => openDetail(enquiry)}
+                        className="relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-green-50 dark:bg-green-900/20 border-2 border-green-500"
+                      >
+                        <div className="p-3 h-full flex flex-col">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
+                              <TypeIcon className="h-4 w-4" />
+                              <p className="font-bold text-xs uppercase tracking-wide">{typeCfg.label}</p>
+                            </div>
+                            {badge && (
+                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full text-white ${badge.color}`}>
+                                {badge.text}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 flex flex-col justify-center text-center">
+                            <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
+                            <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
+                            {enquiry.quoted_price != null && (
+                              <p className="text-lg font-black mt-1 text-green-700 dark:text-green-400">£{enquiry.quoted_price}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-xs border-t border-green-200 dark:border-green-800 pt-1.5">
+                            <span className="font-bold text-green-700 dark:text-green-400">{statusLabel}</span>
+                            <span className="text-gray-400 dark:text-gray-500">{fmtDate(enquiry.created_at)}</span>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Standard Inquiries Section */}
+            {filteredEnquiries.filter(e => !isActionNeeded(e)).length > 0 && (
+              <section>
+                {filteredEnquiries.filter(e => isActionNeeded(e)).length > 0 && (
+                  <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
+                    <Mail className="h-5 w-5 text-gray-500" />
+                    <h2 className="font-bold text-sm text-gray-600 dark:text-gray-400">
+                      Inquiries ({filteredEnquiries.filter(e => !isActionNeeded(e)).length})
+                    </h2>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {filteredEnquiries.filter(e => !isActionNeeded(e)).map((enquiry) => {
+                    const typeCfg = TYPE_CONFIG[enquiry.enquiry_type] || TYPE_CONFIG.repair_quote
+                    const statusLabel = getStatusLabel(enquiry)
+                    const summary = getTileSummary(enquiry)
+                    const badge = getTileBadge(enquiry)
+                    const TypeIcon = typeCfg.icon
+
+                    return (
+                      <button
+                        key={enquiry.id}
+                        onClick={() => openDetail(enquiry)}
+                        className="relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-gray-300"
+                      >
+                        <div className="p-3 h-full flex flex-col">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
+                              <TypeIcon className="h-4 w-4" />
+                              <p className="font-bold text-xs uppercase tracking-wide">{typeCfg.label}</p>
+                            </div>
+                            {badge && (
+                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full text-white ${badge.color}`}>
+                                {badge.text}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 flex flex-col justify-center text-center">
+                            <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
+                            <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
+                            {enquiry.quoted_price != null && (
+                              <p className="text-lg font-black mt-1 text-gray-900 dark:text-white">£{enquiry.quoted_price}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-1.5">
+                            <span className="font-bold text-gray-600 dark:text-gray-400">{statusLabel}</span>
+                            <span className="text-gray-400 dark:text-gray-500">{fmtDate(enquiry.created_at)}</span>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+          </>
         )}
       </main>
 
@@ -671,3 +747,5 @@ function EnquiriesContent() {
     </div>
   )
 }
+
+export default EnquiriesContent

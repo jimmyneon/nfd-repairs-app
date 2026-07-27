@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin } from 'lucide-react'
+import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, BellRing } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -33,6 +33,7 @@ export default function JobsListPageV2() {
   const [activeFilter, setActiveFilter] = useState<string>('all')
   const [sendInCount, setSendInCount] = useState(0)
   const [enquiryCount, setEnquiryCount] = useState(0)
+  const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -82,10 +83,18 @@ export default function JobsListPageV2() {
       })
       .subscribe()
 
+    const enquiriesSubscription = supabase
+      .channel('enquiries-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, () => {
+        loadEnquiryCount()
+      })
+      .subscribe()
+
     return () => {
       jobsSubscription.unsubscribe()
       notificationsSubscription.unsubscribe()
       warrantySubscription.unsubscribe()
+      enquiriesSubscription.unsubscribe()
       window.removeEventListener('pageshow', handlePageShow)
     }
   }, [])
@@ -181,6 +190,14 @@ export default function JobsListPageV2() {
       .eq('status', 'pending')
 
     setEnquiryCount(count || 0)
+
+    // Load approved enquiries for banner
+    const { data: approved } = await supabase
+      .from('enquiries')
+      .select('enquiry_ref, customer_name, device_make, device_model, quoted_price')
+      .eq('status', 'approved')
+      .order('updated_at', { ascending: false })
+    setApprovedEnquiries(approved || [])
   }
 
   const handleLogout = async () => {
@@ -252,6 +269,51 @@ export default function JobsListPageV2() {
       
       {/* Customer Waiting Banner - Shows when customer has arrived */}
       <CustomerWaitingBanner jobs={jobs} />
+      
+      {/* Approved Quote Banner - Shows when customers have approved quotes */}
+      {approvedEnquiries.length > 0 && (
+        <div className="bg-green-600 text-white px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <BellRing className="h-6 w-6 animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">
+                {approvedEnquiries.length === 1 
+                  ? 'QUOTE APPROVED - Action Needed!' 
+                  : `${approvedEnquiries.length} QUOTES APPROVED - Action Needed!`}
+              </p>
+              <div className="flex gap-2 mt-1 overflow-x-auto pb-1">
+                {approvedEnquiries.slice(0, 4).map((enq) => (
+                  <Link
+                    key={enq.enquiry_ref}
+                    href={`/app/enquiries?ref=${enq.enquiry_ref}`}
+                    className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <span className="text-xs font-bold">{enq.customer_name}</span>
+                    <span className="text-xs ml-2 opacity-90">
+                      {enq.device_make} {enq.device_model}
+                      {enq.quoted_price && ` - £${enq.quoted_price}`}
+                    </span>
+                  </Link>
+                ))}
+                {approvedEnquiries.length > 4 && (
+                  <Link
+                    href="/app/enquiries"
+                    className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <span className="text-xs font-bold">+{approvedEnquiries.length - 4} more...</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            <Link
+              href="/app/enquiries"
+              className="flex-shrink-0 bg-white text-green-700 font-black text-xs px-4 py-2 rounded-xl hover:bg-green-50 transition-colors active:scale-95"
+            >
+              View All
+            </Link>
+          </div>
+        </div>
+      )}
       
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
