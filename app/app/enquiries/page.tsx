@@ -200,11 +200,6 @@ function EnquiriesContent() {
     setShowDetail(true)
   }
 
-  const pendingCount = enquiries.filter(e => e.status === 'pending').length
-  const acceptedCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)).length
-  const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
-  const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
-
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
   const isActionNeeded = (e: Enquiry) => e.status === 'approved' || isAccepted(e)
@@ -214,6 +209,11 @@ function EnquiriesContent() {
     if (e.status === 'pending') return 2
     return 3
   }
+
+  const pendingCount = enquiries.filter(e => e.status === 'pending').length
+  const acceptedCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)).length
+  const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
+  const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
 
   const getTileSummary = (e: Enquiry): string => {
     if (e.enquiry_type === 'repair_quote') return `${e.device_make || ''} ${e.device_model || ''}`.trim() || 'Repair quote'

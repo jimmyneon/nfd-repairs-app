@@ -278,19 +278,8 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Send notification via MacroDroid webhook (repair quotes only)
-    if (enquiry_type === 'repair_quote') {
-      try {
-        await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
-          method: 'POST',
-          body: `https://nfd-repairs-app.vercel.app/app/enquiries?ref=${enquiryRef}`,
-        })
-      } catch (e) {
-        console.error('[MacroDroid] Failed to send webhook:', e)
-      }
-    }
-
-    // Note: Quote SMS/email is NOT sent here — it's only sent when the customer
+    // Note: MacroDroid webhook is NOT triggered here — only on quote approval.
+    // Quote SMS/email is NOT sent here — it's only sent when the customer
     // explicitly clicks "Send Me This Quote" via the /api/enquiries/update endpoint
     // with action: 'send_quote'. This prevents double-sending.
 

@@ -120,7 +120,11 @@ export async function POST(request: NextRequest) {
         if (method !== 'none') {
         if (method === 'sms' || method === 'both') {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (webhookUrl && enquiry.customer_phone) {
+          if (!webhookUrl) {
+            console.error('[SMS] MACRODROID_WEBHOOK_URL not set — SMS will not be sent')
+          } else if (!enquiry.customer_phone) {
+            console.error('[SMS] No customer phone on enquiry — cannot send SMS')
+          } else {
             // SMS with line breaks for readability
             // Build additional repairs text for SMS
             const addRepairsText = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
@@ -170,7 +174,7 @@ export async function POST(request: NextRequest) {
 <tr><td style="padding:32px 30px 20px;">
 <h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${enquiry.customer_name},</h2>
 ${isInstant ? `
-<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready. Click below to reserve your repair.</p>
+<p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready.</p>
 
 <!-- Quote card -->
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fdf9;border:1px solid #e0e0e0;border-radius:12px;margin:0 0 20px;">
@@ -194,8 +198,8 @@ ${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.
 </tr>`).join('') : ''}
 <tr><td colspan="2" style="padding:14px 0 0;border-top:2px solid #e0e0e0;">
 <table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-top:12px;color:#888;font-size:14px;">Total</td>
-<td align="right" style="padding-top:12px;color:#009B4D;font-size:26px;font-weight:700;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
+<td style="padding-top:12px;color:#888;font-size:14px;vertical-align:middle;">Total</td>
+<td align="right" style="padding-top:12px;color:#009B4D;font-size:26px;font-weight:700;vertical-align:middle;text-align:right;">£${(enquiry.quoted_price || 0) + (enquiry.additional_repairs ? enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0) : 0)}</td>
 </tr></table>
 </td></tr>
 </table>
@@ -204,7 +208,7 @@ ${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? enquiry.
 
 <!-- CTA button -->
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td align="center">
-<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Reserve My Repair</a>
+<a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Get This Repair Started</a>
 </td></tr></table>
 
 <p style="color:#999;font-size:13px;line-height:1.5;text-align:center;margin:0;">No obligation — we'll confirm everything before any work starts.</p>
@@ -226,7 +230,7 @@ ${enquiry.issue_description ? `<table width="100%" cellpadding="0" cellspacing="
 Questions? Reply to our text message.<br>
 <a href="https://newforestdevicerepairs.co.uk" style="color:#009B4D;text-decoration:none;">newforestdevicerepairs.co.uk</a>
 </p>
-<p style="color:#bbb;font-size:12px;margin:0;">Lymington, New Forest &nbsp;|&nbsp; Mon–Fri 10–5, Sat 10–3</p>
+<p style="color:#bbb;font-size:12px;margin:0;">Lymington, New Forest &nbsp;|&nbsp; <a href="https://newforestdevicerepairs.co.uk/hours" style="color:#bbb;text-decoration:none;">Opening hours</a></p>
 </td></tr>
 </table>
 </td></tr>
@@ -308,6 +312,36 @@ Questions? Reply to our text message.<br>
           is_read: false,
         } as any)
       } catch (e) { console.error('Notification insert failed:', e) }
+    }
+
+    // Send MacroDroid webhook for reserve_repair (customer approved quote)
+    if (action === 'reserve_repair') {
+      try {
+        await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
+          method: 'POST',
+          body: `https://nfd-repairs-app.vercel.app/app/enquiries?ref=${enquiry.enquiry_ref}`,
+        })
+      } catch (e) {
+        console.error('[MacroDroid] Failed to send webhook:', e)
+      }
+
+      // Also send NF Hub push notification
+      try {
+        await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            app_id: 'nfd-repairs',
+            title: notificationTitle,
+            body: notificationBody,
+            category: 'status_update',
+            priority: 'high',
+            deep_link: `https://nfd-repairs-app.vercel.app/app/enquiries?ref=${enquiry.enquiry_ref}`,
+          }),
+        })
+      } catch (e) {
+        console.error('[Notify] Failed to send push:', e)
+      }
     }
 
     // Send confirmation SMS for reserve actions
