@@ -66,6 +66,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showSmsComposer, setShowSmsComposer] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
+  const [aftercareSending, setAftercareSending] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
   const [editingPhone, setEditingPhone] = useState(false)
@@ -830,6 +831,38 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setDepositSending(false)
   }
 
+  const handleSendAftercare = async () => {
+    if (!job) return
+    setAftercareSending(true)
+    try {
+      const response = await fetch('/api/jobs/send-aftercare-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'SYSTEM',
+          message: 'Aftercare SMS sent manually from job page',
+        } as any)
+        await loadJobData()
+      } else if (data.alreadySent) {
+        alert('Aftercare SMS was already sent for this job.')
+      } else if (data.skipped) {
+        alert(`Aftercare skipped: ${data.message}`)
+      } else {
+        alert(`Failed to send aftercare: ${data.error || data.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to send aftercare SMS:', error)
+      alert('Failed to send aftercare SMS')
+    }
+    setAftercareSending(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1129,6 +1162,29 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <span className="text-[10px]">Track</span>
             </a>
           )}
+        </div>
+        )}
+
+        {/* Aftercare Button Row - shown for COLLECTED/COMPLETED jobs */}
+        {(job.status === 'COLLECTED' || job.status === 'COMPLETED') && (
+        <div className="grid grid-cols-5 gap-2">
+          <button
+            onClick={handleSendAftercare}
+            disabled={aftercareSending || !!job.aftercare_sms_sent_at}
+            className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 ${
+              job.aftercare_sms_sent_at
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:border-primary'
+            } disabled:opacity-60`}
+            title={job.aftercare_sms_sent_at ? `Aftercare sent ${new Date(job.aftercare_sms_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'Send aftercare check-in SMS'}
+          >
+            {aftercareSending ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : (
+              <MessageCircle className="h-5 w-5" />
+            )}
+            <span className="text-[10px]">{job.aftercare_sms_sent_at ? 'Sent' : 'Aftercare'}</span>
+          </button>
         </div>
         )}
 

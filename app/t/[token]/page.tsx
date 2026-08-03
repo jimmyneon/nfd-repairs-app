@@ -619,6 +619,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 shopLongitude={shopCoordinates.longitude}
                 radiusMeters={shopCoordinates.radius}
               />
+              <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-center">
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  Please check our live opening hours before setting off
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                  Sometimes we need to pop out — tap below to see our current hours on Google
+                </p>
+              </div>
               <a
                 href={SHOP_INFO.google_maps_link}
                 target="_blank"

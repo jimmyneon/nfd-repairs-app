@@ -97,12 +97,8 @@ export async function POST(request: NextRequest) {
     // Schedule remaining follow-up SMS and email
     const updates: Record<string, string> = {}
 
-    // 2. Schedule aftercare SMS for 3 days later (if not already scheduled)
-    if (!job.aftercare_sms_scheduled_at) {
-      const aftercareTime = calculateAftercareTime()
-      updates.aftercare_sms_scheduled_at = aftercareTime.toISOString()
-      eventMessages.push(`Aftercare scheduled for ${aftercareTime.toLocaleString()}`)
-    }
+    // 2. Aftercare SMS is now manual-only (triggered via button on job page)
+    // No automatic scheduling — too many messages were being sent
 
     // 3. Schedule review reminder SMS for 5 days later (if not already scheduled)
     if (!job.review_reminder_sms_scheduled_at) {
