@@ -16,7 +16,7 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_reassurance_sms_sent_at TIMESTAM
 INSERT INTO sms_templates (key, body, is_active)
 VALUES (
   'PARTS_REASSURANCE',
-  'Hi {{first_name}}, just an update on your {{device_make}} {{device_model}} repair ({{job_ref}}) - we''re still waiting for parts to arrive. They''re on order and we''ll text you the moment they arrive and your repair starts. No action needed from you. Track here: {{tracking_link}}',
+  'Hi {first_name}, just an update on your {device_make} {device_model} repair ({job_ref}) - we''re still waiting for parts to arrive. They''re on order and we''ll text you the moment they arrive and your repair starts. No action needed from you. Track here: {tracking_link}',
   true
 )
 ON CONFLICT (key) DO UPDATE SET

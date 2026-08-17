@@ -22,8 +22,11 @@ export function renderSmsTemplate(
 
   for (const [key, rawValue] of Object.entries(variables)) {
     const value = rawValue === null || rawValue === undefined ? '' : String(rawValue)
-    // Replace every occurrence of the placeholder
-    result = result.replaceAll(`{${key}}`, value)
+    // Replace every occurrence of the placeholder.
+    // Support both {key} and {{key}} syntax so a template using either
+    // convention renders correctly (a previous bug shipped {{first_name}}
+    // to customers because only {key} was handled).
+    result = result.replaceAll(`{{${key}}}`, value).replaceAll(`{${key}}`, value)
   }
 
   // Strip lines where a variable resolved to empty — removes "Deposit paid: £." etc.
@@ -48,9 +51,9 @@ export function renderSmsTemplate(
     // Trim leading/trailing whitespace
     .trim()
 
-  // Safety net: strip any remaining unresolved {variable} placeholders
+  // Safety net: strip any remaining unresolved {variable} or {{variable}} placeholders
   // This catches variables not passed to the function (e.g. device_summary, shop_address)
-  result = result.replace(/\{[a-z_]+\}/gi, '')
+  result = result.replace(/\{\{[a-z_]+\}\}/gi, '').replace(/\{[a-z_]+\}/gi, '')
   // Clean up any double spaces or orphaned punctuation left behind
   result = result.replace(/  +/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 
