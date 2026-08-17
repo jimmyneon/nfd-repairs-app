@@ -473,12 +473,16 @@ export async function POST(request: NextRequest) {
           console.log('✅ SMS log created:', smsLog?.id)
 
           // Automatically send the SMS
+          // IMPORTANT: pass sms_log_id so /api/sms/send targets THIS message.
+          // Without it, the send endpoint falls back to "send oldest PENDING"
+          // and ships the previous job's stuck SMS instead of this one.
           if (smsLog) {
-            console.log('📤 Triggering SMS send...')
+            console.log('📤 Triggering SMS send for job:', job.job_ref, 'sms_log_id:', smsLog.id)
             try {
               const sendResponse = await fetch(`${appUrl}/api/sms/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sms_log_id: smsLog.id }),
               })
               console.log('📤 SMS send response:', sendResponse.status, sendResponse.ok)
             } catch (error) {
