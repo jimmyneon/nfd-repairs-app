@@ -144,13 +144,22 @@ export default function AnalyticsPage() {
               </button>
             </div>
           </div>
-          <Link
-            href="/app/link-builder"
-            className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg w-fit"
-          >
-            <Link2 className="w-4 h-4" />
-            Link Builder
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/app/analytics/jobs"
+              className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg w-fit"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Job Analytics
+            </Link>
+            <Link
+              href="/app/link-builder"
+              className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg w-fit"
+            >
+              <Link2 className="w-4 h-4" />
+              Link Builder
+            </Link>
+          </div>
         </div>
       </header>
 
