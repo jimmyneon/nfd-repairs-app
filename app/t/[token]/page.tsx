@@ -3,10 +3,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
-import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode, X } from 'lucide-react'
+import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
-import SlideUpPanel from '@/components/SlideUpPanel'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
 import { shortTrackingLink } from '@/lib/utils'
 import {
@@ -40,7 +39,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const [showDiagnosisResults, setShowDiagnosisResults] = useState(false)
-  const [selectedStage, setSelectedStage] = useState<string | null>(null)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -598,15 +596,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         )}
 
-        {/* Repair Journey — clean, colourful, clickable */}
+        {/* Repair Journey — simple vertical timeline */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-5">
             <h2 className="font-bold text-base text-gray-900 dark:text-white mb-4">
               Your Repair Journey
             </h2>
 
-            {/* Timeline — horizontal cards, not vertical list */}
-            <div className="space-y-2">
+            <div className="relative pl-1">
               {statusSteps.map((step, index) => {
                 const isAgreedWaiting = displayStatus === '__AGREED_WAITING__'
                 const isCurrent = isAgreedWaiting ? false : step === displayStatus
@@ -616,162 +613,64 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 const isUpNext = isAgreedWaiting && step === 'IN_REPAIR'
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
                 const stageTimestamp = statusTimestamps[step]
-                const isClickable = isCompleted || isCurrent
-
-                // Distinct colours for each state
-                const stateConfig = isCompleted
-                  ? { bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', icon: 'bg-green-500', label: 'Done' }
-                  : isCurrent
-                  ? { bg: 'bg-primary/10 dark:bg-primary/20', border: 'border-primary dark:border-primary/50', text: 'text-primary dark:text-primary', icon: 'bg-primary', label: 'Now' }
-                  : isUpNext
-                  ? { bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', icon: 'bg-orange-400', label: 'Up next' }
-                  : { bg: 'bg-gray-50 dark:bg-gray-700/30', border: 'border-gray-200 dark:border-gray-600', text: 'text-gray-400 dark:text-gray-500', icon: 'bg-gray-300 dark:bg-gray-600', label: '' }
+                const isLast = index === statusSteps.length - 1
 
                 return (
-                  <button
-                    key={step}
-                    onClick={() => isClickable ? setSelectedStage(step) : undefined}
-                    disabled={!isClickable}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 ${stateConfig.bg} ${stateConfig.border} ${
-                      isClickable ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all' : 'cursor-default'
-                    } text-left`}
-                  >
-                    {/* Circle icon */}
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${stateConfig.icon}`}>
-                      {isCompleted ? (
-                        <CheckCircle className="h-5 w-5 text-white" />
-                      ) : isCurrent ? (
-                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
-                      ) : isUpNext ? (
-                        <Clock className="h-4 w-4 text-white" />
-                      ) : (
-                        <span className="text-xs font-bold text-gray-500">{index + 1}</span>
+                  <div key={step} className="flex items-start gap-3 pb-5 relative">
+                    {/* Line */}
+                    {!isLast && (
+                      <div className={`absolute left-[7px] top-4 bottom-0 w-px ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                    )}
+
+                    {/* Dot */}
+                    <div className={`flex-shrink-0 w-3.5 h-3.5 rounded-full mt-1.5 relative z-10 ${
+                      isCompleted ? 'bg-green-500' :
+                      isCurrent ? (isDelayed ? 'bg-red-500' : 'bg-primary') :
+                      isUpNext ? 'bg-orange-400' :
+                      'bg-gray-300 dark:bg-gray-600'
+                    }`}>
+                      {isCurrent && !isDelayed && (
+                        <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
                       )}
                     </div>
 
-                    {/* Label + time */}
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold ${stateConfig.text}`}>
+                    {/* Text */}
+                    <div className="flex-1 -mt-0.5">
+                      <p className={`text-sm font-semibold ${
+                        isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
+                        isCompleted ? 'text-gray-900 dark:text-white' :
+                        isUpNext ? 'text-orange-600 dark:text-orange-400' :
+                        'text-gray-400 dark:text-gray-500'
+                      }`}>
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
                       </p>
                       {isCurrent && (
-                        <p className="text-xs text-primary font-medium">
+                        <p className="text-xs text-primary mt-0.5">
                           {formatTimeSince(statusChangedAt)}
                         </p>
                       )}
                       {isCompleted && stageTimestamp && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                           {formatStageTimestamp(stageTimestamp)}
                         </p>
                       )}
                       {isUpNext && (
-                        <p className="text-xs text-orange-500 dark:text-orange-400">
+                        <p className="text-xs text-orange-500 dark:text-orange-400 mt-0.5">
                           Waiting to start
                         </p>
                       )}
                       {repairAgreed && step === 'DIAGNOSTIC' && isCompleted && (
-                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                          ✓ Agreed
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                          Agreed — starting soon
                         </p>
                       )}
                     </div>
-
-                    {/* State label badge */}
-                    {stateConfig.label && (
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${stateConfig.bg} ${stateConfig.text} border ${stateConfig.border}`}>
-                        {stateConfig.label}
-                      </span>
-                    )}
-
-                    {/* Chevron for clickable */}
-                    {isClickable && (
-                      <ChevronDown className="h-4 w-4 text-gray-400 rotate-[-90deg] flex-shrink-0" />
-                    )}
-                  </button>
+                  </div>
                 )
               })}
             </div>
           </div>
         </div>
-
-        {/* Bottom sheet for stage details */}
-        <SlideUpPanel
-          isOpen={!!selectedStage}
-          onClose={() => setSelectedStage(null)}
-          title={selectedStage ? JOB_STATUS_LABELS[selectedStage as keyof typeof JOB_STATUS_LABELS] : ''}
-          icon={<Clock className="h-5 w-5 text-primary" />}
-          minHeight="40vh"
-        >
-          {selectedStage && (
-            <div className="space-y-4">
-              {/* Status badge */}
-              <div className={`w-full py-3 rounded-xl font-bold text-center ${JOB_STATUS_COLORS[selectedStage as keyof typeof JOB_STATUS_COLORS]}`}>
-                {JOB_STATUS_LABELS[selectedStage as keyof typeof JOB_STATUS_LABELS]}
-              </div>
-
-              {/* Description */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">What happened</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                  {getStatusDescription(selectedStage)}
-                </p>
-              </div>
-
-              {/* Timestamp */}
-              {statusTimestamps[selectedStage] && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">When</p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {formatStageTimestamp(statusTimestamps[selectedStage])}
-                  </p>
-                </div>
-              )}
-
-              {/* Diagnosis results */}
-              {selectedStage === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Our findings</p>
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                      {job.diagnosis_notes || job.diagnostic_report}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Repair agreed */}
-              {selectedStage === 'DIAGNOSTIC' && repairAgreed && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
-                    ✓ You agreed to go ahead with the repair
-                  </p>
-                </div>
-              )}
-
-              {/* Parts tracking */}
-              {selectedStage === 'PARTS_ORDERED' && job.parts_tracking_status && job.show_tracking_to_customer && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Parts tracking</p>
-                  <p className="text-sm text-purple-600 dark:text-purple-400">
-                    {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
-                     job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
-                     job.parts_tracking_status === 'InTransit' ? 'Parts on the way to us' :
-                     job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed with supplier' :
-                     `Parts status: ${job.parts_tracking_status}`}
-                  </p>
-                </div>
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={() => setSelectedStage(null)}
-                className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-bold py-3 rounded-xl"
-              >
-                Close
-              </button>
-            </div>
-          )}
-        </SlideUpPanel>
 
         {/* QR Code — Expandable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
