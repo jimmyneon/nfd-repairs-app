@@ -953,7 +953,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               <MessageSquare className="h-6 w-6 text-primary flex-shrink-0" />
               <div>
                 <p className="font-bold text-gray-900 dark:text-white text-sm">Problem with your repair?</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Just text us — your repair is under warranty</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Just text us — we will sort it</p>
               </div>
             </a>
           </div>

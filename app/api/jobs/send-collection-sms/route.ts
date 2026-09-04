@@ -139,14 +139,14 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}, hope you're happy with your ${job.device_model || 'device'} repair!
+      smsBody = `Hi ${firstName}, hope you are happy with your ${job.device_model || 'device'} repair!
 
 If so, a 5-star Google review would mean the world to our small business →
 ${reviewLink}
 
 (Takes 60 seconds — just tap the link above)
 
-If anything's not right, just reply here.
+If anything is not right, just reply here.
 
 – New Forest Device Repairs`
     }
