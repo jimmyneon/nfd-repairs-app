@@ -54,12 +54,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch all PENDING SMS plus FAILED SMS older than 1 hour (for retry).
     // The 1-hour delay gives MacroDroid time to recover if it was down.
+    // Skip messages that have been retried 10+ times (dead-letter).
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
     const { data: pendingRows, error: pendingError } = await supabase
       .from('sms_logs')
       .select('*, jobs(customer_phone)')
       .eq('status', 'PENDING')
+      .lt('retry_count', 10)
       .order('created_at', { ascending: true })
       .limit(50)
 
@@ -68,6 +70,7 @@ export async function GET(request: NextRequest) {
       .select('*, jobs(customer_phone)')
       .eq('status', 'FAILED')
       .lt('created_at', oneHourAgo)
+      .lt('retry_count', 10)
       .order('created_at', { ascending: true })
       .limit(20)
 
@@ -101,6 +104,23 @@ export async function GET(request: NextRequest) {
 
     for (let i = 0; i < pendingSms.length; i++) {
       const smsLog = pendingSms[i]
+
+      // Dead-letter: if retry_count >= 10, mark as permanently failed
+      if ((smsLog.retry_count || 0) >= 10) {
+        console.error(`SMS ${smsLog.id} has been retried 10+ times - marking as DEAD_LETTER`)
+        await supabaseRetry(() =>
+          supabase
+            .from('sms_logs')
+            .update({
+              status: 'FAILED',
+              error_message: `Dead-letter: failed after ${smsLog.retry_count} retries`,
+            })
+            .eq('id', smsLog.id)
+        )
+        failedCount++
+        results.push({ id: smsLog.id, status: 'DEAD_LETTER', retries: smsLog.retry_count })
+        continue
+      }
 
       // Guard: skip empty SMS
       if (!smsLog.body_rendered || !smsLog.body_rendered.trim()) {
@@ -163,6 +183,8 @@ export async function GET(request: NextRequest) {
               })
               .eq('id', smsLog.id)
           )
+          // Increment retry count
+          await supabaseRetry(() => supabase.rpc('increment_retry_count', { sms_id: smsLog.id }))
           failedCount++
           results.push({ id: smsLog.id, status: newStatus, error: smsResult.body.substring(0, 200) })
         }

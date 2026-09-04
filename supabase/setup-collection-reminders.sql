@@ -106,6 +106,7 @@ New Forest Device Repairs',
 ON CONFLICT (key) DO UPDATE SET body = EXCLUDED.body, is_active = true;
 
 -- Step 3: Create function to process collection reminders
+-- Sets a 30-second HTTP timeout (default is 5s)
 CREATE OR REPLACE FUNCTION send_collection_reminders()
 RETURNS void
 LANGUAGE plpgsql
@@ -116,7 +117,10 @@ DECLARE
   v_response TEXT;
 BEGIN
   v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
-  
+
+  PERFORM http_set_curlopt('CURLOPT_TIMEOUT', '30');
+  PERFORM http_set_curlopt('CURLOPT_CONNECTTIMEOUT', '10');
+
   SELECT content INTO v_response
   FROM http((
     'GET',
@@ -125,8 +129,11 @@ BEGIN
     'application/json',
     ''
   )::http_request);
-  
-  RAISE NOTICE 'Collection reminders cron executed. Response: %', v_response;
+
+  RAISE NOTICE 'Collection reminders cron executed. Response length: %', length(v_response);
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Collection reminders cron error: %', SQLERRM;
 END;
 $$;
 

@@ -150,3 +150,21 @@ export function isWithinUKSendingHours(): boolean {
   const hour = getUKHour()
   return hour >= 8 && hour < 20
 }
+
+/**
+ * Quick health check for Supabase — tries a simple query.
+ * Returns true if Supabase is responding, false if it's down.
+ * Use this before attempting batch operations.
+ */
+export async function isSupabaseHealthy(supabase: SupabaseClient): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('jobs')
+      .select('id')
+      .limit(1)
+      .timeout(5000)
+    return !error
+  } catch {
+    return false
+  }
+}

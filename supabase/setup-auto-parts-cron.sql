@@ -2,6 +2,7 @@
 -- Run this in Supabase SQL Editor
 
 -- Create function to call the auto-parts-ordered API endpoint
+-- Sets a 30-second HTTP timeout (default is 5s)
 CREATE OR REPLACE FUNCTION auto_parts_ordered_cron()
 RETURNS void
 LANGUAGE plpgsql
@@ -12,7 +13,10 @@ DECLARE
   v_response TEXT;
 BEGIN
   v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
-  
+
+  PERFORM http_set_curlopt('CURLOPT_TIMEOUT', '30');
+  PERFORM http_set_curlopt('CURLOPT_CONNECTTIMEOUT', '10');
+
   SELECT content INTO v_response
   FROM http((
     'GET',
@@ -21,8 +25,11 @@ BEGIN
     'application/json',
     ''
   )::http_request);
-  
-  RAISE NOTICE 'Auto parts ordered cron executed. Response: %', v_response;
+
+  RAISE NOTICE 'Auto parts ordered cron executed. Response length: %', length(v_response);
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Auto parts ordered cron error: %', SQLERRM;
 END;
 $$;
 

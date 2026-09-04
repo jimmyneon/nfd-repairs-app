@@ -29,6 +29,8 @@ EXCEPTION
 END $$;
 
 -- Create function to call the SMS drain endpoint
+-- Sets a 30-second HTTP timeout (default is 5s, which is too short
+-- for Vercel functions that may take 10-20s to process a batch)
 CREATE OR REPLACE FUNCTION drain_pending_sms()
 RETURNS void
 LANGUAGE plpgsql
@@ -38,8 +40,11 @@ DECLARE
     v_cron_secret TEXT;
     v_response TEXT;
 BEGIN
-    -- This secret MUST match the CRON_SECRET env var on Vercel
     v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
+
+    -- Set HTTP timeout to 30 seconds (default is 5s)
+    PERFORM http_set_curlopt('CURLOPT_TIMEOUT', '30');
+    PERFORM http_set_curlopt('CURLOPT_CONNECTTIMEOUT', '10');
 
     SELECT content INTO v_response
     FROM http((
@@ -50,7 +55,10 @@ BEGIN
         ''
     )::http_request);
 
-    RAISE NOTICE 'SMS drain cron executed. Response: %', v_response;
+    RAISE NOTICE 'SMS drain cron executed. Response length: %', length(v_response);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'SMS drain cron error: %', SQLERRM;
 END;
 $$;
 
@@ -63,8 +71,3 @@ SELECT cron.schedule(
 
 -- Verify the cron job was created
 SELECT jobid, jobname, schedule, active FROM cron.job WHERE jobname = 'drain-pending-sms-every-5-min';
-
--- Check cron job run history (after it runs)
--- SELECT * FROM cron.job_run_details WHERE jobid IN (
---     SELECT jobid FROM cron.job WHERE jobname = 'drain-pending-sms-every-5-min'
--- ) ORDER BY start_time DESC LIMIT 10;

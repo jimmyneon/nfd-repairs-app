@@ -7,3 +7,6 @@ BEGIN
   UPDATE sms_logs SET retry_count = COALESCE(retry_count, 0) + 1 WHERE id = sms_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Add index on status for faster cron drain queries
+CREATE INDEX IF NOT EXISTS idx_sms_logs_status_created ON sms_logs (status, created_at);
