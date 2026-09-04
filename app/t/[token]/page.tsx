@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
-import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
+import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode, X } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
+import SlideUpPanel from '@/components/SlideUpPanel'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
 import { shortTrackingLink } from '@/lib/utils'
 import {
@@ -39,6 +40,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const [showDiagnosisResults, setShowDiagnosisResults] = useState(false)
+  const [selectedStage, setSelectedStage] = useState<string | null>(null)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -596,101 +598,180 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         )}
 
-        {/* Repair Journey — simple, clear, mobile-first */}
+        {/* Repair Journey — clean, colourful, clickable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-5">
             <h2 className="font-bold text-base text-gray-900 dark:text-white mb-4">
               Your Repair Journey
             </h2>
 
-            {/* Simple timeline */}
-            <div className="space-y-0">
+            {/* Timeline — horizontal cards, not vertical list */}
+            <div className="space-y-2">
               {statusSteps.map((step, index) => {
                 const isAgreedWaiting = displayStatus === '__AGREED_WAITING__'
-                // When agreed waiting: DIAGNOSTIC is completed, IN_REPAIR is "up next" (not current)
                 const isCurrent = isAgreedWaiting ? false : step === displayStatus
                 const isCompleted = isAgreedWaiting
-                  ? index <= currentStepIndex // DIAGNOSTIC and everything before it
+                  ? index <= currentStepIndex
                   : (currentStepIndex >= 0 ? index < currentStepIndex : false)
                 const isUpNext = isAgreedWaiting && step === 'IN_REPAIR'
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
                 const stageTimestamp = statusTimestamps[step]
-                const isLast = index === statusSteps.length - 1
-                const hasContent = isCompleted || isCurrent
-                const isExpanded = expandedStep === index
+                const isClickable = isCompleted || isCurrent
+
+                // Distinct colours for each state
+                const stateConfig = isCompleted
+                  ? { bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', icon: 'bg-green-500', label: 'Done' }
+                  : isCurrent
+                  ? { bg: 'bg-primary/10 dark:bg-primary/20', border: 'border-primary dark:border-primary/50', text: 'text-primary dark:text-primary', icon: 'bg-primary', label: 'Now' }
+                  : isUpNext
+                  ? { bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', icon: 'bg-orange-400', label: 'Up next' }
+                  : { bg: 'bg-gray-50 dark:bg-gray-700/30', border: 'border-gray-200 dark:border-gray-600', text: 'text-gray-400 dark:text-gray-500', icon: 'bg-gray-300 dark:bg-gray-600', label: '' }
 
                 return (
-                  <div key={step} className="flex items-stretch">
-                    {/* Left: circle + line */}
-                    <div className="flex flex-col items-center mr-3">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isCompleted ? 'bg-green-500' :
-                        isCurrent ? (isDelayed ? 'bg-red-500' : 'bg-primary') :
-                        isUpNext ? 'bg-primary/30 border-2 border-primary' :
-                        'bg-gray-200 dark:bg-gray-600'
-                      }`}>
-                        {isCompleted ? (
-                          <CheckCircle className="h-4 w-4 text-white" />
-                        ) : isCurrent ? (
-                          <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
-                        ) : isUpNext ? (
-                          <div className="w-2 h-2 bg-primary rounded-full" />
-                        ) : (
-                          <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full" />
-                        )}
-                      </div>
-                      {!isLast && (
-                        <div className={`w-0.5 flex-1 my-1 ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                  <button
+                    key={step}
+                    onClick={() => isClickable ? setSelectedStage(step) : undefined}
+                    disabled={!isClickable}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 ${stateConfig.bg} ${stateConfig.border} ${
+                      isClickable ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all' : 'cursor-default'
+                    } text-left`}
+                  >
+                    {/* Circle icon */}
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${stateConfig.icon}`}>
+                      {isCompleted ? (
+                        <CheckCircle className="h-5 w-5 text-white" />
+                      ) : isCurrent ? (
+                        <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                      ) : isUpNext ? (
+                        <Clock className="h-4 w-4 text-white" />
+                      ) : (
+                        <span className="text-xs font-bold text-gray-500">{index + 1}</span>
                       )}
                     </div>
 
-                    {/* Right: label + time — clickable if has content */}
-                    <button
-                      onClick={() => hasContent ? setExpandedStep(isExpanded ? null : index) : undefined}
-                      className={`flex-1 pb-4 pt-0.5 text-left ${hasContent ? 'cursor-pointer' : 'cursor-default'}`}
-                    >
-                      <p className={`text-sm font-semibold ${
-                        isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
-                        isCompleted ? 'text-green-600 dark:text-green-400' :
-                        isUpNext ? 'text-primary' :
-                        'text-gray-400 dark:text-gray-500'
-                      }`}>
+                    {/* Label + time */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-bold ${stateConfig.text}`}>
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                        {isUpNext && <span className="ml-2 text-xs text-primary/70 italic">Up next</span>}
-                        {hasContent && (
-                          <span className="ml-1 inline-block">
-                            {isExpanded ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />}
-                          </span>
-                        )}
                       </p>
                       {isCurrent && (
-                        <p className="text-xs text-primary font-medium mt-0.5">
+                        <p className="text-xs text-primary font-medium">
                           {formatTimeSince(statusChangedAt)}
                         </p>
                       )}
-                      {isCompleted && stageTimestamp && !isExpanded && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      {isCompleted && stageTimestamp && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
                           {formatStageTimestamp(stageTimestamp)}
                         </p>
                       )}
+                      {isUpNext && (
+                        <p className="text-xs text-orange-500 dark:text-orange-400">
+                          Waiting to start
+                        </p>
+                      )}
                       {repairAgreed && step === 'DIAGNOSTIC' && isCompleted && (
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
-                          ✓ Agreed — starting soon
+                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                          ✓ Agreed
                         </p>
                       )}
-                      {/* Expanded content — just a one-line description */}
-                      {isExpanded && hasContent && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {getStatusDescription(step)}
-                        </p>
-                      )}
-                    </button>
-                  </div>
+                    </div>
+
+                    {/* State label badge */}
+                    {stateConfig.label && (
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${stateConfig.bg} ${stateConfig.text} border ${stateConfig.border}`}>
+                        {stateConfig.label}
+                      </span>
+                    )}
+
+                    {/* Chevron for clickable */}
+                    {isClickable && (
+                      <ChevronDown className="h-4 w-4 text-gray-400 rotate-[-90deg] flex-shrink-0" />
+                    )}
+                  </button>
                 )
               })}
             </div>
           </div>
         </div>
+
+        {/* Bottom sheet for stage details */}
+        <SlideUpPanel
+          isOpen={!!selectedStage}
+          onClose={() => setSelectedStage(null)}
+          title={selectedStage ? JOB_STATUS_LABELS[selectedStage as keyof typeof JOB_STATUS_LABELS] : ''}
+          icon={<Clock className="h-5 w-5 text-primary" />}
+          minHeight="40vh"
+        >
+          {selectedStage && (
+            <div className="space-y-4">
+              {/* Status badge */}
+              <div className={`w-full py-3 rounded-xl font-bold text-center ${JOB_STATUS_COLORS[selectedStage as keyof typeof JOB_STATUS_COLORS]}`}>
+                {JOB_STATUS_LABELS[selectedStage as keyof typeof JOB_STATUS_LABELS]}
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">What happened</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {getStatusDescription(selectedStage)}
+                </p>
+              </div>
+
+              {/* Timestamp */}
+              {statusTimestamps[selectedStage] && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">When</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {formatStageTimestamp(statusTimestamps[selectedStage])}
+                  </p>
+                </div>
+              )}
+
+              {/* Diagnosis results */}
+              {selectedStage === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Our findings</p>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                      {job.diagnosis_notes || job.diagnostic_report}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Repair agreed */}
+              {selectedStage === 'DIAGNOSTIC' && repairAgreed && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                    ✓ You agreed to go ahead with the repair
+                  </p>
+                </div>
+              )}
+
+              {/* Parts tracking */}
+              {selectedStage === 'PARTS_ORDERED' && job.parts_tracking_status && job.show_tracking_to_customer && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Parts tracking</p>
+                  <p className="text-sm text-purple-600 dark:text-purple-400">
+                    {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
+                     job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
+                     job.parts_tracking_status === 'InTransit' ? 'Parts on the way to us' :
+                     job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed with supplier' :
+                     `Parts status: ${job.parts_tracking_status}`}
+                  </p>
+                </div>
+              )}
+
+              {/* Close button */}
+              <button
+                onClick={() => setSelectedStage(null)}
+                className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-bold py-3 rounded-xl"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </SlideUpPanel>
 
         {/* QR Code — Expandable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
