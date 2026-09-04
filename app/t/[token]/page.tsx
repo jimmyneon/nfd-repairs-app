@@ -406,11 +406,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     if (job.parts_required || job.deposit_required) return 'PARTS_ORDERED'
     return 'IN_REPAIR'
   }
-  // When repair is agreed, DIAGNOSTIC is done — current stage is IN_REPAIR (waiting to start)
+  // When repair is agreed, DIAGNOSTIC is done — but we haven't started IN_REPAIR yet
+  // Show DIAGNOSTIC as completed, IN_REPAIR as upcoming (not current, no fake timestamp)
   const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed()
-    : (job.status === 'DIAGNOSTIC' && repairAgreed) ? 'IN_REPAIR'
+    : (job.status === 'DIAGNOSTIC' && repairAgreed) ? '__AGREED_WAITING__'
     : job.status
-  const currentStepIndex = statusSteps.indexOf(displayStatus)
+  const currentStepIndex = job.status === 'DIAGNOSTIC' && repairAgreed
+    ? statusSteps.indexOf('DIAGNOSTIC') // DIAGNOSTIC is the last completed step
+    : statusSteps.indexOf(displayStatus)
 
   // Show progress bar only for active repair stages (not when diagnostics are complete)
   const showProgressBar = ['IN_REPAIR', 'PARTS_ARRIVED'].includes(job.status) ||
@@ -603,8 +606,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             {/* Simple timeline */}
             <div className="space-y-0">
               {statusSteps.map((step, index) => {
-                const isCurrent = step === displayStatus
-                const isCompleted = currentStepIndex >= 0 ? index < currentStepIndex : false
+                const isAgreedWaiting = displayStatus === '__AGREED_WAITING__'
+                // When agreed waiting: DIAGNOSTIC is completed, IN_REPAIR is "up next" (not current)
+                const isCurrent = isAgreedWaiting ? false : step === displayStatus
+                const isCompleted = isAgreedWaiting
+                  ? index <= currentStepIndex // DIAGNOSTIC and everything before it
+                  : (currentStepIndex >= 0 ? index < currentStepIndex : false)
+                const isUpNext = isAgreedWaiting && step === 'IN_REPAIR'
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
                 const stageTimestamp = statusTimestamps[step]
                 const isLast = index === statusSteps.length - 1
@@ -618,12 +626,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                         isCompleted ? 'bg-green-500' :
                         isCurrent ? (isDelayed ? 'bg-red-500' : 'bg-primary') :
+                        isUpNext ? 'bg-primary/30 border-2 border-primary' :
                         'bg-gray-200 dark:bg-gray-600'
                       }`}>
                         {isCompleted ? (
                           <CheckCircle className="h-4 w-4 text-white" />
                         ) : isCurrent ? (
                           <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                        ) : isUpNext ? (
+                          <div className="w-2 h-2 bg-primary rounded-full" />
                         ) : (
                           <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full" />
                         )}
@@ -641,9 +652,11 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       <p className={`text-sm font-semibold ${
                         isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
                         isCompleted ? 'text-green-600 dark:text-green-400' :
+                        isUpNext ? 'text-primary' :
                         'text-gray-400 dark:text-gray-500'
                       }`}>
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                        {isUpNext && <span className="ml-2 text-xs text-primary/70 italic">Up next</span>}
                         {hasContent && (
                           <span className="ml-1 inline-block">
                             {isExpanded ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />}
@@ -660,9 +673,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                           {formatStageTimestamp(stageTimestamp)}
                         </p>
                       )}
-                      {repairAgreed && step === 'DIAGNOSTIC' && isCurrent && (
+                      {repairAgreed && step === 'DIAGNOSTIC' && isCompleted && (
                         <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
-                          ✓ You agreed to go ahead
+                          ✓ Agreed — starting soon
                         </p>
                       )}
                       {/* Expanded content — just a one-line description */}
