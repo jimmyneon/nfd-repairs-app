@@ -43,7 +43,7 @@ function BookingSuccessContent() {
               <div className="flex-shrink-0 w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                 <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Text sent</strong> with a tracking link - check your phone.</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Tracking link sent</strong> - use it anytime to check the latest repair status.</p>
             </div>
             {email && (
               <div className="flex items-center gap-3">
@@ -57,19 +57,19 @@ function BookingSuccessContent() {
               <div className="flex-shrink-0 w-9 h-9 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
                 <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Updates by text</strong> - we will message you at each stage.</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Track progress online</strong> - status updates will appear on your tracking page as the repair progresses.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-9 h-9 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                 <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
               </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Collect when ready</strong> - we will text you when its done.</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Collect when ready</strong> - we will text you when your device is ready for collection.</p>
             </div>
           </div>
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-500 pb-4">
-          You can check your repair status anytime via the tracking link in your text message.
+          You can check your repair status anytime using the tracking link in your text message.
         </p>
 
         <div className="flex gap-3 pb-8">
