@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -69,6 +69,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [linkCopied, setLinkCopied] = useState(false)
   const [showCustomerArrivedPrompt, setShowCustomerArrivedPrompt] = useState(false)
   const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | 'notes' | null>(null)
+  const [showDiagnosticFollowUp, setShowDiagnosticFollowUp] = useState(false)
+  const [showDiagnosticResponse, setShowDiagnosticResponse] = useState(false)
   const [historyTab, setHistoryTab] = useState<'all' | 'status' | 'messages' | 'notes' | 'emails'>('all')
   const [showSmsComposer, setShowSmsComposer] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
@@ -1628,11 +1630,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'DIAGNOSTIC' && (
               <>
-                {/* Diagnostic prompt — escalating reminders */}
+                {/* Status banner — simple, colour-coded */}
                 {(() => {
-                  const diagHours = job.status_changed_at
-                    ? (Date.now() - new Date(job.status_changed_at).getTime()) / (1000 * 60 * 60)
-                    : 0
                   const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
                   const agreed = !!job.repair_agreed_at
                   const declined = !!job.repair_declined_at
@@ -1656,87 +1655,36 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     )
                   }
 
-                  if (!hasDiagnosis && diagHours < 2) {
-                    return null // Still assessing, no prompt yet
-                  }
-
                   if (!hasDiagnosis) {
                     return (
-                      <div className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border-2 border-amber-300 dark:border-amber-700">
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-200 text-center mb-2">
-                          ⏱ In diagnostics for {Math.round(diagHours)}h — log your findings
-                        </p>
-                        <button
-                          onClick={() => setActivePanel('diagnostic')}
-                          className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all"
-                        >
-                          Write Diagnostic Report
-                        </button>
+                      <div className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-center border-2 border-amber-300 dark:border-amber-700">
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Diagnosis in progress</p>
                       </div>
                     )
                   }
 
-                  // Has diagnosis but no agreement yet
-                  const promptColor = diagHours > 8 ? 'red' : diagHours > 4 ? 'orange' : 'yellow'
-                  const promptBg = promptColor === 'red' ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700' :
-                    promptColor === 'orange' ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700' :
-                    'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700'
-                  const promptText = promptColor === 'red' ? 'text-red-800 dark:text-red-200' :
-                    promptColor === 'orange' ? 'text-orange-800 dark:text-orange-200' :
-                    'text-yellow-800 dark:text-yellow-200'
-
                   return (
-                    <div className={`w-full ${promptBg} rounded-xl p-4 border-2`}>
-                      <p className={`text-sm font-bold ${promptText} text-center mb-3`}>
-                        {diagHours > 8
-                          ? `⚠️ No response for ${Math.round(diagHours)}h — follow up with customer`
-                          : diagHours > 4
-                          ? `📋 Diagnosis sent ${Math.round(diagHours)}h ago — awaiting customer response`
-                          : `📋 Diagnosis sent — awaiting customer response`}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={async () => {
-                            // Send follow-up text
-                            const msg = `Hi, we diagnosed your ${job.device_make || ''} ${job.device_model || ''} and sent a quote. Just checking you received it? Reply here if you'd like to go ahead or if you have any questions.`
-                            setDiagnosticSmsMessage(msg)
-                          }}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
-                        >
-                          Text Customer
-                        </button>
-                        <button
-                          onClick={async () => {
-                            await fetch('/api/jobs/diagnostic-action', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ jobId: job.id, action: 'agree' }),
-                            })
-                            loadJobData()
-                          }}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
-                        >
-                          Mark Agreed
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const reason = prompt('Why was the repair declined?')
-                            if (reason === null) return
-                            await fetch('/api/jobs/diagnostic-action', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ jobId: job.id, action: 'decline', declinedReason: reason }),
-                            })
-                            loadJobData()
-                          }}
-                          className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
-                        >
-                          Decline
-                        </button>
-                      </div>
+                    <div className="w-full bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-center border-2 border-blue-300 dark:border-blue-700">
+                      <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Diagnosis sent — awaiting customer response</p>
                     </div>
                   )
                 })()}
+
+                {/* Two big buttons — mobile-friendly */}
+                <button
+                  onClick={() => setShowDiagnosticFollowUp(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3"
+                >
+                  <MessageCircle className="h-6 w-6" />
+                  <span>Follow Up Customer</span>
+                </button>
+                <button
+                  onClick={() => setShowDiagnosticResponse(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3"
+                >
+                  <CheckCircle className="h-6 w-6" />
+                  <span>Customer Responded</span>
+                </button>
 
                 <button
                   onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
@@ -2539,6 +2487,105 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           onSent={loadJobData}
         />
       )}
+
+      {/* Slide-Up Panel: Follow Up Customer */}
+      <SlideUpPanel
+        isOpen={showDiagnosticFollowUp}
+        onClose={() => setShowDiagnosticFollowUp(false)}
+        title="Follow Up Customer"
+        icon={<MessageCircle className="h-5 w-5 text-primary" />}
+        minHeight="50vh"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Send a follow-up message to {job.customer_name} about their diagnosis.
+          </p>
+          <button
+            onClick={() => {
+              const msg = `Hi ${getFirstName(job.customer_name)}, we diagnosed your ${job.device_make || 'device'} ${job.device_model || ''} and sent a quote. Just checking you received it? Reply here if you'd like to go ahead or if you have any questions.`
+              setDiagnosticSmsMessage(msg)
+              setShowDiagnosticFollowUp(false)
+            }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span>Send Reminder Text</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowSmsComposer(true)
+              setShowDiagnosticFollowUp(false)
+            }}
+            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>Write Custom Message</span>
+          </button>
+          <a
+            href={`sms:${job.customer_phone}`}
+            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <Smartphone className="h-5 w-5" />
+            <span>Open in Messages App</span>
+          </a>
+        </div>
+      </SlideUpPanel>
+
+      {/* Slide-Up Panel: Customer Responded */}
+      <SlideUpPanel
+        isOpen={showDiagnosticResponse}
+        onClose={() => setShowDiagnosticResponse(false)}
+        title="Customer Responded"
+        icon={<CheckCircle className="h-5 w-5 text-primary" />}
+        minHeight="50vh"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            What did {job.customer_name} say?
+          </p>
+          <button
+            onClick={async () => {
+              await fetch('/api/jobs/diagnostic-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId: job.id, action: 'agree' }),
+              })
+              setShowDiagnosticResponse(false)
+              loadJobData()
+            }}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <CheckCircle className="h-6 w-6" />
+            <span>Yes — They Want to Proceed</span>
+          </button>
+          <button
+            onClick={async () => {
+              const reason = prompt('Why did they decline? (optional)')
+              await fetch('/api/jobs/diagnostic-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jobId: job.id, action: 'decline', declinedReason: reason || '' }),
+              })
+              setShowDiagnosticResponse(false)
+              loadJobData()
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-5 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <XCircle className="h-6 w-6" />
+            <span>No — They Declined</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowSmsComposer(true)
+              setShowDiagnosticResponse(false)
+            }}
+            className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>They Had Questions — Reply</span>
+          </button>
+        </div>
+      </SlideUpPanel>
 
       {/* Diagnostic Report SMS Composer */}
       {diagnosticSmsMessage && (

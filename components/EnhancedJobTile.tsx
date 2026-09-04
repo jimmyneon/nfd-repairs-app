@@ -207,12 +207,12 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
             if (!hasDiagnosis) {
               return (
                 <div className="mb-1 bg-amber-400/90 text-amber-900 rounded-md px-2 py-0.5">
-                  <p className="text-xs font-semibold truncate">⏱ Log diagnosis ({Math.round(diagHours)}h)</p>
+                  <p className="text-xs font-semibold truncate">⏱ Log diagnosis</p>
                 </div>
               )
             }
             const urgency = diagHours > 8 ? 'bg-red-400/90 text-red-900' : diagHours > 4 ? 'bg-orange-400/90 text-orange-900' : 'bg-yellow-300/90 text-yellow-900'
-            const msg = diagHours > 8 ? `⚠️ No response ${Math.round(diagHours)}h` : `📋 Awaiting response ${Math.round(diagHours)}h`
+            const msg = diagHours > 8 ? '⚠️ Follow up customer' : '📋 Awaiting response'
             return (
               <div className={`mb-1 ${urgency} rounded-md px-2 py-0.5`}>
                 <p className="text-xs font-semibold truncate">{msg}</p>
