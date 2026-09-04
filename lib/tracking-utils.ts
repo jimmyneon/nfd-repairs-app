@@ -126,18 +126,18 @@ export function getTurnaroundEstimate(
   // Complex repairs — long turnaround regardless of device
   if (complex) {
     if (issueLower.includes('data recovery')) {
-      return { display: 'Usually up to 7 days — we want to make sure we recover everything safely', minHours: 72, maxHours: 168, isComplex: true }
+      return { display: 'Usually up to 7 days — we want to make sure we recover everything safely, and quite often we get it back to you quicker', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'phone' || deviceType === 'watch') {
-      return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
+      return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'tablet') {
-      return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
+      return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'laptop') {
-      return { display: 'Usually up to 10 days, but we'll get it back to you as soon as we can', minHours: 96, maxHours: 240, isComplex: true }
+      return { display: 'Usually up to 10 days, but quite often we get it back to you quicker than that', minHours: 96, maxHours: 240, isComplex: true }
     }
-    return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
+    return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
   }
 
   // Phone repairs

@@ -36,6 +36,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   })
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([])
   const [jobEvents, setJobEvents] = useState<{ created_at: string; message: string }[]>([])
+  const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
+  const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -96,6 +98,27 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       if (events && events.length > 0) {
         setStatusChangedAt(new Date(events[0].created_at))
         setJobEvents(events)
+
+        // Build a map of status -> timestamp from events
+        const timestamps: Record<string, string> = {}
+        for (const event of events) {
+          const match = event.message?.match(/Status changed to (.+?)(?:\s*-|$)/)
+          if (match) {
+            const label = match[1].trim()
+            const statusKey = Object.entries(JOB_STATUS_LABELS).find(
+              ([key, l]) => l === label
+            )?.[0]
+            if (statusKey && !timestamps[statusKey]) {
+              timestamps[statusKey] = event.created_at
+            }
+          }
+        }
+        // Also add the job creation time as the initial timestamp
+        if (!timestamps['QUOTE_APPROVED'] && !timestamps['RECEIVED']) {
+          timestamps['RECEIVED'] = data.created_at
+        }
+        setStatusTimestamps(timestamps)
+
         if (data.status === 'DELAYED' && events.length > 1) {
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
@@ -252,6 +275,37 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     if (isToday) return `${time} — Today`
     if (isYesterday) return `${time} — Yesterday`
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` — ${time}`
+  }
+
+  const formatStageTimestamp = (timestamp: string | undefined) => {
+    if (!timestamp) return null
+    const d = new Date(timestamp)
+    const now = new Date()
+    const isToday = d.toDateString() === now.toDateString()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday = d.toDateString() === yesterday.toDateString()
+
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    if (isToday) return `Today at ${time}`
+    if (isYesterday) return `Yesterday at ${time}`
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` at ${time}`
+  }
+
+  // Get a short description for each status step
+  const getStatusDescription = (step: string): string => {
+    const descriptions: Record<string, string> = {
+      QUOTE_APPROVED: 'Your quote was approved and we booked your device in.',
+      RECEIVED: 'We received your device and added it to our workshop queue.',
+      DIAGNOSTIC: 'We examined your device to identify exactly what needs fixing.',
+      AWAITING_DEPOSIT: 'We need a deposit to order the parts for your repair.',
+      PARTS_ORDERED: 'Parts have been ordered and are on their way to us.',
+      PARTS_ARRIVED: 'Parts have arrived and we are ready to start the repair.',
+      IN_REPAIR: 'Your device is being repaired by our technician.',
+      READY_TO_COLLECT: 'Your device is fully repaired and ready for collection.',
+      COLLECTED: 'You collected your device. Thank you for choosing us!',
+    }
+    return descriptions[step] || ''
   }
 
   if (loading) {
@@ -527,51 +581,147 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         )}
 
-        {/* Repair Progress Timeline */}
+        {/* Repair Progress Timeline — redesigned with timestamps and clickable steps */}
         <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-5 md:p-6">
-            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 flex items-center">
+            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-1 flex items-center">
               <Clock className="h-5 w-5 mr-2 text-primary" />
-              Repair Progress
+              Your Repair Journey
             </h2>
-            <div className="space-y-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Tap any stage to see more details
+            </p>
+            <div className="space-y-1">
               {statusSteps.map((step, index) => {
                 const isCurrent = step === displayStatus
                 const isCompleted = currentStepIndex >= 0 ? index < currentStepIndex : false
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
+                const stageTimestamp = statusTimestamps[step]
+                const formattedTime = formatStageTimestamp(stageTimestamp)
+                const isExpanded = expandedStep === index
+                const description = getStatusDescription(step)
+                const hasContent = isCompleted || isCurrent
+
                 return (
                   <div key={step} className="relative">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-1">
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                          isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
-                          isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/30 scale-110' : 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110') :
-                          'bg-gray-200 text-gray-500 border-2 border-gray-300'
-                        }`}>
-                          {isCompleted ? <CheckCircle className="h-6 w-6" /> : <span className="text-sm font-black">{index + 1}</span>}
-                        </div>
-                        <div className="ml-3 flex-1">
+                    {/* Connecting line */}
+                    {index < statusSteps.length - 1 && (
+                      <div className={`absolute left-5 top-10 w-0.5 h-full ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} style={{ zIndex: 0 }} />
+                    )}
+
+                    <button
+                      onClick={() => hasContent ? setExpandedStep(isExpanded ? null : index) : undefined}
+                      className={`relative w-full flex items-start gap-3 py-2 ${hasContent ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg' : 'cursor-default'}`}
+                      style={{ zIndex: 1 }}
+                    >
+                      {/* Circle icon */}
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isCompleted ? 'bg-green-500 text-white shadow-md' :
+                        isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/20' : 'bg-primary text-white shadow-xl ring-4 ring-primary/20') :
+                        'bg-gray-200 dark:bg-gray-700 text-gray-400 border-2 border-gray-300 dark:border-gray-600'
+                      }`}>
+                        {isCompleted ? <CheckCircle className="h-5 w-5" /> :
+                         isCurrent ? <span className="text-sm font-black">{index + 1}</span> :
+                         <span className="text-sm font-black opacity-50">{index + 1}</span>}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm font-semibold ${
                             isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
-                            isCompleted ? 'text-green-600' : 'text-gray-400'
+                            isCompleted ? 'text-green-700 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'
                           }`}>
                             {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                            {isDelayed && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>}
+                            {isDelayed && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Delayed</span>}
+                            {repairAgreed && step === 'DIAGNOSTIC' && isCurrent && (
+                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Agreed</span>
+                            )}
                           </p>
+                          {hasContent && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {formattedTime && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                                  {formattedTime}
+                                </span>
+                              )}
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                            </div>
+                          )}
                         </div>
+
+                        {/* Time on mobile (below the label) */}
+                        {hasContent && formattedTime && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mt-0.5">
+                            {formattedTime}
+                          </p>
+                        )}
+
+                        {/* Current status time since */}
+                        {isCurrent && !isDelayed && (
+                          <p className="text-xs text-primary font-medium mt-0.5">
+                            {formatTimeSince(statusChangedAt)}
+                          </p>
+                        )}
+
+                        {/* Expanded content */}
+                        {isExpanded && hasContent && (
+                          <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-left">
+                            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed mb-2">
+                              {description}
+                            </p>
+                            {formattedTime && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500">
+                                {formattedTime}
+                              </p>
+                            )}
+                            {/* Show diagnosis notes if this is the diagnostic step */}
+                            {step === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
+                              <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">Our findings:</p>
+                                <p className="text-xs text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
+                                  {job.diagnosis_notes || job.diagnostic_report}
+                                </p>
+                              </div>
+                            )}
+                            {/* Show repair agreed info */}
+                            {step === 'DIAGNOSTIC' && repairAgreed && (
+                              <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-2">
+                                ✓ You agreed to go ahead with the repair
+                              </p>
+                            )}
+                            {/* Show parts tracking info */}
+                            {step === 'PARTS_ORDERED' && job.parts_tracking_status && job.show_tracking_to_customer && (
+                              <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                                {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
+                                 job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
+                                 job.parts_tracking_status === 'InTransit' ? 'Parts on the way to us' :
+                                 job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed with supplier' :
+                                 `Parts status: ${job.parts_tracking_status}`}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Upcoming step — show expected action */}
+                        {!hasContent && index === currentStepIndex + 1 && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 italic">
+                            Up next
+                          </p>
+                        )}
                       </div>
-                      {(isCurrent || isCompleted) && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                          {isCurrent ? formatTimeSince(statusChangedAt) : ''}
-                        </div>
-                      )}
-                    </div>
-                    {index < statusSteps.length - 1 && (
-                      <div className={`absolute left-5 top-10 w-0.5 h-3 ${isCompleted ? 'bg-green-400' : 'bg-gray-300'}`} />
-                    )}
+                    </button>
                   </div>
                 )
               })}
+            </div>
+
+            {/* Reassurance at bottom of timeline */}
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                We update this page the moment your repair reaches each stage.
+                {visitFrequency.tier !== 'first' && ' We\'ll text you too — so no need to keep checking.'}
+              </p>
             </div>
           </div>
         </div>
