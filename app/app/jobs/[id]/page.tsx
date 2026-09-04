@@ -1630,62 +1630,98 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'DIAGNOSTIC' && (
               <>
-                {/* Status banner — simple, colour-coded */}
-                {(() => {
-                  const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
-                  const agreed = !!job.repair_agreed_at
-                  const declined = !!job.repair_declined_at
+                {/* Diagnostic section — boxed off separately */}
+                <div className="w-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border-2 border-gray-200 dark:border-gray-700 space-y-3">
+                  <h3 className="text-sm font-black text-gray-700 dark:text-gray-300 uppercase tracking-wide text-center">
+                    Diagnostic
+                  </h3>
 
-                  if (declined) {
+                  {/* Status banner */}
+                  {(() => {
+                    const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
+                    const agreed = !!job.repair_agreed_at
+                    const declined = !!job.repair_declined_at
+
+                    if (declined) {
+                      return (
+                        <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl p-3 text-center border border-gray-300 dark:border-gray-600">
+                          <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Repair declined by customer</p>
+                          {job.repair_declined_reason && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{job.repair_declined_reason}</p>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (agreed) {
+                      return (
+                        <div className="w-full bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center border border-green-300 dark:border-green-700">
+                          <p className="text-sm font-bold text-green-800 dark:text-green-200">✓ Repair agreed — ready to start</p>
+                        </div>
+                      )
+                    }
+
+                    if (!hasDiagnosis) {
+                      return (
+                        <div className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 text-center border border-amber-300 dark:border-amber-700">
+                          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Diagnosis in progress</p>
+                        </div>
+                      )
+                    }
+
                     return (
-                      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl p-4 text-center border-2 border-gray-300 dark:border-gray-600">
-                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Repair declined by customer</p>
-                        {job.repair_declined_reason && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{job.repair_declined_reason}</p>
-                        )}
+                      <div className="w-full bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center border border-blue-300 dark:border-blue-700">
+                        <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Diagnosis sent — awaiting response</p>
                       </div>
                     )
-                  }
+                  })()}
 
-                  if (agreed) {
-                    return (
-                      <div className="w-full bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center border-2 border-green-300 dark:border-green-700">
-                        <p className="text-sm font-bold text-green-800 dark:text-green-200">✓ Repair agreed — ready to start</p>
-                      </div>
-                    )
-                  }
+                  {/* Action buttons — only show relevant ones */}
+                  {!job.repair_agreed_at && !job.repair_declined_at && (
+                    <>
+                      <button
+                        onClick={() => setShowDiagnosticFollowUp(true)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl text-base transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        <span>Follow Up Customer</span>
+                      </button>
+                      <button
+                        onClick={() => setShowDiagnosticResponse(true)}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-xl text-base transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Customer Responded</span>
+                      </button>
+                    </>
+                  )}
 
-                  if (!hasDiagnosis) {
-                    return (
-                      <div className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-center border-2 border-amber-300 dark:border-amber-700">
-                        <p className="text-sm font-bold text-amber-800 dark:text-amber-200">Diagnosis in progress</p>
-                      </div>
-                    )
-                  }
+                  {/* Write / Edit diagnostic report — only if no report yet */}
+                  {!(job.diagnosis_notes || job.diagnostic_report) && (
+                    <button
+                      onClick={() => setActivePanel('diagnostic')}
+                      disabled={actionLoading}
+                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Write Diagnostic Report</span>
+                    </button>
+                  )}
 
-                  return (
-                    <div className="w-full bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 text-center border-2 border-blue-300 dark:border-blue-700">
-                      <p className="text-sm font-bold text-blue-800 dark:text-blue-200">Diagnosis sent — awaiting customer response</p>
-                    </div>
-                  )
-                })()}
+                  {/* Edit existing report — smaller link */}
+                  {(job.diagnosis_notes || job.diagnostic_report) && (
+                    <button
+                      onClick={() => setActivePanel('diagnostic')}
+                      disabled={actionLoading}
+                      className="w-full text-indigo-600 dark:text-indigo-400 font-medium py-2 text-sm transition-all flex items-center justify-center gap-1"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Edit diagnostic report</span>
+                    </button>
+                  )}
+                </div>
 
-                {/* Two big buttons — mobile-friendly */}
-                <button
-                  onClick={() => setShowDiagnosticFollowUp(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3"
-                >
-                  <MessageCircle className="h-6 w-6" />
-                  <span>Follow Up Customer</span>
-                </button>
-                <button
-                  onClick={() => setShowDiagnosticResponse(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-all shadow-lg active:scale-95 flex items-center justify-center gap-3"
-                >
-                  <CheckCircle className="h-6 w-6" />
-                  <span>Customer Responded</span>
-                </button>
-
+                {/* Start repair — separate from diagnostic section */}
                 <button
                   onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                   disabled={actionLoading}
@@ -1693,14 +1729,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 >
                   <Wrench className="h-7 w-7" />
                   <span>Start Repair</span>
-                </button>
-                <button
-                  onClick={() => setActivePanel('diagnostic')}
-                  disabled={actionLoading}
-                  className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Write Diagnostic Report</span>
                 </button>
               </>
             )}

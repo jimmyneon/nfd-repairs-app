@@ -38,6 +38,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [jobEvents, setJobEvents] = useState<{ created_at: string; message: string }[]>([])
   const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
+  const [showDiagnosisResults, setShowDiagnosisResults] = useState(false)
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
@@ -502,18 +503,24 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               </div>
             )}
 
-            {/* Diagnosis results — button to view, not shown inline */}
+            {/* Diagnosis results — toggle to show/hide */}
             {job.status === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
-              <button
-                onClick={() => setExpandedStep(expandedStep === statusSteps.indexOf('DIAGNOSTIC') ? null : statusSteps.indexOf('DIAGNOSTIC'))}
-                className="mt-3 w-full bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-xl p-3 flex items-center justify-between hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">View diagnostic results</span>
-                </div>
-                <ChevronDown className="h-4 w-4 text-amber-600" />
-              </button>
+              <div className="mt-3">
+                <button
+                  onClick={() => setShowDiagnosisResults(!showDiagnosisResults)}
+                  className="w-full bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl p-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Diagnostic results</span>
+                  {showDiagnosisResults ? <ChevronUp className="h-4 w-4 text-gray-500" /> : <ChevronDown className="h-4 w-4 text-gray-500" />}
+                </button>
+                {showDiagnosisResults && (
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                      {job.diagnosis_notes || job.diagnostic_report}
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Parts tracking */}
@@ -582,134 +589,72 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         )}
 
-        {/* Repair Journey — clean, simple, mobile-first */}
+        {/* Repair Journey — simple, clear, mobile-first */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-5 md:p-6">
-            <h2 className="font-black text-lg text-gray-900 dark:text-white mb-4 flex items-center">
-              <Clock className="h-5 w-5 mr-2 text-primary" />
+          <div className="p-5">
+            <h2 className="font-bold text-base text-gray-900 dark:text-white mb-4">
               Your Repair Journey
             </h2>
 
-            {/* Compact timeline */}
+            {/* Simple timeline */}
             <div className="space-y-0">
               {statusSteps.map((step, index) => {
                 const isCurrent = step === displayStatus
                 const isCompleted = currentStepIndex >= 0 ? index < currentStepIndex : false
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
                 const stageTimestamp = statusTimestamps[step]
-                const formattedTime = formatStageTimestamp(stageTimestamp)
-                const isExpanded = expandedStep === index
-                const hasContent = isCompleted || isCurrent
-                const isUpcoming = !hasContent && index === currentStepIndex + 1
+                const isLast = index === statusSteps.length - 1
 
                 return (
-                  <div key={step} className="relative">
-                    {/* Vertical line */}
-                    {index < statusSteps.length - 1 && (
-                      <div className={`absolute left-[18px] top-8 w-0.5 h-full ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                    )}
-
-                    <button
-                      onClick={() => hasContent ? setExpandedStep(isExpanded ? null : index) : undefined}
-                      className={`relative flex items-center w-full py-2.5 ${hasContent ? 'cursor-pointer' : 'cursor-default'}`}
-                    >
-                      {/* Circle */}
-                      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                        isCompleted ? 'bg-green-500 text-white' :
-                        isCurrent ? (isDelayed ? 'bg-red-600 text-white' : 'bg-primary text-white') :
-                        'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                  <div key={step} className="flex items-stretch">
+                    {/* Left: circle + line */}
+                    <div className="flex flex-col items-center mr-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isCompleted ? 'bg-green-500' :
+                        isCurrent ? (isDelayed ? 'bg-red-500' : 'bg-primary') :
+                        'bg-gray-200 dark:bg-gray-600'
                       }`}>
-                        {isCompleted ? <CheckCircle className="h-5 w-5" /> :
-                         isCurrent ? <Clock className="h-4 w-4" /> :
-                         <span className="text-xs font-bold opacity-50">{index + 1}</span>}
-                      </div>
-
-                      {/* Label + time */}
-                      <div className="ml-3 flex-1 text-left">
-                        <div className="flex items-center justify-between">
-                          <p className={`text-sm font-semibold ${
-                            isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
-                            isCompleted ? 'text-green-700 dark:text-green-400' :
-                            isUpcoming ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'
-                          }`}>
-                            {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                            {isDelayed && <span className="ml-2 text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">Delayed</span>}
-                            {repairAgreed && step === 'DIAGNOSTIC' && isCurrent && (
-                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">Agreed</span>
-                            )}
-                            {isUpcoming && <span className="ml-2 text-xs text-gray-400 italic">Up next</span>}
-                          </p>
-                          {hasContent && (
-                            <div className="flex items-center gap-1">
-                              {formattedTime && (
-                                <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
-                                  {formattedTime}
-                                </span>
-                              )}
-                              {isExpanded
-                                ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />}
-                            </div>
-                          )}
-                        </div>
-                        {/* Time on mobile */}
-                        {hasContent && formattedTime && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 sm:hidden">
-                            {formattedTime}
-                          </p>
-                        )}
-                        {/* Current stage — time since */}
-                        {isCurrent && !isDelayed && (
-                          <p className="text-xs text-primary font-medium">
-                            {formatTimeSince(statusChangedAt)}
-                          </p>
+                        {isCompleted ? (
+                          <CheckCircle className="h-4 w-4 text-white" />
+                        ) : isCurrent ? (
+                          <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse" />
+                        ) : (
+                          <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full" />
                         )}
                       </div>
-                    </button>
+                      {!isLast && (
+                        <div className={`w-0.5 flex-1 my-1 ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                      )}
+                    </div>
 
-                    {/* Expanded details — only when tapped */}
-                    {isExpanded && hasContent && (
-                      <div className="ml-12 mb-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                        <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                          {getStatusDescription(step)}
+                    {/* Right: label + time */}
+                    <div className="flex-1 pb-4 pt-0.5">
+                      <p className={`text-sm font-semibold ${
+                        isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
+                        isCompleted ? 'text-green-600 dark:text-green-400' :
+                        'text-gray-400 dark:text-gray-500'
+                      }`}>
+                        {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                      </p>
+                      {isCurrent && (
+                        <p className="text-xs text-primary font-medium mt-0.5">
+                          {formatTimeSince(statusChangedAt)}
                         </p>
-                        {/* Diagnosis results */}
-                        {step === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
-                          <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
-                            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">Our findings:</p>
-                            <p className="text-xs text-amber-700 dark:text-amber-300 whitespace-pre-wrap">
-                              {job.diagnosis_notes || job.diagnostic_report}
-                            </p>
-                          </div>
-                        )}
-                        {/* Repair agreed */}
-                        {step === 'DIAGNOSTIC' && repairAgreed && (
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-2">
-                            ✓ You agreed to go ahead with the repair
-                          </p>
-                        )}
-                        {/* Parts tracking */}
-                        {step === 'PARTS_ORDERED' && job.parts_tracking_status && job.show_tracking_to_customer && (
-                          <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                            {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
-                             job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
-                             job.parts_tracking_status === 'InTransit' ? 'Parts on the way to us' :
-                             job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed with supplier' :
-                             `Parts status: ${job.parts_tracking_status}`}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                      )}
+                      {isCompleted && stageTimestamp && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                          {formatStageTimestamp(stageTimestamp)}
+                        </p>
+                      )}
+                      {repairAgreed && step === 'DIAGNOSTIC' && isCurrent && (
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                          ✓ You agreed to go ahead
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )
               })}
-            </div>
-
-            {/* Simple reassurance at bottom */}
-            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                We update this page at every stage{visitFrequency.tier !== 'first' ? ' and text you too' : ''}.
-              </p>
             </div>
           </div>
         </div>
