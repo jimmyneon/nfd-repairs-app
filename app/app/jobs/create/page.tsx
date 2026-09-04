@@ -332,8 +332,10 @@ function CreateJobContent() {
             onboarding_completed: false,
             device_in_shop: true,
             linked_quote_id: null,
-            skip_sms: quickFollowUp === 'confirm_now',
-            quick_intake: quickFollowUp !== 'staff_later',
+            // Every quick booking still gets a useful confirmation. Only the
+            // send-link option should use the completion-form SMS template.
+            skip_sms: false,
+            quick_intake: quickFollowUp === 'send_link',
           }),
         })
 
@@ -786,7 +788,7 @@ function CreateJobContent() {
                 <fieldset className="space-y-2">
                   <legend className="text-sm font-bold text-gray-900 dark:text-white mb-2">What happens next?</legend>
                   {([
-                    { value: 'confirm_now', label: 'Customer agrees now', detail: 'Best when their phone is the device being repaired', icon: ClipboardCheck },
+                    { value: 'confirm_now', label: 'Customer agrees now', detail: 'Agree on this screen; tracking confirmation is texted', icon: ClipboardCheck },
                     { value: 'send_link', label: 'Text the full form', detail: 'Best for laptops or when they can use their phone later', icon: Send },
                     { value: 'staff_later', label: 'I’ll finish it later', detail: 'Sends tracking only; agreement stays visibly outstanding', icon: UserCog },
                   ] as const).map(option => {
