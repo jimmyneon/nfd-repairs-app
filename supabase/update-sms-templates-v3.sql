@@ -135,11 +135,12 @@ New Forest Device Repairs'
 WHERE key = 'COMPLETED';
 
 -- READY_TO_COLLECT - Ready for pickup (no price lines — price already communicated)
+-- Single Google Maps link shows both directions and opening hours together
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_summary} is all repaired and ready to collect.
 
-Directions: {google_maps_link}
-Opening times: {hours_link}
+For directions and our opening times, see here:
+{google_maps_link}
 
 Many thanks,
 New Forest Device Repairs'
