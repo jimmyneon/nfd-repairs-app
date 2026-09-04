@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X } from 'lucide-react'
 import Link from 'next/link'
-import { renderSmsTemplate, getFirstName } from '@/lib/sms-template'
+import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
 interface Enquiry {
@@ -243,7 +243,8 @@ function EnquiriesContent() {
       first_name: getFirstName(selectedEnquiry.customer_name),
       customer_name: selectedEnquiry.customer_name,
       device_make: selectedEnquiry.device_make || '',
-      device_model: selectedEnquiry.device_model || '',
+      device_model: safeDeviceLabel(selectedEnquiry.device_make, selectedEnquiry.device_model),
+      device_summary: safeDeviceLabel(selectedEnquiry.device_make, selectedEnquiry.device_model),
       job_ref: selectedEnquiry.enquiry_ref,
     })
     setSmsMessage(rendered)

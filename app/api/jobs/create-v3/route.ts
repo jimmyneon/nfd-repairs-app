@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 
@@ -379,7 +379,25 @@ export async function POST(request: NextRequest) {
       console.error('❌ Template error:', templateError)
     }
 
-    if (!template) {
+    // Fallback: if QUICK_INTAKE template is missing from DB, use a hardcoded
+    // message so the "finish it later" / quick intake flow still sends an SMS
+    // with the tracking link. Without this, customers get no SMS at all.
+    let effectiveTemplate = template
+    if (!template && templateKey === 'QUICK_INTAKE') {
+      console.warn('⚠️ QUICK_INTAKE template not found in DB — using hardcoded fallback')
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'SYSTEM',
+        message: 'QUICK_INTAKE template not found in DB — using hardcoded fallback SMS',
+      } as any)
+      effectiveTemplate = {
+        key: 'QUICK_INTAKE',
+        body: 'Hi {first_name}, your device is now booked in with us. We just need a few more details — please use this link to complete your check-in:\n\n{tracking_link}\n\nWe\'ll update you as soon as possible.\n\nMany thanks,\nNew Forest Device Repairs',
+        is_active: true,
+      } as any
+    }
+
+    if (!effectiveTemplate) {
       console.error('❌ NO TEMPLATE FOUND FOR:', templateKey)
       await supabase.from('job_events').insert({
         job_id: job.id,
@@ -387,7 +405,7 @@ export async function POST(request: NextRequest) {
         message: `SMS template '${templateKey}' not found - SMS not queued`,
       } as any)
     } else {
-      console.log('✅ Template found:', template.key)
+      console.log('✅ Template found:', effectiveTemplate.key)
       
       // Skip SMS and Email if requested (e.g., from batch import or old job import)
       if (skip_sms) {
@@ -433,11 +451,16 @@ export async function POST(request: NextRequest) {
       const locationLink = locationSetting?.value || 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
       const hoursLink = hoursSetting?.value || shortHoursLink()
       
-      let smsBody = renderSmsTemplate(template.body || '', {
+      // Sanitise device labels so customers never see "your To be added is now booked in".
+      // When device details aren't known yet (quick intake / finish later), use a generic word.
+      const safeDevice = safeDeviceLabel(jobData.device_make, jobData.device_model)
+
+      let smsBody = renderSmsTemplate(effectiveTemplate.body || '', {
         customer_name: jobData.customer_name,
         first_name: getFirstName(jobData.customer_name),
         device_make: jobData.device_make,
-        device_model: jobData.device_model,
+        device_model: safeDevice,
+        device_summary: safeDevice,
         price_total: jobData.price_total.toString(),
         // QUICK_INTAKE historically uses {tracking_link}. Make that link match
         // the message promise while keeping existing database templates working.

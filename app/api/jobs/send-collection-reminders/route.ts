@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
 
@@ -191,8 +191,8 @@ export async function GET(request: NextRequest) {
         first_name: getFirstName(job.customer_name),
         customer_name: job.customer_name,
         device_make: job.device_make,
-        device_model: job.device_model,
-        device_summary: `${job.device_make} ${job.device_model}`.trim(),
+        device_model: safeDeviceLabel(job.device_make, job.device_model),
+        device_summary: safeDeviceLabel(job.device_make, job.device_model),
         job_ref: job.job_ref,
         hours_link: hoursLink,
         tracking_link: trackingUrl,

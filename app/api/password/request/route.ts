@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortPasswordLink } from '@/lib/utils'
 
 /**
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const firstName = getFirstName(job.customer_name)
-    const deviceModel = job.device_model || 'your device'
+    const deviceModel = safeDeviceLabel(job.device_make, job.device_model)
 
     let smsBody: string
     if (template) {
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         customer_name: job.customer_name,
         device_make: job.device_make || '',
         device_model: deviceModel,
+        device_summary: deviceModel,
         password_link: passwordLink,
         job_ref: job.job_ref,
       })

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
         const smsBody = renderSmsTemplate(template.body, {
           first_name: getFirstName(customer_name),
           customer_name: customer_name,
-          device_model: device_summary,
+          device_model: safeDeviceLabel('Unknown', device_summary),
+          device_summary: safeDeviceLabel('Unknown', device_summary),
           device_make: 'Unknown',
           price_total: price_total.toString(),
           deposit_amount: final_deposit_amount.toString(),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
 
@@ -131,8 +131,8 @@ export async function POST(request: NextRequest) {
         first_name: firstName,
         customer_name: job.customer_name,
         device_make: job.device_make || '',
-        device_model: job.device_model || '',
-        device_summary: `${job.device_make || ''} ${job.device_model || ''}`.trim(),
+        device_model: safeDeviceLabel(job.device_make, job.device_model),
+        device_summary: safeDeviceLabel(job.device_make, job.device_model),
         review_link: reviewLink,
         tracking_link: shortTrackingLink(job.tracking_token),
         job_ref: job.job_ref,
@@ -462,8 +462,8 @@ export async function GET(request: NextRequest) {
               first_name: firstName,
               customer_name: job.customer_name,
               device_make: job.device_make || '',
-              device_model: job.device_model || '',
-              device_summary: `${job.device_make || ''} ${job.device_model || ''}`.trim(),
+              device_model: safeDeviceLabel(job.device_make, job.device_model),
+              device_summary: safeDeviceLabel(job.device_make, job.device_model),
               job_ref: job.job_ref,
               review_link: aftercareReviewLink,
             })

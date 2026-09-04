@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 
@@ -175,12 +175,15 @@ export async function POST(request: NextRequest) {
     const balanceRemaining = balanceNum > 0 ? balanceNum.toFixed(2) : ''
     const depositPaidStr = job.deposit_received && depositAmount > 0 ? depositAmount.toFixed(2) : ''
 
+    // Sanitise device labels so customers never see "your To be added is now booked in"
+    const safeDevice = safeDeviceLabel(job.device_make, job.device_model)
+
     let smsBody = renderSmsTemplate(template.body, {
       customer_name: job.customer_name,
       first_name: getFirstName(job.customer_name),
       device_make: job.device_make,
-      device_model: job.device_model,
-      device_summary: `${job.device_make} ${job.device_model}`.trim(),
+      device_model: safeDevice,
+      device_summary: safeDevice,
       repair_summary: job.issue || '',
       price_total: priceValue,
       balance_remaining: balanceRemaining,

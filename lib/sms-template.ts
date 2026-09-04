@@ -7,11 +7,46 @@
 
 const TITLES = ['mr','mr.','mrs','mrs.','ms','ms.','miss','dr','dr.','sir','prof','prof.','rev','rev.','fr','fr.','mx','mx.']
 
+// Values used as placeholders when device details aren't known yet (quick intake / finish later).
+// These should NEVER appear in customer-facing SMS — replace with a generic word like "device".
+const PLACEHOLDER_DEVICE_VALUES = ['to be added', 'to-be-added', 'tobeadded', 'unknown', 'n/a', 'na', 'tbd', '']
+
 export function getFirstName(name: string | null | undefined): string {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean)
   const first = parts.find(p => !TITLES.includes(p.toLowerCase()))
   if (!first) return 'there'
   return first
+}
+
+/**
+ * Returns a customer-safe device label for use in SMS templates.
+ * If the make/model is a placeholder (e.g. "To be added", "Unknown", or empty),
+ * returns a generic word like "device" so customers never see "your To be added".
+ *
+ * If both make and model are known, returns "{make} {model}" (trimmed).
+ * If only one is known, returns that one.
+ */
+export function safeDeviceLabel(
+  deviceMake: string | null | undefined,
+  deviceModel: string | null | undefined
+): string {
+  const make = (deviceMake || '').trim()
+  const model = (deviceModel || '').trim()
+
+  const makeIsPlaceholder = PLACEHOLDER_DEVICE_VALUES.includes(make.toLowerCase())
+  const modelIsPlaceholder = PLACEHOLDER_DEVICE_VALUES.includes(model.toLowerCase())
+
+  // Both placeholder/empty → generic
+  if (makeIsPlaceholder && modelIsPlaceholder) return 'device'
+
+  // Make is placeholder but model is real → just use model
+  if (makeIsPlaceholder) return model
+
+  // Model is placeholder but make is real → just use make
+  if (modelIsPlaceholder) return make
+
+  // Both known → combine
+  return `${make} ${model}`.trim()
 }
 
 export function renderSmsTemplate(

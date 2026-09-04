@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, getAppUrl } from '@/lib/utils'
 
 const supabase = createClient(
@@ -78,7 +78,8 @@ export async function POST(
           first_name: firstName,
           customer_name: job.customer_name || '',
           device_make: job.device_make || '',
-          device_model: job.device_model || '',
+          device_model: safeDeviceLabel(job.device_make, job.device_model),
+          device_summary: safeDeviceLabel(job.device_make, job.device_model),
           deposit_amount: depositAmount,
           deposit_link: depositUrl,
           tracking_link: trackingUrl,

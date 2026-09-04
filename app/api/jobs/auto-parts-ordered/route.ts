@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
 
 /**
@@ -161,7 +161,8 @@ export async function GET(request: NextRequest) {
           const smsBody = renderSmsTemplate(template.body || '', {
             first_name: getFirstName(job.customer_name),
             device_make: job.device_make,
-            device_model: job.device_model,
+            device_model: safeDeviceLabel(job.device_make, job.device_model),
+            device_summary: safeDeviceLabel(job.device_make, job.device_model),
             job_ref: job.job_ref,
             tracking_link: trackingUrl,
           })
