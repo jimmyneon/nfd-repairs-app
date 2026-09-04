@@ -1,7 +1,9 @@
 // Updated types to match aligned schema with quote_requests
 
 export type JobStatus =
+  | 'QUOTE_REQUESTED'
   | 'QUOTE_APPROVED'
+  | 'DROPPED_OFF'
   | 'RECEIVED'
   | 'DIAGNOSTIC'
   | 'AWAITING_DEPOSIT'

@@ -5,7 +5,7 @@ INSERT INTO sms_templates (key, body, is_active)
 SELECT 'QUICK_INTAKE',
 'Hi {first_name}, your device is now booked in with us. We just need a few more details — please use this link to complete your check-in:
 
-{tracking_link}
+{onboarding_link}
 
 We''ll update you as soon as possible.
 
@@ -17,7 +17,7 @@ WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE key = 'QUICK_INTAKE');
 UPDATE sms_templates SET body =
 'Hi {first_name}, your device is now booked in with us. We just need a few more details — please use this link to complete your check-in:
 
-{tracking_link}
+{onboarding_link}
 
 We''ll update you as soon as possible.
 

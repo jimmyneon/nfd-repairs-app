@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -12,7 +12,6 @@ import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
-import ManualOnboardingModal from '@/components/ManualOnboardingModal'
 import DelayReasonModal from '@/components/DelayReasonModal'
 import CancellationReasonModal from '@/components/CancellationReasonModal'
 import CustomerFlagControls from '@/components/CustomerFlagControls'
@@ -28,6 +27,15 @@ import RepairOutcomeSelector from '@/components/RepairOutcomeSelector'
 import PriceSetterModal from '@/components/PriceSetterModal'
 import QuickActionsModal from '@/components/QuickActionsModal'
 
+const isIncompleteIntakeValue = (value?: string | null) =>
+  !value || ['unknown', 'to be added', 'to be assessed', 'repair needed'].includes(value.trim().toLowerCase())
+
+const jobNeedsIntake = (job: Job) =>
+  !job.terms_accepted ||
+  isIncompleteIntakeValue(job.device_make) ||
+  isIncompleteIntakeValue(job.device_model) ||
+  isIncompleteIntakeValue(job.issue)
+
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
   const [events, setEvents] = useState<JobEvent[]>([])
@@ -39,7 +47,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [showStatusSelector, setShowStatusSelector] = useState(false)
   const [showSimpleConfirm, setShowSimpleConfirm] = useState(false)
-  const [showManualOnboarding, setShowManualOnboarding] = useState(false)
   const [showDelayModal, setShowDelayModal] = useState(false)
   const [showDelayConfirm, setShowDelayConfirm] = useState(false)
   const [showCancellationModal, setShowCancellationModal] = useState(false)
@@ -1225,17 +1232,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {/* Onboarding Gate - shows if customer hasn't completed onboarding */}
-        {!job.onboarding_completed && (
+        {jobNeedsIntake(job) && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <OnboardingGate 
-              onboardingCompleted={false}
-              jobRef={job.job_ref}
+              termsAccepted={job.terms_accepted}
+              deviceMake={job.device_make}
+              deviceModel={job.device_model}
+              issue={job.issue}
+              hasPasscode={Boolean(job.device_password)}
+              passwordNotApplicable={job.password_not_applicable}
             />
             <Link
-              href={`/app/jobs/create?jobId=${job.id}`}
+              href={`/walk-in/complete/${job.tracking_token}`}
               className="block w-full mt-4 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all text-center"
             >
-              Complete Onboarding In-Shop
+              Open Completion Form In-Shop
             </Link>
           </div>
         )}
@@ -1365,10 +1376,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         <div className="card">
           <h2 className="text-xl font-black text-gray-900 mb-5">Update Status</h2>
-          {!job.onboarding_completed && (
+          {jobNeedsIntake(job) && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
               <p className="text-sm text-yellow-800 font-semibold">
-                ⚠️ Status changes disabled until customer completes onboarding
+                ⚠️ Customer details or agreement are still outstanding. You can continue the job, but complete them as soon as practical.
               </p>
             </div>
           )}
@@ -1698,19 +1709,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             currentStatus={job.status}
             onSelect={handleManualStatusChange}
             onClose={() => setShowStatusSelector(false)}
-          />
-        )}
-
-        {showManualOnboarding && (
-          <ManualOnboardingModal
-            jobId={job.id}
-            jobRef={job.job_ref}
-            customerName={job.customer_name}
-            onComplete={() => {
-              setShowManualOnboarding(false)
-              loadJobData()
-            }}
-            onClose={() => setShowManualOnboarding(false)}
           />
         )}
 

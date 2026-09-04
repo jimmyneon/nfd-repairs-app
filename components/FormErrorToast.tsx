@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle, ArrowUp, X } from 'lucide-react'
 
 interface FormErrorToastProps {
   errors: Record<string, string>
@@ -10,28 +9,15 @@ interface FormErrorToastProps {
 }
 
 export default function FormErrorToast({ errors, show, onClose }: FormErrorToastProps) {
-  const [visible, setVisible] = useState(false)
-  const errorList = Object.values(errors)
+  const errorList = Object.entries(errors)
 
-  useEffect(() => {
-    if (show && errorList.length > 0) {
-      setVisible(true)
-    } else {
-      setVisible(false)
-    }
-  }, [show, errorList.length])
+  if (!show || errorList.length === 0) return null
 
-  useEffect(() => {
-    if (visible) {
-      const timer = setTimeout(() => {
-        setVisible(false)
-        onClose()
-      }, 6000)
-      return () => clearTimeout(timer)
-    }
-  }, [visible, onClose])
-
-  if (!visible || errorList.length === 0) return null
+  const goToField = (field: string) => {
+    const element = document.querySelector(`[name="${field}"]`) as HTMLElement | null
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.setTimeout(() => element?.focus(), 350)
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-4 pb-4 pointer-events-none">
@@ -44,23 +30,23 @@ export default function FormErrorToast({ errors, show, onClose }: FormErrorToast
             <p className="font-bold text-sm mb-1">
               {errorList.length === 1 ? '1 field needs attention' : `${errorList.length} fields need attention`}
             </p>
-            <ul className="space-y-0.5">
-              {errorList.map((msg, i) => (
-                <li key={i} className="text-xs text-white/90 leading-snug">
-                  {msg}
+            <ul className="space-y-1">
+              {errorList.map(([field, message]) => (
+                <li key={field}>
+                  <button type="button" onClick={() => goToField(field)} className="text-left text-xs text-white leading-snug underline underline-offset-2 flex items-center gap-1">
+                    <ArrowUp className="h-3 w-3" />
+                    {message}
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
           <button
-            onClick={() => { setVisible(false); onClose() }}
+            onClick={onClose}
             className="flex-shrink-0 text-white/70 hover:text-white p-1"
           >
             <X className="h-4 w-4" />
           </button>
-        </div>
-        <div className="h-1 bg-white/20">
-          <div className="h-full bg-white/40 animate-toast-progress" />
         </div>
       </div>
     </div>

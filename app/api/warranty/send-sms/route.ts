@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
+import { requireStaffUser } from '@/lib/api-auth'
 
 /**
  * POST /api/warranty/send-sms
@@ -8,17 +10,20 @@ import { createClient } from '@supabase/supabase-js'
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireStaffUser(request)
+    if (auth.response) return auth.response
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { ticketId, message } = await request.json()
+    const { ticketId, message, templateKey, variables = {} } = await request.json()
 
-    if (!ticketId || !message?.trim()) {
+    if (!ticketId || (!message?.trim() && !templateKey)) {
       return NextResponse.json(
-        { error: 'ticketId and message are required' },
+        { error: 'ticketId and either message or templateKey are required' },
         { status: 400 }
       )
     }
@@ -26,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Get ticket details
     const { data: ticketData, error: tError } = await supabase
       .from('warranty_tickets')
-      .select('id, customer_phone, customer_name, ticket_ref, matched_job_id')
+      .select('id, customer_phone, customer_name, ticket_ref, matched_job_id, device_model, issue_description')
       .eq('id', ticketId)
       .single()
 
@@ -43,9 +48,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SMS service not configured' }, { status: 500 })
     }
 
+    let smsBody = message?.trim() || ''
+    let resolvedTemplateKey = templateKey || 'WARRANTY_CUSTOM'
+
+    if (templateKey) {
+      const { data: template } = await supabase
+        .from('sms_templates')
+        .select('body')
+        .eq('key', templateKey)
+        .eq('is_active', true)
+        .single()
+
+      const fallbackTemplates: Record<string, string> = {
+        WARRANTY_APPROVED: 'Hi {first_name}, good news — we have approved your warranty request for your {device_model}. Please bring it in when convenient. Ref: {ticket_ref}. New Forest Device Repairs',
+        WARRANTY_APPROVED_PARTS: 'Hi {first_name}, we have approved your warranty request for your {device_model}. We need to order parts and will text when they arrive. Ref: {ticket_ref}. New Forest Device Repairs',
+        WARRANTY_DECLINED: 'Hi {first_name}, we have reviewed your warranty request for your {device_model}. Unfortunately this issue is not covered: {decline_reason}. Please reply if you would like a paid repair quote. New Forest Device Repairs',
+      }
+
+      smsBody = renderSmsTemplate(template?.body || fallbackTemplates[templateKey] || '', {
+        customer_name: ticketData.customer_name,
+        first_name: getFirstName(ticketData.customer_name),
+        device_make: '',
+        device_model: ticketData.device_model || 'device',
+        ticket_ref: ticketData.ticket_ref,
+        ...variables,
+      })
+    }
+
+    if (!smsBody) {
+      return NextResponse.json({ error: 'SMS template is empty or unavailable' }, { status: 500 })
+    }
+
     const smsPayload = {
       phone: ticketData.customer_phone,
-      message: message.trim(),
+      message: smsBody,
     }
 
     const smsResponse = await fetch(webhookUrl, {
@@ -60,18 +96,18 @@ export async function POST(request: NextRequest) {
       // Log event in warranty_ticket_events
       await supabase.from('warranty_ticket_events').insert({
         ticket_id: ticketId,
-        type: 'SMS_SENT',
-        message: `SMS sent to customer: ${message.trim().substring(0, 80)}...`,
-        metadata: { phone: ticketData.customer_phone, sent_at: sentAt, full_message: message.trim() }
+        type: 'SYSTEM',
+        message: `SMS sent to customer (${resolvedTemplateKey}): ${smsBody.substring(0, 80)}...`,
+        metadata: { phone: ticketData.customer_phone, sent_at: sentAt, full_message: smsBody, template_key: resolvedTemplateKey }
       } as any)
 
       // If there's a matched job, also log in sms_logs
       if (ticketData.matched_job_id) {
         await supabase.from('sms_logs').insert({
           job_id: ticketData.matched_job_id,
-          template_key: 'WARRANTY_APPROVED',
-          body_template: message.trim(),
-          body_rendered: message.trim(),
+          template_key: resolvedTemplateKey,
+          body_template: smsBody,
+          body_rendered: smsBody,
           status: 'SENT',
           sent_at: sentAt,
         } as any)
@@ -84,7 +120,7 @@ export async function POST(request: NextRequest) {
 
       await supabase.from('warranty_ticket_events').insert({
         ticket_id: ticketId,
-        type: 'SMS_FAILED',
+        type: 'SYSTEM',
         message: `SMS send failed: ${errorText.substring(0, 200)}`,
         metadata: { error: errorText }
       } as any)

@@ -217,16 +217,13 @@ export async function POST(request: NextRequest) {
       message: `Job created via API from ${jobData.source}`,
     } as any)
 
-    // If this is a warranty job linked to a warranty ticket, update the ticket
+    // A warranty ticket's matched_job_id is the original repair. Do not replace
+    // it with the new warranty work order; the new job is found through its
+    // linked_warranty_ticket_id field.
     if (is_warranty && linked_warranty_ticket_id) {
-      await supabase
-        .from('warranty_tickets')
-        .update({ matched_job_id: job.id })
-        .eq('id', linked_warranty_ticket_id)
-
       await supabase.from('warranty_ticket_events').insert({
         ticket_id: linked_warranty_ticket_id,
-        type: 'JOB_CREATED',
+        type: 'SYSTEM',
         message: `Warranty job created: ${job.job_ref}`,
         metadata: { job_id: job.id, job_ref: job.job_ref }
       } as any)
@@ -403,6 +400,7 @@ export async function POST(request: NextRequest) {
       const trackingUrl = shortTrackingLink(job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
       const onboardingUrl = shortOnboardingLink(job.onboarding_token)
+      const completionUrl = onboardingUrl
       
       // Fetch location and hours links from admin_settings
       const { data: locationSetting } = await supabase
@@ -426,7 +424,10 @@ export async function POST(request: NextRequest) {
         device_make: jobData.device_make,
         device_model: jobData.device_model,
         price_total: jobData.price_total.toString(),
-        tracking_link: trackingUrl,
+        // QUICK_INTAKE historically uses {tracking_link}. Make that link match
+        // the message promise while keeping existing database templates working.
+        tracking_link: templateKey === 'QUICK_INTAKE' ? completionUrl : trackingUrl,
+        completion_link: completionUrl,
         job_ref: job.job_ref,
         onboarding_link: onboardingUrl,
         location_link: locationLink,
@@ -530,6 +531,8 @@ export async function POST(request: NextRequest) {
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
       tracking_url: shortTrackingLink(job.tracking_token),
+      completion_url: shortOnboardingLink(job.onboarding_token),
+      onboarding_token: job.onboarding_token,
       status: job.status,
     })
   } catch (error) {

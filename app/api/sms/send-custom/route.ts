@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
+import { requireStaffUser } from '@/lib/api-auth'
 
 /**
  * POST /api/sms/send-custom
@@ -9,6 +10,9 @@ import { sendEmail } from '@/lib/email'
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireStaffUser(request)
+    if (auth.response) return auth.response
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
