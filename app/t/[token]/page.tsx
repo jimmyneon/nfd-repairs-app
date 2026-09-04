@@ -361,12 +361,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
   // Calculate all the dynamic values
   const deviceType = getDeviceType(job.device_make, job.device_model)
-  const estimate = getTurnaroundEstimate(job.device_make, job.device_model, job.issue, job.status)
+  const repairAgreed = !!job.repair_agreed_at
+  // When repair is agreed, diagnostics are complete — treat as if we're moving to repair
+  const effectiveStatus = (job.status === 'DIAGNOSTIC' && repairAgreed) ? 'IN_REPAIR' : job.status
+  const estimate = getTurnaroundEstimate(job.device_make, job.device_model, job.issue, effectiveStatus)
   const hoursInStatus = statusChangedAt
     ? (new Date().getTime() - statusChangedAt.getTime()) / (1000 * 60 * 60)
     : 0
-  const progressPercent = calculateProgressPercent(hoursInStatus, estimate)
-  const repairAgreed = !!job.repair_agreed_at
+  // If repair is agreed, diagnostic stage is 100% complete
+  const progressPercent = (job.status === 'DIAGNOSTIC' && repairAgreed) ? 100 : calculateProgressPercent(hoursInStatus, estimate)
   const reassuranceMessage = getReassuranceMessage(
     job.status,
     visitFrequency.tier as any,
@@ -403,12 +406,15 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     if (job.parts_required || job.deposit_required) return 'PARTS_ORDERED'
     return 'IN_REPAIR'
   }
-  const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed() : job.status
+  // When repair is agreed, DIAGNOSTIC is done — current stage is IN_REPAIR (waiting to start)
+  const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed()
+    : (job.status === 'DIAGNOSTIC' && repairAgreed) ? 'IN_REPAIR'
+    : job.status
   const currentStepIndex = statusSteps.indexOf(displayStatus)
 
-  // Show progress bar only for active repair stages
-  const showProgressBar = ['IN_REPAIR', 'PARTS_ARRIVED', 'DIAGNOSTIC'].includes(job.status) ||
-    (job.status === 'DIAGNOSTIC' && repairAgreed)
+  // Show progress bar only for active repair stages (not when diagnostics are complete)
+  const showProgressBar = ['IN_REPAIR', 'PARTS_ARRIVED'].includes(job.status) ||
+    (job.status === 'DIAGNOSTIC' && !repairAgreed)
 
   // Show turnaround time for active stages
   const showTurnaround = ['RECEIVED', 'IN_REPAIR', 'PARTS_ARRIVED', 'DIAGNOSTIC'].includes(job.status)
@@ -446,11 +452,14 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           >
             {/* Status badge */}
             <div className="mb-3">
-              <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md`}>
-                {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
-                {repairAgreed && job.status === 'DIAGNOSTIC' && (
-                  <span className="ml-2 text-sm font-bold bg-green-100 text-green-800 px-2 py-1 rounded-full">Agreed</span>
-                )}
+              <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${
+                job.status === 'DIAGNOSTIC' && repairAgreed
+                  ? 'bg-orange-600 text-white'
+                  : JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]
+              } shadow-md`}>
+                {job.status === 'DIAGNOSTIC' && repairAgreed
+                  ? 'Starting Soon'
+                  : JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
               </div>
             </div>
 
