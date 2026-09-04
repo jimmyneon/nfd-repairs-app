@@ -1,14 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Job } from '@/lib/types'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
-import { Package, Clock, CheckCircle, MapPin, Phone, Mail, QrCode, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, MessageSquare } from 'lucide-react'
+import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
 import { shortTrackingLink } from '@/lib/utils'
+import {
+  getDeviceType,
+  getTurnaroundEstimate,
+  calculateProgressPercent,
+  calculateVisitFrequency,
+  getReassuranceMessage,
+  getDeviceDescription,
+  generateActivityLog,
+  type ActivityEntry,
+} from '@/lib/tracking-utils'
 
 export default function TrackingPage({ params }: { params: { token: string } }) {
   const [job, setJob] = useState<any>(null)
@@ -16,132 +25,66 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [showQRCode, setShowQRCode] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [showStatusInfo, setShowStatusInfo] = useState(false)
+  const [showActivityLog, setShowActivityLog] = useState(false)
   const [statusChangedAt, setStatusChangedAt] = useState<Date | null>(null)
   const [previousStatus, setPreviousStatus] = useState<string | null>(null)
   const [isExpired, setIsExpired] = useState(false)
   const [shopCoordinates, setShopCoordinates] = useState({ latitude: 55.7558, longitude: -3.9626, radius: 100 })
+  const [pageViews, setPageViews] = useState<{ viewed_at: string }[]>([])
+  const [visitFrequency, setVisitFrequency] = useState<{ totalVisits: number; visitsLastHour: number; visitsLast24h: number; tier: string }>({
+    totalVisits: 0, visitsLastHour: 0, visitsLast24h: 0, tier: 'first',
+  })
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([])
+  const [jobEvents, setJobEvents] = useState<{ created_at: string; message: string }[]>([])
   const supabase = createClient()
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
     const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
-    
-    // Mobile phones
-    if (combined.includes('iphone') || combined.includes('samsung') || 
-        combined.includes('pixel') || combined.includes('oneplus') ||
-        combined.includes('huawei') || combined.includes('xiaomi') ||
-        combined.includes('motorola') || combined.includes('nokia') ||
-        combined.includes('phone')) {
-      return <Smartphone className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    if (combined.includes('iphone') || combined.includes('samsung') && !combined.includes('tab') && !combined.includes('book') ||
+        combined.includes('pixel') || combined.includes('oneplus') || combined.includes('huawei') ||
+        combined.includes('xiaomi') || combined.includes('motorola') || combined.includes('nokia') ||
+        combined.includes('phone') || combined.includes('smartphone') || combined.includes('oppo')) {
+      return <Smartphone className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Tablets
-    if (combined.includes('ipad') || combined.includes('tablet') ||
-        combined.includes('tab ')) {
-      return <Tablet className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
+      return <Tablet className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Laptops
-    if (combined.includes('macbook') || combined.includes('laptop') ||
-        combined.includes('notebook') || combined.includes('chromebook')) {
-      return <Laptop className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
+      return <Laptop className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Gaming consoles
-    if (combined.includes('playstation') || combined.includes('xbox') ||
-        combined.includes('nintendo') || combined.includes('switch') ||
-        combined.includes('ps4') || combined.includes('ps5')) {
-      return <Gamepad2 className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') ||
+        combined.includes('switch') || combined.includes('ps4') || combined.includes('ps5') || combined.includes('console')) {
+      return <Gamepad2 className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Watches
     if (combined.includes('watch') || combined.includes('fitbit')) {
-      return <Watch className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+      return <Watch className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Desktop/Monitor
-    if (combined.includes('imac') || combined.includes('desktop') ||
-        combined.includes('monitor')) {
-      return <Monitor className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    if (combined.includes('imac') || combined.includes('desktop') || combined.includes('monitor') || combined.includes('pc')) {
+      return <Monitor className="h-16 w-16 md:h-20 md:w-20 text-primary" />
     }
-    
-    // Default to smartphone
-    return <Smartphone className="h-20 w-20 md:h-24 md:w-24 text-primary" />
+    return <Smartphone className="h-16 w-16 md:h-20 md:w-20 text-primary" />
   }
 
-  useEffect(() => {
-    loadJob()
-    loadShopCoordinates()
-    
-    // Set up real-time subscription for job updates
-    const channel = supabase
-      .channel('job-tracking')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'jobs',
-          filter: `tracking_token=eq.${params.token}`
-        },
-        (payload) => {
-          setJob(payload.new)
-          setLastUpdated(new Date())
-          if (payload.new.status_changed_at) {
-            setStatusChangedAt(new Date(payload.new.status_changed_at))
-          }
-        }
-      )
-      .subscribe()
-
-    // Also poll every 30 seconds as backup
-    const pollInterval = setInterval(() => {
-      loadJob()
-    }, 30000)
-
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(pollInterval)
-    }
-  }, [params.token])
-
-  const loadShopCoordinates = async () => {
-    const { data } = await supabase
-      .from('admin_settings')
-      .select('shop_latitude, shop_longitude, gps_radius_meters')
-      .limit(1)
-      .single()
-
-    if (data) {
-      setShopCoordinates({
-        latitude: data.shop_latitude || 55.7558,
-        longitude: data.shop_longitude || -3.9626,
-        radius: data.gps_radius_meters || 100
-      })
-    }
-  }
-
-  const loadJob = async (showSpinner = false) => {
+  const loadJob = useCallback(async (showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true)
-    
+
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
     if (data) {
-      // Check if tracking link is expired
       if (isTrackingLinkExpired(data.tracking_link_expires_at)) {
         setIsExpired(true)
         setLoading(false)
         return
       }
-      
+
       setJob(data)
       setLastUpdated(new Date())
-      
-      // Get most recent status change event
+
+      // Get status change events
       const { data: events } = await supabase
         .from('job_events')
         .select('created_at, message')
@@ -149,11 +92,10 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         .eq('type', 'STATUS_CHANGE')
         .order('created_at', { ascending: false })
         .limit(10)
-      
+
       if (events && events.length > 0) {
         setStatusChangedAt(new Date(events[0].created_at))
-        
-        // If current status is DELAYED, find the previous non-DELAYED status from events
+        setJobEvents(events)
         if (data.status === 'DELAYED' && events.length > 1) {
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
@@ -175,49 +117,120 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           setPreviousStatus(null)
         }
       } else {
-        // If no status change events, use status_changed_at from job or fall back to creation date
         setStatusChangedAt(new Date(data.status_changed_at || data.created_at))
         setPreviousStatus(null)
       }
+
+      // Load page views
+      const { data: views } = await supabase
+        .from('tracking_page_views')
+        .select('viewed_at')
+        .eq('job_id', data.id)
+        .order('viewed_at', { ascending: false })
+        .limit(50)
+
+      if (views) {
+        setPageViews(views)
+        const freq = calculateVisitFrequency(views)
+        setVisitFrequency(freq)
+      }
     }
     setLoading(false)
-    
+
     if (showSpinner) {
-      // Keep spinner visible for at least 800ms for visual feedback
       setTimeout(() => setIsRefreshing(false), 800)
     }
-  }
+  }, [params.token, supabase])
 
-  const handleManualRefresh = () => {
-    loadJob(true)
-  }
+  // Log page view on mount
+  useEffect(() => {
+    fetch('/api/tracking/view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingToken: params.token }),
+    }).catch(() => {})
+  }, [params.token])
+
+  useEffect(() => {
+    loadJob()
+    // Load shop coordinates
+    supabase
+      .from('admin_settings')
+      .select('shop_latitude, shop_longitude, gps_radius_meters')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setShopCoordinates({
+            latitude: data.shop_latitude || 55.7558,
+            longitude: data.shop_longitude || -3.9626,
+            radius: data.gps_radius_meters || 100,
+          })
+        }
+      })
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('job-tracking')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `tracking_token=eq.${params.token}`,
+        },
+        (payload) => {
+          setJob(payload.new)
+          setLastUpdated(new Date())
+          if (payload.new.status_changed_at) {
+            setStatusChangedAt(new Date(payload.new.status_changed_at))
+          }
+        }
+      )
+      .subscribe()
+
+    // Poll every 30 seconds
+    const pollInterval = setInterval(() => loadJob(), 30000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
+  }, [params.token, loadJob, supabase])
+
+  // Generate activity log when data changes
+  useEffect(() => {
+    if (job && jobEvents) {
+      setActivityLog(generateActivityLog(
+        job.status_changed_at,
+        pageViews,
+        jobEvents
+      ))
+    }
+  }, [job, jobEvents, pageViews])
+
+  const handleManualRefresh = () => loadJob(true)
 
   const formatLastUpdated = () => {
     const now = new Date()
     const diffMs = now.getTime() - lastUpdated.getTime()
     const diffSecs = Math.floor(diffMs / 1000)
-    const diffMins = Math.floor(diffSecs / 60)
-    
     if (diffSecs < 10) return 'Just now'
     if (diffSecs < 60) return `${diffSecs} seconds ago`
+    const diffMins = Math.floor(diffSecs / 60)
     if (diffMins === 1) return '1 minute ago'
     if (diffMins < 60) return `${diffMins} minutes ago`
-    
-    return lastUpdated.toLocaleTimeString('en-GB', { 
-      hour: '2-digit', 
-      minute: '2-digit'
-    })
+    return lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   }
 
   const formatTimeSince = (date: Date | null) => {
     if (!date) return 'Unknown'
-    
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 1000 / 60)
     const diffHours = Math.floor(diffMins / 60)
     const diffDays = Math.floor(diffHours / 24)
-    
     if (diffMins < 1) return 'Just now'
     if (diffMins === 1) return '1 minute ago'
     if (diffMins < 60) return `${diffMins} minutes ago`
@@ -227,103 +240,18 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     return `${diffDays} days ago`
   }
 
-  const getDeviceType = (deviceMake: string, deviceModel: string): 'phone' | 'tablet' | 'laptop' | 'console' | 'watch' | 'desktop' => {
-    const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
-    
-    if (combined.includes('iphone') || combined.includes('samsung') || combined.includes('pixel') || 
-        combined.includes('oneplus') || combined.includes('huawei') || combined.includes('xiaomi') || 
-        combined.includes('motorola') || combined.includes('nokia') || combined.includes('phone')) {
-      return 'phone'
-    }
-    if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
-      return 'tablet'
-    }
-    if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
-      return 'laptop'
-    }
-    if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') || 
-        combined.includes('switch') || combined.includes('ps4') || combined.includes('ps5')) {
-      return 'console'
-    }
-    if (combined.includes('watch') || combined.includes('fitbit')) {
-      return 'watch'
-    }
-    return 'desktop'
-  }
+  const formatActivityTime = (timestamp: string) => {
+    const d = new Date(timestamp)
+    const now = new Date()
+    const isToday = d.toDateString() === now.toDateString()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday = d.toDateString() === yesterday.toDateString()
 
-  const getDynamicMessage = (status: string, deviceType: 'phone' | 'tablet' | 'laptop' | 'console' | 'watch' | 'desktop', hoursInStatus: number): string => {
-    // RECEIVED status - device-aware and time-sensitive
-    if (status === 'RECEIVED') {
-      if (deviceType === 'phone' || deviceType === 'watch') {
-        if (hoursInStatus < 2) return "Quick assessment in progress. Most phone/watch repairs are assessed within a few hours."
-        if (hoursInStatus < 4) return "We're assessing your device. Update coming soon."
-        if (hoursInStatus < 8) return "Assessment still in progress. We're working through our queue."
-        if (hoursInStatus < 12) return "We're still working on your assessment. Complex issues sometimes need more time."
-        return "We haven't forgotten about you! Detailed diagnostics in progress - update coming soon."
-      }
-      if (deviceType === 'tablet') {
-        if (hoursInStatus < 4) return "Assessment in progress. Tablets typically assessed within 4-6 hours."
-        if (hoursInStatus < 8) return "We're working on your assessment. Update coming soon."
-        if (hoursInStatus < 12) return "Assessment still in progress. We're working through our queue."
-        return "Detailed diagnostics needed. Update coming soon."
-      }
-      if (deviceType === 'laptop' || deviceType === 'desktop') {
-        if (hoursInStatus < 6) return "Thorough assessment in progress. Laptops need detailed diagnostics."
-        if (hoursInStatus < 12) return "We're working on your assessment. Complex devices take longer to diagnose."
-        if (hoursInStatus < 24) return "Detailed diagnostics still in progress. Update coming soon."
-        return "Complex assessment in progress. We'll update you as soon as we have more information."
-      }
-      if (deviceType === 'console') {
-        if (hoursInStatus < 8) return "Detailed diagnostics in progress. Consoles require thorough testing."
-        if (hoursInStatus < 16) return "We're working on your assessment. Complex devices need more detailed testing."
-        if (hoursInStatus < 24) return "Thorough diagnostics still in progress. Update coming soon."
-        return "Complex assessment in progress. We'll update you as soon as we have more information."
-      }
-    }
-
-    // IN_REPAIR status - device-aware and time-sensitive
-    if (status === 'IN_REPAIR') {
-      if (deviceType === 'phone' || deviceType === 'watch') {
-        if (hoursInStatus < 4) return "Repair in progress. Most phone/watch repairs completed within a few hours."
-        if (hoursInStatus < 12) return "We're working on your repair. Should be ready soon."
-        if (hoursInStatus < 24) return "Repair still in progress. Some issues take longer than expected."
-        if (hoursInStatus < 48) return "Complex repair in progress. We'll notify you when it's ready."
-        return "Your repair is taking longer than usual. We're working on it and will update you soon."
-      }
-      if (deviceType === 'tablet') {
-        if (hoursInStatus < 8) return "Repair in progress. Tablet repairs typically take 6-12 hours."
-        if (hoursInStatus < 24) return "We're working on your repair. Should be ready within a day."
-        if (hoursInStatus < 48) return "Repair still in progress. Complex issues sometimes take longer."
-        return "Complex repair in progress. We'll notify you when it's ready."
-      }
-      if (deviceType === 'laptop' || deviceType === 'desktop') {
-        if (hoursInStatus < 12) return "Repair in progress. Laptop repairs typically take 1-2 days."
-        if (hoursInStatus < 48) return "We're working on your repair. Complex devices need more time."
-        if (hoursInStatus < 72) return "Repair still in progress. We'll notify you when it's ready."
-        return "Complex repair in progress. We'll update you as soon as we have more information."
-      }
-      if (deviceType === 'console') {
-        if (hoursInStatus < 24) return "Repair in progress. Console repairs typically take 1-3 days."
-        if (hoursInStatus < 72) return "We're working on your repair. Complex devices need thorough work."
-        return "Complex repair in progress. We'll notify you when it's ready."
-      }
-    }
-
-    // Other statuses - time-sensitive only
-    const statusMessages: Record<string, (hours: number) => string> = {
-      QUOTE_APPROVED: (h) => h < 24 ? "Waiting for you to drop off your device at your convenience. See location and hours below." : h < 48 ? "We're ready for your device whenever you can drop it off. Location and hours below." : "Still waiting for your device. Drop off at your convenience - location and hours below.",
-      AWAITING_DEPOSIT: (h) => h < 12 ? "We need a deposit to order parts for your repair. Check your messages for payment details." : h < 24 ? "Still waiting for deposit payment. We can order parts as soon as we receive it." : h < 48 ? "Deposit payment pending. We're ready to order parts once payment is received." : "We're still waiting for your deposit payment to proceed with ordering parts.",
-      PARTS_ORDERED: (h) => h < 24 ? "Parts ordered! Delivery typically takes 2-3 days." : h < 48 ? "Parts are on their way. Should arrive within 1-2 days." : h < 72 ? "Parts should arrive soon. We'll notify you when they're here." : h < 96 ? "Parts delivery taking a bit longer than usual. We'll update you when they arrive." : "Parts are delayed but on their way. We'll start your repair as soon as they arrive.",
-      PARTS_ARRIVED: (h) => h < 6 ? "Good news! Parts have arrived and we're ready to start your repair." : h < 12 ? "Parts are here. Your repair will begin shortly." : "Parts arrived. We're working through our queue - your repair will start soon.",
-      READY_TO_COLLECT: (h) => h < 24 ? "Your device is ready! Collect at your convenience during opening hours." : h < 72 ? "Your device is still ready for collection whenever you're free." : h < 168 ? "We're holding your device ready for collection. Pick up when convenient." : "Your device is ready for collection. We'll hold it safely until you can pick it up.",
-      COLLECTED: () => "Thanks for collecting your device! Hope everything's working perfectly.",
-      COMPLETED: () => "Your repair is complete! Thanks for choosing New Forest Device Repairs.",
-      DELAYED: () => job.delay_notes || "Your repair is experiencing a delay. We'll update you as soon as possible.",
-      CANCELLED: () => job.cancellation_notes || "This repair has been cancelled. Contact us if you have any questions."
-    }
-
-    const messageFn = statusMessages[status]
-    return messageFn ? messageFn(hoursInStatus) : "We're working on your repair and will keep you updated."
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    if (isToday) return `${time} — Today`
+    if (isYesterday) return `${time} — Yesterday`
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` — ${time}`
   }
 
   if (loading) {
@@ -347,42 +275,12 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               This repair has been completed and the tracking link has expired for privacy and security.
             </p>
           </div>
-
-          <a
-            href="https://nfdr.uk/start-repair/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
-          >
+          <a href="https://nfdr.uk/start-repair/" target="_blank" rel="noopener noreferrer"
+            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95">
             <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
             <p className="text-white/90 text-sm mb-3">Start a new repair request online</p>
-            <div className="inline-flex items-center text-white font-bold">
-              <span>nfdr.uk</span>
-            </div>
+            <span className="text-white font-bold">nfdr.uk</span>
           </a>
-
-          <div className="mt-4 flex gap-3">
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 text-center transition-all active:scale-95"
-            >
-              <MapPin className="h-6 w-6 text-primary mx-auto mb-1" />
-              <p className="text-sm font-bold text-gray-900 dark:text-white">Find Us</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Location & directions</p>
-            </a>
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 text-center transition-all active:scale-95"
-            >
-              <Clock className="h-6 w-6 text-primary mx-auto mb-1" />
-              <p className="text-sm font-bold text-gray-900 dark:text-white">Opening Hours</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">View on Google</p>
-            </a>
-          </div>
         </div>
       </div>
     )
@@ -396,12 +294,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h1>
             <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
           </div>
-          <a
-            href="https://nfdr.uk/start-repair/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95"
-          >
+          <a href="https://nfdr.uk/start-repair/" target="_blank" rel="noopener noreferrer"
+            className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95">
             <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
             <p className="text-white/90 text-sm">Start a new repair request online</p>
           </a>
@@ -410,96 +304,55 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     )
   }
 
-  const getNextStepMessage = (status: string): string => {
-    const messages: Record<string, string> = {
-      QUOTE_APPROVED: 'Great! Your quote has been approved. Drop off your device at your convenience - we\'ll complete the details when you arrive.',
-      RECEIVED: 'We\'ve got your device and will take a look shortly.',
-      AWAITING_DEPOSIT: 'We need a small deposit to order the parts. Check your messages for payment details.',
-      PARTS_ORDERED: 'Parts are on order — we\'ll let you know as soon as they arrive.',
-      PARTS_ARRIVED: 'Good news! The parts have arrived and we\'re ready to get started.',
-      IN_REPAIR: 'Your device is being repaired right now. We\'ll message you when it\'s ready.',
-      READY_TO_COLLECT: 'All done! Your device is ready to collect whenever you\'re free.',
-      COLLECTED: 'Thanks for collecting your device. Hope everything\'s working perfectly!',
-      COMPLETED: 'All finished! Thanks for trusting us with your repair.',
-      DELAYED: job.delay_notes || 'There\'s a slight delay with your repair. We\'ll be in touch with more details soon.',
-      CANCELLED: job.cancellation_notes || 'This repair has been cancelled. If you have any questions, just give us a shout.',
-    }
-    return messages[status] || 'We\'ll keep you updated every step of the way.'
-  }
+  // Calculate all the dynamic values
+  const deviceType = getDeviceType(job.device_make, job.device_model)
+  const estimate = getTurnaroundEstimate(job.device_make, job.device_model, job.issue, job.status)
+  const hoursInStatus = statusChangedAt
+    ? (new Date().getTime() - statusChangedAt.getTime()) / (1000 * 60 * 60)
+    : 0
+  const progressPercent = calculateProgressPercent(hoursInStatus, estimate)
+  const repairAgreed = !!job.repair_agreed_at
+  const reassuranceMessage = getReassuranceMessage(
+    job.status,
+    visitFrequency.tier as any,
+    hoursInStatus,
+    estimate,
+    repairAgreed
+  )
+  const deviceDesc = getDeviceDescription(job.device_make, job.device_model)
 
-  // Determine status flow based on job source and parts requirement
-  // Build dynamic status progression based on actual job data
+  // Build status steps
   const buildStatusSteps = () => {
     const steps: string[] = []
-    
-    // API/Responder jobs start with QUOTE_APPROVED (customer needs to drop off)
-    // Manual jobs start with RECEIVED (device already in shop)
-    if (job.source !== 'staff_manual') {
-      steps.push('QUOTE_APPROVED')
-    }
-    
-    // All jobs go through RECEIVED when device is in shop
+    if (job.source !== 'staff_manual') steps.push('QUOTE_APPROVED')
     steps.push('RECEIVED')
-    
-    // Infer if parts/deposit are needed from either the flags OR the current status
-    // This handles data inconsistencies where status is PARTS_ORDERED but parts_required=false
-    const needsDepositStep = job.deposit_required || 
-                            ['AWAITING_DEPOSIT'].includes(job.status) ||
-                            (job.status === 'DELAYED' && previousStatus && ['AWAITING_DEPOSIT'].includes(previousStatus))
-    
-    const needsPartsSteps = job.parts_required || 
-                           ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(job.status) ||
-                           (job.status === 'DELAYED' && previousStatus && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(previousStatus))
-    
-    // Show deposit step only if deposit is actually required
-    if (needsDepositStep) {
-      steps.push('AWAITING_DEPOSIT')
-    }
-    
-    // Show parts steps only if parts are actually required
-    if (needsPartsSteps) {
-      steps.push('PARTS_ORDERED')
-      steps.push('PARTS_ARRIVED')
-    }
-    
-    // All jobs go through these final steps
+    const needsDepositStep = job.deposit_required || ['AWAITING_DEPOSIT'].includes(job.status) ||
+      (job.status === 'DELAYED' && previousStatus && ['AWAITING_DEPOSIT'].includes(previousStatus))
+    const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(job.status) ||
+      (job.status === 'DELAYED' && previousStatus && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(previousStatus))
+    if (needsDepositStep) steps.push('AWAITING_DEPOSIT')
+    if (needsPartsSteps) { steps.push('PARTS_ORDERED'); steps.push('PARTS_ARRIVED') }
     steps.push('IN_REPAIR')
     steps.push('READY_TO_COLLECT')
     steps.push('COLLECTED')
-    // COMPLETED is admin-only, not shown to customers
-    
     return steps
   }
-  
-  const statusSteps = buildStatusSteps()
 
-  // If status is DELAYED, use the previousStatus from job_events history
-  // DELAYED is a modifier status, not a separate step in the timeline
+  const statusSteps = buildStatusSteps()
   const getActualStepForDelayed = (): string => {
-    if (previousStatus && statusSteps.includes(previousStatus)) {
-      return previousStatus
-    }
-    
-    if (job.parts_required || job.deposit_required) {
-      return 'PARTS_ORDERED'
-    }
+    if (previousStatus && statusSteps.includes(previousStatus)) return previousStatus
+    if (job.parts_required || job.deposit_required) return 'PARTS_ORDERED'
     return 'IN_REPAIR'
   }
-
   const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed() : job.status
   const currentStepIndex = statusSteps.indexOf(displayStatus)
-  
-  // Safety check: if displayStatus is not in statusSteps, something is wrong
-  if (currentStepIndex === -1) {
-    console.error('Timeline error: displayStatus not found in statusSteps', {
-      jobStatus: job.status,
-      displayStatus,
-      statusSteps,
-      partsRequired: job.parts_required,
-      depositRequired: job.deposit_required,
-      source: job.source
-    })
-  }
+
+  // Show progress bar only for active repair stages
+  const showProgressBar = ['IN_REPAIR', 'PARTS_ARRIVED', 'DIAGNOSTIC'].includes(job.status) ||
+    (job.status === 'DIAGNOSTIC' && repairAgreed)
+
+  // Show turnaround time for active stages
+  const showTurnaround = ['RECEIVED', 'IN_REPAIR', 'PARTS_ARRIVED', 'DIAGNOSTIC'].includes(job.status)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-white dark:from-gray-900 dark:to-gray-800">
@@ -510,10 +363,10 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {/* PRIMARY: Device Info - Clean and Simple */}
+        {/* Device Info */}
         <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-lg p-5 md:p-6 border-2 border-gray-100">
           <div className="flex items-center gap-4 md:gap-5">
-            <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <div className="flex-shrink-0 w-16 h-16 md:w-20 md:h-20 bg-primary/10 rounded-2xl flex items-center justify-center">
               {getDeviceIcon(job.device_make, job.device_model)}
             </div>
             <div className="flex-1 min-w-0">
@@ -525,77 +378,60 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           </div>
         </div>
 
-        {/* PRIMARY: Current Status - Clean and Simple */}
+        {/* Current Status — Clean and Scannable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700">
           <button
             onClick={handleManualRefresh}
             disabled={isRefreshing}
             className="w-full p-5 md:p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors disabled:cursor-wait"
           >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Current Status</p>
-              <svg 
-                className={`h-4 w-4 text-gray-500 dark:text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </div>
-            
-            {isRefreshing && (
-              <div className="mb-3 flex items-center justify-center gap-2 text-primary animate-pulse">
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="text-sm font-medium">Checking for updates...</span>
-              </div>
-            )}
-            
-            <div className="mb-4">
-              <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md transition-all ${isRefreshing ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
+            {/* Status badge */}
+            <div className="mb-3">
+              <div className={`w-full py-3 md:py-4 rounded-xl font-black text-lg md:text-xl text-center ${JOB_STATUS_COLORS[job.status as keyof typeof JOB_STATUS_COLORS]} shadow-md`}>
                 {JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
+                {repairAgreed && job.status === 'DIAGNOSTIC' && (
+                  <span className="ml-2 text-sm font-bold bg-green-100 text-green-800 px-2 py-1 rounded-full">Agreed</span>
+                )}
               </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
-              <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">{getNextStepMessage(job.status)}</p>
             </div>
 
-            {/* Parts Tracking - only shown if staff toggle is on */}
-            {job.status === 'PARTS_ORDERED' && job.show_tracking_to_customer && job.parts_tracking_status && (
-              <div className="mt-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-3 text-center">
-                <p className="text-sm text-purple-800 dark:text-purple-200 font-medium">
-                  {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
-                   job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
-                   job.parts_tracking_status === 'InTransit' ? 'Parts on the way' :
-                   job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed' :
-                   job.parts_tracking_status === 'AvailableForPickup' ? 'Parts ready for collection' :
-                   `Parts status: ${job.parts_tracking_status}`}
+            {/* Turnaround time */}
+            {showTurnaround && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-2">
+                {estimate.display}
+              </p>
+            )}
+
+            {/* Last checked */}
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-3">
+              Last checked: {formatLastUpdated()}
+            </p>
+
+            {/* Progress bar */}
+            {showProgressBar && (
+              <div className="mb-4">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-primary to-primary/80 h-3 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
+                  {progressPercent >= 95
+                    ? 'Finishing up — almost there'
+                    : `${Math.round(progressPercent)}% through this stage`}
                 </p>
               </div>
             )}
 
-            {/* Reassurance Banner - shown for PARTS_ORDERED, DELAYED, and long-running statuses */}
-            {(job.status === 'PARTS_ORDERED' || job.status === 'DELAYED' || job.status === 'DIAGNOSTIC' || job.status === 'IN_REPAIR') && (
-              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-blue-900 dark:text-blue-200 font-semibold">
-                      We&apos;ll update you at every step of your repair.
-                    </p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                      If something doesn&apos;t look right or you have a question, send us a text — we&apos;re here to help.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Reassurance message — short, one or two lines */}
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center">
+              <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+                {reassuranceMessage}
+              </p>
+            </div>
 
-            {/* Customer Notes - Display prominently at top */}
+            {/* Customer notes */}
             {job.customer_notes && (
               <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl">
                 <div className="flex items-start gap-2">
@@ -607,11 +443,37 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 </div>
               </div>
             )}
+
+            {/* Diagnosis notes — shown when in DIAGNOSTIC */}
+            {job.status === 'DIAGNOSTIC' && job.diagnosis_notes && (
+              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm mb-1">Our diagnosis:</p>
+                    <p className="text-amber-800 dark:text-amber-300 text-sm whitespace-pre-wrap">{job.diagnosis_notes}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Parts tracking */}
+            {job.status === 'PARTS_ORDERED' && job.show_tracking_to_customer && job.parts_tracking_status && (
+              <div className="mt-4 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-3 text-center">
+                <p className="text-sm text-purple-800 dark:text-purple-200 font-medium">
+                  {job.parts_tracking_status === 'Delivered' ? 'Parts delivered' :
+                   job.parts_tracking_status === 'OutForDelivery' ? 'Parts out for delivery today' :
+                   job.parts_tracking_status === 'InTransit' ? 'Parts on the way' :
+                   job.parts_tracking_status === 'InfoReceived' ? 'Parts order placed' :
+                   `Parts status: ${job.parts_tracking_status}`}
+                </p>
+              </div>
+            )}
           </button>
-          
-          {/* Show GPS "I'm Here" button and directions for READY_TO_COLLECT status */}
+
+          {/* READY_TO_COLLECT — directions and I'm Here button */}
           {job.status === 'READY_TO_COLLECT' && (
-            <div className="mt-4 space-y-3">
+            <div className="px-5 md:px-6 pb-5 space-y-3">
               <ImHereButton
                 jobId={job.id}
                 jobRef={job.job_ref}
@@ -619,128 +481,81 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 shopLongitude={shopCoordinates.longitude}
                 radiusMeters={shopCoordinates.radius}
               />
-              <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-center">
-                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
-                  Please check our live opening hours before setting off
-                </p>
-                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                  Sometimes we need to pop out — tap below to see our current hours on Google
-                </p>
-              </div>
-              <a
-                href={SHOP_INFO.google_maps_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95"
-              >
+              <a href={SHOP_INFO.google_maps_link} target="_blank" rel="noopener noreferrer"
+                className="block bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95">
                 <div className="flex items-center justify-center space-x-2">
                   <MapPin className="h-5 w-5" />
-                  <span>Get Directions & Opening Hours</span>
+                  <span>Directions & Opening Hours</span>
                 </div>
               </a>
             </div>
           )}
         </div>
 
-        {/* Location & Hours for QUOTE_APPROVED - Waiting for Drop-off */}
-        {job.status === 'QUOTE_APPROVED' && !job.device_in_shop && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-primary/30 dark:border-gray-700 p-5 md:p-6">
-            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 flex items-center">
-              <MapPin className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
-              Drop Off Your Device
-            </h2>
-            
-            <div className="space-y-4">
-              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">📍 Location</p>
-                <p className="text-base font-bold text-gray-900 dark:text-white">{SHOP_INFO.name}</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{SHOP_INFO.address}</p>
+        {/* Activity Log — Expandable */}
+        {activityLog.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
+            <button
+              onClick={() => setShowActivityLog(!showActivityLog)}
+              className="w-full p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+                <span className="font-bold text-gray-900 dark:text-white text-sm">Recent activity</span>
               </div>
-
-              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">🕐 Opening Hours</p>
-                <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                  <p><span className="font-semibold">Mon-Fri:</span> 9am-5:30pm</p>
-                  <p><span className="font-semibold">Sat:</span> 10am-2pm</p>
-                  <p><span className="font-semibold">Sun:</span> Closed</p>
-                </div>
+              {showActivityLog ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+            </button>
+            {showActivityLog && (
+              <div className="px-5 pb-5 space-y-2 border-t border-gray-100 dark:border-gray-700 pt-4">
+                {activityLog.map((entry, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${entry.isStatusChange ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className="flex-1">
+                      <p className={`text-sm ${entry.isStatusChange ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {entry.label}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{formatActivityTime(entry.timestamp)}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <a
-                href={SHOP_INFO.google_maps_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-center transition-all shadow-md active:scale-95"
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <MapPin className="h-5 w-5" />
-                  <span>Get Directions</span>
-                </div>
-              </a>
-
-              {!job.onboarding_completed && job.tracking_token && (
-                <div className="mt-4 pt-4 border-t-2 border-gray-200 dark:border-gray-600">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">
-                    Optional: Complete details now to speed up drop-off
-                  </p>
-                  <a
-                    href={`/onboard/${job.tracking_token}`}
-                    className="block bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-xl text-center transition-all"
-                  >
-                    Complete Details Online
-                  </a>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                    (Or we'll do this together when you drop off)
-                  </p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
 
-        {/* PRIMARY: Repair Progress with Timeline & Info */}
+        {/* Repair Progress Timeline */}
         <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="p-5 md:p-6">
-            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 md:mb-5 flex items-center">
-              <Clock className="h-5 w-5 md:h-6 md:w-6 mr-2 text-primary" />
+            <h2 className="font-black text-lg md:text-xl text-gray-900 dark:text-white mb-4 flex items-center">
+              <Clock className="h-5 w-5 mr-2 text-primary" />
               Repair Progress
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {statusSteps.map((step, index) => {
                 const isCurrent = step === displayStatus
-                // If currentStepIndex is -1, nothing is completed yet
                 const isCompleted = currentStepIndex >= 0 ? index < currentStepIndex : false
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
-
                 return (
                   <div key={step} className="relative">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center flex-1">
-                        <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                           isCompleted ? 'bg-white border-2 border-green-500 text-green-600' :
                           isCurrent ? (isDelayed ? 'bg-red-600 text-white shadow-xl ring-4 ring-red-600/30 scale-110' : 'bg-primary text-white shadow-xl ring-4 ring-primary/30 scale-110') :
                           'bg-gray-200 text-gray-500 border-2 border-gray-300'
                         }`}>
-                          {isCompleted ? (
-                            <CheckCircle className="h-7 w-7" />
-                          ) : (
-                            <span className="text-base font-black">{index + 1}</span>
-                          )}
+                          {isCompleted ? <CheckCircle className="h-6 w-6" /> : <span className="text-sm font-black">{index + 1}</span>}
                         </div>
-                        <div className="ml-4 flex-1">
+                        <div className="ml-3 flex-1">
                           <p className={`text-sm font-semibold ${
                             isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
-                            isCompleted ? 'text-green-600' :
-                            'text-gray-400'
+                            isCompleted ? 'text-green-600' : 'text-gray-400'
                           }`}>
                             {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
-                            {isDelayed && (
-                              <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>
-                            )}
+                            {isDelayed && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Delayed</span>}
                           </p>
                         </div>
                       </div>
-                      {/* Timestamp on right for current/completed steps */}
                       {(isCurrent || isCompleted) && (
                         <div className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                           {isCurrent ? formatTimeSince(statusChangedAt) : ''}
@@ -748,127 +563,31 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       )}
                     </div>
                     {index < statusSteps.length - 1 && (
-                      <div className={`absolute left-6 top-12 w-0.5 h-4 ${
-                        isCompleted ? 'bg-green-400' : 'bg-gray-300'
-                      }`} />
+                      <div className={`absolute left-5 top-10 w-0.5 h-3 ${isCompleted ? 'bg-green-400' : 'bg-gray-300'}`} />
                     )}
                   </div>
                 )
               })}
             </div>
           </div>
-          
-          {/* Expandable More Info Button */}
-          <button
-            onClick={() => setShowStatusInfo(!showStatusInfo)}
-            className="w-full px-5 md:px-6 py-3 border-t-2 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-          >
-            <div className="flex items-center justify-center gap-2 text-sm text-primary font-semibold">
-              <span>More info</span>
-              {showStatusInfo ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </div>
-          </button>
-          
-          {/* Expandable Info Section */}
-          {showStatusInfo && (
-            <div className="px-5 md:px-6 pb-5 pt-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">What does this mean?</h4>
-              <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
-                {(() => {
-                  const hoursInStatus = statusChangedAt 
-                    ? (new Date().getTime() - statusChangedAt.getTime()) / (1000 * 60 * 60)
-                    : 0
-                  const deviceType = getDeviceType(job.device_make, job.device_model)
-                  const dynamicMessage = getDynamicMessage(job.status, deviceType, hoursInStatus)
-                  
-                  return (
-                    <>
-                      <div className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        <p>{dynamicMessage}</p>
-                      </div>
-                      
-                      {job.status === 'DELAYED' && (job.delay_reason || job.delay_notes) && (
-                        <div className="flex items-start gap-2 mt-3 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded">
-                          <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            {job.delay_reason && (
-                              <p className="font-semibold text-red-900 dark:text-red-200 text-sm mb-1">
-                                Delay Reason: {job.delay_reason.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                              </p>
-                            )}
-                            {job.delay_notes && (
-                              <p className="text-red-800 dark:text-red-300 text-sm">{job.delay_notes}</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {job.status === 'CANCELLED' && (job.cancellation_reason || job.cancellation_notes) && (
-                        <div className="flex items-start gap-2 mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 border-l-4 border-gray-500 rounded">
-                          <AlertCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            {job.cancellation_reason && (
-                              <p className="font-semibold text-gray-900 dark:text-gray-200 text-sm mb-1">
-                                Cancellation Reason: {job.cancellation_reason?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                              </p>
-                            )}
-                            {job.cancellation_notes && (
-                              <p className="text-gray-800 dark:text-gray-300 text-sm">{job.cancellation_notes}</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {job.status === 'READY_TO_COLLECT' && (
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <p>Check Google Maps for live opening times.</p>
-                        </div>
-                      )}
-                      
-                      <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          <strong>Tip:</strong> This page updates automatically. Click the status area above to refresh manually.
-                        </p>
-                      </div>
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* SECONDARY: QR Code - Expandable */}
+        {/* QR Code — Expandable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
-          <button
-            onClick={() => setShowQRCode(!showQRCode)}
-            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={() => setShowQRCode(!showQRCode)}
+            className="w-full p-5 flex items-center justify-between hover:bg-gray-50 transition-colors">
             <div className="flex items-center">
               <QrCode className="h-6 w-6 text-primary mr-3" />
               <span className="font-bold text-gray-900">Collection QR Code</span>
             </div>
-            {showQRCode ? (
-              <ChevronUp className="h-5 w-5 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            )}
+            {showQRCode ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
           </button>
           {showQRCode && (
             <div className="px-6 pb-6 text-center border-t border-gray-100">
               <p className="text-sm text-gray-600 mb-4 mt-4">Show this code when collecting your device</p>
               <div className="flex justify-center mb-4">
                 <div className="bg-white p-4 rounded-xl shadow-inner border-2 border-gray-100">
-                  <QRCodeDisplay 
-                    value={shortTrackingLink(params.token)} 
-                    size={200} 
-                  />
+                  <QRCodeDisplay value={shortTrackingLink(params.token)} size={200} />
                 </div>
               </div>
               <p className="text-xs text-gray-500">Save this page or take a screenshot for easy access</p>
@@ -876,86 +595,36 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           )}
         </div>
 
-        {/* What Happens Next - Info Link */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
-          <details>
-            <summary className="p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <Clock className="h-6 w-6 text-primary flex-shrink-0" />
-                <span className="font-bold text-gray-900 dark:text-white">What happens next?</span>
-              </div>
-              <ChevronDown className="h-5 w-5 text-gray-400" />
-            </summary>
-            <div className="px-5 pb-5 space-y-3 border-t border-gray-100 dark:border-gray-700 pt-4">
-              <div className="flex items-start gap-3">
-                <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Tracking by text</strong> - we&apos;ll message you at each stage of your repair.</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Updates in real time</strong> - this page updates automatically. You can also tap the status above to refresh.</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Collection</strong> - we&apos;ll text you when your device is ready. Bring this page or your reference number.</p>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        {/* SECONDARY: Business Card - Need Help */}
+        {/* Bottom section — Your repair is in safe hands */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-primary to-primary/90 p-6 text-center">
-            <p className="text-white font-black text-2xl mb-1">Need Help?</p>
-            <p className="text-white/90 text-sm">{SHOP_INFO.name}</p>
-          </div>
-          <div className="p-6 space-y-3">
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
-            >
-              <MapPin className="h-6 w-6 text-primary flex-shrink-0" />
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white text-sm">Find Us</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Location & directions on Google Maps</p>
-              </div>
-            </a>
-            <a
-              href={SHOP_INFO.google_maps_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
-            >
-              <Clock className="h-6 w-6 text-primary flex-shrink-0" />
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white text-sm">Opening Hours</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">View on Google</p>
-              </div>
-            </a>
-            <a
-              href="https://nfdr.uk/start-repair/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 bg-gradient-to-r from-primary to-primary/90 rounded-xl p-4 transition-all active:scale-95 hover:from-primary/90 hover:to-primary"
-            >
-              <Smartphone className="h-6 w-6 text-white flex-shrink-0" />
-              <div>
-                <p className="font-bold text-white text-sm">Start a New Repair</p>
-                <p className="text-xs text-white/80">nfdr.uk</p>
-              </div>
-            </a>
-            <a
-              href={`sms:${SHOP_INFO.phone}`}
-              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
-            >
-              <MessageSquare className="h-6 w-6 text-primary flex-shrink-0" />
-              <div>
-                <p className="font-bold text-gray-900 dark:text-white text-sm">Problem with your repair?</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Just text us — we will sort it</p>
-              </div>
-            </a>
+          <div className="p-5 md:p-6">
+            <h2 className="font-bold text-lg text-gray-900 dark:text-white mb-3 text-center">
+              Your repair is in safe hands
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-2">
+              This page is always updated first — the moment anything changes, it shows here.
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
+              We&apos;ll also text you at each stage so you don&apos;t need to keep checking.
+            </p>
+            <div className="flex flex-col gap-2">
+              <a href={SHOP_INFO.google_maps_link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600">
+                <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white text-sm">Directions & Opening Hours</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">View on Google Maps</p>
+                </div>
+              </a>
+              <a href={`sms:${SHOP_INFO.phone}`}
+                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600">
+                <MessageSquare className="h-5 w-5 text-primary flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white text-sm">Have a question? Text us</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">We&apos;ll check your repair and get back to you</p>
+                </div>
+              </a>
+            </div>
           </div>
         </div>
       </main>

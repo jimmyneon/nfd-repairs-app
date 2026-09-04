@@ -1628,6 +1628,116 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
             {job.status === 'DIAGNOSTIC' && (
               <>
+                {/* Diagnostic prompt — escalating reminders */}
+                {(() => {
+                  const diagHours = job.status_changed_at
+                    ? (Date.now() - new Date(job.status_changed_at).getTime()) / (1000 * 60 * 60)
+                    : 0
+                  const hasDiagnosis = !!job.diagnosis_notes
+                  const agreed = !!job.repair_agreed_at
+                  const declined = !!job.repair_declined_at
+
+                  if (declined) {
+                    return (
+                      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-xl p-4 text-center border-2 border-gray-300 dark:border-gray-600">
+                        <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Repair declined by customer</p>
+                        {job.repair_declined_reason && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{job.repair_declined_reason}</p>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  if (agreed) {
+                    return (
+                      <div className="w-full bg-green-50 dark:bg-green-900/20 rounded-xl p-4 text-center border-2 border-green-300 dark:border-green-700">
+                        <p className="text-sm font-bold text-green-800 dark:text-green-200">✓ Repair agreed — ready to start</p>
+                      </div>
+                    )
+                  }
+
+                  if (!hasDiagnosis && diagHours < 2) {
+                    return null // Still assessing, no prompt yet
+                  }
+
+                  if (!hasDiagnosis) {
+                    return (
+                      <div className="w-full bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border-2 border-amber-300 dark:border-amber-700">
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-200 text-center mb-2">
+                          ⏱ In diagnostics for {Math.round(diagHours)}h — log your findings
+                        </p>
+                        <button
+                          onClick={() => setActivePanel('diagnostic')}
+                          className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all"
+                        >
+                          Write Diagnostic Report
+                        </button>
+                      </div>
+                    )
+                  }
+
+                  // Has diagnosis but no agreement yet
+                  const promptColor = diagHours > 8 ? 'red' : diagHours > 4 ? 'orange' : 'yellow'
+                  const promptBg = promptColor === 'red' ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700' :
+                    promptColor === 'orange' ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700' :
+                    'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700'
+                  const promptText = promptColor === 'red' ? 'text-red-800 dark:text-red-200' :
+                    promptColor === 'orange' ? 'text-orange-800 dark:text-orange-200' :
+                    'text-yellow-800 dark:text-yellow-200'
+
+                  return (
+                    <div className={`w-full ${promptBg} rounded-xl p-4 border-2`}>
+                      <p className={`text-sm font-bold ${promptText} text-center mb-3`}>
+                        {diagHours > 8
+                          ? `⚠️ No response for ${Math.round(diagHours)}h — follow up with customer`
+                          : diagHours > 4
+                          ? `📋 Diagnosis sent ${Math.round(diagHours)}h ago — awaiting customer response`
+                          : `📋 Diagnosis sent — awaiting customer response`}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            // Send follow-up text
+                            const msg = `Hi, we diagnosed your ${job.device_make || ''} ${job.device_model || ''} and sent a quote. Just checking you received it? Reply here if you'd like to go ahead or if you have any questions.`
+                            setDiagnosticSmsMessage(msg)
+                          }}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
+                        >
+                          Text Customer
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await fetch('/api/jobs/diagnostic-action', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ jobId: job.id, action: 'agree' }),
+                            })
+                            loadJobData()
+                          }}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
+                        >
+                          Mark Agreed
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const reason = prompt('Why was the repair declined?')
+                            if (reason === null) return
+                            await fetch('/api/jobs/diagnostic-action', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ jobId: job.id, action: 'decline', declinedReason: reason }),
+                            })
+                            loadJobData()
+                          }}
+                          className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg text-sm transition-all"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 <button
                   onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                   disabled={actionLoading}

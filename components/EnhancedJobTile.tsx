@@ -197,6 +197,29 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
             </div>
           )}
 
+          {/* Diagnostic prompt — escalating reminders */}
+          {job.status === 'DIAGNOSTIC' && !job.repair_agreed_at && !job.repair_declined_at && (() => {
+            const diagHours = job.status_changed_at
+              ? (Date.now() - new Date(job.status_changed_at).getTime()) / (1000 * 60 * 60)
+              : 0
+            if (diagHours < 2) return null
+            const hasDiagnosis = !!job.diagnosis_notes
+            if (!hasDiagnosis) {
+              return (
+                <div className="mb-1 bg-amber-400/90 text-amber-900 rounded-md px-2 py-0.5">
+                  <p className="text-xs font-semibold truncate">⏱ Log diagnosis ({Math.round(diagHours)}h)</p>
+                </div>
+              )
+            }
+            const urgency = diagHours > 8 ? 'bg-red-400/90 text-red-900' : diagHours > 4 ? 'bg-orange-400/90 text-orange-900' : 'bg-yellow-300/90 text-yellow-900'
+            const msg = diagHours > 8 ? `⚠️ No response ${Math.round(diagHours)}h` : `📋 Awaiting response ${Math.round(diagHours)}h`
+            return (
+              <div className={`mb-1 ${urgency} rounded-md px-2 py-0.5`}>
+                <p className="text-xs font-semibold truncate">{msg}</p>
+              </div>
+            )
+          })()}
+
           {/* Bottom Row: Time + Deposit indicator */}
           <div className="flex items-center justify-between text-xs border-t border-white/20 pt-1.5">
             <span className={`font-bold ${timeWarning ? 'text-yellow-300' : 'opacity-80'}`}>

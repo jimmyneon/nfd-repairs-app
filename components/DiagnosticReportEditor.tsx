@@ -25,7 +25,10 @@ export default function DiagnosticReportEditor({ job, onUpdate, onSendMessage }:
     try {
       await supabase
         .from('jobs')
-        .update({ diagnostic_report: report.trim() || null })
+        .update({
+          diagnostic_report: report.trim() || null,
+          diagnosis_notes: report.trim() || null,
+        })
         .eq('id', job.id)
 
       await supabase.from('job_events').insert({
@@ -113,7 +116,14 @@ Track your repair: ${trackingUrl}`
           </button>
 
           <button
-            onClick={() => onSendMessage?.(job.diagnostic_report!)}
+            onClick={async () => {
+              // Mark diagnosis as sent
+              await supabase
+                .from('jobs')
+                .update({ diagnosis_sent_at: new Date().toISOString() })
+                .eq('id', job.id)
+              onSendMessage?.(job.diagnostic_report!)
+            }}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition-colors shadow-md active:scale-95"
           >
             <Send className="h-5 w-5" />
