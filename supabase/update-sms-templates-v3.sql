@@ -136,10 +136,10 @@ WHERE key = 'COMPLETED';
 
 -- READY_TO_COLLECT - Ready for pickup (no price lines — price already communicated)
 UPDATE sms_templates SET body =
-'Hi {first_name}, great news — your {device_model} is all repaired and ready to collect.
+'Hi {first_name}, great news — your {device_summary} is all repaired and ready to collect.
 
-Please check our opening times before setting off:
-{hours_link}
+Directions: {google_maps_link}
+Opening times: {hours_link}
 
 Many thanks,
 New Forest Device Repairs'

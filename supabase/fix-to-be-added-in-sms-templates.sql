@@ -152,8 +152,8 @@ WHERE key = 'COMPLETED';
 UPDATE sms_templates SET body =
 'Hi {first_name}, great news — your {device_summary} is all repaired and ready to collect.
 
-Please check our opening times before setting off:
-{hours_link}
+Directions: {google_maps_link}
+Opening times: {hours_link}
 
 Many thanks,
 New Forest Device Repairs'
