@@ -946,6 +946,16 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 <p className="text-xs text-white/80">nfdr.uk</p>
               </div>
             </a>
+            <a
+              href={`sms:${SHOP_INFO.phone}`}
+              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-xl p-4 transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              <MessageSquare className="h-6 w-6 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white text-sm">Problem with your repair?</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Just text us — your repair is under warranty</p>
+              </div>
+            </a>
           </div>
         </div>
       </main>

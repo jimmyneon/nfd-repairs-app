@@ -100,9 +100,9 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      aftercareBody = `Hi ${firstName}, just checking in — how's your ${job.device_model} getting on? Any issues at all, just reply here and we'll sort it.
+      aftercareBody = `Hi ${firstName}, just checking in — how is your ${job.device_model} getting on? Any issues at all, just reply here and we will sort it.
 
-If you're happy with the repair, a quick review really helps us →
+If you are happy with the repair, a quick review really helps us →
 ${aftercareReviewLink}
 
 New Forest Device Repairs`
