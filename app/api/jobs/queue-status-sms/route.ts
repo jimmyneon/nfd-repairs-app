@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,16 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use service role key for server-side operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+    const supabase = createServiceClient()
 
     // Get job details
     const { data: job, error: jobError } = await supabase
@@ -268,16 +259,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Queue SMS
-    const { data: smsLog, error: smsError } = await supabase
-      .from('sms_logs')
-      .insert({
-        job_id: jobId,
-        template_key: templateKey,
-        body_rendered: smsBody,
-        status: 'PENDING',
-      })
-      .select()
-      .single()
+    const { data: smsLog, error: smsError } = await supabaseRetry(() =>
+      supabase
+        .from('sms_logs')
+        .insert({
+          job_id: jobId,
+          template_key: templateKey,
+          body_rendered: smsBody,
+          status: 'PENDING',
+        })
+        .select()
+        .single()
+    )
 
     if (smsError) {
       console.error('Failed to queue SMS:', smsError)
@@ -293,11 +286,11 @@ export async function POST(request: NextRequest) {
         console.log('📤 Triggering SMS send for job:', job.job_ref, 'sms_log_id:', smsLog.id)
         // Use hardcoded URL since NEXT_PUBLIC_ vars aren't available in API routes
         const appUrl = 'https://nfd-repairs-app.vercel.app'
-        const response = await fetch(`${appUrl}/api/sms/send`, {
+        const response = await fetchWithTimeout(`${appUrl}/api/sms/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sms_log_id: smsLog.id }),
-        })
+        }, 15000)
         console.log('SMS send trigger response:', response.status, response.ok)
       } catch (error) {
         console.error('❌ Failed to trigger SMS send:', error)

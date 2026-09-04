@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+
+// Allow up to 5 minutes for draining large queues
+export const maxDuration = 300
 
 /**
  * GET /api/sms/send-all
@@ -25,16 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const supabase = createServiceClient()
 
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (!webhookUrl) {
@@ -45,11 +39,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check sending hours (8am-8pm) unless explicitly skipped
+    // Check sending hours (8am-8pm UK time) unless explicitly skipped
     const skipHoursCheck = request.nextUrl.searchParams.get('skip_hours_check') === 'true'
     if (!skipHoursCheck) {
-      const hour = new Date().getHours()
-      if (hour < 8 || hour >= 20) {
+      if (!isWithinUKSendingHours()) {
         return NextResponse.json({
           success: true,
           message: 'Outside allowed sending hours (8am-8pm)',
@@ -59,13 +52,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch all PENDING SMS, oldest first
-    const { data: pendingSms, error: fetchError } = await supabase
+    // Fetch all PENDING SMS plus FAILED SMS older than 1 hour (for retry).
+    // The 1-hour delay gives MacroDroid time to recover if it was down.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+    const { data: pendingRows, error: pendingError } = await supabase
       .from('sms_logs')
       .select('*, jobs(customer_phone)')
       .eq('status', 'PENDING')
       .order('created_at', { ascending: true })
       .limit(50)
+
+    const { data: failedRows, error: failedError } = await supabase
+      .from('sms_logs')
+      .select('*, jobs(customer_phone)')
+      .eq('status', 'FAILED')
+      .lt('created_at', oneHourAgo)
+      .order('created_at', { ascending: true })
+      .limit(20)
+
+    const fetchError = pendingError || failedError
+    const pendingSms = [
+      ...(pendingRows || []),
+      ...(failedRows || []),
+    ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(0, 50)
 
     if (fetchError) {
       console.error('Failed to fetch pending SMS:', fetchError)
@@ -125,49 +135,51 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`Sending SMS ${i + 1}/${pendingSms.length} - log ${smsLog.id} to ${smsLog.jobs.customer_phone}`)
 
-        const smsResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: smsLog.jobs.customer_phone,
-            message: smsLog.body_rendered,
-          }),
-        })
+        const smsResult = await sendViaMacroDroid(webhookUrl, smsLog.jobs.customer_phone, smsLog.body_rendered)
 
-        if (smsResponse.ok) {
-          await supabase
-            .from('sms_logs')
-            .update({
-              status: 'SENT',
-              sent_at: new Date().toISOString(),
-            })
-            .eq('id', smsLog.id)
+        if (smsResult.ok) {
+          await supabaseRetry(() =>
+            supabase
+              .from('sms_logs')
+              .update({
+                status: 'SENT',
+                sent_at: new Date().toISOString(),
+              })
+              .eq('id', smsLog.id)
+          )
           sentCount++
           results.push({ id: smsLog.id, status: 'SENT' })
         } else {
-          const errorText = await smsResponse.text()
-          console.error(`MacroDroid webhook failed for sms_log ${smsLog.id}:`, errorText)
-          await supabase
-            .from('sms_logs')
-            .update({
-              status: 'FAILED',
-              error_message: errorText.substring(0, 500),
-            })
-            .eq('id', smsLog.id)
+          console.error(`MacroDroid webhook failed for sms_log ${smsLog.id}:`, smsResult.body)
+          // Keep as PENDING for retry on next cron run, unless it was a 4xx rejection
+          const isRejection = smsResult.status >= 400 && smsResult.status < 500
+          const newStatus = isRejection ? 'FAILED' : 'PENDING'
+          await supabaseRetry(() =>
+            supabase
+              .from('sms_logs')
+              .update({
+                status: newStatus,
+                error_message: smsResult.body.substring(0, 500),
+              })
+              .eq('id', smsLog.id)
+          )
           failedCount++
-          results.push({ id: smsLog.id, status: 'FAILED', error: errorText.substring(0, 200) })
+          results.push({ id: smsLog.id, status: newStatus, error: smsResult.body.substring(0, 200) })
         }
       } catch (err) {
         console.error(`Error sending sms_log ${smsLog.id}:`, err)
-        await supabase
-          .from('sms_logs')
-          .update({
-            status: 'FAILED',
-            error_message: err instanceof Error ? err.message : 'Unknown error',
-          })
-          .eq('id', smsLog.id)
+        // Keep as PENDING for retry — don't mark FAILED on network errors
+        await supabaseRetry(() =>
+          supabase
+            .from('sms_logs')
+            .update({
+              status: 'PENDING',
+              error_message: err instanceof Error ? err.message : 'Unknown error',
+            })
+            .eq('id', smsLog.id)
+        )
         failedCount++
-        results.push({ id: smsLog.id, status: 'FAILED', error: 'exception' })
+        results.push({ id: smsLog.id, status: 'PENDING', error: 'exception' })
       }
 
       // 3-second delay between sends to respect MacroDroid rate limits

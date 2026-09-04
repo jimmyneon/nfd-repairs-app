@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
   try {
-    // Use service role key to bypass RLS
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     let smsLog
     let sms_log_id
@@ -103,44 +99,49 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Sending to MacroDroid webhook...')
-    console.log('Payload:', JSON.stringify(smsPayload, null, 2))
 
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(smsPayload),
-    })
+    const result = await sendViaMacroDroid(webhookUrl, smsLog.jobs.customer_phone, smsLog.body_rendered)
 
-    console.log('MacroDroid response status:', smsResponse.status)
-    console.log('MacroDroid response ok:', smsResponse.ok)
+    console.log('MacroDroid response:', result.status, result.ok)
 
-    if (smsResponse.ok) {
+    if (result.ok) {
       console.log('✅ SMS sent successfully via MacroDroid')
-      await supabase
-        .from('sms_logs')
-        .update({ 
-          status: 'SENT',
-          sent_at: new Date().toISOString()
-        })
-        .eq('id', sms_log_id)
+      await supabaseRetry(() =>
+        supabase
+          .from('sms_logs')
+          .update({
+            status: 'SENT',
+            sent_at: new Date().toISOString()
+          })
+          .eq('id', sms_log_id)
+      )
 
       return NextResponse.json({ success: true })
     } else {
-      const errorText = await smsResponse.text()
-      console.error('❌ MacroDroid webhook failed:', errorText)
-      
-      await supabase
-        .from('sms_logs')
-        .update({ 
-          status: 'FAILED',
-          error_message: errorText
-        })
-        .eq('id', sms_log_id)
+      console.error('❌ MacroDroid webhook failed:', result.body)
+
+      // Keep status as PENDING (not FAILED) so the drain cron retries it.
+      // Only mark FAILED if MacroDroid explicitly rejected it (4xx).
+      const isRejection = result.status >= 400 && result.status < 500
+      const newStatus = isRejection ? 'FAILED' : 'PENDING'
+
+      await supabaseRetry(() =>
+        supabase
+          .from('sms_logs')
+          .update({
+            status: newStatus,
+            error_message: result.body.substring(0, 500),
+          })
+          .eq('id', sms_log_id)
+      )
+
+      // Increment retry_count for tracking
+      if (newStatus === 'PENDING') {
+        await supabaseRetry(() => supabase.rpc('increment_retry_count', { sms_id: sms_log_id }))
+      }
 
       return NextResponse.json(
-        { error: 'Failed to send SMS', details: errorText },
+        { error: 'Failed to send SMS', details: result.body },
         { status: 500 }
       )
     }

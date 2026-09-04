@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortReviewLink } from '@/lib/utils'
+import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
 
 /**
  * POST /api/jobs/send-aftercare-sms
@@ -11,10 +11,7 @@ import { shortReviewLink } from '@/lib/utils'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     const { jobId } = await request.json()
 
@@ -129,32 +126,30 @@ New Forest Device Repairs`
 
     console.log(`Sending manual aftercare SMS for job ${job.job_ref} to ${job.customer_phone}`)
 
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: job.customer_phone,
-        message: aftercareBody,
-      }),
-    })
+    const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, aftercareBody)
 
-    const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+    const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
     const now = new Date().toISOString()
 
-    await supabase
-      .from('jobs')
-      .update({
-        aftercare_sms_sent_at: now,
-        aftercare_sms_delivery_status: deliveryStatus,
-        aftercare_sms_body: aftercareBody,
-      })
-      .eq('id', jobId)
+    // Only write sent_at if actually sent — otherwise the cron never retries it
+    await supabaseRetry(() =>
+      supabase
+        .from('jobs')
+        .update({
+          ...(smsResult.ok ? { aftercare_sms_sent_at: now } : {}),
+          aftercare_sms_delivery_status: deliveryStatus,
+          aftercare_sms_body: aftercareBody,
+        })
+        .eq('id', jobId)
+    )
 
-    await supabase.from('job_events').insert({
-      job_id: jobId,
-      type: 'SYSTEM',
-      message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent manually`,
-    })
+    await supabaseRetry(() =>
+      supabase.from('job_events').insert({
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent manually`,
+      } as any)
+    )
 
     console.log(`Aftercare SMS ${deliveryStatus} for job ${job.job_ref}`)
 

@@ -141,21 +141,33 @@ export async function POST(request: NextRequest) {
 
 /**
  * Calculate when to send the initial review SMS — 6pm evening.
- * If it's already after 5pm, schedule for 6pm today (cron will pick it up soon).
- * If it's after 8pm, schedule for 6pm tomorrow (too late to text tonight).
+ * If it's already past 6pm, schedule for 6pm tomorrow (too late to text tonight).
+ * Uses UK time to handle BST correctly.
  */
 function calculateReviewSMSTime(): Date {
   const now = new Date()
   const reviewTime = new Date(now)
-  const hour = now.getHours()
 
-  if (hour >= 20) {
-    // After 8pm — schedule for 6pm tomorrow
+  // Get current hour in UK time
+  const ukHour = parseInt(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: 'numeric',
+    hour12: false,
+  }).format(now), 10)
+
+  if (ukHour >= 18) {
+    // Already past 6pm UK — schedule for 6pm tomorrow
     reviewTime.setDate(reviewTime.getDate() + 1)
-    reviewTime.setHours(18, 0, 0, 0)
-  } else {
-    // Before 8pm — schedule for 6pm today
-    reviewTime.setHours(18, 0, 0, 0)
+  }
+  // Set to 18:00 UK time. During BST that's 17:00 UTC, during GMT that's 18:00 UTC.
+  // We calculate the UTC offset by comparing the UK hour to the UTC hour.
+  const utcHour = now.getUTCHours()
+  const offset = ukHour >= utcHour ? ukHour - utcHour : 24 - utcHour + ukHour
+  reviewTime.setUTCHours(18 - offset, 0, 0, 0)
+
+  // If the calculated time is still in the past (edge case), push to tomorrow
+  if (reviewTime.getTime() <= now.getTime()) {
+    reviewTime.setDate(reviewTime.getDate() + 1)
   }
 
   return reviewTime

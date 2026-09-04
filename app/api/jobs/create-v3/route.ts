@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
+import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
@@ -153,10 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase client with service role for server-side operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     // Duplicate prevention: Check for existing job with same customer/phone/device within last 5 minutes
     // This prevents multiple jobs being created when errors occur during submission
@@ -471,14 +469,16 @@ export async function POST(request: NextRequest) {
         } as any)
       } else {
         console.log('📝 Creating SMS log...')
-        const { data: smsLog, error: smsLogError } = await supabase.from('sms_logs').insert({
-          job_id: job.id,
-          template_key: templateKey,
-          body_rendered: smsBody,
-          status: 'PENDING',
-        } as any)
-        .select()
-        .single()
+        const { data: smsLog, error: smsLogError } = await supabaseRetry(() =>
+          supabase.from('sms_logs').insert({
+            job_id: job.id,
+            template_key: templateKey,
+            body_rendered: smsBody,
+            status: 'PENDING',
+          } as any)
+          .select()
+          .single()
+        )
 
         if (smsLogError) {
           console.error('❌ SMS log insert failed:', smsLogError)
@@ -497,11 +497,11 @@ export async function POST(request: NextRequest) {
           if (smsLog) {
             console.log('📤 Triggering SMS send for job:', job.job_ref, 'sms_log_id:', smsLog.id)
             try {
-              const sendResponse = await fetch(`${appUrl}/api/sms/send`, {
+              const sendResponse = await fetchWithTimeout(`${appUrl}/api/sms/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sms_log_id: smsLog.id }),
-              })
+              }, 15000)
               console.log('📤 SMS send response:', sendResponse.status, sendResponse.ok)
             } catch (error) {
               console.error('❌ Failed to trigger SMS send:', error)
@@ -528,14 +528,14 @@ export async function POST(request: NextRequest) {
     if (jobData.customer_email && !skip_sms) {
       try {
         const appUrl = 'https://nfd-repairs-app.vercel.app'
-        await fetch(`${appUrl}/api/email/send`, {
+        await fetchWithTimeout(`${appUrl}/api/email/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jobId: job.id,
             type: 'JOB_CREATED',
           }),
-        })
+        }, 15000)
       } catch (error) {
         console.error('Failed to send email:', error)
       }

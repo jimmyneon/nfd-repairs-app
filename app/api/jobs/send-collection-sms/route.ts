@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
+import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+
+// Allow up to 5 minutes for the cron handler (it has 30s delays between sends)
+export const maxDuration = 300
 
 /**
  * POST /api/jobs/send-collection-sms
@@ -12,10 +15,7 @@ import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     const body = await request.json()
     const { jobId, manual, platform } = body
@@ -172,16 +172,9 @@ If anything is not right, just reply here.
 
     console.log('Sending post-collection SMS to:', job.customer_phone)
 
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: job.customer_phone,
-        message: smsBody
-      })
-    })
+    const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
 
-    const smsDeliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+    const smsDeliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
 
     // Send email with dynamic cross-sell content
     console.log('Sending post-collection email to:', job.customer_email)
@@ -211,21 +204,25 @@ If anything is not right, just reply here.
       console.log(`No email address for job ${job.job_ref}, skipping email`)
     }
 
-    // Update job with sent status for both SMS and email
+    // Update job with sent status for both SMS and email.
+    // CRITICAL: only write *_sent_at when delivery actually succeeded.
+    // Writing sent_at on failure blocks the cron from ever retrying.
     const now = new Date().toISOString()
-    await supabase
-      .from('jobs')
-      .update({
-        post_collection_sms_sent_at: now,
-        post_collection_sms_delivery_status: smsDeliveryStatus,
-        post_collection_sms_body: smsBody,
-        last_review_platform_requested: selectedPlatform,
-        post_collection_email_sent_at: job.customer_email ? now : null,
-        post_collection_email_delivery_status: emailDeliveryStatus,
-        post_collection_email_subject: emailSubject,
-        post_collection_email_body: emailBody
-      })
-      .eq('id', jobId)
+    await supabaseRetry(() =>
+      supabase
+        .from('jobs')
+        .update({
+          ...(smsResult.ok ? { post_collection_sms_sent_at: now } : {}),
+          post_collection_sms_delivery_status: smsDeliveryStatus,
+          post_collection_sms_body: smsBody,
+          last_review_platform_requested: selectedPlatform,
+          ...(emailDeliveryStatus === 'SENT' ? { post_collection_email_sent_at: now } : {}),
+          post_collection_email_delivery_status: emailDeliveryStatus,
+          post_collection_email_subject: emailSubject,
+          post_collection_email_body: emailBody
+        })
+        .eq('id', jobId)
+    )
 
     // Log events
     await supabase
@@ -262,13 +259,9 @@ If anything is not right, just reply here.
 }
 
 /**
- * Helper function to check if current time is within allowed sending hours (8am-8pm)
+ * Helper function to check if current time is within allowed sending hours (8am-8pm UK time)
+ * Uses UK timezone to handle BST/GMT correctly on Vercel (which runs in UTC).
  */
-function isWithinAllowedHours(): boolean {
-  const now = new Date()
-  const hours = now.getHours()
-  return hours >= 8 && hours < 20
-}
 
 /**
  * Helper function to get next allowed send time if outside hours
@@ -319,12 +312,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check if we're within allowed sending hours (8am-8pm)
-    if (!isWithinAllowedHours()) {
-      console.log('Outside allowed sending hours (8am-8pm), skipping SMS send')
+    // Check if we're within allowed sending hours (8am-8pm UK time)
+    if (!isWithinUKSendingHours()) {
+      console.log('Outside allowed sending hours (8am-8pm UK), skipping SMS send')
       return NextResponse.json({
         success: true,
-        message: 'Outside allowed sending hours (8am-8pm)',
+        message: 'Outside allowed sending hours (8am-8pm UK)',
         count: 0,
         skipped: true
       })
@@ -498,34 +491,32 @@ New Forest Device Repairs`
 
           console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: job.customer_phone,
-              message: aftercareBody,
-            }),
-          })
+          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, aftercareBody)
 
-          const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+          const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()
 
-          await supabase
-            .from('jobs')
-            .update({
-              aftercare_sms_sent_at: now,
-              aftercare_sms_delivery_status: deliveryStatus,
-              aftercare_sms_body: aftercareBody,
-            })
-            .eq('id', job.id)
+          // Only write sent_at if actually sent — otherwise the cron never retries it
+          await supabaseRetry(() =>
+            supabase
+              .from('jobs')
+              .update({
+                ...(smsResult.ok ? { aftercare_sms_sent_at: now } : {}),
+                aftercare_sms_delivery_status: deliveryStatus,
+                aftercare_sms_body: aftercareBody,
+              })
+              .eq('id', job.id)
+          )
 
-          await supabase.from('job_events').insert({
-            job_id: job.id,
-            type: 'SYSTEM',
-            message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent`,
-          })
+          await supabaseRetry(() =>
+            supabase.from('job_events').insert({
+              job_id: job.id,
+              type: 'SYSTEM',
+              message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent`,
+            } as any)
+          )
 
-          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: smsResponse.ok, deliveryStatus })
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: smsResult.ok, deliveryStatus })
 
           if (i < aftercareJobs.length - 1 || (reviewReminderJobs && reviewReminderJobs.length > 0)) {
             console.log('Waiting 30 seconds before next SMS...')
@@ -610,34 +601,32 @@ ${reminderReviewLink}
 
           console.log(`Sending review reminder SMS ${i + 1}/${jobsNeedingReminder.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: job.customer_phone,
-              message: reminderBody,
-            }),
-          })
+          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, reminderBody)
 
-          const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+          const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()
 
-          await supabase
-            .from('jobs')
-            .update({
-              review_reminder_sms_sent_at: now,
-              review_reminder_sms_delivery_status: deliveryStatus,
-              review_reminder_sms_body: reminderBody,
-            })
-            .eq('id', job.id)
+          // Only write sent_at if actually sent
+          await supabaseRetry(() =>
+            supabase
+              .from('jobs')
+              .update({
+                ...(smsResult.ok ? { review_reminder_sms_sent_at: now } : {}),
+                review_reminder_sms_delivery_status: deliveryStatus,
+                review_reminder_sms_body: reminderBody,
+              })
+              .eq('id', job.id)
+          )
 
-          await supabase.from('job_events').insert({
-            job_id: job.id,
-            type: 'SYSTEM',
-            message: `Review reminder SMS ${deliveryStatus.toLowerCase()}: sent (no review clicked within 5 days)`,
-          })
+          await supabaseRetry(() =>
+            supabase.from('job_events').insert({
+              job_id: job.id,
+              type: 'SYSTEM',
+              message: `Review reminder SMS ${deliveryStatus.toLowerCase()}: sent (no review clicked within 5 days)`,
+            } as any)
+          )
 
-          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: smsResponse.ok, deliveryStatus })
+          results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: smsResult.ok, deliveryStatus })
 
           if (i < jobsNeedingReminder.length - 1) {
             console.log('Waiting 30 seconds before next SMS...')

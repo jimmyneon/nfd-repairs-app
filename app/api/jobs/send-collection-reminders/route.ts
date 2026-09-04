@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+
+// Allow up to 5 minutes for the cron handler
+export const maxDuration = 300
 
 /**
  * GET /api/jobs/send-collection-reminders
@@ -23,16 +26,7 @@ import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    )
+    const supabase = createServiceClient()
 
     // Verify cron secret
     const cronSecret = request.headers.get('Authorization')
@@ -40,9 +34,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check sending hours (8am-8pm)
-    const hour = new Date().getHours()
-    if (hour < 8 || hour >= 20) {
+    // Check sending hours (8am-8pm UK time)
+    if (!isWithinUKSendingHours()) {
       return NextResponse.json({
         success: true,
         message: 'Outside allowed sending hours (8am-8pm)',
@@ -243,36 +236,40 @@ export async function GET(request: NextRequest) {
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl) {
         try {
-          const smsResponse = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: job.customer_phone,
-              message: smsBody,
-            }),
-          })
+          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
 
-          const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+          const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
 
-          // Update SMS log
-          await supabase
-            .from('sms_logs')
-            .update({ status: deliveryStatus, sent_at: now.toISOString() })
-            .eq('id', smsLog.id)
+          // Update SMS log — only write sent_at if actually sent
+          await supabaseRetry(() =>
+            supabase
+              .from('sms_logs')
+              .update({
+                status: deliveryStatus,
+                ...(smsResult.ok ? { sent_at: now.toISOString() } : {}),
+              })
+              .eq('id', smsLog.id)
+          )
 
-          // Update reminder tracking field
-          const updateField = `collection_reminder_${reminderNumber}_sent_at`
-          await supabase
-            .from('jobs')
-            .update({ [updateField]: now.toISOString() })
-            .eq('id', job.id)
+          // Update reminder tracking field — only if actually sent
+          if (smsResult.ok) {
+            const updateField = `collection_reminder_${reminderNumber}_sent_at`
+            await supabaseRetry(() =>
+              supabase
+                .from('jobs')
+                .update({ [updateField]: now.toISOString() })
+                .eq('id', job.id)
+            )
+          }
 
           // Log event
-          await supabase.from('job_events').insert({
-            job_id: job.id,
-            type: 'SYSTEM',
-            message: `Collection reminder ${reminderNumber} sent (day ${daysInStatus}) - ${deliveryStatus}`,
-          })
+          await supabaseRetry(() =>
+            supabase.from('job_events').insert({
+              job_id: job.id,
+              type: 'SYSTEM',
+              message: `Collection reminder ${reminderNumber} sent (day ${daysInStatus}) - ${deliveryStatus}`,
+            } as any)
+          )
 
           reminderCount++
           results.push({

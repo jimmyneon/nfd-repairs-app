@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
 import { shortTrackingLink } from '@/lib/utils'
+import { createServiceClient, supabaseRetry } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,10 +16,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     const { data: job, error: jobError } = await supabase
       .from('jobs')
@@ -95,19 +92,21 @@ export async function POST(request: NextRequest) {
 
     // Log email attempt
     console.log('📝 Creating email log entry...')
-    const { data: emailLog, error: logError } = await supabase
-      .from('email_logs')
-      .insert({
-        job_id: jobId,
-        template_key: type,
-        subject: emailTemplate.subject,
-        body_html: emailTemplate.html,
-        body_text: emailTemplate.text,
-        recipient_email: job.customer_email,
-        status: 'PENDING',
-      })
-      .select()
-      .single()
+    const { data: emailLog, error: logError } = await supabaseRetry(() =>
+      supabase
+        .from('email_logs')
+        .insert({
+          job_id: jobId,
+          template_key: type,
+          subject: emailTemplate.subject,
+          body_html: emailTemplate.html,
+          body_text: emailTemplate.text,
+          recipient_email: job.customer_email,
+          status: 'PENDING',
+        })
+        .select()
+        .single()
+    )
 
     if (logError) {
       console.error('❌ Failed to create email log:', logError)
@@ -127,33 +126,39 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       // Update email log as sent
       if (emailLog) {
-        await supabase
-          .from('email_logs')
-          .update({
-            status: 'SENT',
-            sent_at: new Date().toISOString(),
-            resend_id: result.data?.id || null,
-          })
-          .eq('id', emailLog.id)
+        await supabaseRetry(() =>
+          supabase
+            .from('email_logs')
+            .update({
+              status: 'SENT',
+              sent_at: new Date().toISOString(),
+              resend_id: result.data?.id || null,
+            })
+            .eq('id', emailLog.id)
+        )
       }
 
-      await supabase.from('job_events').insert({
-        job_id: jobId,
-        type: 'SYSTEM',
-        message: `Email sent: ${emailTemplate.subject}`,
-      })
+      await supabaseRetry(() =>
+        supabase.from('job_events').insert({
+          job_id: jobId,
+          type: 'SYSTEM',
+          message: `Email sent: ${emailTemplate.subject}`,
+        } as any)
+      )
 
       return NextResponse.json({ success: true })
     } else {
       // Update email log as failed
       if (emailLog) {
-        await supabase
-          .from('email_logs')
-          .update({
-            status: 'FAILED',
-            error_message: JSON.stringify(result.error),
-          })
-          .eq('id', emailLog.id)
+        await supabaseRetry(() =>
+          supabase
+            .from('email_logs')
+            .update({
+              status: 'FAILED',
+              error_message: JSON.stringify(result.error),
+            })
+            .eq('id', emailLog.id)
+        )
       }
 
       console.error('Failed to send email:', result.error)
