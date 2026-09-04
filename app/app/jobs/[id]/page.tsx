@@ -1633,7 +1633,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   const diagHours = job.status_changed_at
                     ? (Date.now() - new Date(job.status_changed_at).getTime()) / (1000 * 60 * 60)
                     : 0
-                  const hasDiagnosis = !!job.diagnosis_notes
+                  const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
                   const agreed = !!job.repair_agreed_at
                   const declined = !!job.repair_declined_at
 

@@ -70,7 +70,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes')
+      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report')
       .eq('tracking_token', params.token)
       .maybeSingle()
 
@@ -326,6 +326,10 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     const steps: string[] = []
     if (job.source !== 'staff_manual') steps.push('QUOTE_APPROVED')
     steps.push('RECEIVED')
+    // Show DIAGNOSTIC step if the job has been through it or is currently in it
+    if (job.status === 'DIAGNOSTIC' || job.diagnosis_notes || job.diagnostic_report) {
+      steps.push('DIAGNOSTIC')
+    }
     const needsDepositStep = job.deposit_required || ['AWAITING_DEPOSIT'].includes(job.status) ||
       (job.status === 'DELAYED' && previousStatus && ['AWAITING_DEPOSIT'].includes(previousStatus))
     const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(job.status) ||
@@ -445,13 +449,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             )}
 
             {/* Diagnosis notes — shown when in DIAGNOSTIC */}
-            {job.status === 'DIAGNOSTIC' && job.diagnosis_notes && (
+            {job.status === 'DIAGNOSTIC' && (job.diagnosis_notes || job.diagnostic_report) && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-xl">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm mb-1">Our diagnosis:</p>
-                    <p className="text-amber-800 dark:text-amber-300 text-sm whitespace-pre-wrap">{job.diagnosis_notes}</p>
+                    <p className="text-amber-800 dark:text-amber-300 text-sm whitespace-pre-wrap">{job.diagnosis_notes || job.diagnostic_report}</p>
                   </div>
                 </div>
               </div>

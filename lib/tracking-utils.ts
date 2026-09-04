@@ -126,18 +126,18 @@ export function getTurnaroundEstimate(
   // Complex repairs — long turnaround regardless of device
   if (complex) {
     if (issueLower.includes('data recovery')) {
-      return { display: '7–14 days — these take time to do properly', minHours: 168, maxHours: 336, isComplex: true }
+      return { display: 'Usually up to 7 days — we want to make sure we recover everything safely', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'phone' || deviceType === 'watch') {
-      return { display: '5–10 days — these are complex repairs', minHours: 120, maxHours: 240, isComplex: true }
+      return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'tablet') {
-      return { display: '7–14 days — these are complex repairs', minHours: 168, maxHours: 336, isComplex: true }
+      return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'laptop') {
-      return { display: '7–14 days — these are complex repairs', minHours: 168, maxHours: 336, isComplex: true }
+      return { display: 'Usually up to 10 days, but we'll get it back to you as soon as we can', minHours: 96, maxHours: 240, isComplex: true }
     }
-    return { display: '5–14 days depending on the repair', minHours: 120, maxHours: 336, isComplex: true }
+    return { display: 'Usually up to 7 days, but we'll get it back to you as soon as we can', minHours: 72, maxHours: 168, isComplex: true }
   }
 
   // Phone repairs

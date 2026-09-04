@@ -203,7 +203,7 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
               ? (Date.now() - new Date(job.status_changed_at).getTime()) / (1000 * 60 * 60)
               : 0
             if (diagHours < 2) return null
-            const hasDiagnosis = !!job.diagnosis_notes
+            const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
             if (!hasDiagnosis) {
               return (
                 <div className="mb-1 bg-amber-400/90 text-amber-900 rounded-md px-2 py-0.5">
