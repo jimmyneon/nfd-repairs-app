@@ -105,18 +105,20 @@ export async function POST(request: NextRequest) {
     console.log('MacroDroid response:', result.status, result.ok)
 
     if (result.ok) {
-      console.log('✅ SMS sent successfully via MacroDroid')
+      console.log('✅ SMS sent successfully via MacroDroid, response:', result.body.substring(0, 200))
       await supabaseRetry(() =>
         supabase
           .from('sms_logs')
           .update({
             status: 'SENT',
-            sent_at: new Date().toISOString()
+            sent_at: new Date().toISOString(),
+            // Store the MacroDroid response body for diagnostics
+            error_message: `macrodroid_${result.status}:${result.body.substring(0, 200)}`,
           })
           .eq('id', sms_log_id)
       )
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, macrodroid_response: result.body.substring(0, 200) })
     } else {
       console.error('❌ MacroDroid webhook failed:', result.body)
 
