@@ -74,7 +74,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
   const supabase = getAdminClient()
   const { data: job, error: jobError } = await supabase
     .from('jobs')
-    .select('id,job_ref,is_warranty')
+    .select('id,job_ref,is_warranty,customer_email')
     .eq('tracking_token', params.token)
     .single()
 
@@ -123,6 +123,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
     type: 'SYSTEM',
     message: `Customer completed intake and accepted repair terms${job.is_warranty ? '' : ' and diagnostic fee policy'}`,
   } as any)
+
+  // If the customer just added an email that wasn't on the job before,
+  // send the "Job Created" confirmation email so they get a record of the
+  // booking (quick-intake jobs are created without an email).
+  if (email && !job.customer_email) {
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+      await fetch(`${appUrl}/api/email/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, type: 'JOB_CREATED' }),
+      })
+    } catch (err) {
+      console.error('Failed to send post-intake email:', err)
+    }
+  }
 
   return NextResponse.json({ success: true, job_ref: job.job_ref })
 }

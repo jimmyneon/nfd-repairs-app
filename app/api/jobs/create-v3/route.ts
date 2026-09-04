@@ -399,7 +399,10 @@ export async function POST(request: NextRequest) {
       const appUrl = getAppUrl()
       const trackingUrl = shortTrackingLink(job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
-      const onboardingUrl = shortOnboardingLink(job.onboarding_token)
+      // The onboarding_token column was never added to production, so the
+      // completion/intake form reuses the tracking token. The /onboard/[token]
+      // page looks up by tracking_token and redirects to /walk-in/complete/[token].
+      const onboardingUrl = shortOnboardingLink(job.tracking_token)
       const completionUrl = onboardingUrl
       
       // Fetch location and hours links from admin_settings
@@ -531,8 +534,8 @@ export async function POST(request: NextRequest) {
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
       tracking_url: shortTrackingLink(job.tracking_token),
-      completion_url: shortOnboardingLink(job.onboarding_token),
-      onboarding_token: job.onboarding_token,
+      completion_url: shortOnboardingLink(job.tracking_token),
+      onboarding_token: job.tracking_token,
       status: job.status,
     })
   } catch (error) {

@@ -75,13 +75,11 @@ export async function POST(request: NextRequest) {
 
     const jobRef = `NF-${String((jobCount || 0) + 1).padStart(5, '0')}`
     const trackingToken = crypto.randomUUID()
-    const onboardingToken = crypto.randomUUID()
 
     // Build job data
     const jobData: Record<string, any> = {
       job_ref: jobRef,
       tracking_token: trackingToken,
-      onboarding_token: onboardingToken,
 
       // Customer details
       customer_name: enquiry.customer_name,

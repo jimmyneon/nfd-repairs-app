@@ -678,13 +678,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 </div>
               </a>
 
-              {!job.onboarding_completed && job.onboarding_token && (
+              {!job.onboarding_completed && job.tracking_token && (
                 <div className="mt-4 pt-4 border-t-2 border-gray-200 dark:border-gray-600">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">
                     Optional: Complete details now to speed up drop-off
                   </p>
                   <a
-                    href={`/onboard/${job.onboarding_token}`}
+                    href={`/onboard/${job.tracking_token}`}
                     className="block bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-xl text-center transition-all"
                   >
                     Complete Details Online
