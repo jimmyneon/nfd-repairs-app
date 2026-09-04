@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
 import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, BellRing } from 'lucide-react'
@@ -34,6 +34,7 @@ export default function JobsListPageV2() {
   const [sendInCount, setSendInCount] = useState(0)
   const [enquiryCount, setEnquiryCount] = useState(0)
   const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -64,7 +65,9 @@ export default function JobsListPageV2() {
     const jobsSubscription = supabase
       .channel('jobs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        loadJobs()
+        // Debounce: multiple changes often arrive in quick succession
+        if (reloadTimer.current) clearTimeout(reloadTimer.current)
+        reloadTimer.current = setTimeout(() => loadJobs(), 300)
       })
       .subscribe()
 
@@ -321,7 +324,14 @@ export default function JobsListPageV2() {
       
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Repair Jobs</h1>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Repair Jobs</h1>
+            {!loading && (
+              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                {jobs.length} {showAllJobs ? 'total' : 'active'}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3 mb-3">
             <button onClick={() => setShowScanner(!showScanner)} className="w-14 h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors active:scale-90" title="Scan QR Code">
               <QrCode className="h-6 w-6" />
@@ -372,7 +382,7 @@ export default function JobsListPageV2() {
                     <p className="text-xs text-gray-600">{actionGroupConfig.URGENT.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {groupedJobs.URGENT.map(job => (
                     <EnhancedJobTile key={job.id} job={job} />
                   ))}
@@ -392,7 +402,7 @@ export default function JobsListPageV2() {
                     <p className="text-xs text-gray-600">{actionGroupConfig.READY_TO_WORK.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {groupedJobs.READY_TO_WORK.map(job => (
                     <EnhancedJobTile key={job.id} job={job} />
                   ))}
@@ -412,7 +422,7 @@ export default function JobsListPageV2() {
                     <p className="text-xs text-gray-600">{actionGroupConfig.WAITING.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {groupedJobs.WAITING.map(job => (
                     <EnhancedJobTile key={job.id} job={job} />
                   ))}
@@ -432,7 +442,7 @@ export default function JobsListPageV2() {
                     <p className="text-xs text-gray-600">{actionGroupConfig.READY_TO_COLLECT.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {groupedJobs.READY_TO_COLLECT.map(job => (
                     <EnhancedJobTile key={job.id} job={job} />
                   ))}
@@ -455,7 +465,7 @@ export default function JobsListPageV2() {
                 </button>
 
                 {showCollected && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                     {groupedJobs.COLLECTED.map(job => (
                       <EnhancedJobTile key={job.id} job={job} />
                     ))}
@@ -476,7 +486,7 @@ export default function JobsListPageV2() {
                     <p className="text-xs text-gray-600">{actionGroupConfig.OTHER.description}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {groupedJobs.OTHER.map(job => (
                     <EnhancedJobTile key={job.id} job={job} />
                   ))}

@@ -195,12 +195,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Insert job
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .insert(jobData)
-      .select()
-      .single() as any
+    // Insert job — retry on duplicate job_ref collisions (the DB trigger
+    // uses COUNT instead of MAX, so deleted jobs cause collisions).
+    let job: any = null
+    let jobError: any = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await supabase
+        .from('jobs')
+        .insert(jobData)
+        .select()
+        .single() as any
+      job = result.data
+      jobError = result.error
+      if (!jobError) break
+      if (jobError.message?.includes('duplicate key') && jobError.message?.includes('job_ref')) {
+        console.warn(`job_ref collision on attempt ${attempt + 1}, retrying...`)
+        await new Promise(r => setTimeout(r, 200 * (attempt + 1)))
+        continue
+      }
+      break
+    }
 
     if (jobError) {
       console.error('Failed to create job:', jobError)

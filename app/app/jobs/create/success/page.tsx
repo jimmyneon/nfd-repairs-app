@@ -17,11 +17,7 @@ function BookingSuccessContent() {
       sessionStorage.removeItem('job_creation_overrides')
       sessionStorage.removeItem('customer_confirm_wizard')
     }
-    const timer = setTimeout(() => {
-      router.push('/app/jobs/create')
-    }, 15000)
-    return () => clearTimeout(timer)
-  }, [router])
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -75,6 +71,21 @@ function BookingSuccessContent() {
         <p className="text-center text-xs text-gray-400 dark:text-gray-500 pb-4">
           You can check your repair status anytime via the tracking link in your text message.
         </p>
+
+        <div className="flex gap-3 pb-8">
+          <button
+            onClick={() => router.push('/app/jobs/create')}
+            className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg"
+          >
+            Book Another
+          </button>
+          <button
+            onClick={() => router.push('/app/jobs')}
+            className="flex-1 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl text-lg transition-all active:scale-95 shadow-lg border-2 border-gray-200 dark:border-gray-600"
+          >
+            View Jobs
+          </button>
+        </div>
       </main>
     </div>
   )

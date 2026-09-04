@@ -134,9 +134,9 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchMove}
-        className={`relative block rounded-xl shadow-lg overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-l-4 ${statusBg}`}
+        className={`relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none border-l-4 ${statusBg}`}
       >
-        <div className="p-3 h-full flex flex-col relative text-white">
+        <div className="p-3 flex flex-col relative text-white">
 
           {/* Top Row: Status label + badges */}
           <div className="flex items-center justify-between mb-1">
@@ -181,11 +181,14 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
             </div>
           </div>
 
-          {/* Device & Issue - Main Content */}
-          <div className="flex-1 flex flex-col justify-center text-center">
-            <p className="text-sm font-black leading-tight mb-1 truncate">{incompleteValue(job.device_make) && incompleteValue(job.device_model) ? 'Device details needed' : `${job.device_make || ''} ${job.device_model || ''}`.trim()}</p>
-            <p className="text-xs font-semibold truncate opacity-90">{incompleteValue(job.issue) ? 'Fault details needed' : job.issue}</p>
-          </div>
+          {/* Customer name — primary identifier */}
+          <p className="text-sm font-black leading-tight truncate">{job.customer_name || 'Unknown'}</p>
+
+          {/* Device & Issue */}
+          <p className="text-xs font-semibold leading-tight truncate opacity-90 mb-0.5">
+            {incompleteValue(job.device_make) && incompleteValue(job.device_model) ? 'Device details needed' : `${job.device_make || ''} ${job.device_model || ''}`.trim()}
+          </p>
+          <p className="text-xs truncate opacity-75 mb-1">{incompleteValue(job.issue) ? 'Fault details needed' : job.issue}</p>
 
           {/* Blocker Badge */}
           {blockerText && (

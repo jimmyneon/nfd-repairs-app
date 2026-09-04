@@ -213,7 +213,7 @@ function CreateJobContent() {
       ...formData,
       device_type: preset.device_type,
       device_make: preset.device_make,
-      device_model: preset.device_model,
+      device_model: preset.device_model.trim(),
     })
     
     // Auto-scroll to device model input so user can adjust the model name
@@ -256,6 +256,11 @@ function CreateJobContent() {
       }
       if (!customerPhone.trim()) {
         errors.customerPhone = 'Customer phone is required'
+      } else {
+        const cleanPhone = customerPhone.replace(/[\s\-()]/g, '')
+        if (!/^[0-9+]{10,15}$/.test(cleanPhone)) {
+          errors.customerPhone = 'Enter a valid phone number (10–15 digits)'
+        }
       }
     } else {
       // Normal validation
