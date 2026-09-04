@@ -309,6 +309,9 @@ export function calculateVisitFrequency(
 /**
  * Get the short one-liner reassurance message based on status, visit frequency,
  * and whether the repair is exceeding expected time.
+ *
+ * Note: We only text the customer when their device is ready to collect.
+ * We update this page at every stage.
  */
 export function getReassuranceMessage(
   status: string,
@@ -338,74 +341,74 @@ export function getReassuranceMessage(
   if (status === 'DIAGNOSTIC') {
     if (repairAgreed) {
       if (tier === 'first') {
-        return "You've agreed to go ahead — thank you! We're doing final checks before starting your repair."
+        return "Thanks for confirming! We're finalising everything and getting things ready. We'll start your repair ASAP and update this page soon."
       }
       if (tier === 'very_anxious') {
-        return "Your repair has been agreed and we're getting started — everything's in hand. We'll text you the moment it begins, so there's no need to keep checking."
+        return "We're getting everything ready to start your repair — ordering parts, finalising details. We'll update this page the moment work begins, so no need to keep checking."
       }
-      return "Repair agreed — we're doing final checks before starting. We'll text you the moment your repair begins."
+      return "We're finalising everything and will start your repair ASAP. We'll update this page the moment work begins."
     }
     if (tier === 'first') {
-      return "We're finding out what's needed. We'll text you with a quote — no obligation until you're happy."
+      return "We're checking your device to see what's needed. We'll update this page with our findings and a quote — no obligation until you're happy."
     }
     if (tier === 'very_anxious') {
-      return "We're still checking your device thoroughly — we want to get it right. We'll text you with our findings as soon as we know more, so there's no need to keep checking."
+      return "We're still checking your device thoroughly — we want to get it right. We'll update this page with our findings as soon as we know more, so no need to keep checking."
     }
     if (tier === 'frequent' || tier === 'anxious') {
-      return "Diagnostics are still in progress — we're checking everything thoroughly. We'll text you with a quote as soon as we know more."
+      return "Diagnostics are still in progress — we're checking everything thoroughly. We'll update this page with a quote as soon as we know more."
     }
-    return "We're running diagnostics on your device. We'll text you with our findings and a quote."
+    return "We're running diagnostics on your device. We'll update this page with our findings and a quote."
   }
 
   // RECEIVED
   if (status === 'RECEIVED') {
     if (tier === 'first') {
-      return `We've got your device and we're on the case. ${estimate.display}. We'll text you the moment there's an update.`
+      return `We've got your device and we're on the case. ${estimate.display}. We'll update this page as soon as there's any progress.`
     }
     if (tier === 'very_anxious') {
-      return "Your device is in the queue and everything's on track. We'll text you the moment there's any news, so there's no need to keep checking — we'll come to you."
+      return "Your device is in the queue and everything's on track. We'll update this page the moment there's any progress, so no need to keep checking."
     }
     if (tier === 'frequent' || tier === 'anxious') {
-      return "Your device is in the queue and being assessed — everything's on track. We check on repairs throughout the day and update this page first."
+      return "Your device is in the queue and being assessed — everything's on track. We update this page at every stage."
     }
-    return "Your device is in the queue and we're getting started. We'll text you as soon as there's an update."
+    return "Your device is in the queue and we're getting started. We'll update this page as soon as there's progress."
   }
 
   // IN_REPAIR
   if (status === 'IN_REPAIR') {
     if (exceedingTime) {
       if (tier === 'first') {
-        return "Your repair is taking a little longer than expected — some issues need extra care to get right. We're still working on it and will text you as soon as it's ready."
+        return "Your repair is taking a little longer than expected — some issues need extra care to get right. We're still working on it and will update this page as soon as it's ready."
       }
-      return "Still working on your repair — taking a little extra care to get it right. We'll text you the moment it's ready."
+      return "Still working on your repair — taking a little extra care to get it right. We'll update this page the moment it's done."
     }
     if (tier === 'first') {
-      return `Your repair is underway. ${estimate.display}. We'll text you as soon as it's ready.`
+      return `Your repair is underway. ${estimate.display}. We'll update this page as soon as it's ready.`
     }
     if (tier === 'very_anxious') {
-      return "Your repair is in good hands and progressing well. We'll text you the second it's ready, so you can relax and we'll come to you."
+      return "Your repair is in good hands and progressing well. We'll update this page the moment it's ready, so no need to keep checking."
     }
     if (tier === 'anxious') {
-      return "All on track — we'll text you as soon as it's done, so no need to keep checking."
+      return "All on track — we'll update this page as soon as it's done, so no need to keep checking."
     }
     if (tier === 'frequent') {
-      return "Your repair is progressing well and is on track. This page is always updated first — we'll text you the moment it's ready."
+      return "Your repair is progressing well and is on track. This page is always updated first — we'll update it the moment it's ready."
     }
-    return "Your repair is progressing well. We'll text you the moment it's ready."
+    return "Your repair is progressing well. We'll update this page the moment it's ready."
   }
 
   // PARTS_ORDERED
   if (status === 'PARTS_ORDERED') {
     if (tier === 'first') {
-      return "We've ordered the parts for your repair. Parts typically arrive within 2–3 working days. We'll text you when they arrive."
+      return "We've ordered the parts for your repair. Parts typically arrive within 2–3 working days. We'll update this page when they arrive."
     }
     if (tier === 'very_anxious' || tier === 'anxious') {
-      return "Parts are on their way — we check deliveries every day. We'll text you the moment they arrive, so there's no need to keep checking."
+      return "Parts are on their way — we check deliveries every day. We'll update this page the moment they arrive, so no need to keep checking."
     }
     if (tier === 'frequent') {
-      return "Parts are still on their way — we check deliveries daily and will update this page and text you when they arrive."
+      return "Parts are still on their way — we check deliveries daily and will update this page when they arrive."
     }
-    return "Parts are on their way — we'll text you when they arrive and start your repair straight away."
+    return "Parts are on their way — we'll update this page when they arrive and start your repair straight away."
   }
 
   // PARTS_ARRIVED
@@ -413,7 +416,7 @@ export function getReassuranceMessage(
     if (tier === 'first') {
       return `Good news — your parts have arrived and we're getting started. ${estimate.display} from this point.`
     }
-    return "Parts have arrived and we're starting your repair. We'll text you as soon as it's ready."
+    return "Parts have arrived and we're starting your repair. We'll update this page as soon as it's ready."
   }
 
   // AWAITING_DEPOSIT
@@ -431,9 +434,9 @@ export function getReassuranceMessage(
 
   // Default
   if (tier === 'very_anxious') {
-    return "Everything's on track with your repair. We'll text you the moment there's any update, so there's no need to keep checking."
+    return "Everything's on track with your repair. We'll update this page the moment there's any progress, so no need to keep checking."
   }
-  return "We're working on your repair and will text you the moment there's an update."
+  return "We're working on your repair and will update this page as soon as there's progress."
 }
 
 /**

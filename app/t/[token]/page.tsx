@@ -469,17 +469,12 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             {/* Progress bar */}
             {showProgressBar && (
               <div className="mb-4">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-primary to-primary/80 h-3 rounded-full transition-all duration-1000 ease-out"
+                    className="bg-gradient-to-r from-primary to-primary/80 h-2 rounded-full transition-all duration-1000 ease-out"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">
-                  {progressPercent >= 95
-                    ? 'Finishing up — almost there'
-                    : `${Math.round(progressPercent)}% through this stage`}
-                </p>
               </div>
             )}
 
@@ -604,6 +599,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
                 const stageTimestamp = statusTimestamps[step]
                 const isLast = index === statusSteps.length - 1
+                const hasContent = isCompleted || isCurrent
+                const isExpanded = expandedStep === index
 
                 return (
                   <div key={step} className="flex items-stretch">
@@ -627,21 +624,29 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                       )}
                     </div>
 
-                    {/* Right: label + time */}
-                    <div className="flex-1 pb-4 pt-0.5">
+                    {/* Right: label + time — clickable if has content */}
+                    <button
+                      onClick={() => hasContent ? setExpandedStep(isExpanded ? null : index) : undefined}
+                      className={`flex-1 pb-4 pt-0.5 text-left ${hasContent ? 'cursor-pointer' : 'cursor-default'}`}
+                    >
                       <p className={`text-sm font-semibold ${
                         isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
                         isCompleted ? 'text-green-600 dark:text-green-400' :
                         'text-gray-400 dark:text-gray-500'
                       }`}>
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                        {hasContent && (
+                          <span className="ml-1 inline-block">
+                            {isExpanded ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />}
+                          </span>
+                        )}
                       </p>
                       {isCurrent && (
                         <p className="text-xs text-primary font-medium mt-0.5">
                           {formatTimeSince(statusChangedAt)}
                         </p>
                       )}
-                      {isCompleted && stageTimestamp && (
+                      {isCompleted && stageTimestamp && !isExpanded && (
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                           {formatStageTimestamp(stageTimestamp)}
                         </p>
@@ -651,7 +656,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                           ✓ You agreed to go ahead
                         </p>
                       )}
-                    </div>
+                      {/* Expanded content — just a one-line description */}
+                      {isExpanded && hasContent && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {getStatusDescription(step)}
+                        </p>
+                      )}
+                    </button>
                   </div>
                 )
               })}
@@ -692,7 +703,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               This page is always updated first — the moment anything changes, it shows here.
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
-              We&apos;ll also text you at each stage so you don&apos;t need to keep checking.
+              We&apos;ll text you when your device is ready to collect.
             </p>
             <div className="flex flex-col gap-2">
               <a href={SHOP_INFO.google_maps_link} target="_blank" rel="noopener noreferrer"
