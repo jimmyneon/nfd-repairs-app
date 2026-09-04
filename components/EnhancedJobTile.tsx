@@ -33,6 +33,14 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
     (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
 
   const timeWarning = job.isOverdue
+  const incompleteValue = (value?: string | null) =>
+    !value || ['unknown', 'to be added', 'to be assessed', 'repair needed'].includes(value.trim().toLowerCase())
+  const missingIntakeCount = [
+    !job.terms_accepted,
+    incompleteValue(job.device_make),
+    incompleteValue(job.device_model),
+    incompleteValue(job.issue),
+  ].filter(Boolean).length
 
   const handleCardClick = () => {
     router.push(`/app/jobs/${job.id}`)
@@ -147,6 +155,11 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
                   W
                 </span>
               )}
+              {missingIntakeCount > 0 && (
+                <span className="bg-amber-300 text-amber-950 text-[10px] font-black px-1.5 py-0.5 rounded-full" title={`${missingIntakeCount} intake item${missingIntakeCount === 1 ? '' : 's'} missing`}>
+                  {missingIntakeCount} MISSING
+                </span>
+              )}
               {job.message_preference === 'whatsapp' && (
                 <span className="bg-emerald-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5" title="Customer prefers WhatsApp">
                   <MessageCircle className="h-3 w-3" />
@@ -170,8 +183,8 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
 
           {/* Device & Issue - Main Content */}
           <div className="flex-1 flex flex-col justify-center text-center">
-            <p className="text-sm font-black leading-tight mb-1 truncate">{job.device_make} {job.device_model}</p>
-            <p className="text-xs font-semibold truncate opacity-90">{job.issue}</p>
+            <p className="text-sm font-black leading-tight mb-1 truncate">{incompleteValue(job.device_make) && incompleteValue(job.device_model) ? 'Device details needed' : `${job.device_make || ''} ${job.device_model || ''}`.trim()}</p>
+            <p className="text-xs font-semibold truncate opacity-90">{incompleteValue(job.issue) ? 'Fault details needed' : job.issue}</p>
           </div>
 
           {/* Blocker Badge */}

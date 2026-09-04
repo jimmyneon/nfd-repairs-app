@@ -25,6 +25,7 @@ export default function WalkInSelfBookingPage() {
     issue: '',
     description: '',
     notSure: false,
+    termsAccepted: false,
   })
 
   const issueOptions: Record<string, string[]> = {
@@ -58,6 +59,11 @@ export default function WalkInSelfBookingPage() {
     }
     if (currentStep === 1 && !formData.customerPhone.trim()) {
       errors.customerPhone = 'Please enter your mobile number'
+    }
+    if (currentStep === 2 && !formData.notSure) {
+      if (!formData.deviceMake.trim()) errors.deviceMake = 'Please enter the device make or choose “Not sure”'
+      if (!formData.deviceModel.trim()) errors.deviceModel = 'Please enter the device model or choose “Not sure”'
+      if (!formData.issue.trim()) errors.issue = 'Please select the main problem or choose “Not sure”'
     }
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors)
@@ -105,14 +111,14 @@ export default function WalkInSelfBookingPage() {
         requires_parts_order: false,
         source: 'walk_in_self',
         device_password: null,
-        password_not_applicable: true,
+        password_not_applicable: false,
         passcode_requirement: 'not_required',
         customer_signature: null,
-        terms_accepted: true,
+        terms_accepted: false,
         onboarding_completed: false,
         device_in_shop: false,
         linked_quote_id: null,
-        skip_sms: true,
+        skip_sms: false,
         quick_intake: true,
         initial_status: 'RECEIVED',
       }
@@ -128,20 +134,6 @@ export default function WalkInSelfBookingPage() {
       if (response.ok) {
         setJobRef(result.job_ref)
 
-        // Send custom SMS with completion link
-        const completionUrl = `${window.location.origin}/walk-in/complete/${result.tracking_token}`
-        const firstName = formData.customerName.trim().split(' ')[0]
-        const smsMessage = `Hi ${firstName}, thanks for starting your check-in with New Forest Device Repairs. Please use this link to complete your details when you're ready:\n\n${completionUrl}\n\nMany thanks,\nNew Forest Device Repairs`
-
-        await fetch('/api/sms/send-custom', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId: result.job_id,
-            message: smsMessage,
-          }),
-        })
-
         setFinishLaterSuccess(true)
       } else {
         setError(result.error || 'Failed to send link')
@@ -156,6 +148,12 @@ export default function WalkInSelfBookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.termsAccepted) {
+      setValidationErrors({ termsAccepted: 'Please accept the repair terms and diagnostic fee policy' })
+      setError('Please accept the agreement before checking in')
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -175,11 +173,11 @@ export default function WalkInSelfBookingPage() {
         requires_parts_order: false,
         source: 'walk_in_self',
         device_password: null,
-        password_not_applicable: true,
+        password_not_applicable: false,
         passcode_requirement: 'not_required',
         customer_signature: null,
-        terms_accepted: true,
-        onboarding_completed: false,
+        terms_accepted: formData.termsAccepted,
+        onboarding_completed: formData.termsAccepted,
         device_in_shop: true,
         linked_quote_id: null,
         skip_sms: false,
@@ -328,7 +326,7 @@ export default function WalkInSelfBookingPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
               {/* Step 0: Name */}
               {currentStep === 0 && (
@@ -536,6 +534,14 @@ export default function WalkInSelfBookingPage() {
                   <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                     Please hand your device to a member of staff after checking in.
                   </p>
+                  <label className={`mt-5 flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer ${validationErrors.termsAccepted ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-blue-200 bg-blue-50 dark:bg-blue-900/20'}`}>
+                    <input type="checkbox" name="termsAccepted" checked={formData.termsAccepted} onChange={handleChange} className="h-6 w-6 mt-0.5 rounded text-primary" />
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      <strong>I accept the repair terms and diagnostic fee policy</strong>
+                      <span className="block text-xs text-gray-600 dark:text-gray-400 mt-1">Diagnostic fees may apply where investigation is required: £20 for small devices or £40 for laptops, desktops and consoles.</span>
+                    </span>
+                  </label>
+                  {validationErrors.termsAccepted && <p className="mt-2 text-sm font-semibold text-red-600">{validationErrors.termsAccepted}</p>}
                 </div>
               )}
             </div>

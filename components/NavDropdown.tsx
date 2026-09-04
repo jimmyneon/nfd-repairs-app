@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, Home, Plus, QrCode, Smartphone, Archive, Shield, Bell, Settings, Mail, Package, Clock, Wrench, ChevronDown, X, BarChart3 } from 'lucide-react'
+import { Menu, Home, Plus, Smartphone, Shield, Bell, Settings, Mail, Package, Clock, X, BarChart3, MessageSquareText } from 'lucide-react'
 
 interface NavLink {
   href: string
@@ -41,6 +41,7 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
   const secondaryLinks: NavLink[] = [
     { href: '/app/send-in-requests', label: 'Send-In Requests', icon: Package, badge: sendInCount },
     { href: '/app/enquiries', label: 'Enquiries', icon: Mail, badge: enquiryCount },
+    { href: '/app/send-link', label: 'Send Customer Form', icon: MessageSquareText },
     { href: '/app/warranty', label: 'Warranty', icon: Shield, badge: warrantyCount },
     { href: '/app/notifications', label: 'Notifications', icon: Bell, badge: unreadCount },
     { href: '/app/history', label: 'Job History', icon: Clock },
@@ -60,6 +61,9 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
         </Link>
         <Link href="/app/qr-display" className="w-14 h-14 flex items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors active:scale-90" title="Walk-In QR Code">
           <Smartphone className="h-6 w-6" />
+        </Link>
+        <Link href="/app/send-link" className="w-14 h-14 flex items-center justify-center rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors active:scale-90" title="Send Customer Form">
+          <MessageSquareText className="h-6 w-6" />
         </Link>
 
         {/* Dropdown trigger */}

@@ -43,7 +43,6 @@ export default function JobsListPageV2() {
   }
 
   useEffect(() => {
-    loadJobs()
     loadUnreadNotifications()
     loadWarrantyTickets()
     loadSendInCount()
@@ -113,9 +112,9 @@ export default function JobsListPageV2() {
         job.job_ref.toLowerCase().includes(search) ||
         job.customer_name.toLowerCase().includes(search) ||
         job.customer_phone.toLowerCase().includes(search) ||
-        job.device_make.toLowerCase().includes(search) ||
-        job.device_model.toLowerCase().includes(search) ||
-        job.issue.toLowerCase().includes(search) ||
+        (job.device_make || '').toLowerCase().includes(search) ||
+        (job.device_model || '').toLowerCase().includes(search) ||
+        (job.issue || '').toLowerCase().includes(search) ||
         (job.description && job.description.toLowerCase().includes(search))
       )
     }
@@ -129,6 +128,10 @@ export default function JobsListPageV2() {
           case 'overdue': return getHoursInStatus(job.status_changed_at, job.created_at) > 72
           case 'deposit': return job.deposit_required && !job.deposit_received
           case 'arrived': return job.customer_arrived_at && (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
+          case 'needs_info': {
+            const placeholders = ['unknown', 'to be added', 'to be assessed', 'repair needed']
+            return !job.terms_accepted || [job.device_make, job.device_model, job.issue].some(value => !value || placeholders.includes(value.trim().toLowerCase()))
+          }
           default: return true
         }
       })
@@ -143,6 +146,7 @@ export default function JobsListPageV2() {
     const query = supabase
       .from('jobs')
       .select('*')
+      .order('created_at', { ascending: false })
 
     if (!showAllJobs) {
       query.not('status', 'in', '("COMPLETED","CANCELLED","IN_STORAGE")')
@@ -332,6 +336,19 @@ export default function JobsListPageV2() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input type="text" placeholder="Search by job ref, name, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+          </div>
+          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+            {[
+              ['all', 'All'],
+              ['needs_info', 'Needs info'],
+              ['in_shop', 'In shop'],
+              ['needs_parts', 'Parts'],
+              ['deposit', 'Deposit'],
+            ].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setActiveFilter(value)} className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${activeFilter === value ? 'bg-primary border-primary text-white' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200'}`}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </header>

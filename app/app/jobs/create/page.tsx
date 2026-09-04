@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { ArrowLeft, Home, Plus, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield, Send } from 'lucide-react'
+import { Home, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield, Send, ClipboardCheck, UserCog } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
@@ -39,7 +39,7 @@ function CreateJobContent() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [isWarranty, setIsWarranty] = useState(false)
-  const [sendCompleteLaterSms, setSendCompleteLaterSms] = useState(false)
+  const [quickFollowUp, setQuickFollowUp] = useState<'confirm_now' | 'send_link' | 'staff_later'>('confirm_now')
   
   const [formData, setFormData] = useState({
     device_type: '',
@@ -292,11 +292,6 @@ function CreateJobContent() {
         }, 500)
       }
       
-      // Hide validation summary after 10 seconds
-      setTimeout(() => {
-        setShowValidationSummary(false)
-      }, 10000)
-      
       return
     }
     
@@ -329,42 +324,26 @@ function CreateJobContent() {
             requires_parts_order: false,
             source: 'staff_manual',
             device_password: null,
-            password_not_applicable: true,
+            password_not_applicable: false,
             passcode_requirement: 'not_required',
             passcode_method: 'not_applicable',
             customer_signature: null,
-            terms_accepted: true,
+            terms_accepted: false,
             onboarding_completed: false,
             device_in_shop: true,
             linked_quote_id: null,
-            skip_sms: sendCompleteLaterSms,
-            quick_intake: true,
+            skip_sms: quickFollowUp === 'confirm_now',
+            quick_intake: quickFollowUp !== 'staff_later',
           }),
         })
 
         const result = await response.json()
 
         if (response.ok) {
-          // If sendCompleteLaterSms is on, send custom SMS with completion link
-          if (sendCompleteLaterSms && result.tracking_token) {
-            const completionUrl = `${window.location.origin}/walk-in/complete/${result.tracking_token}`
-            const firstName = customerName.trim().split(' ')[0]
-            const smsMessage = `Hi ${firstName}, thanks for bringing your device to New Forest Device Repairs. Please use this link to complete your details when you're ready:\n\n${completionUrl}\n\nMany thanks,\nNew Forest Device Repairs`
-
-            await fetch('/api/sms/send-custom', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jobId: result.job_id,
-                message: smsMessage,
-              }),
-            })
-          }
-
           // Clear form and session state so next job starts fresh
           setCustomerName('')
           setCustomerPhone('')
-          setSendCompleteLaterSms(false)
+          setQuickFollowUp('confirm_now')
           setFormData({
             device_type: '',
             device_make: '',
@@ -384,8 +363,13 @@ function CreateJobContent() {
             sessionStorage.removeItem('quote_customer_data')
             sessionStorage.removeItem('customer_confirm_wizard')
           }
-          // Show success and stay on page for next customer
-          alert(`Job created! Ref: ${result.job_ref}\n\n${sendCompleteLaterSms ? 'SMS sent to customer with link to complete details.' : 'Customer will receive booking confirmation SMS.'}`)
+          if (quickFollowUp === 'confirm_now') {
+            router.push(`/walk-in/complete/${result.tracking_token}?mode=agreement`)
+            return
+          }
+
+          // Stay here so the next person in a queue can be booked in immediately.
+          alert(`Job created! Ref: ${result.job_ref}\n\n${quickFollowUp === 'send_link' ? 'Customer form sent by SMS.' : 'Booking confirmation sent. Details and agreement remain outstanding.'}`)
           setLoading(false)
         } else {
           alert(`Failed to create job: ${result.error}`)
@@ -689,8 +673,8 @@ function CreateJobContent() {
       </header>
 
       <main className="p-4 max-w-2xl mx-auto">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Mode toggles — perfectly square buttons */}
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {/* Intake mode */}
           <div className="flex gap-3 justify-center">
             <button
               type="button"
@@ -702,7 +686,8 @@ function CreateJobContent() {
               }`}
             >
               <Zap className="h-8 w-8" />
-              <span className="text-sm font-bold">Super Quick</span>
+              <span className="text-sm font-bold">Quick drop-off</span>
+              <span className="text-[11px] opacity-80">Name + mobile</span>
             </button>
             <button
               type="button"
@@ -715,7 +700,8 @@ function CreateJobContent() {
               }`}
             >
               <Zap className="h-8 w-8" />
-              <span className="text-sm font-bold">Quick Walk-In</span>
+              <span className="text-sm font-bold">Fast booking</span>
+              <span className="text-[11px] opacity-80">Device + fault</span>
             </button>
           </div>
 
@@ -797,18 +783,23 @@ function CreateJobContent() {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSendCompleteLaterSms(!sendCompleteLaterSms)}
-                  className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold border-2 transition-colors ${
-                    sendCompleteLaterSms
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary'
-                  }`}
-                >
-                  <Send className="h-5 w-5" />
-                  {sendCompleteLaterSms ? 'Will send SMS to customer to complete later' : 'Send SMS to customer to complete later'}
-                </button>
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-bold text-gray-900 dark:text-white mb-2">What happens next?</legend>
+                  {([
+                    { value: 'confirm_now', label: 'Customer agrees now', detail: 'Best when their phone is the device being repaired', icon: ClipboardCheck },
+                    { value: 'send_link', label: 'Text the full form', detail: 'Best for laptops or when they can use their phone later', icon: Send },
+                    { value: 'staff_later', label: 'I’ll finish it later', detail: 'Sends tracking only; agreement stays visibly outstanding', icon: UserCog },
+                  ] as const).map(option => {
+                    const Icon = option.icon
+                    return (
+                      <label key={option.value} className={`flex items-start gap-3 rounded-xl border-2 p-3 cursor-pointer transition-colors ${quickFollowUp === option.value ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-600'}`}>
+                        <input type="radio" name="quick_follow_up" value={option.value} checked={quickFollowUp === option.value} onChange={() => setQuickFollowUp(option.value)} className="mt-1 h-5 w-5 text-primary" />
+                        <Icon className="h-5 w-5 text-primary mt-0.5" />
+                        <span><strong className="block text-gray-900 dark:text-white">{option.label}</strong><span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{option.detail}</span></span>
+                      </label>
+                    )
+                  })}
+                </fieldset>
               </div>
             </div>
           )}
