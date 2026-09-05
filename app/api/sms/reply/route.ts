@@ -32,8 +32,21 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const body = await request.json()
-    const { phone, message, timestamp, threadId } = body
+    // Support both JSON and form-encoded payloads (MacroDroid sends form-encoded)
+    let body: any
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      body = await request.json()
+    } else {
+      const formData = await request.formData()
+      body = Object.fromEntries(formData.entries())
+    }
+
+    // Normalise field names: MacroDroid may send 'From'/'Body' or 'phone'/'message'
+    const phone = body.phone || body.From || body.from || body.number || body.Number
+    const message = body.message || body.Body || body.body || body.text || body.Text
+    const timestamp = body.timestamp || body.Timestamp || body.MessageSid || body.messageSid
+    const threadId = body.threadId || body.thread_id || body.ThreadId
 
     if (!phone || !message) {
       return NextResponse.json(
