@@ -233,6 +233,17 @@ describe('New consolidation routes', () => {
       expect(content).not.toContain("setConvertStep('deposit_confirm')")
     })
 
+    it('removes converted enquiries from working lists and links by job id', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
+        'utf-8'
+      )
+      expect(content).toContain("e.status === 'converted' || Boolean(e.converted_job_id)")
+      expect(content).toContain('!isConverted(e)')
+      expect(content).toContain('href={`/app/jobs/${convertResult.job_id}`}')
+      expect(content).not.toContain('href={`/app/jobs/${convertResult.job_ref}`}')
+    })
+
     it('creates parts-needed jobs awaiting deposit', () => {
       const content = fs.readFileSync(
         path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),

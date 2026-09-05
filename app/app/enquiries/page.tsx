@@ -99,6 +99,7 @@ function EnquiriesContent() {
   const [sendingSms, setSendingSms] = useState(false)
   const [converting, setConverting] = useState(false)
   const [convertResult, setConvertResult] = useState<{
+    job_id: string
     job_ref: string
     tracking_url: string
     status: string
@@ -208,8 +209,9 @@ function EnquiriesContent() {
   }
 
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
-  const isAccepted = (e: Enquiry) => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
-  const isActionNeeded = (e: Enquiry) => e.status === 'approved' || isAccepted(e)
+  const isConverted = (e: Enquiry) => e.status === 'converted' || Boolean(e.converted_job_id)
+  const isAccepted = (e: Enquiry) => !isConverted(e) && e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
+  const isActionNeeded = (e: Enquiry) => !isConverted(e) && (e.status === 'approved' || isAccepted(e))
   const getPriority = (e: Enquiry) => {
     if (isActionNeeded(e)) return 0
     if (e.status === 'pending' && e.enquiry_type === 'repair_quote') return 1
@@ -218,7 +220,7 @@ function EnquiriesContent() {
   }
 
   const pendingCount = enquiries.filter(e => e.status === 'pending').length
-  const acceptedCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)).length
+  const acceptedCount = enquiries.filter(e => isAccepted(e)).length
   const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
   const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
 
@@ -273,6 +275,7 @@ function EnquiriesContent() {
       const data = await res.json()
       if (data.success) {
         setConvertResult({
+          job_id: data.job_id,
           job_ref: data.job_ref,
           tracking_url: data.tracking_url,
           status: data.status,
@@ -600,7 +603,7 @@ function EnquiriesContent() {
                 </div>
                 <div className="flex gap-3">
                   <Link
-                    href={`/app/jobs/${convertResult.job_ref}`}
+                    href={`/app/jobs/${convertResult.job_id}`}
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95"
                   >
                     <ArrowRight className="h-4 w-4" /> View Job
