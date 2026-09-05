@@ -88,11 +88,16 @@ export async function POST(request: NextRequest) {
     const job = jobs?.[0]
 
     if (job) {
-      // Log the reply as a NOTE on the job
+      // Log the reply as a CUSTOMER_SMS event on the job (full chat history)
       await supabase.from('job_events').insert({
         job_id: job.id,
-        type: 'NOTE',
-        message: `Customer SMS reply: ${message.substring(0, 200)}${message.length > 200 ? '...' : ''}`,
+        type: 'CUSTOMER_SMS',
+        message: message.substring(0, 500),
+        metadata: {
+          phone,
+          timestamp: timestamp || new Date().toISOString(),
+          thread_id: threadId || null,
+        },
       })
 
       // Notify staff
@@ -108,7 +113,7 @@ export async function POST(request: NextRequest) {
         console.error('[sms/reply] Notification insert failed:', e)
       }
 
-      console.log(`[sms/reply] Logged reply as NOTE on job ${job.job_ref}`)
+      console.log(`[sms/reply] Logged reply as CUSTOMER_SMS on job ${job.job_ref}`)
 
       // Also route to warranty ticket flow if the job is completed/collected
       // (existing behaviour — post-repair support)

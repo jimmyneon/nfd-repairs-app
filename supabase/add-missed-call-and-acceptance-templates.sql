@@ -1,6 +1,7 @@
 -- Add SMS templates for the missed-call bridge and customer response automation.
 -- These support the consolidated repair app (replacing the old AI Steve / NFDRai app).
 --
+-- Uses nfdr.uk short links for SMS-friendly brevity.
 -- Run in Supabase SQL editor. Safe to re-run (uses ON CONFLICT upsert).
 
 -- MISSED_CALL_OPEN — sent when a customer calls and we're currently open
@@ -13,11 +14,11 @@ We''re currently OPEN until {close_time}.
 
 Need help? Here''s the quickest way:
 
-REPAIR QUOTES & APPOINTMENTS:
-https://www.newforestdevicerepairs.co.uk/repair-request
+Repair quotes & appointments:
+nfdr.uk/start
 
-QUESTIONS & STATUS CHECKS:
-Text us or visit: https://www.newforestdevicerepairs.co.uk/start
+Questions & status checks:
+Text us or visit nfdr.uk/start
 
 Find us: {maps_link}
 
@@ -37,11 +38,11 @@ We''re currently closed. We''ll be open {next_open}.
 
 Need help? Here''s the quickest way:
 
-REPAIR QUOTES & APPOINTMENTS:
-https://www.newforestdevicerepairs.co.uk/repair-request
+Repair quotes & appointments:
+nfdr.uk/start
 
-QUESTIONS & STATUS CHECKS:
-Text us or visit: https://www.newforestdevicerepairs.co.uk/start
+Questions & status checks:
+Text us or visit nfdr.uk/start
 
 Find us: {maps_link}
 
@@ -61,7 +62,7 @@ Great news — your {device_make} {device_model} repair is booked in!
 
 Pop in with your device whenever you''re ready — no appointment needed.
 
-Opening hours: {hours_link}
+Opening hours: nfdr.uk/h
 Find us: {maps_link}
 Track your repair: {tracking_link}
 
@@ -101,8 +102,23 @@ New Forest Device Repairs',
 )
 ON CONFLICT (key) DO UPDATE SET body = EXCLUDED.body, is_active = EXCLUDED.is_active, updated_at = NOW();
 
+-- REPAIR_REQUEST_ACK — sent when a customer submits the freeform repair request form
+INSERT INTO sms_templates (key, body, is_active)
+VALUES (
+  'REPAIR_REQUEST_ACK',
+  'Hi {first_name},
+
+Thanks for your repair request{device_label}. John will review it and get back to you with a quote — usually within 2 hours during business hours.
+
+Opening hours: nfdr.uk/h
+
+New Forest Device Repairs',
+  true
+)
+ON CONFLICT (key) DO UPDATE SET body = EXCLUDED.body, is_active = EXCLUDED.is_active, updated_at = NOW();
+
 -- Verify
 SELECT key, LEFT(body, 60) as body_preview, is_active
 FROM sms_templates
-WHERE key IN ('MISSED_CALL_OPEN', 'MISSED_CALL_CLOSED', 'QUOTE_ACCEPTED_AUTO', 'QUOTE_CONFIRM_PROMPT', 'QUOTE_DECLINED_AUTO')
+WHERE key IN ('MISSED_CALL_OPEN', 'MISSED_CALL_CLOSED', 'QUOTE_ACCEPTED_AUTO', 'QUOTE_CONFIRM_PROMPT', 'QUOTE_DECLINED_AUTO', 'REPAIR_REQUEST_ACK')
 ORDER BY key;
