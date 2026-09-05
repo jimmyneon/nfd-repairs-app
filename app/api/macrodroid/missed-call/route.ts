@@ -18,15 +18,11 @@ import { sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
  * The endpoint is unauthenticated (MacroDroid cannot sign requests) but is
  * guarded by:
  *   - UK mobile validation (international numbers are logged but not texted)
- *   - 1 response per 30 minutes per phone number (in-memory rate limit)
+ *   - DB-based rate limiting: 1 SMS per 30 min per number (works across instances)
+ *   - Repeat caller detection: after 2 missed calls without a response in 24h,
+ *     stop texting and notify staff instead
  *   - UK sending-hours window (8am-8pm) — outside hours we log but don't send
  */
-
-// In-memory rate limit: phone → last-sent timestamp.
-// Vercel serverless instances are short-lived, so this is a best-effort
-// guard against duplicate texts within a single instance's lifetime.
-const rateLimitStore = new Map<string, number>()
-const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000 // 30 minutes
 
 // Fallback hours if Supabase is unreachable — matches /api/public/opening-hours
 const FALLBACK_HOURS: Record<string, { isOpen: boolean; formatted: string; open?: string; close?: string }> = {
@@ -87,34 +83,124 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Rate limit: 1 per 30 min per number
-    const now = Date.now()
-    const lastSent = rateLimitStore.get(from)
-    if (lastSent && now - lastSent < RATE_LIMIT_WINDOW_MS) {
-      const retryAfterSec = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - lastSent)) / 1000)
-      console.log(`[missed-call] Rate limited ${from} (retry in ${retryAfterSec}s)`)
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded', retryAfter: retryAfterSec },
-        { status: 429, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-      )
-    }
-
-    // Respect UK sending-hours window (8am-8pm). Outside hours, log and exit.
-    if (!isWithinUKSendingHours()) {
-      console.log(`[missed-call] Outside UK sending hours — not texting ${from}`)
-      rateLimitStore.set(from, now) // still count it so we don't fire on every retry
-      return NextResponse.json(
-        { success: true, skipped: true, reason: 'Outside UK sending hours' },
-        { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-      )
-    }
-
-    // Pull hours + special hours + maps link from admin_settings
+    // DB-based rate limiting + repeat caller detection
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // Log this missed call
+    try {
+      await supabase.from('missed_call_log').insert({
+        phone: from,
+        sms_sent: false,
+        called_at: new Date().toISOString(),
+      })
+    } catch (e: any) {
+      console.error('[missed-call] Failed to log call:', e)
+    }
+
+    // Check: has this number been sent an SMS in the last 30 minutes?
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    const { data: recentSms } = await supabase
+      .from('missed_call_log')
+      .select('id, called_at')
+      .eq('phone', from)
+      .eq('sms_sent', true)
+      .gte('called_at', thirtyMinAgo)
+      .limit(1)
+
+    if (recentSms && recentSms.length > 0) {
+      console.log(`[missed-call] Rate limited ${from} (SMS sent in last 30 min)`)
+      return NextResponse.json(
+        { success: true, skipped: true, reason: 'Rate limited — SMS sent in last 30 min' },
+        { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      )
+    }
+
+    // Check: how many missed calls from this number in the last 24 hours?
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const { count: missedCallCount } = await supabase
+      .from('missed_call_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('phone', from)
+      .gte('called_at', twentyFourHoursAgo)
+
+    // If 3+ missed calls in 24h, check if they've responded to any SMS.
+    // If they haven't responded, stop texting — just notify staff.
+    // If they HAVE responded (sent an inbound SMS), they're engaging — text them.
+    if ((missedCallCount || 0) >= 3) {
+      // Check if customer has sent any inbound SMS since the first missed call
+      const normalisedPhone = normaliseUkPhoneForLookup(from)
+      const { count: inboundCount } = await supabase
+        .from('job_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('type', 'CUSTOMER_SMS')
+        .gte('created_at', twentyFourHoursAgo)
+        .contains('metadata', { phone: normalisedPhone })
+
+      const hasResponded = (inboundCount || 0) > 0
+
+      if (!hasResponded) {
+        console.log(`[missed-call] Repeat caller ${from} — ${missedCallCount} missed calls in 24h, no response, sending "use the form" message`)
+
+        // Notify staff about the repeat caller
+        try {
+          await supabase.from('notifications').insert({
+            type: 'REPEAT_CALLER',
+            title: 'Repeat missed caller',
+            body: `${from} has called ${(missedCallCount || 0)} times in 24h without responding to SMS. They may need urgent help — consider calling them back.`,
+            is_read: false,
+          } as any)
+        } catch (e) {
+          console.error('[missed-call] Failed to notify staff:', e)
+        }
+
+        // Instead of going silent, send a one-off message asking them to use the form/links/reply
+        // (we can't take calls while working on devices)
+        if (isWithinUKSendingHours()) {
+          const repeatBody = `Hi, we noticed you've called a few times but we can't take calls while we're working on devices.\n\nPlease use the form here: nfdr.uk/start\nOr reply to this message and we'll get back to you.\n\nOur hours and location: nfdr.uk/h\n\nNew Forest Device Repairs`
+          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+          if (webhookUrl) {
+            try {
+              const { sendViaMacroDroid } = await import('@/lib/resilience')
+              const result = await sendViaMacroDroid(webhookUrl, from, repeatBody)
+              await supabase.from('sms_logs').insert({
+                template: 'MISSED_CALL_REPEAT',
+                recipient_phone: from,
+                message: repeatBody,
+                status: result.ok ? 'SENT' : 'FAILED',
+                sent_at: result.ok ? new Date().toISOString() : null,
+              } as any)
+            } catch (e) {
+              console.error('[missed-call] Failed to send repeat-caller message:', e)
+            }
+          }
+        }
+
+        return NextResponse.json(
+          {
+            success: true,
+            skipped: true,
+            reason: 'Repeat caller — sent "use the form" message and notified staff',
+            missed_call_count_24h: missedCallCount,
+          },
+          { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        )
+      } else {
+        console.log(`[missed-call] Repeat caller ${from} but they have responded to SMS — texting again`)
+      }
+    }
+
+    // Respect UK sending-hours window (8am-8pm). Outside hours, log and exit.
+    if (!isWithinUKSendingHours()) {
+      console.log(`[missed-call] Outside UK sending hours — not texting ${from}`)
+      return NextResponse.json(
+        { success: true, skipped: true, reason: 'Outside UK sending hours' },
+        { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      )
+    }
 
     let weeklyHours = FALLBACK_HOURS
     let specialHours: { active?: boolean; note?: string | null } | null = null
@@ -187,7 +273,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    rateLimitStore.set(from, now)
+    // Mark the most recent missed_call_log entry as sms_sent
+    try {
+      const { data: recentEntry } = await supabase
+        .from('missed_call_log')
+        .select('id')
+        .eq('phone', from)
+        .order('called_at', { ascending: false })
+        .limit(1)
+      if (recentEntry && recentEntry.length > 0) {
+        await supabase
+          .from('missed_call_log')
+          .update({ sms_sent: true })
+          .eq('id', recentEntry[0].id)
+      }
+    } catch (e) {
+      console.error('[missed-call] Failed to update missed_call_log:', e)
+    }
+
     console.log(`[missed-call] Sent template to ${from}`)
 
     return NextResponse.json(
@@ -344,4 +447,14 @@ function buildMissedCallMessage(ctx: {
 function extractCloseTime(hoursString: string): string {
   const match = hoursString.match(/-\s*(\d{1,2}:\d{2}\s*[AP]M)/i)
   return match ? match[1].trim() : hoursString
+}
+
+/** Normalise UK phone to +44XXXXXXXXX for DB lookup. */
+function normaliseUkPhoneForLookup(raw: string): string {
+  const digits = raw.replace(/[^\d+]/g, '')
+  if (/^\+447\d{9}$/.test(digits)) return digits
+  if (/^00447\d{9}$/.test(digits)) return `+447${digits.slice(5)}`
+  if (/^447\d{9}$/.test(digits)) return `+${digits}`
+  if (/^07\d{9}$/.test(digits)) return `+44${digits.slice(1)}`
+  return raw.trim()
 }

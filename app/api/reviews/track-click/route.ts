@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid platform' }, { status: 400 })
     }
 
-    // Find the job by job_ref or tracking_token
+    // Find the job by job_ref, tracking_token, or short_token
     const { data: job, error } = await supabase
       .from('jobs')
       .select('id, job_ref, customer_name, review_platforms_completed')
-      .or(`job_ref.eq.${ref},tracking_token.eq.${ref}`)
+      .or(`job_ref.eq.${ref},tracking_token.eq.${ref},short_token.eq.${ref}`)
       .single()
 
     if (error || !job) {

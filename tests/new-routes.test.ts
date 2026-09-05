@@ -35,13 +35,21 @@ describe('New consolidation routes', () => {
       expect(content).toContain('isUkMobile')
     })
 
-    it('has rate limiting (30 min window)', () => {
+    it('has database-backed repeat caller detection (24h window)', () => {
       const content = fs.readFileSync(
         path.join(process.cwd(), 'app/api/macrodroid/missed-call/route.ts'),
         'utf-8'
       )
-      expect(content).toContain('RATE_LIMIT_WINDOW_MS')
-      expect(content).toMatch(/30\s*\*\s*60/)
+      expect(content).toContain('missed_call_log')
+      expect(content).toMatch(/24\s*\*\s*60/) // 24 hours
+    })
+
+    it('creates REPEAT_CALLER staff notification', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/macrodroid/missed-call/route.ts'),
+        'utf-8'
+      )
+      expect(content).toContain('REPEAT_CALLER')
     })
 
     it('respects UK sending hours (8am-8pm)', () => {

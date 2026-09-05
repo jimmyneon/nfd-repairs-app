@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     // -----------------------------------------------------------------------
     const { data: jobs } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, tracking_token')
+      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, tracking_token, short_token, review_platforms_completed')
       .in('customer_phone', lookupPhones)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -114,6 +114,134 @@ export async function POST(request: NextRequest) {
       }
 
       console.log(`[sms/reply] Logged reply as CUSTOMER_SMS on job ${job.job_ref}`)
+
+      // --- PAID detection: customer says they've paid the deposit ---
+      // Only triggers if the job has a deposit required that hasn't been received yet
+      if (/\b(paid|i.*ve.*paid|payment.*done|deposit.*paid|just.*paid|done.*pay)\b/i.test(message.toLowerCase())) {
+        const jobData = await supabase
+          .from('jobs')
+          .select('id, deposit_required, deposit_received, deposit_amount, device_make, device_model, customer_name, short_token, tracking_token')
+          .eq('id', job.id)
+          .single()
+
+        if (jobData.data?.deposit_required && !jobData.data?.deposit_received) {
+          // Mark deposit as received
+          await supabase
+            .from('jobs')
+            .update({
+              deposit_received: true,
+              deposit_received_at: new Date().toISOString(),
+              status: 'PARTS_ORDERED',
+              status_changed_at: new Date().toISOString(),
+            } as any)
+            .eq('id', job.id)
+
+          // Log the deposit payment event
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'DEPOSIT_PAID',
+            message: 'Customer confirmed deposit payment via SMS',
+            metadata: {
+              amount: jobData.data.deposit_amount || 20.00,
+              source: 'sms_auto_detect',
+              original_message: message.substring(0, 200),
+            },
+          })
+
+          // Send confirmation SMS
+          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+          if (webhookUrl) {
+            const trackingLink = jobData.data.short_token
+              ? shortTrackingLink(jobData.data.short_token)
+              : shortTrackingLink(jobData.data.tracking_token)
+            const smsBody = `Brilliant, thanks ${getFirstName(jobData.data.customer_name)}! We've got your deposit — parts are being ordered now.\n\nWe'll text you the moment they arrive.\n\nTrack your repair: ${trackingLink}\n\nNew Forest Device Repairs`
+            const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+            await logSms(supabase, 'DEPOSIT_CONFIRMED', smsBody, result.ok, job.id)
+          }
+
+          console.log(`[sms/reply] Deposit auto-confirmed for job ${job.job_ref}`)
+          return NextResponse.json({
+            success: true,
+            routed_to: 'deposit_paid',
+            job_ref: job.job_ref,
+            deposit_confirmed: true,
+            sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+          })
+        }
+      }
+
+      // --- Review completion detection ---
+      // If customer says they've done a Google review, mark it and send Trustpilot link
+      if (/\b(i.*ve.*done.*review|left.*review|done.*google|reviewed|posted.*review|done.*it|left.*google|finished.*review)\b/i.test(message.toLowerCase())) {
+        const completed: string[] = job.review_platforms_completed || []
+        if (!completed.includes('google')) {
+          completed.push('google')
+          await supabase
+            .from('jobs')
+            .update({ review_platforms_completed: completed } as any)
+            .eq('id', job.id)
+
+          // If Trustpilot not yet sent, send it now
+          if (!completed.includes('trustpilot')) {
+            const trustpilotLink = process.env.TRUSTPILOT_REVIEW_LINK || 'https://www.trustpilot.com'
+            const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+            if (webhookUrl) {
+              const reviewBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for the Google review — it really means a lot.\n\nIf you have a spare minute, we'd love a Trustpilot one too:\n${trustpilotLink}\n\nNo pressure at all — every review helps us a lot.\n\nNew Forest Device Repairs`
+              const result = await sendViaMacroDroid(webhookUrl, phone, reviewBody)
+              await logSms(supabase, 'REVIEW_FLIP_TRUSTPILOT', reviewBody, result.ok, job.id)
+            }
+            console.log(`[sms/reply] Review flip: Google marked done, Trustpilot sent for ${job.job_ref}`)
+            return NextResponse.json({
+              success: true,
+              routed_to: 'review_flip',
+              job_ref: job.job_ref,
+              flipped_to: 'trustpilot',
+              sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+            })
+          } else {
+            // Both platforms done — just acknowledge
+            const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+            if (webhookUrl) {
+              const ackBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for leaving a review — we really appreciate it!\n\nNew Forest Device Repairs`
+              const result = await sendViaMacroDroid(webhookUrl, phone, ackBody)
+              await logSms(supabase, 'AUTO_REVIEW_ACK', ackBody, result.ok, job.id)
+            }
+            return NextResponse.json({
+              success: true,
+              routed_to: 'review_ack',
+              job_ref: job.job_ref,
+              sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+            })
+          }
+        }
+      }
+
+      // --- Auto-detect common questions (deterministic, no AI) ---
+      // Only auto-reply to unambiguous questions. Never jump into conversations.
+      // If the message doesn't match any pattern, it falls through to staff notification.
+      const autoReply = detectAutoReply(message, job)
+      if (autoReply) {
+        const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+        if (webhookUrl) {
+          const result = await sendViaMacroDroid(webhookUrl, phone, autoReply.body)
+          await logSms(supabase, autoReply.templateKey, autoReply.body, result.ok, job.id)
+        }
+        // Log the auto-reply as a job event
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'SYSTEM',
+          message: `Auto-reply sent: ${autoReply.templateKey}`,
+        })
+        console.log(`[sms/reply] Auto-reply (${autoReply.templateKey}) sent for job ${job.job_ref}`)
+
+        return NextResponse.json({
+          success: true,
+          routed_to: 'auto_reply',
+          auto_reply_type: autoReply.templateKey,
+          job_ref: job.job_ref,
+          sms_sent: !!webhookUrl,
+        })
+      }
 
       // Also route to warranty ticket flow if the job is completed/collected
       // (existing behaviour — post-repair support)
@@ -568,4 +696,48 @@ function normaliseUkPhoneForLookup(raw: string): string {
   if (/^447\d{9}$/.test(digits)) return `+${digits}`
   if (/^07\d{9}$/.test(digits)) return `+44${digits.slice(1)}`
   return raw.trim() // fallback: return as-is for non-UK or unusual formats
+}
+
+// ---------------------------------------------------------------------------
+// Auto-reply detector: deterministic pattern matching for common questions
+// Returns null if no match (falls through to staff notification)
+// ---------------------------------------------------------------------------
+type AutoReply = { templateKey: string; body: string }
+
+const STATUS_LABELS: Record<string, string> = {
+  QUOTE_APPROVED: 'Your repair\'s approved and ready to book in — just pop in with your device whenever suits you.',
+  RECEIVED: 'Your device is booked in and in the queue for repair.',
+  IN_REPAIR: 'Your device is being repaired right now — we\'ll text you the moment it\'s ready.',
+  PARTS_ORDERED: 'We\'ve ordered parts for your device and are waiting on them to arrive.',
+  PARTS_ARRIVED: 'Parts are here for your device — repair will start shortly.',
+  AWAITING_DEPOSIT: 'We need a deposit to order parts. Have a look back through your texts for the payment link, or reply here and we\'ll sort it.',
+  READY_TO_COLLECT: 'Great news — your device is repaired and ready to collect!',
+  COMPLETED: 'Your device is repaired and ready to collect. Pop in during opening hours: nfdr.uk/h',
+  COLLECTED: 'Your device has been collected — thanks for choosing us!',
+}
+
+function detectAutoReply(message: string, job: any): AutoReply | null {
+  const msg = message.toLowerCase().trim()
+
+  // --- "When will it be ready?" / "What's the status?" ---
+  if (/\b(when|what\s+time|how\s+long|ready|status|where.*my|progress|done|finished|pick\s*up|collect)\b/i.test(msg)
+      && !/\b(yes|no|book|proceed|go ahead|accept|decline|cancel|paid)\b/i.test(msg)) {
+    const statusInfo = STATUS_LABELS[job.status] || `Your repair is at the ${job.status} stage — we\'ll text you as soon as there's an update.`
+    const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
+    return {
+      templateKey: 'AUTO_STATUS_REPLY',
+      body: `Hi ${getFirstName(job.customer_name)},\n\n${statusInfo}\n\nYou can track it here anytime: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
+    }
+  }
+
+  // --- "Where are you?" / "What's your address?" / "How do I find you?" ---
+  if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store)\b/i.test(msg)) {
+    return {
+      templateKey: 'AUTO_LOCATION_REPLY',
+      body: `Hi ${getFirstName(job.customer_name)},\n\nHere\'s where we are and our opening hours: nfdr.uk/h\n\nNew Forest Device Repairs`,
+    }
+  }
+
+  // No match — let staff handle it
+  return null
 }
