@@ -57,7 +57,7 @@ interface Enquiry {
   quote_sent_method?: string | null
   repair_reserved?: boolean
   part_reserved?: boolean
-  converted_to_job_id?: string | null
+  converted_job_id?: string | null
   preferred_contact_method?: string | null
   customer_notes?: string | null
   quote_valid_until?: string | null
@@ -225,7 +225,7 @@ function EnquiriesContent() {
   }
 
   const getStatusLabel = (e: Enquiry): string => {
-    if (e.converted_to_job_id) return 'Booked In'
+    if (e.converted_job_id) return 'Booked In'
     if (isAccepted(e)) return 'Accepted'
     if (isFollowUp(e)) return 'Follow-up'
     if (e.enquiry_type !== 'repair_quote' && e.status === 'pending') return 'New Enquiry'

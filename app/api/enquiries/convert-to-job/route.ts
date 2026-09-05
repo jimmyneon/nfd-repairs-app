@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already converted
-    if (enquiry.converted_to_job_id) {
+    if (enquiry.converted_job_id) {
       return NextResponse.json({
         success: true,
         already_converted: true,
-        job_id: enquiry.converted_to_job_id,
+        job_id: enquiry.converted_job_id,
       })
     }
 
@@ -158,7 +158,9 @@ export async function POST(request: NextRequest) {
       .from('enquiries')
       .update({
         status: 'converted',
-        converted_to_job_id: job.id,
+        converted_job_id: job.id,
+        converted_to_job: true,
+        converted_at: now,
         updated_at: now,
       })
       .eq('id', enquiry_id)
