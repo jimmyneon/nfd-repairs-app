@@ -222,6 +222,38 @@ describe('New consolidation routes', () => {
       expect(content).toContain('NEW_ENQUIRY')
     })
   })
+
+  describe('Enquiry stock conversion', () => {
+    it('saves Need Parts immediately instead of using temporary UI state', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
+        'utf-8'
+      )
+      expect(content).toContain("handleConvertToJob('parts_needed')")
+      expect(content).not.toContain("setConvertStep('deposit_confirm')")
+    })
+
+    it('creates parts-needed jobs awaiting deposit', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),
+        'utf-8'
+      )
+      expect(content).toContain("'parts_needed'")
+      expect(content).toContain("'AWAITING_DEPOSIT'")
+      expect(content).toContain('deposit_received: depositAlreadyPaid')
+      expect(content).toContain("'DEPOSIT_REQUEST'")
+    })
+
+    it('reports the real SMS outcome and contains no incorrect shop address', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),
+        'utf-8'
+      )
+      expect(content).toContain('sms_sent: smsSent')
+      expect(content).toContain('sms_error: smsError')
+      expect(content).not.toContain('123 High Street')
+    })
+  })
 })
 
 describe('Quote acceptance detector module', () => {

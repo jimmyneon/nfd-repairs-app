@@ -98,8 +98,13 @@ function EnquiriesContent() {
   const [smsMessage, setSmsMessage] = useState('')
   const [sendingSms, setSendingSms] = useState(false)
   const [converting, setConverting] = useState(false)
-  const [convertStep, setConvertStep] = useState<'main' | 'deposit_confirm'>('main')
-  const [convertResult, setConvertResult] = useState<{ job_ref: string; tracking_url: string } | null>(null)
+  const [convertResult, setConvertResult] = useState<{
+    job_ref: string
+    tracking_url: string
+    status: string
+    sms_sent: boolean
+    sms_error?: string | null
+  } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
   const supabase = createClient() as any
@@ -253,7 +258,7 @@ function EnquiriesContent() {
     setShowTemplatePicker(false)
   }
 
-  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_deposit_paid') => {
+  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_needed') => {
     if (!selectedEnquiry) return
     setConverting(true)
     try {
@@ -267,8 +272,13 @@ function EnquiriesContent() {
       })
       const data = await res.json()
       if (data.success) {
-        setConvertResult({ job_ref: data.job_ref, tracking_url: data.tracking_url })
-        setConvertStep('main')
+        setConvertResult({
+          job_ref: data.job_ref,
+          tracking_url: data.tracking_url,
+          status: data.status,
+          sms_sent: data.sms_sent === true,
+          sms_error: data.sms_error || null,
+        })
         loadEnquiries()
       } else {
         alert(data.error || 'Failed to convert enquiry')
@@ -321,7 +331,6 @@ function EnquiriesContent() {
   const openDetail = (enquiry: Enquiry) => {
     setSelectedEnquiry(enquiry)
     setResponseText(enquiry.staff_notes || '')
-    setConvertStep('main')
     setConvertResult(null)
     setShowMessageComposer(false)
     setShowDetail(true)
@@ -542,7 +551,7 @@ function EnquiriesContent() {
       {/* Detail Slide-Up Panel */}
       <SlideUpPanel
         isOpen={showDetail}
-        onClose={() => { setShowDetail(false); setConvertStep('main'); setConvertResult(null); setShowMessageComposer(false) }}
+        onClose={() => { setShowDetail(false); setConvertResult(null); setShowMessageComposer(false) }}
         title={selectedEnquiry?.customer_name || 'Enquiry'}
         icon={<Mail className="h-5 w-5 text-primary" />}
       >
@@ -578,7 +587,16 @@ function EnquiriesContent() {
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Job Created!</h3>
                   <p className="text-sm text-gray-500 mt-1">Job ref: <span className="font-mono font-bold">{convertResult.job_ref}</span></p>
-                  <p className="text-sm text-green-600 dark:text-green-400 mt-2">Customer has been messaged automatically.</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {convertResult.status === 'AWAITING_DEPOSIT' ? 'Parts required · awaiting £20 deposit' : 'In stock · ready to book in'}
+                  </p>
+                  {convertResult.sms_sent ? (
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">Customer message sent successfully.</p>
+                  ) : (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      Job saved, but the customer message was not sent{convertResult.sms_error ? `: ${convertResult.sms_error}` : '.'}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <Link
@@ -668,42 +686,6 @@ function EnquiriesContent() {
                   {sendingSms ? 'Sending...' : `Send ${messageMethod === 'both' ? 'Text + Email' : messageMethod === 'sms' ? 'Text' : 'Email'}`}
                 </button>
               </div>
-            ) : convertStep === 'deposit_confirm' ? (
-              /* Deposit confirmation step for Need Parts flow */
-              <div className="space-y-4 py-4">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Clock className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Parts Need Ordering</h3>
-                  <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">
-                    Has the customer paid the £20 deposit? Once confirmed, the part will be ordered and the job will be created.
-                  </p>
-                </div>
-
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 text-sm text-yellow-800 dark:text-yellow-400 space-y-1">
-                  <p>• £20 deposit required for special parts</p>
-                  <p>• Customer receives: "Deposit received, part ordered"</p>
-                  <p>• Job status: <span className="font-bold">Parts Ordered</span></p>
-                  <p>• Job won't proceed until deposit is paid</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setConvertStep('main')}
-                    className="py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={() => handleConvertToJob('parts_deposit_paid')}
-                    disabled={converting}
-                    className="py-4 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
-                  >
-                    {converting ? 'Processing...' : '✓ Deposit Paid'}
-                  </button>
-                </div>
-              </div>
             ) : (
               <div className="space-y-4">
                 {/* Repair details — compact */}
@@ -756,16 +738,16 @@ function EnquiriesContent() {
                       >
                         <CheckCircle className="h-7 w-7" />
                         <span className="text-sm">In Stock</span>
-                        <span className="text-xs opacity-80">Book it in →</span>
+                        <span className="text-xs opacity-80">Book in & message →</span>
                       </button>
                       <button
-                        onClick={() => setConvertStep('deposit_confirm')}
+                        onClick={() => handleConvertToJob('parts_needed')}
                         disabled={converting}
                         className="flex flex-col items-center justify-center gap-2 py-6 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
                       >
                         <Clock className="h-7 w-7" />
                         <span className="text-sm">Need Parts</span>
-                        <span className="text-xs opacity-80">£20 deposit →</span>
+                        <span className="text-xs opacity-80">Send deposit request →</span>
                       </button>
                     </div>
                   </div>
