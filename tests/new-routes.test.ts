@@ -151,6 +151,19 @@ describe('New consolidation routes', () => {
       )
       expect(content).toContain('body.ts')
     })
+
+    it.each([
+      ['delivery-confirmation', '../../macrodroid/delivery-confirmation/route'],
+      ['missed-call', '../../macrodroid/missed-call/route'],
+      ['send', '../../macrodroid/sms-sent/route'],
+    ])('keeps the legacy MacroDroid %s URL working', (routeName, handlerPath) => {
+      const legacyRoute = path.join(process.cwd(), `app/api/messages/${routeName}/route.ts`)
+      expect(fs.existsSync(legacyRoute)).toBe(true)
+
+      const content = fs.readFileSync(legacyRoute, 'utf-8')
+      expect(content).toContain(handlerPath)
+      expect(content).toContain('POST')
+    })
   })
 
   describe('Public start-repair adapter endpoint', () => {
