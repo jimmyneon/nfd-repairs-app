@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Normalise field names: MacroDroid may send 'From'/'Body' or 'phone'/'message'
     const phone = body.phone || body.From || body.from || body.number || body.Number
     const message = body.message || body.Body || body.body || body.text || body.Text
-    const timestamp = body.timestamp || body.Timestamp || body.MessageSid || body.messageSid
+    const timestamp = body.timestamp || body.Timestamp || body.ts || body.MessageSid || body.messageSid
     const threadId = body.threadId || body.thread_id || body.ThreadId
 
     if (!phone || !message) {

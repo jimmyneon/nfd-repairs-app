@@ -134,6 +134,23 @@ describe('New consolidation routes', () => {
       )
       expect(content).toContain('ORPHAN_SMS')
     })
+
+    it('keeps the legacy MacroDroid incoming URL working', () => {
+      const legacyRoute = path.join(process.cwd(), 'app/api/messages/incoming/route.ts')
+      expect(fs.existsSync(legacyRoute)).toBe(true)
+
+      const content = fs.readFileSync(legacyRoute, 'utf-8')
+      expect(content).toContain("../../sms/reply/route")
+      expect(content).toContain('handleSmsReply(request)')
+    })
+
+    it('accepts the legacy MacroDroid timestamp field', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/sms/reply/route.ts'),
+        'utf-8'
+      )
+      expect(content).toContain('body.ts')
+    })
   })
 
   describe('Public start-repair adapter endpoint', () => {
