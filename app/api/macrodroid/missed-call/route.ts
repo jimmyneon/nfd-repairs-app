@@ -40,8 +40,8 @@ const FALLBACK_HOURS: Record<string, { isOpen: boolean; formatted: string; open?
 }
 
 const DEFAULT_MAPS_URL = 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7'
-const REPAIR_REQUEST_URL = 'https://nfdr.uk/start'
-const START_URL = 'https://nfdr.uk/start'
+const REPAIR_REQUEST_URL = 'nfdr.uk/start'
+const START_URL = 'nfdr.uk/start'
 
 export async function OPTIONS() {
   return new NextResponse(null, {
