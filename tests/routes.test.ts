@@ -9,9 +9,7 @@ describe('API route authentication', () => {
     'app/api/analytics/summary/route.ts',
     'app/api/enquiries/accept/route.ts',
     'app/api/enquiries/convert-to-job/route.ts',
-    'app/api/enquiries/get/route.ts',
     'app/api/enquiries/send-sms/route.ts',
-    'app/api/enquiries/update/route.ts',
     'app/api/jobs/check-status/route.ts',
     'app/api/jobs/create-v3/route.ts',
     'app/api/jobs/diagnostic-action/route.ts',
@@ -29,6 +27,19 @@ describe('API route authentication', () => {
         const content = fs.readFileSync(filePath, 'utf-8')
         expect(content).toContain('requireStaffUser')
       }
+    })
+  }
+
+  const publicEnquiryRoutes = [
+    'app/api/enquiries/get/route.ts',
+    'app/api/enquiries/update/route.ts',
+  ]
+
+  for (const route of publicEnquiryRoutes) {
+    it(`${route} should remain public and use restricted CORS`, () => {
+      const content = fs.readFileSync(path.join(process.cwd(), route), 'utf-8')
+      expect(content).not.toContain('requireStaffUser')
+      expect(content).toContain('corsHeaders')
     })
   }
 

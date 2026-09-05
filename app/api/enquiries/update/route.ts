@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
-import { requireStaffUser } from '@/lib/api-auth'
+import { corsHeaders } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 
 function escapeHtml(str: string): string {
@@ -17,17 +17,12 @@ function escapeHtml(str: string): string {
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers: corsHeaders(request),
   })
 }
 
 export async function POST(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
+  const headers = corsHeaders(request)
 
   try {
     const supabase = createClient(
@@ -40,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { enquiry_ref, action, data } = body
 
     if (!enquiry_ref || !action) {
-      return NextResponse.json({ error: 'Missing enquiry_ref or action' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing enquiry_ref or action' }, { status: 400, headers })
     }
 
     // Find the enquiry
@@ -51,7 +46,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !enquiry) {
-      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404, headers })
     }
 
     const now = new Date().toISOString()
@@ -69,7 +64,7 @@ export async function POST(request: NextRequest) {
             enquiry_ref: enquiry.enquiry_ref,
             already_reserved: true,
           }, {
-            headers: { 'Access-Control-Allow-Origin': '*' },
+            headers,
           })
         }
         updateFields.repair_reserved = true
@@ -128,7 +123,7 @@ export async function POST(request: NextRequest) {
         if (enquiry.quote_type === 'instant' && !enquiry.quoted_price) {
           return NextResponse.json(
             { error: 'Cannot send quote: no price selected. Please select a repair option first.' },
-            { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+            { status: 400, headers }
           )
         }
 
@@ -179,7 +174,7 @@ export async function POST(request: NextRequest) {
       }
 
       default: {
-        return NextResponse.json({ error: 'Unknown action: ' + action }, { status: 400 })
+        return NextResponse.json({ error: 'Unknown action: ' + action }, { status: 400, headers })
       }
     }
 
@@ -362,10 +357,10 @@ ${additionalRepairs ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${ad
       action,
       enquiry_ref: enquiry.enquiry_ref,
     }, {
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers,
     })
   } catch (error) {
     console.error('Error in enquiry update:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers })
   }
 }

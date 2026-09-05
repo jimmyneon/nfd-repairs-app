@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireStaffUser } from '@/lib/api-auth'
+import { corsHeaders } from '@/lib/api-auth'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers: corsHeaders(request),
   })
 }
 
 export async function GET(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
+  const headers = corsHeaders(request)
 
   try {
     const supabase = createClient(
@@ -28,7 +23,7 @@ export async function GET(request: NextRequest) {
     const ref = searchParams.get('ref')
 
     if (!ref) {
-      return NextResponse.json({ error: 'Missing ref parameter' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing ref parameter' }, { status: 400, headers })
     }
 
     const { data: enquiry, error } = await supabase
@@ -38,12 +33,12 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (error || !enquiry) {
-      return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Quote not found' }, { status: 404, headers })
     }
 
     // Only return repair quotes
     if (enquiry.enquiry_type !== 'repair_quote') {
-      return NextResponse.json({ error: 'Invalid quote type' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid quote type' }, { status: 400, headers })
     }
 
     // Expiry check: quote valid for 14 days from submission
@@ -51,7 +46,7 @@ export async function GET(request: NextRequest) {
       const created = new Date(enquiry.created_at)
       const expiry = new Date(created.getTime() + 14 * 24 * 60 * 60 * 1000)
       if (new Date() > expiry) {
-        return NextResponse.json({ error: 'This quote has expired. Quotes are valid for 14 days.' }, { status: 410 })
+        return NextResponse.json({ error: 'This quote has expired. Quotes are valid for 14 days.' }, { status: 410, headers })
       }
     }
 
@@ -72,11 +67,9 @@ export async function GET(request: NextRequest) {
       repair_reserved: enquiry.repair_reserved,
     }
 
-    return NextResponse.json({ enquiry: safeEnquiry }, {
-      headers: { 'Access-Control-Allow-Origin': '*' },
-    })
+    return NextResponse.json({ enquiry: safeEnquiry }, { headers })
   } catch (error) {
     console.error('Error fetching quote:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers })
   }
 }

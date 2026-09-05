@@ -51,6 +51,8 @@ export function getAllowedOrigin(request: NextRequest): string {
   const allowedOrigins = [
     'https://nfd-repairs-app.vercel.app',
     'https://nfdr.uk',
+    'https://newforestdevicerepairs.co.uk',
+    'https://www.newforestdevicerepairs.co.uk',
     process.env.NEXT_PUBLIC_APP_URL,
   ].filter(Boolean)
   if (origin && allowedOrigins.includes(origin)) {

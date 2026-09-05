@@ -53,6 +53,15 @@ describe('getAllowedOrigin', () => {
     expect(origin).toBe('https://nfd-repairs-app.vercel.app')
   })
 
+  it('should allow the public New Forest Device Repairs website', async () => {
+    const { getAllowedOrigin } = await import('@/lib/api-auth')
+    const request = new NextRequest('http://localhost/api/test', {
+      headers: { origin: 'https://newforestdevicerepairs.co.uk' },
+    })
+    const origin = getAllowedOrigin(request)
+    expect(origin).toBe('https://newforestdevicerepairs.co.uk')
+  })
+
   it('should return the default origin if request origin is not allowed', async () => {
     const { getAllowedOrigin } = await import('@/lib/api-auth')
     const request = new NextRequest('http://localhost/api/test', {
