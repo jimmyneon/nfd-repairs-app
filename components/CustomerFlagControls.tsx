@@ -17,7 +17,7 @@ export default function CustomerFlagControls({ job, onUpdate }: CustomerFlagCont
   const [skipReview, setSkipReview] = useState(job.skip_review_request || false)
   const [messagePref, setMessagePref] = useState<'sms' | 'whatsapp' | null>(job.message_preference || null)
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const handleSave = async () => {
     setSaving(true)

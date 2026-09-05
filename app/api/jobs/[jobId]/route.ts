@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireStaffUser } from '@/lib/api-auth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,6 +66,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const body = await request.json()
     

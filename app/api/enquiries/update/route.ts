@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
+import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
+
+function escapeHtml(str: string): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -15,6 +26,9 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +58,7 @@ export async function POST(request: NextRequest) {
     let updateFields: Record<string, any> = { updated_at: now }
     let notificationTitle = ''
     let notificationBody = ''
-    let pendingQuoteSend: { method: string; quoteUrl: string; isInstant: boolean; priceText: string; deviceName: string; repairName: string } | null = null
+    let pendingQuoteSend: { method: string; quoteUrl: string; isInstant: boolean; priceText: string; deviceName: string; repairName: string; customerName: string; partOption: string; additionalRepairs: string } | null = null
 
     switch (action) {
       case 'reserve_repair': {
@@ -122,11 +136,16 @@ export async function POST(request: NextRequest) {
         const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
-        const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim()
-        const repairName = enquiry.repair_type || 'repair'
+        const deviceName = escapeHtml(`${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim())
+        const repairName = escapeHtml(enquiry.repair_type || 'repair')
+        const customerName = escapeHtml(enquiry.customer_name || '')
+        const partOption = escapeHtml(enquiry.part_option || enquiry.screen_option || '')
+        const additionalRepairs = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
+          ? escapeHtml(enquiry.additional_repairs.map((r: any) => r.display_name || r.repair).join(', '))
+          : ''
 
         if (method !== 'none') {
-          pendingQuoteSend = { method, quoteUrl, isInstant, priceText, deviceName, repairName }
+          pendingQuoteSend = { method, quoteUrl, isInstant, priceText, deviceName, repairName, customerName, partOption, additionalRepairs }
         }
         break
       }
@@ -224,17 +243,13 @@ export async function POST(request: NextRequest) {
           ? `Thanks ${enquiry.customer_name}!\n\nWe've got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request.\n\nWe'll be in touch ASAP with next steps.\n\nNew Forest Device Repairs\nnfdr.uk/h`
           : `Thanks ${enquiry.customer_name}!\n\nWe'll look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe'll be in touch to confirm.\n\nNew Forest Device Repairs\nnfdr.uk/h`
         try {
-          await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: enquiry.customer_phone, message: smsMessage }),
-          })
+          const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
           try {
             await supabase.from('sms_logs').insert({
               template_key: action === 'reserve_repair' ? 'REPAIR_RESERVED' : 'PART_RESERVED',
               body_rendered: smsMessage,
-              status: 'SENT',
-              sent_at: now,
+              status: smsResponse.ok ? 'SENT' : 'FAILED',
+              sent_at: smsResponse.ok ? now : null,
             } as any)
           } catch (e) { console.error('SMS log failed:', e) }
         } catch (e) { console.error('Confirmation SMS failed:', e) }
@@ -243,7 +258,7 @@ export async function POST(request: NextRequest) {
 
     // Send quote SMS/email — AFTER DB update so data is committed first
     if (pendingQuoteSend) {
-      const { method, quoteUrl, isInstant, priceText, deviceName, repairName } = pendingQuoteSend
+      const { method, quoteUrl, isInstant, priceText, deviceName, repairName, customerName, partOption, additionalRepairs } = pendingQuoteSend
 
       if (method === 'sms' || method === 'both') {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
@@ -259,17 +274,13 @@ export async function POST(request: NextRequest) {
             ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
             : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
           try {
-            await fetch(webhookUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: enquiry.customer_phone, message: smsMessage }),
-            })
+            const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {
               await supabase.from('sms_logs').insert({
                 template_key: 'QUOTE_SENT',
                 body_rendered: smsMessage,
-                status: 'SENT',
-                sent_at: now,
+                status: smsResponse.ok ? 'SENT' : 'FAILED',
+                sent_at: smsResponse.ok ? now : null,
               } as any)
             } catch (e) { console.error('SMS log failed:', e) }
           } catch (e) { console.error('Quote SMS failed:', e) }
@@ -295,14 +306,14 @@ export async function POST(request: NextRequest) {
 </td></tr>
 
 <tr><td style="padding:32px 30px 20px;">
-<h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${enquiry.customer_name},</h2>
+<h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${customerName},</h2>
 ${isInstant ? `
 <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">Your quote for your <strong style="color:#1a1a2e;">${deviceName}</strong> ${repairName} is ready.</p>
 
 <div style="background:#f8fdf9;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px;">
 <p style="color:#888;font-size:14px;margin:0 0 4px;">${deviceName} — ${repairName}</p>
-${(enquiry.part_option || enquiry.screen_option) ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${enquiry.part_option || enquiry.screen_option}</p>` : ''}
-${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${enquiry.additional_repairs.map((r: any) => r.display_name || r.repair).join(', ')}</p>` : ''}
+${partOption ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${partOption}</p>` : ''}
+${additionalRepairs ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${additionalRepairs}</p>` : ''}
 <p style="color:#009B4D;font-size:32px;font-weight:800;margin:8px 0 0;">${priceText}</p>
 </div>
 

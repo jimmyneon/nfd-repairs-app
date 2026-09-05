@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
+import { sendViaMacroDroid } from '@/lib/resilience'
+
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/jobs/auto-parts-ordered
@@ -194,20 +198,13 @@ export async function GET(request: NextRequest) {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
             try {
-              const smsResponse = await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  phone: job.customer_phone,
-                  message: smsBody,
-                }),
-              })
+              const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
 
               const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 
               await supabase
                 .from('sms_logs')
-                .update({ status: deliveryStatus, sent_at: now.toISOString() })
+                .update({ status: deliveryStatus, sent_at: deliveryStatus === 'SENT' ? now.toISOString() : null })
                 .eq('id', smsLog.id)
 
               // Mark reassurance as sent

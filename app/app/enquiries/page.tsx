@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
+export const dynamic = 'force-dynamic'
+
 interface Enquiry {
   id: string
   enquiry_ref: string
@@ -100,7 +102,7 @@ function EnquiriesContent() {
   const [convertResult, setConvertResult] = useState<{ job_ref: string; tracking_url: string } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
-  const supabase = createClient()
+  const supabase = createClient() as any as any
 
   useEffect(() => {
     loadEnquiries()
@@ -108,7 +110,7 @@ function EnquiriesContent() {
       .channel('enquiries-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, () => loadEnquiries())
       .subscribe()
-    return () => subscription.unsubscribe()
+    return () => { subscription.unsubscribe() }
   }, [])
 
   // Deep link: auto-open enquiry if ?ref= is in URL
@@ -131,7 +133,7 @@ function EnquiriesContent() {
       .from('sms_templates')
       .select('key, body')
       .eq('is_active', true)
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) setSmsTemplates(data)
       })
   }, [])

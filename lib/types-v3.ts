@@ -61,6 +61,11 @@ export interface Job {
   cancellation_notes?: string | null
   customer_notes?: string | null
   diagnostic_report?: string | null
+  diagnosis_notes?: string | null
+  diagnosis_sent_at?: string | null
+  repair_agreed_at?: string | null
+  repair_declined_at?: string | null
+  repair_declined_reason?: string | null
   
   // Parts & deposit
   requires_parts_order: boolean

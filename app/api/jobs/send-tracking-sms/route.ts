@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/resilience'
 import { getFirstName } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireStaffUser } from '@/lib/api-auth'
+import { fetchWithTimeout } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
+  const supabase = createServiceClient()
+
   try {
     const { jobId } = await request.json()
 
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (webhookUrl) {
       try {
-        const response = await fetch(webhookUrl, {
+        const response = await fetchWithTimeout(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

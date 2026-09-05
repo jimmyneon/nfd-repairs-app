@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase-browser'
 import { Home, Plus, Mail, Phone, MapPin, Clock, CreditCard, Package, CheckCircle, XCircle, Send } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 interface SendInRequest {
   id: string
   request_ref: string
@@ -34,7 +36,7 @@ export default function SendInRequestsPage() {
   const [showModal, setShowModal] = useState(false)
   const [staffNotes, setStaffNotes] = useState('')
   const [saving, setSaving] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadRequests()

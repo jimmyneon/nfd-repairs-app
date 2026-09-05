@@ -3,14 +3,21 @@ import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'crypto'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortPasswordLink } from '@/lib/utils'
+import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 /**
  * POST /api/password/request
  * Creates a password request record and sends an SMS to the customer
  * with a secure link to enter their device password.
+ * Requires staff authentication.
  */
 export async function POST(request: NextRequest) {
   try {
+    // Require staff auth
+    const { response: authResponse } = await requireStaffUser(request)
+    if (authResponse) return authResponse
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -93,14 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (webhookUrl) {
       try {
-        const smsResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: job.customer_phone,
-            message: smsBody,
-          }),
-        })
+        const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
         smsStatus = smsResponse.ok ? 'SENT' : 'FAILED'
       } catch (err) {
         console.error('MacroDroid send failed:', err)
@@ -126,7 +126,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: smsStatus === 'SENT',
       smsStatus,
-      token,
     })
   } catch (error) {
     console.error('Error in password request:', error)

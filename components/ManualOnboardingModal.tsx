@@ -34,7 +34,7 @@ export default function ManualOnboardingModal({
   })
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     setIsDrawing(true)

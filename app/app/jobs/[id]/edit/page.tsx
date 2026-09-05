@@ -1,5 +1,5 @@
 'use client'
-
+export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Home, Save, Loader2, Plus } from 'lucide-react'
@@ -9,7 +9,7 @@ import { getIssuesForDeviceType, saveCustomIssue, getCustomIssues } from '@/lib/
 
 export default function EditJobPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

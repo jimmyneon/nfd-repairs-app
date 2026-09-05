@@ -55,6 +55,8 @@ export default function QuickActionsModal({
       COLLECTED: 'bg-green-700 hover:bg-green-800',
       COMPLETED: 'bg-gray-600 hover:bg-gray-700',
       CANCELLED: 'bg-gray-800 hover:bg-gray-900',
+      DROPPED_OFF: 'bg-blue-600 hover:bg-blue-700',
+      QUOTE_REQUESTED: 'bg-cyan-500 hover:bg-cyan-600',
     }
     return colors[status]
   }
@@ -74,6 +76,8 @@ export default function QuickActionsModal({
       COLLECTED: UserCheck,
       COMPLETED: Archive,
       CANCELLED: Ban,
+      DROPPED_OFF: Package,
+      QUOTE_REQUESTED: FileText,
     }
     return icons[status]
   }
@@ -93,6 +97,8 @@ export default function QuickActionsModal({
       COLLECTED: 'Collected',
       COMPLETED: 'Done',
       CANCELLED: 'Cancel',
+      DROPPED_OFF: 'Dropped',
+      QUOTE_REQUESTED: 'Quote',
     }
     return shortLabels[status]
   }

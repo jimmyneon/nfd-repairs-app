@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { requireCronSecret } from '@/lib/api-auth'
 
 // Allow up to 5 minutes for the cron handler
 export const maxDuration = 300
@@ -25,14 +26,11 @@ export const maxDuration = 300
  * - Day 90: Flag for disposal
  */
 export async function GET(request: NextRequest) {
+  const cronResponse = requireCronSecret(request)
+  if (cronResponse) return cronResponse
+
   try {
     const supabase = createServiceClient()
-
-    // Verify cron secret
-    const cronSecret = request.headers.get('Authorization')
-    if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Check sending hours (8am-8pm UK time)
     if (!isWithinUKSendingHours()) {

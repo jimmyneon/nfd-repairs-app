@@ -1,12 +1,22 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+
+export const maxDuration = 300;
 
 /**
  * POST /api/password/cleanup
  * Called by cron to auto-delete encrypted passwords 7 days after job collection.
  * Also expires any pending requests past their 24h expiry.
+ * Requires CRON_SECRET bearer token.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // Verify CRON_SECRET
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

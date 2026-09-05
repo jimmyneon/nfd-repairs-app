@@ -46,6 +46,8 @@ export default function StatusSelectorModal({
       COLLECTED: 'bg-green-700 hover:bg-green-800',
       COMPLETED: 'bg-gray-600 hover:bg-gray-700',
       CANCELLED: 'bg-gray-800 hover:bg-gray-900',
+      DROPPED_OFF: 'bg-blue-600 hover:bg-blue-700',
+      QUOTE_REQUESTED: 'bg-cyan-500 hover:bg-cyan-600',
     }
     return colors[status]
   }

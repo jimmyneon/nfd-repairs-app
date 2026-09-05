@@ -3,9 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
+import { requireStaffUser } from '@/lib/api-auth'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const body = await request.json()
     
@@ -154,7 +158,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase client with service role for server-side operations
-    const supabase = createServiceClient()
+    const supabase = createServiceClient() as any
 
     // Duplicate prevention: Check for existing job with same customer/phone/device within last 5 minutes
     // This prevents multiple jobs being created when errors occur during submission
@@ -492,7 +496,7 @@ export async function POST(request: NextRequest) {
         } as any)
       } else {
         console.log('📝 Creating SMS log...')
-        const { data: smsLog, error: smsLogError } = await supabaseRetry(() =>
+        const { data: smsLog, error: smsLogError }: any = await supabaseRetry(() =>
           supabase.from('sms_logs').insert({
             job_id: job.id,
             template_key: templateKey,

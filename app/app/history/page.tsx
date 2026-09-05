@@ -8,6 +8,8 @@ import { Search, ArrowLeft, Calendar, DollarSign, User, Smartphone, Home, Plus }
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+
 export default function JobHistoryPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([])
@@ -15,7 +17,7 @@ export default function JobHistoryPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState<'all' | '7days' | '30days' | '90days' | 'year'>('all')
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadClosedJobs()

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { requireCronSecret } from '@/lib/api-auth'
 
 // Allow up to 5 minutes for draining large queues
 export const maxDuration = 300
@@ -21,13 +22,10 @@ export const maxDuration = 300
  * - Caps at 50 per run to avoid timeout
  */
 export async function GET(request: NextRequest) {
-  try {
-    // Verify cron secret
-    const cronSecret = request.headers.get('Authorization')
-    if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const cronResponse = requireCronSecret(request)
+  if (cronResponse) return cronResponse
 
+  try {
     const supabase = createServiceClient()
 
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL

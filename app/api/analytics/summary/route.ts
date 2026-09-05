@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireStaffUser } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -35,6 +36,9 @@ function emptyResponse(days: number, tableMissing = false) {
 }
 
 export async function GET(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     // Validate environment variables
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

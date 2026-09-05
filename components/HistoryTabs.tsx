@@ -34,7 +34,7 @@ interface TimelineItem {
 export default function HistoryTabs({ events, smsLogs, emailLogs, actionLoading, activeTab, onTabChange, onRetrySms }: HistoryTabsProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const items: TimelineItem[] = [
+  const items: any[] = [
     ...events.map((e) => ({
       id: `evt-${e.id}`,
       date: e.created_at,

@@ -13,6 +13,8 @@ import CustomerWaitingBanner from '@/components/CustomerWaitingBanner'
 import NavDropdown from '@/components/NavDropdown'
 import { groupJobsByAction, JobWithMetrics, ActionGroup, getHoursInStatus } from '@/lib/job-utils'
 
+export const dynamic = 'force-dynamic'
+
 export default function JobsListPageV2() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [groupedJobs, setGroupedJobs] = useState<Record<ActionGroup, JobWithMetrics[]>>({
@@ -36,7 +38,7 @@ export default function JobsListPageV2() {
   const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const handleQRScan = (jobRef: string) => {
     setSearchTerm(jobRef)

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const maxDuration = 300;
+
 /**
  * GET /api/jobs/backup-schedule-collection-sms
  * Cron endpoint — runs daily to catch any COLLECTED/COMPLETED jobs

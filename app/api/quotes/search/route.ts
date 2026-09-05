@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireStaffUser } from '@/lib/api-auth'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('q')

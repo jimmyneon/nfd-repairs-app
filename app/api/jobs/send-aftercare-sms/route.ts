@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortReviewLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
+import { requireCronSecret } from '@/lib/api-auth'
+
+export const maxDuration = 300;
 
 /**
  * POST /api/jobs/send-aftercare-sms
@@ -10,6 +13,9 @@ import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/res
  * Unlike the old automatic scheduling, this is opt-in only.
  */
 export async function POST(request: NextRequest) {
+  const cronResponse = requireCronSecret(request)
+  if (cronResponse) return cronResponse
+
   try {
     const supabase = createServiceClient()
 
@@ -154,7 +160,7 @@ New Forest Device Repairs`
     console.log(`Aftercare SMS ${deliveryStatus} for job ${job.job_ref}`)
 
     return NextResponse.json({
-      success: smsResponse.ok,
+      success: smsResult.ok,
       deliveryStatus,
       message: `Aftercare SMS ${deliveryStatus.toLowerCase()}`
     })

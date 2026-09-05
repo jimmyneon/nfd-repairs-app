@@ -23,7 +23,7 @@ export default function ReviewPlatformControls({ job, isOpen, onClose, onUpdate 
   const [saving, setSaving] = useState<string | null>(null)
   const [sendingReview, setSendingReview] = useState(false)
   const [sendResult, setSendResult] = useState<string | null>(null)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const completed: string[] = job.review_platforms_completed || []
 

@@ -13,11 +13,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: repairs, error: repairError } = await supabase
+    const { data: repairs, error: repairError } = await (supabase
       .from('repairs')
       .select('id, customer_name, device_type, device_model')
       .eq('customer_email', email.toLowerCase())
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }) as any)
 
     if (repairError) {
       console.error('Database error:', repairError)

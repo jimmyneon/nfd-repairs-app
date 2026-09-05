@@ -43,7 +43,7 @@ DECLARE
     v_response TEXT;
 BEGIN
     -- This secret MUST match the CRON_SECRET env var on Vercel
-    v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
+    v_cron_secret := 'REPLACE_WITH_CRON_SECRET_FROM_VAULT';
 
     SELECT content INTO v_response
     FROM http((

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { requireStaffUser } from '@/lib/api-auth'
 
 /**
  * OPTIONS /api/warranty-tickets
@@ -24,6 +25,9 @@ export async function OPTIONS(request: NextRequest) {
  * Requires X-API-KEY header for authentication
  */
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     // Use service role key to bypass RLS
     const supabase = createClient(
@@ -400,7 +404,7 @@ async function findJobSuggestions(
 
   // Sort by confidence and date
   suggestions.sort((a, b) => {
-    const confOrder = { high: 3, medium: 2, low: 1 }
+    const confOrder: Record<string, number> = { high: 3, medium: 2, low: 1 }
     if (confOrder[a.confidence] !== confOrder[b.confidence]) {
       return confOrder[b.confidence] - confOrder[a.confidence]
     }

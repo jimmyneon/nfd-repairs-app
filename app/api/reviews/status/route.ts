@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getReviewLinks(supabase: ReturnType<typeof createClient>) {
+async function getReviewLinks(supabase: any) {
   const { data: settings } = await supabase
     .from('admin_settings')
     .select('key, value')

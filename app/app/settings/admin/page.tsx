@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase-browser'
 import { ArrowLeft, Home, Save, Loader2, Link as LinkIcon, Star, Plus, Clock } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 interface AdminSetting {
   id: string
   key: string
@@ -34,7 +36,7 @@ export default function AdminSettingsPage() {
   })
   const [specialHoursActive, setSpecialHoursActive] = useState(false)
   const [specialHoursNote, setSpecialHoursNote] = useState('')
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadSettings()
@@ -47,10 +49,10 @@ export default function AdminSettingsPage() {
       .in('key', ['google_review_link', 'google_maps_link', 'warranty_api_key'])
 
     if (!error && data) {
-      setSettings(data)
-      const reviewLink = data.find(s => s.key === 'google_review_link')
-      const mapsLink = data.find(s => s.key === 'google_maps_link')
-      const apiKey = data.find(s => s.key === 'warranty_api_key')
+      setSettings(data as any)
+      const reviewLink = data.find((s: any) => s.key === 'google_review_link')
+      const mapsLink = data.find((s: any) => s.key === 'google_maps_link')
+      const apiKey = data.find((s: any) => s.key === 'warranty_api_key')
       
       if (reviewLink) setGoogleReviewLink(reviewLink.value)
       if (mapsLink) setGoogleMapsLink(mapsLink.value)
@@ -77,7 +79,7 @@ export default function AdminSettingsPage() {
       .in('key', ['opening_hours', 'special_hours'])
 
     if (hoursData) {
-      const hoursSetting = hoursData.find(s => s.key === 'opening_hours')
+      const hoursSetting = hoursData.find((s: any) => s.key === 'opening_hours')
       if (hoursSetting?.value) {
         try {
           const parsed = typeof hoursSetting.value === 'string' 
@@ -102,7 +104,7 @@ export default function AdminSettingsPage() {
         }
       }
 
-      const specialSetting = hoursData.find(s => s.key === 'special_hours')
+      const specialSetting = hoursData.find((s: any) => s.key === 'special_hours')
       if (specialSetting?.value) {
         try {
           const parsed = typeof specialSetting.value === 'string' 

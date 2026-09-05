@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireCronSecret } from '@/lib/api-auth'
+
+export const maxDuration = 300;
 
 /**
  * POST /api/jobs/schedule-collection-sms
@@ -11,6 +14,9 @@ import { createClient } from '@supabase/supabase-js'
  * 4. Schedules post-collection email for same evening as SMS
  */
 export async function POST(request: NextRequest) {
+  const cronResponse = requireCronSecret(request)
+  if (cronResponse) return cronResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

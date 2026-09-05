@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 /**
  * POST /api/warranty/send-sms
@@ -79,16 +80,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SMS template is empty or unavailable' }, { status: 500 })
     }
 
-    const smsPayload = {
-      phone: ticketData.customer_phone,
-      message: smsBody,
-    }
-
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(smsPayload),
-    })
+    const smsResponse = await sendViaMacroDroid(webhookUrl, ticketData.customer_phone, smsBody)
 
     const sentAt = new Date().toISOString()
 
@@ -115,7 +107,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true })
     } else {
-      const errorText = await smsResponse.text()
+      const errorText = smsResponse.body
       console.error('Warranty SMS failed:', errorText)
 
       await supabase.from('warranty_ticket_events').insert({

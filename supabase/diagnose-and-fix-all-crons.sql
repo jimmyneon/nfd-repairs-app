@@ -16,7 +16,7 @@
 --   3. Re-creates all cron functions with the correct secret
 --
 -- ACTION REQUIRED BEFORE RUNNING:
---   → Set CRON_SECRET=74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263
+--   → Set CRON_SECRET=REPLACE_WITH_CRON_SECRET_FROM_VAULT
 --     in your Vercel project environment variables
 --   → Redeploy the app so the env var takes effect
 -- ============================================================
@@ -80,7 +80,7 @@ DECLARE
     v_cron_secret TEXT;
     v_response TEXT;
 BEGIN
-    v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
+    v_cron_secret := 'REPLACE_WITH_CRON_SECRET_FROM_VAULT';
 
     SELECT content INTO v_response
     FROM http((
@@ -105,7 +105,7 @@ DECLARE
     v_cron_secret TEXT;
     v_response TEXT;
 BEGIN
-    v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
+    v_cron_secret := 'REPLACE_WITH_CRON_SECRET_FROM_VAULT';
 
     SELECT content INTO v_response
     FROM http((
@@ -130,7 +130,7 @@ DECLARE
     v_cron_secret TEXT;
     v_response TEXT;
 BEGIN
-    v_cron_secret := '74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263';
+    v_cron_secret := 'REPLACE_WITH_CRON_SECRET_FROM_VAULT';
 
     SELECT content INTO v_response
     FROM http((

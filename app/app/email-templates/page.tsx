@@ -6,6 +6,8 @@ import { Home, Save, Eye, EyeOff, Code, Mail, X, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
+export const dynamic = 'force-dynamic'
+
 interface EmailTemplate {
   id: string
   status_key: string
@@ -37,7 +39,7 @@ export default function EmailTemplatesPage() {
   const [showVariableModal, setShowVariableModal] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [activeField, setActiveField] = useState<'subject' | 'html' | 'text'>('html')
-  const supabase = createClient()
+  const supabase = createClient() as any as any
 
   useEffect(() => {
     loadTemplates()
@@ -278,9 +280,11 @@ export default function EmailTemplatesPage() {
             {showPreview && (
               <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800">
                 <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Preview:</h4>
-                <div
-                  className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: editBodyHtml }}
+                <iframe
+                  srcDoc={editBodyHtml}
+                  sandbox=""
+                  className="w-full min-h-[300px] border-0"
+                  title="Email template preview"
                 />
               </div>
             )}

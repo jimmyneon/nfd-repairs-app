@@ -7,12 +7,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import { useTheme } from 'next-themes'
 
+export const dynamic = 'force-dynamic'
+
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     setMounted(true)

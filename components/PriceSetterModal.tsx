@@ -24,7 +24,7 @@ export default function PriceSetterModal({
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toString() : '')
   const [payLoading, setPayLoading] = useState(false)
   const [isPaid, setIsPaid] = useState(paymentReceived)
-  const supabase = createClient()
+  const supabase = createClient() as any
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 

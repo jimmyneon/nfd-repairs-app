@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { trackPackage } from '@/lib/trackers'
 
+export const maxDuration = 300;
+
 /**
  * GET /api/tracking/sync
  * Cron endpoint - runs daily via pg_cron

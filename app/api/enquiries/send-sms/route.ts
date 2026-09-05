@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { renderSmsTemplate, getFirstName } from '@/lib/sms-template'
+import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -14,6 +16,9 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,16 +57,8 @@ export async function POST(request: NextRequest) {
     const smsBody = message.trim()
     const now = new Date().toISOString()
 
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: enquiry.customer_phone,
-        message: smsBody,
-      }),
-    })
+    const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
 
-    const sentAt = now
     const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 
     // Log to sms_logs
@@ -69,7 +66,7 @@ export async function POST(request: NextRequest) {
       template_key: templateKey || 'ENQUIRY_CUSTOM',
       body_rendered: smsBody,
       status: deliveryStatus,
-      sent_at: sentAt,
+      sent_at: deliveryStatus === 'SENT' ? now : null,
     } as any)
 
     // Update enquiry with staff_response and timestamp
@@ -83,10 +80,9 @@ export async function POST(request: NextRequest) {
       .eq('id', enquiryId)
 
     if (!smsResponse.ok) {
-      const errorText = await smsResponse.text()
-      console.error('Enquiry SMS failed:', errorText)
+      console.error('Enquiry SMS failed:', smsResponse.body)
       return NextResponse.json(
-        { error: 'Failed to send SMS', details: errorText },
+        { error: 'Failed to send SMS', details: smsResponse.body },
         { status: 500 }
       )
     }

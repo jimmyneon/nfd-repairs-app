@@ -243,7 +243,7 @@ If anything is not right, just reply here.
     console.log(`Post-collection notifications sent for job ${job.job_ref}: SMS=${smsDeliveryStatus}, Email=${emailDeliveryStatus}`)
 
     return NextResponse.json({
-      success: smsResponse.ok || (job.customer_email && emailDeliveryStatus === 'SENT'),
+      success: smsResult.ok || (job.customer_email && emailDeliveryStatus === 'SENT'),
       smsDeliveryStatus,
       emailDeliveryStatus,
       message: `Post-collection notifications sent: SMS ${smsDeliveryStatus}, Email ${emailDeliveryStatus}`
@@ -298,10 +298,7 @@ function delay(ms: number): Promise<void> {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     // Verify cron secret
     const cronSecret = request.headers.get('Authorization')

@@ -41,7 +41,7 @@ Use a free external cron service to run every 15 minutes:
    - **Method:** GET
    - **Headers:** 
      ```
-     Authorization: Bearer 74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263
+     Authorization: Bearer REPLACE_WITH_CRON_SECRET_FROM_VAULT
      ```
 
 ### **Alternative: EasyCron**
@@ -54,7 +54,7 @@ Use a free external cron service to run every 15 minutes:
    - **HTTP Method:** GET
    - **Custom Headers:**
      ```
-     Authorization: Bearer 74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263
+     Authorization: Bearer REPLACE_WITH_CRON_SECRET_FROM_VAULT
      ```
 
 ---
@@ -110,7 +110,7 @@ Use cron-job.org or EasyCron as described above.
 After setup, manually trigger to test:
 ```bash
 curl -X GET https://nfd-repairs-app.vercel.app/api/jobs/send-collection-sms \
-  -H "Authorization: Bearer 74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263"
+  -H "Authorization: Bearer REPLACE_WITH_CRON_SECRET_FROM_VAULT"
 ```
 
 Should return:
@@ -146,7 +146,7 @@ Should return:
 ## 🔑 Your CRON_SECRET
 
 ```
-74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263
+REPLACE_WITH_CRON_SECRET_FROM_VAULT
 ```
 
 Use this in the `Authorization: Bearer` header for external cron services.
@@ -183,7 +183,7 @@ Use this in the `Authorization: Bearer` header for external cron services.
 6. Click "Advanced" tab
 7. Add header:
    - **Name:** `Authorization`
-   - **Value:** `Bearer 74f5d06ea99badfeb73748de6b4efbc96f6c8aee489aafb1d2d7a573eb221263`
+   - **Value:** `Bearer REPLACE_WITH_CRON_SECRET_FROM_VAULT`
 8. Save
 
 **Done!** Your SMS will now send every 15 minutes instead of once daily.

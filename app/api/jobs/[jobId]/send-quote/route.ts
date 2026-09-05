@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/resilience'
 import { shortQuoteApprovalLink } from '@/lib/utils'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireStaffUser } from '@/lib/api-auth'
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
+  const supabase = createServiceClient()
+
   try {
     const { jobId } = params
     const { quoted_price, requires_parts_order } = await request.json()

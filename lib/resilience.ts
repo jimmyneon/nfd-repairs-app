@@ -27,7 +27,7 @@ export function createServiceClient(): SupabaseClient {
  *   )
  */
 export async function supabaseRetry<T>(
-  operation: () => Promise<T>,
+  operation: () => Promise<T> | any,
   maxRetries = 3,
   baseDelayMs = 200
 ): Promise<T> {
@@ -37,7 +37,7 @@ export async function supabaseRetry<T>(
       lastResult = await operation()
       // Check if the result has an error property (Supabase responses do)
       const maybeError = (lastResult as any)?.error
-      if (!maybeError) return lastResult
+      if (!maybeError) return lastResult as T
 
       // Retry on 401 (JWT rejection) or connection errors
       const msg = String(maybeError?.message || '')
@@ -55,7 +55,7 @@ export async function supabaseRetry<T>(
       }
 
       // Non-retryable error — return immediately
-      return lastResult
+      return lastResult as T
     } catch (err: any) {
       const msg = String(err?.message || '')
       if (attempt < maxRetries - 1) {
@@ -162,7 +162,6 @@ export async function isSupabaseHealthy(supabase: SupabaseClient): Promise<boole
       .from('jobs')
       .select('id')
       .limit(1)
-      .timeout(5000)
     return !error
   } catch {
     return false

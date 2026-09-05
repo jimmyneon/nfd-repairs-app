@@ -16,7 +16,7 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
   const [name, setName] = useState(job.customer_name)
   const [phone, setPhone] = useState(job.customer_phone)
   const [email, setEmail] = useState(job.customer_email || '')
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const handleSave = async () => {
     if (!name.trim() || !phone.trim()) return

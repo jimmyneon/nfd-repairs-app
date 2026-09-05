@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
+import { requireStaffUser } from '@/lib/api-auth'
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const body = await request.json()
     const { jobId, action, diagnosisNotes, declinedReason } = body
@@ -10,11 +14,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'jobId and action required' }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    const supabase = createServiceClient() as any
 
     if (action === 'agree') {
       // Mark repair as agreed
-      const { error } = await supabaseRetry(() =>
+      const { error }: any = await supabaseRetry(() =>
         supabase
           .from('jobs')
           .update({ repair_agreed_at: new Date().toISOString() })
@@ -37,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'decline') {
-      const { error } = await supabaseRetry(() =>
+      const { error }: any = await supabaseRetry(() =>
         supabase
           .from('jobs')
           .update({
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'save_diagnosis') {
-      const { error } = await supabaseRetry(() =>
+      const { error }: any = await supabaseRetry(() =>
         supabase
           .from('jobs')
           .update({

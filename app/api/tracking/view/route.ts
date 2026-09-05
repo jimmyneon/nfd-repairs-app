@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // If only token provided, look up job ID
     if (!resolvedJobId && trackingToken) {
-      const { data } = await supabaseRetry(() =>
+      const { data }: any = await supabaseRetry(() =>
         supabase
           .from('jobs')
           .select('id')
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const [{ count: totalVisits }, { count: visitsLastHour }, { count: visitsLast24h }] = await Promise.all([
+    const [{ count: totalVisits }, { count: visitsLastHour }, { count: visitsLast24h }]: any = await Promise.all([
       supabaseRetry(() => supabase.from('tracking_page_views').select('*', { count: 'exact', head: true }).eq('job_id', resolvedJobId)),
       supabaseRetry(() => supabase.from('tracking_page_views').select('*', { count: 'exact', head: true }).eq('job_id', resolvedJobId).gte('viewed_at', oneHourAgo)),
       supabaseRetry(() => supabase.from('tracking_page_views').select('*', { count: 'exact', head: true }).eq('job_id', resolvedJobId).gte('viewed_at', twentyFourHoursAgo)),

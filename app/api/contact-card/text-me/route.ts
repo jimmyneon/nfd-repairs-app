@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,18 +81,10 @@ Opening hours: ${hoursLink}`
       )
     }
 
-    const smsResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: normalisedPhone,
-        message: smsBody
-      })
-    })
+    const smsResponse = await sendViaMacroDroid(webhookUrl, normalisedPhone, smsBody)
 
     if (!smsResponse.ok) {
-      const errorText = await smsResponse.text()
-      console.error('SMS send failed:', errorText)
+      console.error('SMS send failed:', smsResponse.body)
       return NextResponse.json(
         { success: false, message: 'Failed to send SMS' },
         { status: 500, headers: corsHeaders }

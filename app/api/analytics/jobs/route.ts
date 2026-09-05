@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireStaffUser } from '@/lib/api-auth'
+
+export const dynamic = 'force-dynamic'
 
 type JobRow = {
   id: string
@@ -156,7 +159,7 @@ function parseRange(request: NextRequest) {
   return { start, end, label: `Last ${days} days`, custom: false }
 }
 
-async function fetchAllJobs(supabase: ReturnType<typeof createClient>): Promise<JobRow[]> {
+async function fetchAllJobs(supabase: any): Promise<JobRow[]> {
   const rows: JobRow[] = []
   let from = 0
 
@@ -181,6 +184,9 @@ async function fetchAllJobs(supabase: ReturnType<typeof createClient>): Promise<
 }
 
 export async function GET(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY

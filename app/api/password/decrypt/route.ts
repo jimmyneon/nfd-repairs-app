@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createDecipheriv } from 'crypto'
+import { requireStaffUser } from '@/lib/api-auth'
 
 /**
  * POST /api/password/decrypt
  * Decrypts a stored device password for staff use.
- * Only accessible with service role key (server-side).
+ * Requires staff authentication.
  */
 export async function POST(request: NextRequest) {
   try {
+    // Require staff auth
+    const { user, response: authResponse } = await requireStaffUser(request)
+    if (authResponse) return authResponse
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -64,7 +69,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('job_events').insert({
       job_id: jobId,
       type: 'SYSTEM',
-      message: 'Device password decrypted by staff',
+      message: `Device password decrypted by staff (${user?.email || 'unknown'})`,
     })
 
     return NextResponse.json({ password: decrypted })

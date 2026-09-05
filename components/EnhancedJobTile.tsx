@@ -21,7 +21,7 @@ interface EnhancedJobTileProps {
 
 export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
   const [showQuickActions, setShowQuickActions] = useState(false)
 
   const priorityEmoji = getPriorityEmoji(job.priority_score)

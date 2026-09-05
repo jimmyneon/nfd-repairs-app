@@ -1,5 +1,5 @@
 'use client'
-
+export const dynamic = 'force-dynamic'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Lock, Unlock, AlertCircle, Smartphone, ChevronDown, Shield } from 'lucide-react'
@@ -281,7 +281,7 @@ function CustomerConfirmContent() {
       if (jobId) {
         // Update existing job with onboarding data
         const { createClient } = await import('@/lib/supabase-browser')
-        const supabase = createClient()
+        const supabase = createClient() as any
         
         const { error: updateError } = await supabase
           .from('jobs')

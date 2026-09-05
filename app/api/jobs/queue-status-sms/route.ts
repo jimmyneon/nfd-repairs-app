@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
+import { requireCronSecret } from '@/lib/api-auth'
+
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  const cronResponse = requireCronSecret(request)
+  if (cronResponse) return cronResponse
+
   try {
     const { jobId, status, sendPriceInSms } = await request.json()
 
@@ -262,7 +268,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Queue SMS
-    const { data: smsLog, error: smsError } = await supabaseRetry(() =>
+    const { data: smsLog, error: smsError }: any = await supabaseRetry(() =>
       supabase
         .from('sms_logs')
         .insert({

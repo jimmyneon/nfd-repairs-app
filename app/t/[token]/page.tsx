@@ -39,7 +39,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const [showDiagnosisResults, setShowDiagnosisResults] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
     const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
@@ -183,7 +183,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
       .select('shop_latitude, shop_longitude, gps_radius_meters')
       .limit(1)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: any) => {
         if (data) {
           setShopCoordinates({
             latitude: data.shop_latitude || 55.7558,
@@ -204,7 +204,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           table: 'jobs',
           filter: `tracking_token=eq.${params.token}`,
         },
-        (payload) => {
+        (payload: any) => {
           setJob(payload.new)
           setLastUpdated(new Date())
           if (payload.new.status_changed_at) {

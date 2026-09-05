@@ -14,7 +14,7 @@ export default function CustomerNotesEditor({ job, onUpdate }: CustomerNotesEdit
   const [notes, setNotes] = useState(job.customer_notes || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const handleSave = async () => {
     setSaving(true)

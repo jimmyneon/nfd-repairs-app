@@ -48,7 +48,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
   const [customers, setCustomers] = useState<CustomerJob[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerJob | null>(null)
   const [customerJobs, setCustomerJobs] = useState<CustomerJob[]>([])
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     if (isOpen) {

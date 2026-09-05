@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink, getAppUrl } from '@/lib/utils'
+import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -15,6 +17,9 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,7 +74,7 @@ export async function POST(request: NextRequest) {
     const jobStatus = requiresParts ? 'PARTS_ORDERED' : 'QUOTE_APPROVED'
 
     // Generate job ref
-    const { data: jobCount } = await supabase
+    const { count: jobCount } = await supabase
       .from('jobs')
       .select('id', { count: 'exact', head: true })
 
@@ -204,14 +209,7 @@ export async function POST(request: NextRequest) {
 
     if (smsBody && customerPhone && webhookUrl) {
       try {
-        const smsResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: customerPhone,
-            message: smsBody,
-          }),
-        })
+        const smsResponse = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
 
         const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 
@@ -220,7 +218,7 @@ export async function POST(request: NextRequest) {
           template_key: requiresParts ? 'DEPOSIT_RECEIVED' : 'QUOTE_APPROVED',
           body_rendered: smsBody,
           status: deliveryStatus,
-          sent_at: now,
+          sent_at: deliveryStatus === 'SENT' ? now : null,
         })
 
         if (!smsResponse.ok) {

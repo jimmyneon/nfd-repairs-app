@@ -6,6 +6,8 @@ import { Search, AlertTriangle, Home, Clock, CheckCircle, Settings, ChevronDown,
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+
 interface WarrantyTicket {
   id: string
   ticket_ref: string
@@ -63,7 +65,7 @@ export default function WarrantyTicketsPage() {
   const [showFilterModal, setShowFilterModal] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     if (showFilterModal) {

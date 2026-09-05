@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 /**
  * POST /api/sms/send-custom
@@ -70,14 +71,7 @@ export async function POST(request: NextRequest) {
 
     if (webhookUrl) {
       try {
-        const smsResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: job.customer_phone,
-            message: smsBody,
-          }),
-        })
+        const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
 
         smsDeliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 
@@ -85,7 +79,7 @@ export async function POST(request: NextRequest) {
           .from('sms_logs')
           .update({
             status: smsDeliveryStatus,
-            sent_at: now,
+            sent_at: smsDeliveryStatus === 'SENT' ? now : null,
           })
           .eq('id', smsLog.id)
       } catch (err) {

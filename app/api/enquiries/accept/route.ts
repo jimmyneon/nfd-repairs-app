@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireStaffUser } from '@/lib/api-auth'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -13,6 +15,9 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,12 +77,13 @@ export async function POST(request: NextRequest) {
     if (webhookUrl && enquiry.customer_phone) {
       const smsMessage = `Great choice, ${enquiry.customer_name}! We've got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll be in touch ASAP to let you know what to do next. - NFD Repairs`
 
+      let smsOk = false
       try {
-        await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: enquiry.customer_phone, message: smsMessage }),
-        })
+        const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
+        smsOk = smsResponse.ok
+        if (!smsOk) {
+          console.error('Confirmation SMS failed:', smsResponse.body)
+        }
       } catch (e) {
         console.error('Confirmation SMS failed:', e)
       }
@@ -86,8 +92,8 @@ export async function POST(request: NextRequest) {
         await supabase.from('sms_logs').insert({
           template_key: 'QUOTE_ACCEPTED',
           body_rendered: smsMessage,
-          status: 'SENT',
-          sent_at: new Date().toISOString(),
+          status: smsOk ? 'SENT' : 'FAILED',
+          sent_at: smsOk ? new Date().toISOString() : null,
         } as any)
       } catch (e) {
         console.error('SMS log failed:', e)

@@ -11,6 +11,8 @@ import {
   savePushSubscription
 } from '@/lib/notifications'
 
+export const dynamic = 'force-dynamic'
+
 interface NotificationConfig {
   id: string
   status_key: string
@@ -31,7 +33,7 @@ export default function NotificationSettingsPage() {
   const [hasSubscription, setHasSubscription] = useState(false)
   const [checkingSubscription, setCheckingSubscription] = useState(true)
   const [subscribing, setSubscribing] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadConfigs()

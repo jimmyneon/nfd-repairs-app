@@ -16,7 +16,7 @@ export default function DiagnosticReportEditor({ job, onUpdate, onSendMessage }:
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const handleSave = async () => {
     setSaving(true)

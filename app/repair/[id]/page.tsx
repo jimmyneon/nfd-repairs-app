@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import RepairDashboard from '@/components/RepairDashboard'
 
 export default async function RepairPage({ params }: { params: { id: string } }) {
+  const db = supabase as any
   const cookieStore = cookies()
   const token = cookieStore.get('repair_token')?.value
 
@@ -11,7 +12,7 @@ export default async function RepairPage({ params }: { params: { id: string } })
     redirect('/auth/login')
   }
 
-  const { data: magicLink } = await supabase
+  const { data: magicLink } = await db
     .from('magic_links')
     .select('repair_id')
     .eq('token', token)
@@ -22,7 +23,7 @@ export default async function RepairPage({ params }: { params: { id: string } })
     redirect('/auth/login')
   }
 
-  const { data: repair, error } = await supabase
+  const { data: repair, error } = await db
     .from('repairs')
     .select('*')
     .eq('id', params.id)

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, AlertTriangle, MessageSquare } from 'lucide-react'
-import { JobStatus } from '@/lib/types'
+import { JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS } from '@/lib/constants'
 
 interface StatusChangeModalProps {

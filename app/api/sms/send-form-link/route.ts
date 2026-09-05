@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireStaffUser } from '@/lib/api-auth'
 import { getAppUrl } from '@/lib/utils'
+import { sendViaMacroDroid } from '@/lib/resilience'
+
+export const dynamic = 'force-dynamic'
 
 const LINKS = {
   quote: 'https://nfdr.uk/q/sms',
@@ -30,11 +33,7 @@ export async function POST(request: NextRequest) {
   const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
   if (!webhookUrl) return NextResponse.json({ error: 'SMS service is not configured' }, { status: 500 })
 
-  const smsResponse = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: cleanPhone, message }),
-  })
+  const smsResponse = await sendViaMacroDroid(webhookUrl, cleanPhone, message)
 
   if (!smsResponse.ok) {
     return NextResponse.json({ error: 'The SMS service did not accept the message' }, { status: 502 })

@@ -5,6 +5,7 @@ import { shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
+    const db = supabase as any
     const body = await request.json()
     
     const {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     const final_deposit_amount = parts_required ? 20.00 : null
     const initial_status = parts_required ? 'AWAITING_DEPOSIT' : 'READY_TO_BOOK_IN'
 
-    const { data: job, error: jobError } = await supabase
+    const { data: job, error: jobError } = await db
       .from('jobs')
       .insert({
         status: initial_status,
@@ -55,13 +56,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await supabase.from('job_events').insert({
+    await db.from('job_events').insert({
       job_id: job.id,
       type: 'SYSTEM',
       message: 'Job created via API',
     } as any)
 
-    await supabase.from('notifications').insert({
+    await db.from('notifications').insert({
       type: 'NEW_JOB',
       title: 'New repair job created',
       body: device_summary,
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     } as any)
 
     if (deposit_required) {
-      const { data: template } = await supabase
+      const { data: template } = await db
         .from('sms_templates')
         .select('*')
         .eq('key', 'DEPOSIT_REQUIRED')
@@ -88,13 +89,13 @@ export async function POST(request: NextRequest) {
           device_summary: safeDeviceLabel('Unknown', device_summary),
           device_make: 'Unknown',
           price_total: price_total.toString(),
-          deposit_amount: final_deposit_amount.toString(),
+          deposit_amount: (final_deposit_amount || 0).toString(),
           tracking_link: trackingUrl,
           deposit_link: depositUrl,
           job_ref: job.job_ref,
         })
 
-        await supabase.from('sms_logs').insert({
+        await db.from('sms_logs').insert({
           job_id: job.id,
           template_key: 'DEPOSIT_REQUIRED',
           body_rendered: smsBody,

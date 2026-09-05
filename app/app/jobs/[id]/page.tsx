@@ -1,5 +1,5 @@
 'use client'
-
+export const dynamic = 'force-dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { getFirstName } from '@/lib/sms-template'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
@@ -32,9 +33,9 @@ const isIncompleteIntakeValue = (value?: string | null) =>
 
 const jobNeedsIntake = (job: Job) =>
   !job.terms_accepted ||
-  isIncompleteIntakeValue(job.device_make) ||
-  isIncompleteIntakeValue(job.device_model) ||
-  isIncompleteIntakeValue(job.issue)
+  isIncompleteIntakeValue(job!.device_make) ||
+  isIncompleteIntakeValue(job!.device_model) ||
+  isIncompleteIntakeValue(job!.issue)
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [job, setJob] = useState<Job | null>(null)
@@ -94,7 +95,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [savingPartsInfo, setSavingPartsInfo] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
     const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
@@ -155,7 +156,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   // Auto-show customer arrived prompt if customer is waiting (within last 30 minutes)
   useEffect(() => {
-    if (job && job.customer_arrived_at && job.status === 'READY_TO_COLLECT') {
+    if (job && job.customer_arrived_at && job!.status === 'READY_TO_COLLECT') {
       const arrivedAt = new Date(job.customer_arrived_at)
       const now = new Date()
       const minutesSinceArrival = (now.getTime() - arrivedAt.getTime()) / (1000 * 60)
@@ -169,7 +170,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   // Auto-show collection confirmation modal if ?collect=true and status is READY_TO_COLLECT
   useEffect(() => {
-    if (job && searchParams.get('collect') === 'true' && job.status === 'READY_TO_COLLECT') {
+    if (job && searchParams.get('collect') === 'true' && job!.status === 'READY_TO_COLLECT') {
       setNewStatus('COLLECTED')
       setShowStatusModal(true)
       // Remove query param from URL
@@ -254,9 +255,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (!nameValue.trim()) return
     setActionLoading(true)
     try {
-      await supabase.from('jobs').update({ customer_name: nameValue.trim() }).eq('id', job.id)
+      await supabase.from('jobs').update({ customer_name: nameValue.trim() }).eq('id', job!.id)
       await supabase.from('job_events').insert({
-        job_id: job.id,
+        job_id: job!.id,
         type: 'SYSTEM',
         message: `Customer name updated to: ${nameValue.trim()}`,
       })
@@ -273,9 +274,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (!phoneValue.trim()) return
     setActionLoading(true)
     try {
-      await supabase.from('jobs').update({ customer_phone: phoneValue.trim() }).eq('id', job.id)
+      await supabase.from('jobs').update({ customer_phone: phoneValue.trim() }).eq('id', job!.id)
       await supabase.from('job_events').insert({
-        job_id: job.id,
+        job_id: job!.id,
         type: 'SYSTEM',
         message: `Customer phone updated to: ${phoneValue.trim()}`,
       })
@@ -291,9 +292,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const handleSaveEmail = async () => {
     setActionLoading(true)
     try {
-      await supabase.from('jobs').update({ customer_email: emailValue.trim() || null }).eq('id', job.id)
+      await supabase.from('jobs').update({ customer_email: emailValue.trim() || null }).eq('id', job!.id)
       await supabase.from('job_events').insert({
-        job_id: job.id,
+        job_id: job!.id,
         type: 'SYSTEM',
         message: emailValue.trim() ? `Customer email updated to: ${emailValue.trim()}` : 'Customer email cleared',
       })
@@ -313,9 +314,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       const updateData: any = {
         parts_tracking_number: partsTrackingNumber.trim() || null,
       }
-      await supabase.from('jobs').update(updateData).eq('id', job.id)
+      await supabase.from('jobs').update(updateData).eq('id', job!.id)
       await supabase.from('job_events').insert({
-        job_id: job.id,
+        job_id: job!.id,
         type: 'SYSTEM',
         message: `Parts tracking info updated${partsTrackingNumber ? ` - Tracking: ${partsTrackingNumber} (${partsCarrier === 'auto' ? 'auto-detect' : partsCarrier})` : ''}`,
       })
@@ -347,7 +348,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   const getCarrierFromJob = () => {
     if (!job?.parts_tracking_number) return null
-    const tn = job.parts_tracking_number.trim().toUpperCase()
+    const tn = job!.parts_tracking_number.trim().toUpperCase()
     if (/^[A-Z]{2}\d{9}[A-Z]{2}$/.test(tn)) return 'royalmail'
     if (/^\d{14,15}$/.test(tn)) return 'dpd'
     return 'evri'
@@ -356,10 +357,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const handleQuickReviewToggle = async () => {
     setReviewToggling(true)
     try {
-      const newValue = !job.skip_review_request
-      await supabase.from('jobs').update({ skip_review_request: newValue } as any).eq('id', job.id)
+      const newValue = !job!.skip_review_request
+      await supabase.from('jobs').update({ skip_review_request: newValue } as any).eq('id', job!.id)
       await supabase.from('job_events').insert({
-        job_id: job.id,
+        job_id: job!.id,
         type: 'SYSTEM',
         message: `Review request ${newValue ? 'DISABLED' : 'ENABLED'}`,
       } as any)
@@ -422,14 +423,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     let { error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
-      .eq('id', job.id)
+      .eq('id', job!.id)
 
     if (updateError) {
       console.error('Failed to update job:', updateError)
       // If repair_outcome column doesn't exist yet, retry without it
       if (updateError.message.includes('repair_outcome') || updateError.message.includes('Could not find')) {
         const { repair_outcome, ...dataWithoutOutcome } = updateData
-        const { error: retryError } = await supabase.from('jobs').update(dataWithoutOutcome).eq('id', job.id)
+        const { error: retryError } = await supabase.from('jobs').update(dataWithoutOutcome).eq('id', job!.id)
         updateError = retryError
       }
     }
@@ -449,16 +450,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setJob({ ...job, ...updateData } as Job)
 
     await supabase.from('job_events').insert({
-      job_id: job.id,
+      job_id: job!.id,
       type: 'STATUS_CHANGE',
       message: `Status changed to ${JOB_STATUS_LABELS[pendingWorkflowStatus]}`,
     })
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
-      title: `Job ${job.job_ref} updated`,
+      title: `Job ${job!.job_ref} updated`,
       body: `Status changed to ${JOB_STATUS_LABELS[pendingWorkflowStatus]}`,
-      job_id: job.id,
+      job_id: job!.id,
     })
 
     // Queue SMS for status change (unless overridden)
@@ -468,7 +469,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jobId: job.id,
+            jobId: job!.id,
             status: pendingWorkflowStatus,
             sendPriceInSms,
           }),
@@ -484,13 +485,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Send email notification (unless overridden)
     if (!overrideEmail) {
-      if (job.customer_email) {
+      if (job!.customer_email) {
         try {
           const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              jobId: job.id,
+              jobId: job!.id,
               type: 'STATUS_UPDATE',
             }),
           })
@@ -543,19 +544,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         delay_reason: pendingDelayReason,
         delay_notes: pendingDelayNotes,
       } as any)
-      .eq('id', job.id)
+      .eq('id', job!.id)
 
     await supabase.from('job_events').insert({
-      job_id: job.id,
+      job_id: job!.id,
       type: 'STATUS_CHANGE',
       message: `Status changed to Delayed - ${pendingDelayReason}`,
     } as any)
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
-      title: `Job ${job.job_ref} delayed`,
+      title: `Job ${job!.job_ref} delayed`,
       body: `Delay reason: ${pendingDelayReason}`,
-      job_id: job.id,
+      job_id: job!.id,
     } as any)
 
     // Queue SMS for DELAYED status (will include delay_reason and delay_notes) - unless overridden
@@ -565,7 +566,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jobId: job.id,
+            jobId: job!.id,
             status: 'DELAYED',
             sendPriceInSms,
           }),
@@ -577,13 +578,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Send email notification (unless overridden)
     if (!overrideEmail) {
-      if (job.customer_email) {
+      if (job!.customer_email) {
         try {
           await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              jobId: job.id,
+              jobId: job!.id,
               type: 'STATUS_UPDATE',
             }),
           })
@@ -635,19 +636,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         cancellation_reason: pendingCancellationReason,
         cancellation_notes: pendingCancellationNotes,
       } as any)
-      .eq('id', job.id)
+      .eq('id', job!.id)
 
     await supabase.from('job_events').insert({
-      job_id: job.id,
+      job_id: job!.id,
       type: 'STATUS_CHANGE',
       message: `Status changed to Cancelled - ${pendingCancellationReason}`,
     } as any)
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
-      title: `Job ${job.job_ref} cancelled`,
+      title: `Job ${job!.job_ref} cancelled`,
       body: `Cancellation reason: ${pendingCancellationReason}`,
-      job_id: job.id,
+      job_id: job!.id,
     } as any)
 
     // Queue SMS for CANCELLED status (will include cancellation_reason and cancellation_notes) - unless overridden
@@ -657,7 +658,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jobId: job.id,
+            jobId: job!.id,
             status: 'CANCELLED',
             sendPriceInSms,
           }),
@@ -669,13 +670,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Send email notification (unless overridden)
     if (!overrideEmail) {
-      if (job.customer_email) {
+      if (job!.customer_email) {
         try {
           await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              jobId: job.id,
+              jobId: job!.id,
               type: 'STATUS_UPDATE',
             }),
           })
@@ -714,7 +715,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const { error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
-      .eq('id', job.id)
+      .eq('id', job!.id)
 
     if (updateError) {
       console.error('Status update failed, aborting:', updateError)
@@ -730,16 +731,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setJob({ ...job, ...updateData } as Job)
 
     await supabase.from('job_events').insert({
-      job_id: job.id,
+      job_id: job!.id,
       type: 'STATUS_CHANGE',
       message,
     } as any)
 
     await supabase.from('notifications').insert({
       type: 'STATUS_UPDATE',
-      title: `Job ${job.job_ref} updated`,
+      title: `Job ${job!.job_ref} updated`,
       body: message,
-      job_id: job.id,
+      job_id: job!.id,
     } as any)
 
     // Queue SMS for status change (unless overridden) - use parameter directly
@@ -749,7 +750,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            jobId: job.id,
+            jobId: job!.id,
             status: newStatus,
             sendPriceInSms,
           }),
@@ -765,13 +766,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
     // Send email notification (unless overridden) - use parameter directly
     if (!overrideEmailParam) {
-      if (job.customer_email) {
+      if (job!.customer_email) {
         try {
           const emailResponse = await fetch('/api/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              jobId: job.id,
+              jobId: job!.id,
               type: 'STATUS_UPDATE',
             }),
           })
@@ -801,10 +802,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         deposit_amount: depositAmount,
         status: 'PARTS_ORDERED'
       } as any)
-      .eq('id', job.id)
+      .eq('id', job!.id)
 
     await supabase.from('job_events').insert({
-      job_id: job.id,
+      job_id: job!.id,
       type: 'STATUS_CHANGE',
       message: `Deposit of £${depositAmount.toFixed(2)} received`,
     } as any)
@@ -819,7 +820,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setDepositSending(true)
 
     try {
-      const response = await fetch(`/api/jobs/${job.id}/request-deposit`, {
+      const response = await fetch(`/api/jobs/${job!.id}/request-deposit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -827,7 +828,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
       if (data.success) {
         await supabase.from('job_events').insert({
-          job_id: job.id,
+          job_id: job!.id,
           type: 'SYSTEM',
           message: 'Deposit request SMS sent to customer',
         } as any)
@@ -847,13 +848,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       const response = await fetch('/api/jobs/send-aftercare-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
+        body: JSON.stringify({ jobId: job!.id }),
       })
       const data = await response.json()
 
       if (data.success) {
         await supabase.from('job_events').insert({
-          job_id: job.id,
+          job_id: job!.id,
           type: 'SYSTEM',
           message: 'Aftercare SMS sent manually from job page',
         } as any)
@@ -913,7 +914,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {/* Customer Arrived Prompt - inline banner */}
         {showCustomerArrivedPrompt && job && (
           <CustomerArrivedPrompt
-            jobRef={job.job_ref}
+            jobRef={job!.job_ref}
             onConfirm={handleCustomerArrivedConfirm}
             onDismiss={() => setShowCustomerArrivedPrompt(false)}
           />
@@ -923,12 +924,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border-2 border-gray-100 dark:border-gray-700">
           <div className="flex items-start gap-4 mb-3">
             <div className="flex-shrink-0 w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
-              {getDeviceIcon(job.device_make || '', job.device_model || '')}
+              {getDeviceIcon(job!.device_make || '', job!.device_model || '')}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{job.device_make} {job.device_model}</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{job.issue}</p>
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-1">{job.customer_name}</p>
+              <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{job!.device_make} {job!.device_model}</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{job!.issue}</p>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-1">{job!.customer_name}</p>
             </div>
             {job.is_warranty ? (
               <div className="text-right flex-shrink-0">
@@ -943,19 +944,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 onClick={() => setShowPriceModal(true)}
                 className="text-right flex-shrink-0 active:scale-95 transition-transform"
               >
-                <p className="text-2xl font-black text-primary">£{job.price_total.toFixed(2)}</p>
+                <p className="text-2xl font-black text-primary">£{job!.price_total.toFixed(2)}</p>
                 {job.payment_received && (
                   <p className="text-xs text-green-600 font-bold">Paid in full</p>
                 )}
-                {job.deposit_required && !job.deposit_received && (
+                {job!.deposit_required && !job!.deposit_received && (
                   <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
                 )}
-                {job.deposit_required && job.deposit_received && !job.payment_received && (
+                {job!.deposit_required && job!.deposit_received && !job.payment_received && (
                   <p className="text-xs text-green-600 font-bold">
-                    Deposit paid · £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)} due
+                    Deposit paid · £{(job!.price_total - (job!.deposit_amount || 0)).toFixed(2)} due
                   </p>
                 )}
-                {!job.payment_received && !job.deposit_required && job.price_total > 0 && (
+                {!job.payment_received && !job!.deposit_required && job!.price_total > 0 && (
                   <p className="text-xs text-orange-600 font-bold">Payment due</p>
                 )}
               </button>
@@ -963,8 +964,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-            <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job.status]}`}>
-              {JOB_STATUS_SHORT_LABELS[job.status]}
+            <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job!.status]}`}>
+              {JOB_STATUS_SHORT_LABELS[job!.status]}
             </span>
             {job.repair_outcome && (
               <span className={`text-xs px-2.5 py-1 rounded-lg font-bold ${
@@ -1055,7 +1056,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     const res = await fetch('/api/password/decrypt', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ jobId: job.id }),
+                      body: JSON.stringify({ jobId: job!.id }),
                     })
                     const data = await res.json()
                     if (data.password) setDecryptedPassword(data.password)
@@ -1131,7 +1132,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             onClick={() => setShowReviewPlatforms(true)}
             onContextMenu={(e) => { e.preventDefault(); setShowReviewReason(true) }}
             className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 ${
-              job.skip_review_request
+              job!.skip_review_request
                 ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300'
                 : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300'
             }`}
@@ -1143,25 +1144,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         </div>
 
         {/* Mini Action Buttons Row 3 - contextual (parts tracking) */}
-        {(job.status === 'PARTS_ORDERED' || job.status === 'PARTS_ARRIVED') && (
+        {(job!.status === 'PARTS_ORDERED' || job!.status === 'PARTS_ARRIVED') && (
         <div className="grid grid-cols-5 gap-2">
           <button
             onClick={() => setShowPartsTrackingForm(!showPartsTrackingForm)}
             className={`aspect-square flex flex-col items-center justify-center gap-1 border-2 font-bold rounded-xl transition-colors active:scale-95 ${
               showPartsTrackingForm
                 ? 'bg-purple-600 text-white border-purple-700'
-                : job.parts_tracking_number
+                : job!.parts_tracking_number
                 ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300'
                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
             }`}
-            title={job.parts_tracking_number ? `Tracking: ${job.parts_tracking_number}` : 'Add parts tracking'}
+            title={job!.parts_tracking_number ? `Tracking: ${job!.parts_tracking_number}` : 'Add parts tracking'}
           >
             <Truck className="h-5 w-5" />
-            <span className="text-[10px]">{job.parts_tracking_number ? 'Parcel' : 'Parts'}</span>
+            <span className="text-[10px]">{job!.parts_tracking_number ? 'Parcel' : 'Parts'}</span>
           </button>
-          {job.parts_tracking_number && (
+          {job!.parts_tracking_number && (
             <a
-              href={getCarrierTrackingUrl(partsCarrier === 'auto' ? (getCarrierFromJob() || 'auto') : partsCarrier, job.parts_tracking_number)}
+              href={getCarrierTrackingUrl(partsCarrier === 'auto' ? (getCarrierFromJob() || 'auto') : partsCarrier, job!.parts_tracking_number)}
               target="_blank"
               rel="noopener noreferrer"
               className="aspect-square flex flex-col items-center justify-center gap-1 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95"
@@ -1175,7 +1176,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {/* Aftercare Button Row - shown for COLLECTED/COMPLETED jobs */}
-        {(job.status === 'COLLECTED' || job.status === 'COMPLETED') && (
+        {(job!.status === 'COLLECTED' || job!.status === 'COMPLETED') && (
         <div className="grid grid-cols-5 gap-2">
           <button
             onClick={handleSendAftercare}
@@ -1198,7 +1199,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {/* Parts Tracking Slide-up Panel */}
-        {showPartsTrackingForm && (job.status === 'PARTS_ORDERED' || job.status === 'PARTS_ARRIVED') && (
+        {showPartsTrackingForm && (job!.status === 'PARTS_ORDERED' || job!.status === 'PARTS_ARRIVED') && (
           <div className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-3">
             <div className="space-y-2">
               <select
@@ -1238,14 +1239,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <OnboardingGate 
               termsAccepted={job.terms_accepted}
-              deviceMake={job.device_make}
-              deviceModel={job.device_model}
-              issue={job.issue}
+              deviceMake={job!.device_make}
+              deviceModel={job!.device_model}
+              issue={job!.issue}
               hasPasscode={Boolean(job.device_password)}
               passwordNotApplicable={job.password_not_applicable}
             />
             <Link
-              href={`/walk-in/complete/${job.tracking_token}`}
+              href={`/walk-in/complete/${job!.tracking_token}`}
               className="block w-full mt-4 bg-primary hover:bg-primary-dark text-white font-bold py-3 px-6 rounded-xl transition-all text-center"
             >
               Open Completion Form In-Shop
@@ -1291,7 +1292,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job.deposit_required && !job.deposit_received && !job.is_warranty && (
+        {job!.deposit_required && !job!.deposit_received && !job.is_warranty && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <div className="flex items-start space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
@@ -1315,9 +1316,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     className="w-full px-4 py-3 text-2xl font-bold border-2 border-yellow-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-yellow-900"
                     placeholder="20.00"
                   />
-                  {job.price_total > 0 && (
+                  {job!.price_total > 0 && (
                     <p className="text-xs text-yellow-700 mt-1">
-                      Balance after deposit: £{(job.price_total - (parseFloat(depositAmountInput) || 0)).toFixed(2)}
+                      Balance after deposit: £{(job!.price_total - (parseFloat(depositAmountInput) || 0)).toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -1353,7 +1354,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job.deposit_required && job.deposit_received && !job.is_warranty && (
+        {job!.deposit_required && job!.deposit_received && !job.is_warranty && (
           <div className="card bg-green-50 border-2 border-green-300">
             <div className="flex items-start space-x-3">
               <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
@@ -1362,11 +1363,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   Deposit Paid
                 </p>
                 <p className="text-green-800 text-sm">
-                  £{job.deposit_amount?.toFixed(2) || '20.00'} deposit received
+                  £{job!.deposit_amount?.toFixed(2) || '20.00'} deposit received
                 </p>
-                {job.price_total > 0 && (
+                {job!.price_total > 0 && (
                   <p className="text-green-700 text-sm font-semibold mt-1">
-                    Balance remaining: £{(job.price_total - (job.deposit_amount || 0)).toFixed(2)}
+                    Balance remaining: £{(job!.price_total - (job!.deposit_amount || 0)).toFixed(2)}
                   </p>
                 )}
               </div>
@@ -1386,7 +1387,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           )}
           <div className="space-y-4">
-            {job.status === 'QUOTE_REQUESTED' && (
+            {job!.status === 'QUOTE_REQUESTED' && (
               <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
                 {job.quoted_at && (
                   <div className="mb-4 bg-amber-50 border-2 border-amber-200 rounded-lg p-3 flex items-center gap-2">
@@ -1395,7 +1396,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       <p className="font-bold text-amber-900 text-sm">Quote Sent — Waiting for Customer</p>
                       <p className="text-xs text-amber-700">
                         Sent {new Date(job.quoted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        {job.quoted_price && ` · £${job.quoted_price.toFixed(2)}`}
+                        {job!.quoted_price && ` · £${job!.quoted_price.toFixed(2)}`}
                       </p>
                     </div>
                   </div>
@@ -1414,7 +1415,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       step="0.01"
                       min="0"
                       id="quotePrice"
-                      defaultValue={job.quoted_price || ''}
+                      defaultValue={job!.quoted_price || ''}
                       className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter price"
                     />
@@ -1478,7 +1479,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {job.status === 'QUOTE_APPROVED' && (
+            {job!.status === 'QUOTE_APPROVED' && (
               <>
                 {/* Highlighted banner - customer approved the quote */}
                 <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-xl p-4">
@@ -1490,7 +1491,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     {job.quote_approved_at
                       ? `Approved ${new Date(job.quote_approved_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
                       : 'Customer has approved this quote.'}
-                    {job.quoted_price && ` — £${job.quoted_price.toFixed(2)}`}
+                    {job!.quoted_price && ` — £${job!.quoted_price.toFixed(2)}`}
                   </p>
                 </div>
 
@@ -1500,13 +1501,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   onClick={async () => {
                     setActionLoading(true)
                     try {
-                      const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
-                      const firstName = job.customer_name?.split(' ')[0] || 'there'
+                      const deviceName = `${job!.device_make || ''} ${job!.device_model || ''}`.trim() || 'your device'
+                      const firstName = job!.customer_name?.split(' ')[0] || 'there'
                       const smsMessage = `Hi ${firstName}, we've got the parts for your ${deviceName} in stock! Pop it in any time at your convenience and we'll get it sorted.\n\nPlease check our live hours before setting off: ${shortHoursLink()}`
                       await fetch('/api/sms/send-custom', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ jobId: job.id, message: smsMessage, sendEmail: true }),
+                        body: JSON.stringify({ jobId: job!.id, message: smsMessage, sendEmail: true }),
                       })
                       await handleWorkflowStatusChange('RECEIVED')
                     } catch (err) {
@@ -1524,21 +1525,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   onClick={async () => {
                     setActionLoading(true)
                     try {
-                      const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
-                      const firstName = job.customer_name?.split(' ')[0] || 'there'
+                      const deviceName = `${job!.device_make || ''} ${job!.device_model || ''}`.trim() || 'your device'
+                      const firstName = job!.customer_name?.split(' ')[0] || 'there'
                       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
                       const smsMessage = `Hi ${firstName}, thanks for approving the quote for your ${deviceName}! I'm ordering the parts in now — they usually arrive next day. We just need a £20 deposit to get the order placed.\n\nPay online here: ${depositUrl}\n\nOr pop in to the shop to pay. Please check our live hours before setting off: ${shortHoursLink()}`
                       await fetch('/api/sms/send-custom', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ jobId: job.id, message: smsMessage, sendEmail: true }),
+                        body: JSON.stringify({ jobId: job!.id, message: smsMessage, sendEmail: true }),
                       })
                       // Set deposit required and move to AWAITING_DEPOSIT
                       await supabase.from('jobs').update({
                         deposit_required: true,
                         deposit_amount: 20.00,
                         requires_parts_order: true,
-                      }).eq('id', job.id)
+                      }).eq('id', job!.id)
                       await handleWorkflowStatusChange('AWAITING_DEPOSIT')
                     } catch (err) {
                       console.error('Failed to send special order message:', err)
@@ -1563,7 +1564,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </>
             )}
             
-            {job.status === 'RECEIVED' && !job.parts_required && (
+            {job!.status === 'RECEIVED' && !job!.parts_required && (
               <>
                 <button
                   onClick={() => handleWorkflowStatusChange('DIAGNOSTIC')}
@@ -1584,7 +1585,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </>
             )}
             
-            {job.status === 'RECEIVED' && job.parts_required && (
+            {job!.status === 'RECEIVED' && job!.parts_required && (
               <button
                 onClick={() => handleWorkflowStatusChange('AWAITING_DEPOSIT')}
                 disabled={actionLoading}
@@ -1595,7 +1596,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
             
-            {job.status === 'AWAITING_DEPOSIT' && job.deposit_received && (
+            {job!.status === 'AWAITING_DEPOSIT' && job!.deposit_received && (
               <button
                 onClick={() => handleWorkflowStatusChange('PARTS_ORDERED')}
                 disabled={actionLoading}
@@ -1606,7 +1607,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {job.status === 'PARTS_ORDERED' && (
+            {job!.status === 'PARTS_ORDERED' && (
               <button
                 onClick={() => handleWorkflowStatusChange('PARTS_ARRIVED')}
                 disabled={actionLoading}
@@ -1617,7 +1618,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {job.status === 'PARTS_ARRIVED' && (
+            {job!.status === 'PARTS_ARRIVED' && (
               <button
                 onClick={() => handleWorkflowStatusChange('IN_REPAIR')}
                 disabled={actionLoading}
@@ -1628,7 +1629,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {job.status === 'DIAGNOSTIC' && (
+            {job!.status === 'DIAGNOSTIC' && (
               <>
                 {/* Diagnostic section — boxed off separately */}
                 <div className="w-full bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 border-2 border-gray-200 dark:border-gray-700 space-y-3">
@@ -1638,8 +1639,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
                   {/* Status banner */}
                   {(() => {
-                    const hasDiagnosis = !!(job.diagnosis_notes || job.diagnostic_report)
-                    const agreed = !!job.repair_agreed_at
+                    const hasDiagnosis = !!(job!.diagnosis_notes || job.diagnostic_report)
+                    const agreed = !!job!.repair_agreed_at
                     const declined = !!job.repair_declined_at
 
                     if (declined) {
@@ -1677,7 +1678,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   })()}
 
                   {/* Action buttons — only show relevant ones */}
-                  {!job.repair_agreed_at && !job.repair_declined_at && (
+                  {!job!.repair_agreed_at && !job.repair_declined_at && (
                     <>
                       <button
                         onClick={() => setShowDiagnosticFollowUp(true)}
@@ -1697,7 +1698,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   )}
 
                   {/* Write / Edit diagnostic report — only if no report yet */}
-                  {!(job.diagnosis_notes || job.diagnostic_report) && (
+                  {!(job!.diagnosis_notes || job.diagnostic_report) && (
                     <button
                       onClick={() => setActivePanel('diagnostic')}
                       disabled={actionLoading}
@@ -1709,7 +1710,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                   )}
 
                   {/* Edit existing report — smaller link */}
-                  {(job.diagnosis_notes || job.diagnostic_report) && (
+                  {(job!.diagnosis_notes || job.diagnostic_report) && (
                     <button
                       onClick={() => setActivePanel('diagnostic')}
                       disabled={actionLoading}
@@ -1733,7 +1734,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </>
             )}
 
-            {job.status === 'IN_REPAIR' && (
+            {job!.status === 'IN_REPAIR' && (
               <button
                 onClick={() => handleWorkflowStatusChange('READY_TO_COLLECT')}
                 disabled={actionLoading}
@@ -1744,7 +1745,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
 
-            {job.status === 'READY_TO_COLLECT' && (
+            {job!.status === 'READY_TO_COLLECT' && (
               <button
                 onClick={() => handleWorkflowStatusChange('COLLECTED')}
                 disabled={actionLoading}
@@ -1755,7 +1756,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
             
-            {job.status === 'COLLECTED' && (
+            {job!.status === 'COLLECTED' && (
               <button
                 onClick={() => handleWorkflowStatusChange('COMPLETED')}
                 disabled={actionLoading}
@@ -1792,7 +1793,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {/* Status Selector Modal */}
         {showStatusSelector && (
           <StatusSelectorModal
-            currentStatus={job.status}
+            currentStatus={job!.status}
             onSelect={handleManualStatusChange}
             onClose={() => setShowStatusSelector(false)}
           />
@@ -1843,7 +1844,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                       </div>
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Uncheck to skip sending that notification</p>
 
-                      {willSendSMS && !overrideSMS && (pendingWorkflowStatus === 'READY_TO_COLLECT' || pendingWorkflowStatus === 'QUOTE_REMINDER') && job.price_total > 0 && (
+                      {willSendSMS && !overrideSMS && (pendingWorkflowStatus === 'READY_TO_COLLECT' || (pendingWorkflowStatus as string) === 'QUOTE_REMINDER') && job!.price_total > 0 && (
                         <label className="flex items-center gap-2 cursor-pointer mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
                           <input
                             type="checkbox"
@@ -1852,7 +1853,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                           />
                           <span className="text-xs text-blue-900 dark:text-blue-200">
-                            <span className="font-semibold">Include price (£{job.price_total.toFixed(2)})</span> in SMS
+                            <span className="font-semibold">Include price (£{job!.price_total.toFixed(2)})</span> in SMS
                           </span>
                         </label>
                       )}
@@ -1889,7 +1890,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {/* Delay Reason Modal */}
         {showDelayModal && job && (
           <DelayReasonModal
-            deviceInfo={`${job.device_make} ${job.device_model}`}
+            deviceInfo={`${job!.device_make} ${job!.device_model}`}
             onConfirm={handleDelayReasonSubmit}
             onCancel={() => setShowDelayModal(false)}
           />
@@ -1901,7 +1902,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
               <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Delay Status</h2>
               <p className="text-gray-700 mb-2">
-                Mark <span className="font-bold">{job.device_make} {job.device_model}</span> as <span className="font-bold text-red-600">Delayed</span>?
+                Mark <span className="font-bold">{job!.device_make} {job!.device_model}</span> as <span className="font-bold text-red-600">Delayed</span>?
               </p>
               <p className="text-sm text-gray-600 mb-4">
                 Reason: <span className="font-semibold">{pendingDelayReason.replace(/_/g, ' ')}</span>
@@ -1942,7 +1943,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                           </label>
                         )}
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">To: {job.customer_phone}{job.customer_email ? ` / ${job.customer_email}` : ''}</p>
+                      <p className="text-xs text-blue-600 mt-2">To: {job!.customer_phone}{job!.customer_email ? ` / ${job!.customer_email}` : ''}</p>
                       <p className="text-xs text-blue-600 mt-1">Uncheck to skip sending that notification</p>
                     </div>
                   </div>
@@ -1974,7 +1975,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {/* Cancellation Reason Modal */}
         {showCancellationModal && job && (
           <CancellationReasonModal
-            deviceInfo={`${job.device_make} ${job.device_model}`}
+            deviceInfo={`${job!.device_make} ${job!.device_model}`}
             onConfirm={handleCancellationReasonSubmit}
             onCancel={() => setShowCancellationModal(false)}
           />
@@ -1986,7 +1987,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
               <h2 className="text-2xl font-black text-gray-900 mb-4">Confirm Cancellation</h2>
               <p className="text-gray-700 mb-2">
-                Cancel job for <span className="font-bold">{job.device_make} {job.device_model}</span>?
+                Cancel job for <span className="font-bold">{job!.device_make} {job!.device_model}</span>?
               </p>
               <p className="text-sm text-gray-600 mb-4">
                 Reason: <span className="font-semibold">{pendingCancellationReason.replace(/_/g, ' ')}</span>
@@ -2027,7 +2028,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                           </label>
                         )}
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">To: {job.customer_phone}{job.customer_email ? ` / ${job.customer_email}` : ''}</p>
+                      <p className="text-xs text-blue-600 mt-2">To: {job!.customer_phone}{job!.customer_email ? ` / ${job!.customer_email}` : ''}</p>
                       <p className="text-xs text-blue-600 mt-1">Uncheck to skip sending that notification</p>
                     </div>
                   </div>
@@ -2059,9 +2060,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         {/* Triple Confirmation Modal (for manual status changes) */}
         {showStatusModal && newStatus && (
           <StatusChangeModal
-            currentStatus={job.status}
+            currentStatus={job!.status}
             newStatus={newStatus}
-            deviceInfo={`${job.device_make} ${job.device_model}`}
+            deviceInfo={`${job!.device_make} ${job!.device_model}`}
             onConfirm={confirmStatusChange}
             onCancel={() => {
               setShowStatusModal(false)
@@ -2069,8 +2070,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             }}
             willSendSMS={willSendSMS}
             willSendEmail={willSendEmail}
-            showPriceOption={newStatus === 'READY_TO_COLLECT' || newStatus === 'QUOTE_REMINDER'}
-            priceValue={job.price_total}
+            showPriceOption={newStatus === 'READY_TO_COLLECT' || (newStatus as string) === 'QUOTE_REMINDER'}
+            priceValue={job!.price_total}
             sendPriceInSms={sendPriceInSms}
             onSendPriceInSmsChange={setSendPriceInSms}
           />
@@ -2102,13 +2103,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer Tracking Link</h3>
               
               <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded text-xs break-all text-gray-900 dark:text-white mb-4 border border-gray-200 dark:border-gray-600">
-                {shortTrackingLink(job.tracking_token)}
+                {shortTrackingLink(job!.tracking_token)}
               </div>
 
               <div className="space-y-2 mb-4">
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(shortTrackingLink(job.tracking_token))
+                    navigator.clipboard.writeText(shortTrackingLink(job!.tracking_token))
                     setLinkCopied(true)
                     setTimeout(() => setLinkCopied(false), 2000)
                   }}
@@ -2119,7 +2120,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 
                 <button
                   onClick={() => {
-                    window.open(shortTrackingLink(job.tracking_token), '_blank')
+                    window.open(shortTrackingLink(job!.tracking_token), '_blank')
                     setShowTrackingLinkModal(false)
                   }}
                   className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-4 rounded transition-colors"
@@ -2153,11 +2154,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         <div className="space-y-4">
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Device</p>
-            <p className="text-base text-gray-900 dark:text-white break-words">{job.device_make} {job.device_model}</p>
+            <p className="text-base text-gray-900 dark:text-white break-words">{job!.device_make} {job!.device_model}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Issue</p>
-            <p className="text-base text-gray-900 dark:text-white break-words">{job.issue}</p>
+            <p className="text-base text-gray-900 dark:text-white break-words">{job!.issue}</p>
           </div>
 
           {/* Device Password */}
@@ -2187,7 +2188,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                           const res = await fetch('/api/password/decrypt', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ jobId: job.id }),
+                            body: JSON.stringify({ jobId: job!.id }),
                           })
                           const data = await res.json()
                           if (data.password) setDecryptedPassword(data.password)
@@ -2264,11 +2265,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          {(job.source || job.page) && (
+          {(job!.source || job.page) && (
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-semibold">Job Source</p>
               <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                {job.source && <p className="text-sm text-gray-900 dark:text-white"><span className="font-semibold">Source:</span> {job.source}</p>}
+                {job!.source && <p className="text-sm text-gray-900 dark:text-white"><span className="font-semibold">Source:</span> {job!.source}</p>}
                 {job.page && <p className="text-sm text-gray-900 dark:text-white"><span className="font-semibold">Page:</span> {job.page}</p>}
               </div>
             </div>
@@ -2276,7 +2277,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
           {/* Edit button */}
           <Link
-            href={`/app/jobs/${job.id}/edit`}
+            href={`/app/jobs/${job!.id}/edit`}
             className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl transition-colors font-medium"
           >
             <Edit className="h-4 w-4" />
@@ -2323,10 +2324,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <button
-                onClick={() => { setNameValue(job.customer_name); setEditingName(true) }}
+                onClick={() => { setNameValue(job!.customer_name); setEditingName(true) }}
                 className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors text-left"
               >
-                {job.customer_name}
+                {job!.customer_name}
                 <Edit className="h-3 w-3 inline ml-2 text-gray-400" />
               </button>
             )}
@@ -2361,13 +2362,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             ) : (
               <div className="flex items-center gap-2">
                 <a
-                  href={`sms:${job.customer_phone}`}
+                  href={`sms:${job!.customer_phone}`}
                   className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors"
                 >
-                  {job.customer_phone}
+                  {job!.customer_phone}
                 </a>
                 <button
-                  onClick={() => { setPhoneValue(job.customer_phone); setEditingPhone(true) }}
+                  onClick={() => { setPhoneValue(job!.customer_phone); setEditingPhone(true) }}
                   className="p-1 text-gray-400 hover:text-primary transition-colors"
                   title="Edit phone number"
                 >
@@ -2406,16 +2407,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                {job.customer_email ? (
+                {job!.customer_email ? (
                   <>
                     <a
-                      href={`mailto:${job.customer_email}`}
+                      href={`mailto:${job!.customer_email}`}
                       className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors break-all"
                     >
-                      {job.customer_email}
+                      {job!.customer_email}
                     </a>
                     <button
-                      onClick={() => { setEmailValue(job.customer_email || ''); setEditingEmail(true) }}
+                      onClick={() => { setEmailValue(job!.customer_email || ''); setEditingEmail(true) }}
                       className="p-1 text-gray-400 hover:text-primary transition-colors flex-shrink-0"
                       title="Edit email"
                     >
@@ -2437,8 +2438,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
           <p className="text-sm text-gray-600 dark:text-gray-400">Tap to call, text, or message</p>
           <ContactActions
-            phone={job.customer_phone}
-            name={job.customer_name}
+            phone={job!.customer_phone}
+            name={job!.customer_name}
             job={job}
             onMessageSent={loadJobData}
           />
@@ -2526,11 +2527,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       >
         <div className="space-y-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Send a follow-up message to {job.customer_name} about their diagnosis.
+            Send a follow-up message to {job!.customer_name} about their diagnosis.
           </p>
           <button
             onClick={() => {
-              const msg = `Hi ${getFirstName(job.customer_name)}, we diagnosed your ${job.device_make || 'device'} ${job.device_model || ''} and sent a quote. Just checking you received it? Reply here if you'd like to go ahead or if you have any questions.`
+              const msg = `Hi ${getFirstName(job!.customer_name)}, we diagnosed your ${job!.device_make || 'device'} ${job!.device_model || ''} and sent a quote. Just checking you received it? Reply here if you'd like to go ahead or if you have any questions.`
               setDiagnosticSmsMessage(msg)
               setShowDiagnosticFollowUp(false)
             }}
@@ -2550,7 +2551,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             <span>Write Custom Message</span>
           </button>
           <a
-            href={`sms:${job.customer_phone}`}
+            href={`sms:${job!.customer_phone}`}
             className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-bold py-4 px-6 rounded-xl text-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-3"
           >
             <Smartphone className="h-5 w-5" />
@@ -2569,14 +2570,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       >
         <div className="space-y-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            What did {job.customer_name} say?
+            What did {job!.customer_name} say?
           </p>
           <button
             onClick={async () => {
               await fetch('/api/jobs/diagnostic-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId: job.id, action: 'agree' }),
+                body: JSON.stringify({ jobId: job!.id, action: 'agree' }),
               })
               setShowDiagnosticResponse(false)
               loadJobData()
@@ -2592,7 +2593,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               await fetch('/api/jobs/diagnostic-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jobId: job.id, action: 'decline', declinedReason: reason || '' }),
+                body: JSON.stringify({ jobId: job!.id, action: 'decline', declinedReason: reason || '' }),
               })
               setShowDiagnosticResponse(false)
               loadJobData()
@@ -2628,12 +2629,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       {/* Price Setter Modal */}
       {showPriceModal && (
         <PriceSetterModal
-          jobId={job.id}
-          currentPrice={job.price_total}
+          jobId={job!.id}
+          currentPrice={job!.price_total}
           paymentReceived={job.payment_received}
-          depositRequired={job.deposit_required}
-          depositReceived={job.deposit_received}
-          depositAmount={job.deposit_amount}
+          depositRequired={job!.deposit_required}
+          depositReceived={job!.deposit_received}
+          depositAmount={job!.deposit_amount}
           onClose={() => setShowPriceModal(false)}
           onSaved={loadJobData}
         />
@@ -2642,9 +2643,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       {/* Quick Actions Modal (status changes) */}
       {showQuickActions && (
         <QuickActionsModal
-          jobRef={job.job_ref}
-          deviceInfo={`${job.device_make} ${job.device_model}`}
-          currentStatus={job.status}
+          jobRef={job!.job_ref}
+          deviceInfo={`${job!.device_make} ${job!.device_model}`}
+          currentStatus={job!.status}
           onSelectStatus={(status) => {
             setShowQuickActions(false)
             handleWorkflowStatusChange(status)
@@ -2652,11 +2653,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           onDelete={async () => {
             setShowQuickActions(false)
             setActionLoading(true)
-            await supabase.from('job_events').delete().eq('job_id', job.id)
-            await supabase.from('sms_logs').delete().eq('job_id', job.id)
-            await supabase.from('email_logs').delete().eq('job_id', job.id)
-            await supabase.from('notifications').delete().eq('job_id', job.id)
-            await supabase.from('jobs').delete().eq('id', job.id)
+            await supabase.from('job_events').delete().eq('job_id', job!.id)
+            await supabase.from('sms_logs').delete().eq('job_id', job!.id)
+            await supabase.from('email_logs').delete().eq('job_id', job!.id)
+            await supabase.from('notifications').delete().eq('job_id', job!.id)
+            await supabase.from('jobs').delete().eq('id', job!.id)
             router.push('/app/jobs')
           }}
           onClose={() => setShowQuickActions(false)}

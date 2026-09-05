@@ -32,9 +32,10 @@ CREATE TABLE notification_config (
 
 -- Email templates table
 -- Stores customizable email templates for each status
-CREATE TABLE email_templates (
+-- NOTE: Uses status_key (not key) to match initialize-notification-system.sql
+CREATE TABLE IF NOT EXISTS email_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    key VARCHAR(100) NOT NULL UNIQUE,
+    status_key VARCHAR(100) NOT NULL UNIQUE,
     subject TEXT NOT NULL,
     body_html TEXT NOT NULL,
     body_text TEXT,
@@ -44,10 +45,10 @@ CREATE TABLE email_templates (
 );
 
 -- Indexes
-CREATE INDEX idx_notification_config_status ON notification_config(status_key);
-CREATE INDEX idx_notification_config_active ON notification_config(is_active);
-CREATE INDEX idx_email_templates_key ON email_templates(key);
-CREATE INDEX idx_email_templates_active ON email_templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_notification_config_status ON notification_config(status_key);
+CREATE INDEX IF NOT EXISTS idx_notification_config_active ON notification_config(is_active);
+CREATE INDEX IF NOT EXISTS idx_email_templates_key ON email_templates(status_key);
+CREATE INDEX IF NOT EXISTS idx_email_templates_active ON email_templates(is_active);
 
 -- Auto-update updated_at trigger
 CREATE TRIGGER update_notification_config_updated_at

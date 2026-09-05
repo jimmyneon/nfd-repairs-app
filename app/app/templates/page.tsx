@@ -8,6 +8,8 @@ import { Home, Save, Eye, EyeOff, MessageSquare, X, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SlideUpPanel from '@/components/SlideUpPanel'
 
+export const dynamic = 'force-dynamic'
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<SMSTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [showVariableModal, setShowVariableModal] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadTemplates()

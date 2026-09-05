@@ -1,5 +1,5 @@
 'use client'
-
+export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Home, CheckCircle, XCircle, Package, Send, Link as LinkIcon, AlertTriangle, Plus, Wrench } from 'lucide-react'
@@ -53,7 +53,7 @@ export default function WarrantyTicketDetailPage({ params }: { params: { id: str
   const [showApproveModal, setShowApproveModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadTicket()
