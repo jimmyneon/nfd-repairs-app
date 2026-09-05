@@ -36,7 +36,6 @@
   },
   "devDependencies": {
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.35",
-    "vitest": "^2.1.9"
+    "eslint-config-next": "^14.2.35"
   }
 }
