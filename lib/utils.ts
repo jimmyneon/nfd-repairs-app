@@ -54,6 +54,8 @@ const SHORT_LINK_BASE = process.env.NEXT_PUBLIC_SHORT_LINK_BASE || 'https://nfdr
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
 
 export function shortTrackingLink(token: string): string {
+  // If token looks like a UUID (36 chars with dashes), use it as-is for backward compat.
+  // If it's a short token (6-8 chars), use that for a shorter URL.
   return `${SHORT_LINK_BASE}/t/${token}`
 }
 

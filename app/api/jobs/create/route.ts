@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (template) {
-        const trackingUrl = shortTrackingLink(job.tracking_token)
+        const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
         const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.example.com'
 
         const smsBody = renderSmsTemplate(template.body, {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       success: true,
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
-      tracking_url: shortTrackingLink(job.tracking_token),
+      tracking_url: shortTrackingLink(job.short_token || job.tracking_token),
     })
   } catch (error) {
     console.error('Error in create job:', error)

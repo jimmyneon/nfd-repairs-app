@@ -329,10 +329,9 @@ function buildMissedCallMessage(ctx: {
     lines.push(`Text us or visit: ${START_URL}`)
   }
 
-  if (ctx.googleMapsUrl) {
-    lines.push('')
-    lines.push(`Find us: ${ctx.googleMapsUrl}`)
-  }
+  // Use nfdr.uk/h for "Find us" — it redirects to Google Maps and is much shorter
+  lines.push('')
+  lines.push('Find us: nfdr.uk/h')
 
   lines.push('')
   lines.push('Many thanks,')

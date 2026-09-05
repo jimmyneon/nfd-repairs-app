@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           phone: normalizedPhone,
           jobs: altJobs.map(job => ({
             ...job,
-            tracking_url: shortTrackingLink(job.tracking_token),
+            tracking_url: shortTrackingLink((job as any).short_token || job.tracking_token),
             status_label: getStatusLabel(job.status),
           }))
         })
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
       phone: normalizedPhone,
       jobs: jobs?.map(job => ({
         ...job,
-        tracking_url: shortTrackingLink(job.tracking_token),
+        tracking_url: shortTrackingLink((job as any).short_token || job.tracking_token),
         status_label: getStatusLabel(job.status),
       })) || []
     })

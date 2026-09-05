@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       console.log('✓ Email enabled for this status')
     }
 
-    const trackingUrl = shortTrackingLink(job.tracking_token)
+    const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     const statusMessages: Record<string, string> = {

@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
             continue
           }
 
-          const trackingUrl = shortTrackingLink(job.tracking_token)
+          const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
 
           const smsBody = renderSmsTemplate(template.body || '', {
             first_name: getFirstName(job.customer_name),

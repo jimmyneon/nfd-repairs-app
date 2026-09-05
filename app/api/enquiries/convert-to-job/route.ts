@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       job_id: job.id,
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
-      tracking_url: shortTrackingLink(job.tracking_token),
+      tracking_url: shortTrackingLink(job.short_token || job.tracking_token),
       status: job.status,
       sms_sent: !!smsBody,
     })

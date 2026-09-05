@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build tracking URL
-    const trackingUrl = shortTrackingLink(job.tracking_token)
+    const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
 
     // Replace variables in template
     const smsBody = template.body

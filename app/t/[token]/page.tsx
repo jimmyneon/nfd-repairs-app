@@ -73,8 +73,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report')
-      .eq('tracking_token', params.token)
+      .select('id, job_ref, tracking_token, short_token, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report')
+      .or(`tracking_token.eq.${params.token},short_token.eq.${params.token}`)
       .maybeSingle()
 
     if (data) {
@@ -202,7 +202,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           event: 'UPDATE',
           schema: 'public',
           table: 'jobs',
-          filter: `tracking_token=eq.${params.token}`,
+          filter: `tracking_token=eq.${job?.tracking_token || params.token}`,
         },
         (payload: any) => {
           setJob(payload.new)

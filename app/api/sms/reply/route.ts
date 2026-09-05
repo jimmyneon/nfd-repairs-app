@@ -317,17 +317,19 @@ async function autoConvertEnquiry({
     })
   }
 
-  // Generate job ref + tracking token
+  // Generate job ref + tracking token + short token
   const { count: jobCount } = await supabase
     .from('jobs')
     .select('id', { count: 'exact', head: true })
 
   const jobRef = `NF-${String((jobCount || 0) + 1).padStart(5, '0')}`
   const trackingToken = crypto.randomUUID()
+  const shortToken = Array.from(crypto.getRandomValues(new Uint8Array(3))).map(b => b.toString(16).padStart(2, '0')).join('')
 
   const jobData: Record<string, any> = {
     job_ref: jobRef,
     tracking_token: trackingToken,
+    short_token: shortToken,
     customer_name: enquiry.customer_name,
     customer_phone: enquiry.customer_phone,
     customer_email: enquiry.customer_email || null,
@@ -405,7 +407,7 @@ async function autoConvertEnquiry({
 
   // Send confirmation SMS to customer
   const deviceLabel = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
-  const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nGreat news — your ${deviceLabel} repair is booked in!\n\nPop in with your device whenever you're ready — no appointment needed.\n\nOpening hours: ${shortHoursLink()}\nTrack your repair: ${shortTrackingLink(trackingToken)}\n\nSee you soon,\nNew Forest Device Repairs`
+  const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nGreat news — your ${deviceLabel} repair is booked in!\n\nPop in with your device whenever you're ready — no appointment needed.\n\nOpening hours: ${shortHoursLink()}\nTrack your repair: ${shortTrackingLink(shortToken)}\n\nSee you soon,\nNew Forest Device Repairs`
 
   if (webhookUrl) {
     const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)

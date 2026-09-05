@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build tracking URL (use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes)
-    const trackingUrl = shortTrackingLink(job.tracking_token)
+    const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     // Fetch links from admin settings (never hardcode location or hours)

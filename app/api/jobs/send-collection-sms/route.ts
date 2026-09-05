@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         device_model: safeDeviceLabel(job.device_make, job.device_model),
         device_summary: safeDeviceLabel(job.device_make, job.device_model),
         review_link: reviewLink,
-        tracking_link: shortTrackingLink(job.tracking_token),
+        tracking_link: shortTrackingLink(job.short_token || job.tracking_token),
         job_ref: job.job_ref,
       })
     } else {

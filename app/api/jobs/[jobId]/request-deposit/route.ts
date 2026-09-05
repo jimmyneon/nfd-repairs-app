@@ -62,7 +62,7 @@ export async function POST(
     // Send SMS using DEPOSIT_REQUEST template from database
     try {
       const firstName = getFirstName(job.customer_name)
-      const trackingUrl = shortTrackingLink(job.tracking_token)
+      const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
       const depositAmount = (job.deposit_amount || 20.00).toFixed(2)
 
