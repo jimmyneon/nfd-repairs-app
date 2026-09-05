@@ -1,5 +1,5 @@
 'use client'
-export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'

@@ -102,7 +102,7 @@ function EnquiriesContent() {
   const [convertResult, setConvertResult] = useState<{ job_ref: string; tracking_url: string } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
-  const supabase = createClient() as any as any
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadEnquiries()

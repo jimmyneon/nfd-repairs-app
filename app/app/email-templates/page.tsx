@@ -39,7 +39,7 @@ export default function EmailTemplatesPage() {
   const [showVariableModal, setShowVariableModal] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [activeField, setActiveField] = useState<'subject' | 'html' | 'text'>('html')
-  const supabase = createClient() as any as any
+  const supabase = createClient() as any
 
   useEffect(() => {
     loadTemplates()

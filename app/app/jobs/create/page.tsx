@@ -1,5 +1,4 @@
 'use client'
-export const dynamic = 'force-dynamic'
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Home, Loader2, CheckCircle, Search, Zap, Smartphone, Tablet, Laptop, Monitor, Wrench, Battery, Zap as Lightning, Droplet, Power, Circle, AlertCircle, Trash2, UserSearch, X, Shield, Send, ClipboardCheck, UserCog } from 'lucide-react'
