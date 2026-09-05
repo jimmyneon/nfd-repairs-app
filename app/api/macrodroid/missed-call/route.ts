@@ -167,9 +167,9 @@ export async function POST(request: NextRequest) {
               const { sendViaMacroDroid } = await import('@/lib/resilience')
               const result = await sendViaMacroDroid(webhookUrl, from, repeatBody)
               await supabase.from('sms_logs').insert({
-                template: 'MISSED_CALL_REPEAT',
+                template_key: 'MISSED_CALL_REPEAT',
                 recipient_phone: from,
-                message: repeatBody,
+                body_rendered: repeatBody,
                 status: result.ok ? 'SENT' : 'FAILED',
                 sent_at: result.ok ? new Date().toISOString() : null,
               } as any)
