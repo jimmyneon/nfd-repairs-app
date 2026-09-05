@@ -225,20 +225,22 @@ If anything is not right, just reply here.
     )
 
     // Log events
+    const events: any[] = [
+      {
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: ${selectedPlatform} review request sent`
+      },
+      job.customer_email ? {
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: `Post-collection email ${emailDeliveryStatus.toLowerCase()}: Review request with cross-sell content`
+      } : null
+    ].filter(Boolean)
+
     await supabase
       .from('job_events')
-      .insert([
-        {
-          job_id: jobId,
-          type: 'SYSTEM',
-          message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: ${selectedPlatform} review request sent`
-        },
-        job.customer_email ? {
-          job_id: jobId,
-          type: 'SYSTEM',
-          message: `Post-collection email ${emailDeliveryStatus.toLowerCase()}: Review request with cross-sell content`
-        } : null
-      ].filter(Boolean))
+      .insert(events)
 
     console.log(`Post-collection notifications sent for job ${job.job_ref}: SMS=${smsDeliveryStatus}, Email=${emailDeliveryStatus}`)
 
