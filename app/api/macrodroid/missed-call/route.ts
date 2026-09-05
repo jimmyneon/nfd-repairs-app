@@ -90,10 +90,13 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Log this missed call
+    // Normalise phone for consistent storage/lookup (strip spaces, standardise format)
+    const normalisedFrom = normaliseUkPhoneForLookup(from)
+
+    // Log this missed call (using normalised phone so rate limiting works across formats)
     try {
       await supabase.from('missed_call_log').insert({
-        phone: from,
+        phone: normalisedFrom,
         sms_sent: false,
         called_at: new Date().toISOString(),
       })
@@ -106,13 +109,13 @@ export async function POST(request: NextRequest) {
     const { data: recentSms } = await supabase
       .from('missed_call_log')
       .select('id, called_at')
-      .eq('phone', from)
+      .eq('phone', normalisedFrom)
       .eq('sms_sent', true)
       .gte('called_at', thirtyMinAgo)
       .limit(1)
 
     if (recentSms && recentSms.length > 0) {
-      console.log(`[missed-call] Rate limited ${from} (SMS sent in last 30 min)`)
+      console.log(`[missed-call] Rate limited ${normalisedFrom} (SMS sent in last 30 min)`)
       return NextResponse.json(
         { success: true, skipped: true, reason: 'Rate limited — SMS sent in last 30 min' },
         { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
     const { count: missedCallCount } = await supabase
       .from('missed_call_log')
       .select('id', { count: 'exact', head: true })
-      .eq('phone', from)
+      .eq('phone', normalisedFrom)
       .gte('called_at', twentyFourHoursAgo)
 
     // If 3+ missed calls in 24h, check if they've responded to any SMS.
@@ -132,13 +135,12 @@ export async function POST(request: NextRequest) {
     // If they HAVE responded (sent an inbound SMS), they're engaging — text them.
     if ((missedCallCount || 0) >= 3) {
       // Check if customer has sent any inbound SMS since the first missed call
-      const normalisedPhone = normaliseUkPhoneForLookup(from)
       const { count: inboundCount } = await supabase
         .from('job_events')
         .select('id', { count: 'exact', head: true })
         .eq('type', 'CUSTOMER_SMS')
         .gte('created_at', twentyFourHoursAgo)
-        .contains('metadata', { phone: normalisedPhone })
+        .contains('metadata', { phone: normalisedFrom })
 
       const hasResponded = (inboundCount || 0) > 0
 
@@ -278,7 +280,7 @@ export async function POST(request: NextRequest) {
       const { data: recentEntry } = await supabase
         .from('missed_call_log')
         .select('id')
-        .eq('phone', from)
+        .eq('phone', normalisedFrom)
         .order('called_at', { ascending: false })
         .limit(1)
       if (recentEntry && recentEntry.length > 0) {
