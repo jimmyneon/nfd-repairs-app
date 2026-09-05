@@ -165,16 +165,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- Notify staff via MacroDroid repair-request webhook (if configured) ---
-    // This is the secondary MacroDroid trigger that pings John's phone with the
-    // dashboard enquiry URL. Optional — only fires if MACRODROID_REPAIR_REQUEST_WEBHOOK_URL is set.
-    const repairRequestWebhookUrl = process.env.MACRODROID_REPAIR_REQUEST_WEBHOOK_URL
-    if (repairRequestWebhookUrl) {
+    // --- Notify staff via MacroDroid repair-request webhook ---
+    // Uses the same MACRODROID_WEBHOOK_URL with /repair-request appended
+    // (matches the old NFDRai behaviour — triggers a notification on John's phone)
+    const macrodroidWebhookUrl = process.env.MACRODROID_WEBHOOK_URL
+    if (macrodroidWebhookUrl) {
       const appUrl = getAppUrl()
       const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiry.enquiry_ref}`
+      const notifyUrl = `${macrodroidWebhookUrl}/repair-request`
       try {
-        await fetch(repairRequestWebhookUrl, {
+        await fetch(notifyUrl, {
           method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
           body: enquiryUrl,
         })
       } catch (e) {
