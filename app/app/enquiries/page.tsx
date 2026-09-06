@@ -57,6 +57,7 @@ interface Enquiry {
   quote_sent_method?: string | null
   repair_reserved?: boolean
   part_reserved?: boolean
+  converted_to_job?: boolean
   converted_job_id?: string | null
   preferred_contact_method?: string | null
   customer_notes?: string | null
@@ -68,11 +69,16 @@ interface Enquiry {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string }> = {
-  pending: { label: 'Quote Sent', color: 'border-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+  pending: { label: 'Quote Viewed', color: 'border-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
   approved: { label: 'Approved', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  rejected: { label: 'Rejected', color: 'border-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400' },
+  rejected: { label: 'Dismissed', color: 'border-gray-500', bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300' },
   more_info_requested: { label: 'Info Sent', color: 'border-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
   converted: { label: 'Booked In', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+  quote_viewed: { label: 'Viewed · No Action', color: 'border-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+  quote_sent: { label: 'Quote Sent', color: 'border-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
+  follow_up: { label: 'Follow-up', color: 'border-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400' },
+  accepted: { label: 'Accepted', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
+  booked: { label: 'Booked In', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: string; bg: string }> = {
@@ -87,7 +93,7 @@ function EnquiriesContent() {
   const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('action_needed')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [responseText, setResponseText] = useState('')
@@ -165,6 +171,14 @@ function EnquiriesContent() {
         filtered = filtered.filter(e => isFollowUp(e))
       } else if (statusFilter === 'accepted') {
         filtered = filtered.filter(e => isAccepted(e))
+      } else if (statusFilter === 'quote_viewed') {
+        filtered = filtered.filter(e => getJourneyStage(e).key === 'quote_viewed')
+      } else if (statusFilter === 'quote_sent') {
+        filtered = filtered.filter(e => getJourneyStage(e).key === 'quote_sent')
+      } else if (statusFilter === 'booked') {
+        filtered = filtered.filter(e => isConverted(e))
+      } else if (statusFilter === 'dismissed') {
+        filtered = filtered.filter(e => e.status === 'rejected' && !isAccepted(e) && !isConverted(e))
       } else {
         filtered = filtered.filter(e => e.status === statusFilter)
       }
@@ -193,6 +207,28 @@ function EnquiriesContent() {
     loadEnquiries()
   }
 
+  const handleDismissToggle = async (enquiry: Enquiry) => {
+    if (isAccepted(enquiry) || isConverted(enquiry)) {
+      alert('Accepted or booked enquiries cannot be dismissed.')
+      return
+    }
+
+    const nextStatus = enquiry.status === 'rejected' ? 'pending' : 'rejected'
+    const updatedAt = new Date().toISOString()
+    const { error } = await supabase
+      .from('enquiries')
+      .update({ status: nextStatus, updated_at: updatedAt })
+      .eq('id', enquiry.id)
+
+    if (error) {
+      alert('Could not update this enquiry. Please try again.')
+      return
+    }
+
+    setSelectedEnquiry({ ...enquiry, status: nextStatus, updated_at: updatedAt })
+    loadEnquiries()
+  }
+
   const handleRespond = async () => {
     if (!selectedEnquiry || !responseText.trim()) return
     setResponding(true)
@@ -208,21 +244,45 @@ function EnquiriesContent() {
     setResponding(false)
   }
 
-  const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)
-  const isConverted = (e: Enquiry) => e.status === 'converted' || Boolean(e.converted_job_id)
-  const isAccepted = (e: Enquiry) => !isConverted(e) && e.enquiry_type === 'repair_quote' && (e.repair_reserved || e.proceed_with_repair)
-  const isActionNeeded = (e: Enquiry) => !isConverted(e) && (e.status === 'approved' || isAccepted(e))
+  const isConverted = (e: Enquiry) => Boolean(e.converted_job_id || e.converted_to_job)
+  const isAccepted = (e: Enquiry) => !isConverted(e) && e.enquiry_type === 'repair_quote' && (
+    e.status === 'approved' || e.status === 'converted' || Boolean(e.repair_reserved || e.proceed_with_repair)
+  )
+  const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && e.status !== 'rejected' && !isConverted(e) && !isAccepted(e) && Boolean(e.hesitation_reason || e.customer_budget != null || e.part_reserved)
+  const hasQuoteBeenSent = (e: Enquiry) => Boolean(e.quote_sent_method && e.quote_sent_method !== 'none')
+  const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e)
+
+  const getJourneyStage = (e: Enquiry): { key: string; label: string; detail: string } => {
+    if (isConverted(e)) return { key: 'booked', label: 'Booked In', detail: 'Transferred to a repair job' }
+    if (isAccepted(e)) return { key: 'accepted', label: 'Accepted', detail: 'Customer wants the repair — check stock' }
+    if (isFollowUp(e)) return { key: 'follow_up', label: 'Follow-up', detail: 'Customer asked a question or shared a concern' }
+    if (e.status === 'rejected') return { key: 'dismissed', label: 'Dismissed', detail: 'Archived from the active enquiry lists' }
+    if (e.enquiry_type !== 'repair_quote') {
+      return { key: e.status, label: e.status === 'pending' ? 'New Enquiry' : (STATUS_CONFIG[e.status]?.label || 'Enquiry'), detail: 'Service enquiry' }
+    }
+    if (hasQuoteBeenSent(e)) {
+      const method = e.quote_sent_method === 'both' ? 'text and email' : e.quote_sent_method
+      return { key: 'quote_sent', label: 'Quote Sent', detail: `Customer requested the quote by ${method}` }
+    }
+    return { key: 'quote_viewed', label: 'Viewed · No Action', detail: 'Details submitted and quote revealed; no next action selected' }
+  }
   const getPriority = (e: Enquiry) => {
-    if (isActionNeeded(e)) return 0
-    if (e.status === 'pending' && e.enquiry_type === 'repair_quote') return 1
-    if (e.status === 'pending') return 2
-    return 3
+    if (isAccepted(e)) return 0
+    if (isFollowUp(e)) return 1
+    if (getJourneyStage(e).key === 'quote_sent') return 2
+    if (getJourneyStage(e).key === 'quote_viewed') return 3
+    if (e.status === 'pending') return 4
+    if (isConverted(e)) return 6
+    return 5
   }
 
-  const pendingCount = enquiries.filter(e => e.status === 'pending').length
   const acceptedCount = enquiries.filter(e => isAccepted(e)).length
-  const followUpCount = enquiries.filter(e => e.enquiry_type === 'repair_quote' && !e.repair_reserved && !e.proceed_with_repair && (e.hesitation_reason || e.customer_budget != null || e.part_reserved)).length
+  const followUpCount = enquiries.filter(e => isFollowUp(e)).length
   const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
+  const quoteViewedCount = enquiries.filter(e => getJourneyStage(e).key === 'quote_viewed').length
+  const quoteSentCount = enquiries.filter(e => getJourneyStage(e).key === 'quote_sent').length
+  const bookedCount = enquiries.filter(e => isConverted(e)).length
+  const dismissedCount = enquiries.filter(e => e.status === 'rejected' && !isAccepted(e) && !isConverted(e)).length
 
   const getTileSummary = (e: Enquiry): string => {
     if (e.enquiry_type === 'repair_quote') return `${e.device_make || ''} ${e.device_model || ''}`.trim() || 'Repair quote'
@@ -232,11 +292,7 @@ function EnquiriesContent() {
   }
 
   const getStatusLabel = (e: Enquiry): string => {
-    if (e.converted_job_id) return 'Booked In'
-    if (isAccepted(e)) return 'Accepted'
-    if (isFollowUp(e)) return 'Follow-up'
-    if (e.enquiry_type !== 'repair_quote' && e.status === 'pending') return 'New Enquiry'
-    return STATUS_CONFIG[e.status]?.label || 'Pending'
+    return getJourneyStage(e).label
   }
 
   const getTileBadge = (e: Enquiry): { text: string; color: string } | null => {
@@ -394,12 +450,20 @@ function EnquiriesContent() {
             >
               All ({enquiries.length})
             </button>
-            {pendingCount > 0 && (
+            {quoteViewedCount > 0 && (
               <button
-                onClick={() => setStatusFilter('pending')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'pending' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700'}`}
+                onClick={() => setStatusFilter('quote_viewed')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'quote_viewed' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700'}`}
               >
-                Pending ({pendingCount})
+                Viewed · No Action ({quoteViewedCount})
+              </button>
+            )}
+            {quoteSentCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('quote_sent')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'quote_sent' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'}`}
+              >
+                Quote Sent ({quoteSentCount})
               </button>
             )}
             {acceptedCount > 0 && (
@@ -416,6 +480,22 @@ function EnquiriesContent() {
                 className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'follow_up' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700'}`}
               >
                 Follow-up ({followUpCount})
+              </button>
+            )}
+            {bookedCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('booked')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'booked' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Booked ({bookedCount})
+              </button>
+            )}
+            {dismissedCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('dismissed')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'dismissed' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Dismissed ({dismissedCount})
               </button>
             )}
           </div>
@@ -435,16 +515,16 @@ function EnquiriesContent() {
           </div>
         ) : (
           <>
-            {/* Approved Section - highlighted at top */}
+            {/* Enquiries that need a staff decision or reply */}
             {filteredEnquiries.filter(e => isActionNeeded(e)).length > 0 && (
               <section className="mb-6">
                 <div className="flex items-center gap-2 mb-3 p-3 rounded-xl bg-green-100 dark:bg-green-900/30 border-2 border-green-500">
                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
                   <div className="flex-1">
                     <h2 className="font-black text-lg text-green-700 dark:text-green-400">
-                      Approved - Action Needed ({filteredEnquiries.filter(e => isActionNeeded(e)).length})
+                      Action Needed ({filteredEnquiries.filter(e => isActionNeeded(e)).length})
                     </h2>
-                    <p className="text-xs text-green-600 dark:text-green-500">Customer wants this booked in — check stock & convert to job</p>
+                    <p className="text-xs text-green-600 dark:text-green-500">Accepted repairs, questions and budget follow-ups</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -569,8 +649,9 @@ function EnquiriesContent() {
             {/* Status badge + price */}
             <div className="flex items-center gap-2 flex-wrap">
               {(() => {
-                const cfg = STATUS_CONFIG[selectedEnquiry.status] || STATUS_CONFIG.pending
-                const label = getStatusLabel(selectedEnquiry)
+                const stage = getJourneyStage(selectedEnquiry)
+                const cfg = STATUS_CONFIG[stage.key] || STATUS_CONFIG[selectedEnquiry.status] || STATUS_CONFIG.pending
+                const label = stage.label
                 return <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${cfg.bg} ${cfg.text}`}>{label}</span>
               })()}
               {selectedEnquiry.enquiry_type === 'repair_quote' && selectedEnquiry.quoted_price != null && (
@@ -580,6 +661,17 @@ function EnquiriesContent() {
                 <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Reserved</span>
               )}
             </div>
+
+            {selectedEnquiry.enquiry_type === 'repair_quote' && (
+              <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-1">Customer journey</p>
+                <p className="font-bold text-blue-950 dark:text-blue-100">{getJourneyStage(selectedEnquiry).label}</p>
+                <p className="text-sm text-blue-800 dark:text-blue-300 mt-1">{getJourneyStage(selectedEnquiry).detail}</p>
+                <p className="text-xs text-blue-700/80 dark:text-blue-400 mt-2">
+                  The enquiry is first saved when the customer presses Reveal My Quote. That alone does not mean they approved the repair.
+                </p>
+              </div>
+            )}
 
             {/* Conversion success screen */}
             {convertResult ? (
@@ -764,6 +856,16 @@ function EnquiriesContent() {
                   <MessageSquare className="h-4 w-4" /> Message Customer
                 </button>
 
+                {!isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry) && (
+                  <button
+                    onClick={() => handleDismissToggle(selectedEnquiry)}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                  >
+                    <X className="h-4 w-4" />
+                    {selectedEnquiry.status === 'rejected' ? 'Restore Enquiry' : 'Dismiss Enquiry'}
+                  </button>
+                )}
+
                 {/* Non-repair enquiry actions */}
                 {selectedEnquiry.status === 'pending' && selectedEnquiry.enquiry_type !== 'repair_quote' && (
                   <div className="grid grid-cols-2 gap-3">
@@ -794,6 +896,7 @@ function EnquiriesContent() {
                     {selectedEnquiry.terms_accepted !== undefined && <p><span className="font-semibold">Terms:</span> {selectedEnquiry.terms_accepted ? 'Yes' : 'No'}</p>}
                     {selectedEnquiry.marketing_consent !== undefined && <p><span className="font-semibold">Marketing:</span> {selectedEnquiry.marketing_consent ? 'Yes' : 'No'}</p>}
                     {selectedEnquiry.quote_source && <p><span className="font-semibold">Source:</span> {selectedEnquiry.quote_source}</p>}
+                    {selectedEnquiry.quote_sent_method && selectedEnquiry.quote_sent_method !== 'none' && <p><span className="font-semibold">Quote requested by:</span> {selectedEnquiry.quote_sent_method === 'both' ? 'Text and email' : selectedEnquiry.quote_sent_method}</p>}
                     {selectedEnquiry.preferred_contact_method && <p><span className="font-semibold">Preferred contact:</span> {selectedEnquiry.preferred_contact_method}</p>}
                     {selectedEnquiry.additional_info && <p><span className="font-semibold">Additional info:</span> {selectedEnquiry.additional_info}</p>}
                     {selectedEnquiry.staff_notes && <p><span className="font-semibold">Staff notes:</span> {selectedEnquiry.staff_notes}</p>}

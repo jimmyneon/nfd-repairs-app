@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
           })
         }
         updateFields.repair_reserved = true
-        updateFields.status = 'converted'
+        // Approved is the pre-job state. Only convert-to-job should mark an
+        // enquiry as converted, otherwise it disappears before stock is checked.
+        updateFields.status = 'approved'
         updateFields.proceed_with_repair = true
         notificationTitle = `Repair Reserved: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
         notificationBody = `${enquiry.customer_name} reserved their repair${enquiry.quoted_price ? ' (£' + enquiry.quoted_price + ')' : ''}. Text them to arrange a time.`

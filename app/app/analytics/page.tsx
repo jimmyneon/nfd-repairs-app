@@ -50,6 +50,15 @@ interface AnalyticsData {
   back_navigation: [string, number][]
   start_again: { sessions: number; by_step: { step: number; label: string; count: number }[] }
   option_selections: { total: number; breakdown: [string, number][] }
+  quote_journey: {
+    submitted: number
+    sent: number
+    follow_up: number
+    accepted: number
+    booked: number
+    dismissed: number
+    no_next_action: number
+  }
   conversion_rate: number
   table_missing?: boolean
 }
@@ -68,7 +77,7 @@ function pct(n: number, d: number): string {
   return Math.round((n / d) * 100) + '%'
 }
 
-type SheetType = 'funnel' | 'traffic' | 'devices' | 'behavior' | 'abandonment' | 'actions' | 'errors' | 'search' | 'addons' | 'budget' | 'insights' | null
+type SheetType = 'funnel' | 'journey' | 'traffic' | 'devices' | 'behavior' | 'abandonment' | 'actions' | 'errors' | 'search' | 'addons' | 'budget' | 'insights' | null
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -184,14 +193,14 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {data && data.total_sessions === 0 && !loading && (
+        {data && data.total_sessions === 0 && data.quote_journey.submitted === 0 && !loading && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
             <BarChart3 className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">No analytics data yet for this period. Start using the quote form to collect data.</p>
           </div>
         )}
 
-        {data && data.total_sessions > 0 && (
+        {data && (data.total_sessions > 0 || data.quote_journey.submitted > 0) && (
           <>
             {/* Compact Grid of Tappable Tiles */}
             <div className="grid grid-cols-3 gap-2.5">
@@ -208,6 +217,13 @@ export default function AnalyticsPage() {
                 label="Funnel"
                 value={data.funnel.actions.Form_Submitted}
                 color="green"
+              />
+              <Tile
+                onClick={() => setActiveSheet('journey')}
+                icon={<ArrowRight className="w-4 h-4" />}
+                label="Quote Journey"
+                value={data.quote_journey.submitted}
+                color="blue"
               />
               <Tile
                 onClick={() => setActiveSheet('abandonment')}
@@ -300,6 +316,7 @@ export default function AnalyticsPage() {
         <BottomSheet onClose={() => setActiveSheet(null)} title={sheetTitle(activeSheet)} icon={sheetIcon(activeSheet)}>
           {activeSheet === 'insights' && <InsightsSheet data={data} />}
           {activeSheet === 'funnel' && <FunnelSheet data={data} maxStepCount={maxStepCount} />}
+          {activeSheet === 'journey' && <QuoteJourneySheet data={data} />}
           {activeSheet === 'abandonment' && <AbandonmentSheet data={data} />}
           {activeSheet === 'traffic' && <TrafficSheet data={data} />}
           {activeSheet === 'devices' && <DevicesSheet data={data} />}
@@ -323,6 +340,7 @@ function sheetTitle(sheet: SheetType): string {
   const titles: Record<string, string> = {
     insights: 'Key Insights',
     funnel: 'Quote Funnel',
+    journey: 'Saved Quote Journey',
     abandonment: 'Where People Leave',
     traffic: 'Traffic Sources',
     devices: 'Popular Devices & Repairs',
@@ -340,6 +358,7 @@ function sheetIcon(sheet: SheetType): React.ReactNode {
   const icons: Record<string, React.ReactNode> = {
     insights: <Lightbulb className="w-5 h-5 text-amber-500" />,
     funnel: <BarChart3 className="w-5 h-5 text-green-600" />,
+    journey: <ArrowRight className="w-5 h-5 text-blue-500" />,
     abandonment: <LogOut className="w-5 h-5 text-red-500" />,
     traffic: <Users className="w-5 h-5 text-teal-500" />,
     devices: <Smartphone className="w-5 h-5 text-indigo-500" />,
@@ -444,6 +463,7 @@ function DetailBar({ label, count, max, color = 'green' }: { label: string; coun
     red: 'from-red-300 to-red-500',
     blue: 'from-blue-400 to-blue-600',
     purple: 'from-purple-400 to-purple-600',
+    orange: 'from-orange-300 to-orange-500',
   }
   const width = max > 0 ? (count / max) * 100 : 0
   return (
@@ -633,6 +653,32 @@ function FunnelSheet({ data, maxStepCount }: { data: AnalyticsData; maxStepCount
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function QuoteJourneySheet({ data }: { data: AnalyticsData }) {
+  const journey = data.quote_journey
+  const max = Math.max(journey.submitted, 1)
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        These are saved enquiry outcomes. A record is created when someone presses Reveal My Quote; approval is only counted after they explicitly choose to proceed.
+      </p>
+      <div className="space-y-2">
+        <DetailBar label="Details submitted / quote revealed" count={journey.submitted} max={max} color="blue" />
+        <DetailBar label="Asked for quote by text/email" count={journey.sent} max={max} color="purple" />
+        <DetailBar label="Question, budget or other follow-up" count={journey.follow_up} max={max} color="orange" />
+        <DetailBar label="Accepted repair" count={journey.accepted} max={max} color="green" />
+        <DetailBar label="Converted to job" count={journey.booked} max={max} color="green" />
+        <DetailBar label="Dismissed" count={journey.dismissed} max={max} color="blue" />
+        <DetailBar label="No next action selected" count={journey.no_next_action} max={max} color="red" />
+      </div>
+      <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3 text-sm text-gray-600 dark:text-gray-300">
+        <span className="font-bold text-gray-900 dark:text-white">Accepted-to-job:</span>{' '}
+        {journey.accepted > 0 ? pct(journey.booked, journey.accepted) : '0%'}
+      </div>
     </div>
   )
 }

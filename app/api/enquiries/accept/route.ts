@@ -46,11 +46,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid quote type' }, { status: 400 })
     }
 
-    // Update enquiry status to accepted
+    // Approved is the pre-job state. The stock check / conversion route is the
+    // only place that should mark an enquiry as converted.
     const { error: updateError } = await supabase
       .from('enquiries')
       .update({
-        status: 'converted',
+        status: 'approved',
         proceed_with_repair: true,
         updated_at: new Date().toISOString(),
       })

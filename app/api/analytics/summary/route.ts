@@ -30,6 +30,7 @@ function emptyResponse(days: number, tableMissing = false) {
     back_navigation: [],
     start_again: { sessions: 0, by_step: [] },
     option_selections: { total: 0, breakdown: [] },
+    quote_journey: { submitted: 0, sent: 0, follow_up: 0, accepted: 0, booked: 0, dismissed: 0, no_next_action: 0 },
     conversion_rate: 0,
     table_missing: tableMissing,
   })
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       funnelRes, stepEnterRes, actionRes, hesitationRes, sourceRes,
       timeRes, popularRes, searchRes, addonRes, deviceRes,
       acceptRes, errorRes, budgetRes,
-      exitIntentRes, backNavRes, startAgainRes, optionSelectedRes,
+      exitIntentRes, backNavRes, startAgainRes, optionSelectedRes, enquiryJourneyRes,
     ] = await Promise.all([
       supabase.from('quote_analytics_events').select('event_type, session_id').gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
@@ -95,6 +96,10 @@ export async function GET(request: NextRequest) {
       supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_back_navigation').gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_start_again').gte('created_at', startDateISO),
       supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_option_selected').gte('created_at', startDateISO),
+      supabase.from('enquiries')
+        .select('status, quote_sent_method, hesitation_reason, customer_budget, part_reserved, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
+        .eq('enquiry_type', 'repair_quote')
+        .gte('created_at', startDateISO),
     ])
 
     // Helper: safely get array from Supabase response
@@ -117,6 +122,7 @@ export async function GET(request: NextRequest) {
     const backNavData = arr(backNavRes)
     const startAgainData = arr(startAgainRes)
     const optionSelectedData = arr(optionSelectedRes)
+    const enquiryJourneyData = arr(enquiryJourneyRes)
 
     // Build funnel counts
     const funnelSteps = ['quote_step_enter', 'quote_form_start', 'quote_form_submit', 'quote_reveal', 'quote_action_click']
@@ -374,6 +380,32 @@ export async function GET(request: NextRequest) {
     const formSubmitCount = stepSessions['quote_form_submit'].size
     const overallConversionRate = totalSessions > 0 ? Math.round((formSubmitCount / totalSessions) * 100) : 0
 
+    // Persistent customer actions. These answer a different question from the
+    // anonymous click funnel: what happened to each saved quote enquiry?
+    const quoteJourney = {
+      submitted: enquiryJourneyData.length,
+      sent: 0,
+      follow_up: 0,
+      accepted: 0,
+      booked: 0,
+      dismissed: 0,
+      no_next_action: 0,
+    }
+    for (const enquiry of enquiryJourneyData) {
+      const booked = Boolean(enquiry.converted_job_id || enquiry.converted_to_job)
+      const accepted = booked || enquiry.status === 'approved' || enquiry.status === 'converted' || Boolean(enquiry.repair_reserved || enquiry.proceed_with_repair)
+      const dismissed = !accepted && enquiry.status === 'rejected'
+      const followUp = !accepted && !dismissed && Boolean(enquiry.hesitation_reason || enquiry.customer_budget != null || enquiry.part_reserved)
+      const sent = Boolean(enquiry.quote_sent_method && enquiry.quote_sent_method !== 'none')
+
+      if (sent) quoteJourney.sent++
+      if (followUp) quoteJourney.follow_up++
+      if (accepted) quoteJourney.accepted++
+      if (booked) quoteJourney.booked++
+      if (dismissed) quoteJourney.dismissed++
+      if (!sent && !followUp && !accepted && !dismissed) quoteJourney.no_next_action++
+    }
+
     // Sort helper
     const sortDesc = (obj: Record<string, number>) =>
       Object.entries(obj).sort((a, b) => b[1] - a[1])
@@ -443,6 +475,7 @@ export async function GET(request: NextRequest) {
         total: totalOptionsSelected,
         breakdown: sortDesc(optionBreakdown),
       },
+      quote_journey: quoteJourney,
       conversion_rate: overallConversionRate,
     })
   } catch (error) {

@@ -233,15 +233,69 @@ describe('New consolidation routes', () => {
       expect(content).not.toContain("setConvertStep('deposit_confirm')")
     })
 
-    it('removes converted enquiries from working lists and links by job id', () => {
+    it('only treats enquiries with a real job link as converted and links by job id', () => {
       const content = fs.readFileSync(
         path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
         'utf-8'
       )
-      expect(content).toContain("e.status === 'converted' || Boolean(e.converted_job_id)")
-      expect(content).toContain('!isConverted(e)')
+      expect(content).toContain('Boolean(e.converted_job_id || e.converted_to_job)')
+      expect(content).toContain("e.status === 'approved' || e.status === 'converted'")
       expect(content).toContain('href={`/app/jobs/${convertResult.job_id}`}')
       expect(content).not.toContain('href={`/app/jobs/${convertResult.job_ref}`}')
+    })
+
+    it('keeps customer approval separate from conversion', () => {
+      const updateRoute = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/enquiries/update/route.ts'),
+        'utf-8'
+      )
+      expect(updateRoute).toContain("updateFields.status = 'approved'")
+
+      const acceptRoute = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/enquiries/accept/route.ts'),
+        'utf-8'
+      )
+      expect(acceptRoute).toContain("status: 'approved'")
+    })
+
+    it('shows separate viewed, sent, follow-up, accepted and booked stages', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
+        'utf-8'
+      )
+      expect(content).toContain('Viewed · No Action')
+      expect(content).toContain('Quote Sent')
+      expect(content).toContain('Follow-up')
+      expect(content).toContain('Accepted')
+      expect(content).toContain('Booked In')
+      expect(content).toContain('Dismissed')
+    })
+
+    it('reports the saved quote journey in analytics', () => {
+      const summaryRoute = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/analytics/summary/route.ts'),
+        'utf-8'
+      )
+      const analyticsPage = fs.readFileSync(
+        path.join(process.cwd(), 'app/app/analytics/page.tsx'),
+        'utf-8'
+      )
+      expect(summaryRoute).toContain('quote_journey: quoteJourney')
+      expect(summaryRoute).toContain('no_next_action')
+      expect(analyticsPage).toContain('Saved Quote Journey')
+      expect(analyticsPage).toContain('No next action selected')
+      expect(analyticsPage).toContain('Dismissed')
+    })
+
+    it('allows reversible dismissal but protects accepted and booked enquiries', () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
+        'utf-8'
+      )
+      expect(content).toContain('handleDismissToggle')
+      expect(content).toContain("enquiry.status === 'rejected' ? 'pending' : 'rejected'")
+      expect(content).toContain('!isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry)')
+      expect(content).toContain('Restore Enquiry')
     })
 
     it('creates parts-needed jobs awaiting deposit', () => {
