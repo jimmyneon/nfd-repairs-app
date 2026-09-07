@@ -518,45 +518,76 @@ export function calculateWorkload(
 }
 
 /**
- * Format a time range in hours as natural customer-facing text.
- * Handles sub-hour times (e.g. 0.5h → "30 minutes", 1.5h → "1.5 hours")
- * and converts to "later today" / "tomorrow" where appropriate.
+ * Natural wording layer: takes raw calculated min/max hours and returns
+ * a clean, customer-facing phrase. Buckets are chosen to under-promise,
+ * avoid false precision, and preserve meaningful workload differences.
+ *
+ * Used by both getShortEta and getWorkloadAdjustedEta so SMS and tracking
+ * pages always use identical wording.
  */
-function formatTimeRange(minHours: number, maxHours: number): string {
-  // Sub-hour: express in minutes
+export function naturalEtaPhrase(minHours: number, maxHours: number): string {
+  // Sub-hour: "Around 30–60 minutes"
   if (maxHours <= 1) {
-    const minMin = Math.round(minHours * 60)
-    const maxMin = Math.round(maxHours * 60)
-    if (minMin === maxMin) return `${maxMin} minutes`
-    return `${minMin}–${maxMin} minutes`
+    return 'Around 30–60 minutes'
   }
 
-  // 1-8 hours: express in hours
+  // 1–2 hours
+  if (maxHours <= 2) {
+    return 'Around 1–2 hours'
+  }
+
+  // 2–3 hours
+  if (maxHours <= 3) {
+    return 'Around 2–3 hours'
+  }
+
+  // 3–4 hours
+  if (maxHours <= 4) {
+    return 'Around 3–4 hours'
+  }
+
+  // 4–8 hours: same day, natural phrasing
   if (maxHours <= 8) {
-    const minH = minHours < 1 ? Math.round(minHours * 60) / 60 : Math.ceil(minHours)
-    const maxH = Math.ceil(maxHours)
-    if (minH < 1) {
-      // e.g. 0.5-2 hours → "30 mins to 2 hours"
-      const minMin = Math.round(minHours * 60)
-      return `${minMin} minutes to ${maxH} hours`
-    }
-    return `${minH}–${maxH} hours`
+    return 'Later today'
   }
 
-  // 8-48 hours: express in hours or "1-2 days"
+  // 8h–1.5 days
+  if (maxHours <= 36) {
+    return 'Usually 1–2 working days'
+  }
+
+  // 1.5–2 days
   if (maxHours <= 48) {
-    const minDays = Math.round(minHours / 24 * 10) / 10
-    const maxDays = Math.round(maxHours / 24 * 10) / 10
-    if (minDays < 1 && maxDays <= 1) {
-      return `${Math.ceil(minHours)}–${Math.ceil(maxHours)} hours`
-    }
-    return `${Math.ceil(minHours / 24)}–${Math.ceil(maxHours / 24)} working days`
+    return 'Usually 1–2 working days'
   }
 
-  // > 48 hours: express in working days
-  const minDays = Math.ceil(minHours / 24)
-  const maxDays = Math.ceil(maxHours / 24)
-  return `${minDays}–${maxDays} working days`
+  // 2–3 days
+  if (maxHours <= 72) {
+    return 'Around 2–3 working days'
+  }
+
+  // 3–4 days
+  if (maxHours <= 96) {
+    return 'Around 3–4 working days'
+  }
+
+  // 4–5 days
+  if (maxHours <= 120) {
+    return 'Around 4–5 working days'
+  }
+
+  // 5–7 days
+  if (maxHours <= 168) {
+    return 'Around 5–7 working days'
+  }
+
+  // 7–10 days
+  if (maxHours <= 240) {
+    return 'Around 7–10 working days'
+  }
+
+  // > 10 days
+  return 'Around 10+ working days'
 }
 
 /**
@@ -583,44 +614,41 @@ export function getWorkloadAdjustedEta(
   let repairEta: string
   if (baseEstimate.isComplex) {
     // Complex repairs — express in days, never fake precision
-    const minDays = Math.ceil(adjustedMin / 24)
     const maxDays = Math.ceil(adjustedMax / 24)
     if (workload.level === 'very_busy') {
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently ${maxDays}–${maxDays + 2} days due to workload`
+      repairEta = `Usually up to ${maxDays} days, currently closer to ${maxDays + 2} days due to workload`
     } else if (workload.level === 'busy') {
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
+      repairEta = `Usually up to ${maxDays} days, currently around ${maxDays + 1} days`
     } else {
       // normal — slight adjustment
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
+      repairEta = `Usually up to ${maxDays} days, currently around ${maxDays} days`
     }
   } else if (adjustedMax <= 8) {
-    // Short repairs — express in hours or minutes
-    const timeRange = formatTimeRange(adjustedMin, adjustedMax)
-    // Lowercase the base display for inline use (e.g. "Around 30-60 minutes" → "around 30-60 minutes")
+    // Short repairs — use natural wording
+    const phrase = naturalEtaPhrase(adjustedMin, adjustedMax)
     const baseLower = baseEstimate.display.charAt(0).toLowerCase() + baseEstimate.display.slice(1)
     if (workload.level === 'very_busy') {
-      const bumpedMax = adjustedMax + 2
-      const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${baseLower}, but currently closer to ${bumpedRange} due to workload`
+      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 2)
+      repairEta = `Usually ${baseLower}, but currently closer to ${bumpedPhrase} due to workload`
     } else if (workload.level === 'busy') {
-      const bumpedMax = adjustedMax + 1
-      const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${baseLower}, currently around ${bumpedRange} based on today's workload`
+      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 1)
+      repairEta = `Usually ${baseLower}, currently around ${bumpedPhrase} based on today's workload`
     } else {
       // normal — show adjusted time with a light note
-      repairEta = `Usually ${baseLower}, currently around ${timeRange}`
+      repairEta = `Usually ${baseLower}, currently around ${phrase}`
     }
   } else {
-    // Medium/long repairs — express in days
-    const minDays = Math.ceil(adjustedMin / 24)
-    const maxDays = Math.ceil(adjustedMax / 24)
+    // Medium/long repairs — use natural wording
+    const phrase = naturalEtaPhrase(adjustedMin, adjustedMax)
     if (workload.level === 'very_busy') {
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently ${maxDays + 1}–${maxDays + 2} days due to workload`
+      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 24)
+      repairEta = `Usually ${phrase}, currently closer to ${bumpedPhrase} due to workload`
     } else if (workload.level === 'busy') {
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays}–${maxDays + 1} days`
+      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 12)
+      repairEta = `Usually ${phrase}, currently around ${bumpedPhrase}`
     } else {
       // normal
-      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
+      repairEta = `Usually ${phrase}, currently around ${phrase}`
     }
   }
 
@@ -656,19 +684,18 @@ export function getShortEta(
   if (baseEstimate.isComplex) {
     const maxDays = Math.ceil(adjustedMax / 24)
     repairEta = workload.level === 'very_busy'
-      ? `about ${maxDays}–${maxDays + 2} working days`
+      ? `about ${maxDays + 2} working days`
       : `about ${maxDays} working days`
   } else if (adjustedMax <= 8) {
-    // Short repairs — use natural time formatting
-    const timeRange = formatTimeRange(adjustedMin, adjustedMax)
+    // Short repairs — use natural wording
     repairEta = workload.level === 'very_busy'
-      ? `about ${formatTimeRange(adjustedMin, adjustedMax + 2)}`
-      : `about ${timeRange}`
+      ? naturalEtaPhrase(adjustedMin, adjustedMax + 2)
+      : naturalEtaPhrase(adjustedMin, adjustedMax)
   } else {
-    const maxDays = Math.ceil(adjustedMax / 24)
+    // Medium/long repairs — use natural wording
     repairEta = workload.level === 'very_busy'
-      ? `about ${maxDays + 1}–${maxDays + 2} working days`
-      : `about ${maxDays}–${maxDays + 1} working days`
+      ? naturalEtaPhrase(adjustedMin, adjustedMax + 24)
+      : naturalEtaPhrase(adjustedMin, adjustedMax)
   }
 
   if (partsLeadTimeDays > 0) {

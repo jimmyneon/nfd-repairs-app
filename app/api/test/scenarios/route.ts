@@ -8,6 +8,7 @@ import {
   calculateWorkloadFromJobs,
   getDeviceType,
   getPriorityTier,
+  naturalEtaPhrase,
   type WorkloadInfo,
   type TurnaroundEstimate,
 } from '@/lib/tracking-utils'
@@ -513,6 +514,20 @@ function runScenario(scenario: Scenario) {
       minHours: baseEstimate.minHours,
       maxHours: baseEstimate.maxHours,
       partsLeadDays,
+      // Raw calculated values (what the engine actually computed)
+      rawAdjustedMinHours: effectiveWorkload.adjustment > 1.0
+        ? Math.round(baseEstimate.minHours * effectiveWorkload.adjustment * 100) / 100
+        : null,
+      rawAdjustedMaxHours: effectiveWorkload.adjustment > 1.0
+        ? Math.round(baseEstimate.maxHours * effectiveWorkload.adjustment * 100) / 100
+        : null,
+      // Natural wording from the raw values
+      naturalPhrase: effectiveWorkload.adjustment > 1.0
+        ? naturalEtaPhrase(
+            baseEstimate.minHours * effectiveWorkload.adjustment,
+            baseEstimate.maxHours * effectiveWorkload.adjustment
+          )
+        : baseEstimate.display,
       shortEta,
       fullEta,
     },
