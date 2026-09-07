@@ -568,9 +568,8 @@ export function getWorkloadAdjustedEta(
   workload: WorkloadInfo | null,
   partsLeadTimeDays: number = 0
 ): string {
-  // If no workload info, quiet, or adjustment is 1.0 (quick repairs that jump the queue),
-  // just return the base estimate + parts lead time
-  if (!workload || workload.level === 'quiet' || workload.adjustment <= 1.0) {
+  // If no workload info, or adjustment is 1.0 (no actual delay), just return base
+  if (!workload || workload.adjustment <= 1.0) {
     if (partsLeadTimeDays > 0) {
       return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} working days, then ${baseEstimate.display.toLowerCase()}`
     }
@@ -591,7 +590,8 @@ export function getWorkloadAdjustedEta(
     } else if (workload.level === 'busy') {
       repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
     } else {
-      repairEta = baseEstimate.display
+      // normal — slight adjustment
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
     }
   } else if (adjustedMax <= 8) {
     // Short repairs — express in hours or minutes
@@ -599,13 +599,14 @@ export function getWorkloadAdjustedEta(
     if (workload.level === 'very_busy') {
       const bumpedMax = adjustedMax + 2
       const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${timeRange}, but currently closer to ${bumpedRange} due to workload`
+      repairEta = `Usually ${baseEstimate.display}, but currently closer to ${bumpedRange} due to workload`
     } else if (workload.level === 'busy') {
       const bumpedMax = adjustedMax + 1
       const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${timeRange}, currently around ${bumpedRange} based on today's workload`
+      repairEta = `Usually ${baseEstimate.display}, currently around ${bumpedRange} based on today's workload`
     } else {
-      repairEta = baseEstimate.display
+      // normal — show adjusted time with a light note
+      repairEta = `Usually ${baseEstimate.display}, currently around ${timeRange}`
     }
   } else {
     // Medium/long repairs — express in days
@@ -616,7 +617,8 @@ export function getWorkloadAdjustedEta(
     } else if (workload.level === 'busy') {
       repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays}–${maxDays + 1} days`
     } else {
-      repairEta = baseEstimate.display
+      // normal
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
     }
   }
 
@@ -637,9 +639,8 @@ export function getShortEta(
   workload: WorkloadInfo | null,
   partsLeadTimeDays: number = 0
 ): string {
-  // If no workload, quiet, or adjustment is 1.0 (quick repairs that jump the queue),
-  // just return the base estimate — no workload delay to communicate
-  if (!workload || workload.level === 'quiet' || workload.adjustment <= 1.0) {
+  // If no workload, or adjustment is 1.0 (no actual delay), return base
+  if (!workload || workload.adjustment <= 1.0) {
     if (partsLeadTimeDays > 0) {
       return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} days, then ${baseEstimate.display.toLowerCase()}`
     }

@@ -440,18 +440,12 @@ function runScenario(scenario: Scenario) {
   const deviceType = getDeviceType(job.device_make, job.device_model)
   const priorityTier = getPriorityTier(deviceType, job.issue)
 
-  // Build workload from the simulated queue
-  const workload = calculateWorkloadFromJobs(scenario.queue, {
+  // Build workload from the simulated queue — no override, let the engine decide
+  const effectiveWorkload = calculateWorkloadFromJobs(scenario.queue, {
     device_make: job.device_make,
     device_model: job.device_model,
     issue: job.issue,
   })
-
-  // Override workload level if requested
-  let effectiveWorkload = workload
-  if (scenario.workloadLabel === 'quiet') {
-    effectiveWorkload = { ...workload, level: 'quiet', adjustment: 1.0 }
-  }
 
   // Base turnaround estimate
   const baseEstimate = getTurnaroundEstimate(
