@@ -65,6 +65,10 @@ export async function POST(request: NextRequest) {
 
     // -----------------------------------------------------------------------
     // 1. Check for an active repair_quote enquiry
+    //    BUT: if the message is clearly a status/update/collection query
+    //    (not a quote acceptance), and the customer also has a job, route
+    //    to the job handler instead. This prevents "can I pick it up?" from
+    //    being swallowed by the enquiry handler when they have an active repair.
     // -----------------------------------------------------------------------
     const { data: enquiries } = await supabase
       .from('enquiries')
@@ -77,7 +81,10 @@ export async function POST(request: NextRequest) {
 
     const activeEnquiry = enquiries?.[0]
 
-    if (activeEnquiry) {
+    // Check if this message looks like a status/update query (not a quote response)
+    const looksLikeStatusQuery = detectSmsIntent(message) !== null
+
+    if (activeEnquiry && !looksLikeStatusQuery) {
       return handleEnquiryReply({
         supabase,
         enquiry: activeEnquiry,
