@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
+import { corsHeaders } from '@/lib/api-auth'
 
 // Server-side price verification: fetch catalogue and look up the real price by quote_key
 async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
@@ -22,18 +23,35 @@ async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): P
   }
 }
 
+// Input validation helpers
+const MAX_NAME = 100
+const MAX_EMAIL = 255
+const MAX_PHONE = 30
+const MAX_TEXT = 5000
+const MAX_PRICE = 10000
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function isValidUkPhone(phone: string): boolean {
+  const c = phone.replace(/[\s\-()]/g, '')
+  return /^(07|\+447)[0-9]{9}$/.test(c)
+}
+
+function clampLength(str: string, max: number): string {
+  return String(str || '').substring(0, max)
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers: corsHeaders(request),
   })
 }
 
 export async function POST(request: NextRequest) {
+  const headers = corsHeaders(request)
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,23 +110,57 @@ export async function POST(request: NextRequest) {
     if (!enquiry_type || !customer_name) {
       return NextResponse.json(
         { error: 'Missing required fields: enquiry_type, customer_name' },
-        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+        { status: 400, headers }
       )
     }
 
+    // Input validation — clamp lengths and validate formats
+    const sanitizedName = clampLength(customer_name, MAX_NAME)
+    const sanitizedEmail = customer_email ? clampLength(customer_email, MAX_EMAIL) : null
+    const sanitizedPhone = customer_phone ? clampLength(customer_phone, MAX_PHONE) : null
+
+    if (sanitizedEmail && !isValidEmail(sanitizedEmail)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400, headers }
+      )
+    }
+
+    if (enquiry_type === 'repair_quote' && sanitizedPhone && !isValidUkPhone(sanitizedPhone)) {
+      return NextResponse.json(
+        { error: 'Invalid UK mobile number' },
+        { status: 400, headers }
+      )
+    }
+
+    // Clamp free-text fields
+    if (issue_description) (body as any).issue_description = clampLength(issue_description, MAX_TEXT)
+    if (additional_info) (body as any).additional_info = clampLength(additional_info, MAX_TEXT)
+    if (project_description) (body as any).project_description = clampLength(project_description, MAX_TEXT)
+    if (description) (body as any).description = clampLength(description, MAX_TEXT)
+    if (quoted_price !== null && quoted_price !== undefined) {
+      const p = Number(quoted_price)
+      if (isNaN(p) || p < 0 || p > MAX_PRICE) {
+        return NextResponse.json(
+          { error: 'Invalid quoted price' },
+          { status: 400, headers }
+        )
+      }
+    }
+
     // Email required for web/home services, optional for repair_quote and business
-    if (enquiry_type !== 'repair_quote' && !customer_email) {
+    if (enquiry_type !== 'repair_quote' && !sanitizedEmail) {
       return NextResponse.json(
         { error: 'Missing required field: customer_email' },
-        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+        { status: 400, headers }
       )
     }
 
     // Phone required for repair_quote (unless email is provided — customer can choose email-only)
-    if (enquiry_type === 'repair_quote' && !customer_phone && !customer_email) {
+    if (enquiry_type === 'repair_quote' && !sanitizedPhone && !sanitizedEmail) {
       return NextResponse.json(
         { error: 'Missing required field: customer_phone or customer_email' },
-        { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+        { status: 400, headers }
       )
     }
 
@@ -116,14 +168,14 @@ export async function POST(request: NextRequest) {
       if (!project_type || !sector || !number_pages || !goals || !project_description) {
         return NextResponse.json(
           { error: 'Missing required web services fields' },
-          { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+          { status: 400, headers }
         )
       }
     } else if (enquiry_type === 'home_services') {
       if (!service_type || !address || !description) {
         return NextResponse.json(
           { error: 'Missing required home services fields' },
-          { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
+          { status: 400, headers }
         )
       }
     }
@@ -155,9 +207,9 @@ export async function POST(request: NextRequest) {
         .from('enquiries')
         .insert({
           enquiry_type,
-          customer_name,
-          customer_email: customer_email || null,
-          customer_phone: customer_phone || null,
+          customer_name: sanitizedName,
+          customer_email: sanitizedEmail || null,
+          customer_phone: sanitizedPhone || null,
           // Web Services fields
           project_type: project_type || null,
           sector: sector || null,
@@ -248,7 +300,7 @@ export async function POST(request: NextRequest) {
           console.error('Fallback insert also failed:', enquiryError2)
           return NextResponse.json(
             { error: 'Failed to create enquiry' },
-            { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
+            { status: 500, headers }
           )
         }
         enquiryRef = enquiry2.enquiry_ref
@@ -259,7 +311,7 @@ export async function POST(request: NextRequest) {
       console.error('Insert exception:', insertErr)
       return NextResponse.json(
         { error: 'Failed to create enquiry' },
-        { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
+        { status: 500, headers }
       )
     }
 
@@ -288,15 +340,13 @@ export async function POST(request: NextRequest) {
       enquiry_ref: enquiryRef,
       message: 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
     }, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers,
     })
   } catch (error) {
     console.error('Error processing enquiry submission:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
+      { status: 500, headers }
     )
   }
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { requireStaffUser } from '@/lib/api-auth'
+import { corsHeaders } from '@/lib/api-auth'
 
 /**
  * OPTIONS /api/warranty-tickets
@@ -10,23 +10,17 @@ import { requireStaffUser } from '@/lib/api-auth'
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
-      'Access-Control-Max-Age': '86400',
-    },
+    headers: corsHeaders(request),
   })
 }
 
 /**
  * POST /api/warranty-tickets
- * Create warranty ticket from website or external source
- * Requires X-API-KEY header for authentication
+ * Create warranty ticket from website
+ * Public endpoint — protected by idempotency keys and input validation
  */
 export async function POST(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
+  const headers = corsHeaders(request)
 
   try {
     // Use service role key to bypass RLS
@@ -35,35 +29,6 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
-    }
-
-    // Verify API key
-    const apiKey = request.headers.get('X-API-KEY')
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing X-API-KEY header' },
-        { status: 401, headers: corsHeaders }
-      )
-    }
-
-    // Get stored API key from admin_settings
-    const { data: settingData } = await supabase
-      .from('admin_settings')
-      .select('value')
-      .eq('key', 'warranty_api_key')
-      .single()
-
-    if (!settingData || apiKey !== settingData.value) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401, headers: corsHeaders }
-      )
-    }
-
     // Parse request body
     const body = await request.json()
 
@@ -71,7 +36,18 @@ export async function POST(request: NextRequest) {
     if (!body.customer?.name || !body.customer?.phone || !body.issue?.description) {
       return NextResponse.json(
         { error: 'Missing required fields: customer.name, customer.phone, issue.description' },
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers }
+      )
+    }
+
+    // Input validation — max lengths to prevent abuse
+    const MAX_NAME = 100
+    const MAX_DESC = 5000
+    const MAX_EMAIL = 255
+    if (body.customer.name.length > MAX_NAME || body.customer.phone.length > 30 || (body.customer.email && body.customer.email.length > MAX_EMAIL) || body.issue.description.length > MAX_DESC) {
+      return NextResponse.json(
+        { error: 'Field length exceeded' },
+        { status: 400, headers }
       )
     }
 
@@ -99,7 +75,7 @@ export async function POST(request: NextRequest) {
         status: existingTicket.status,
         duplicate: true
       }, {
-        headers: corsHeaders
+        headers
       })
     }
 
@@ -143,7 +119,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating warranty ticket:', ticketError)
       return NextResponse.json(
         { error: 'Failed to create warranty ticket' },
-        { status: 500, headers: corsHeaders }
+        { status: 500, headers }
       )
     }
 
@@ -199,11 +175,7 @@ export async function POST(request: NextRequest) {
       suggestionsCount: suggestions.length,
       status: ticket.status
     }, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
-      }
+      headers
     })
 
   } catch (error) {
@@ -212,11 +184,7 @@ export async function POST(request: NextRequest) {
       { error: 'Internal server error' },
       { 
         status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, X-API-KEY',
-        }
+        headers
       }
     )
   }
