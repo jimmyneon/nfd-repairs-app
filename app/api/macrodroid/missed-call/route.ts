@@ -36,7 +36,7 @@ const FALLBACK_HOURS: Record<string, { isOpen: boolean; formatted: string; open?
 }
 
 const DEFAULT_MAPS_URL = 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7'
-const REPAIR_REQUEST_URL = 'nfdr.uk/start'
+const QUOTE_URL = 'nfdr.uk/quote'
 const START_URL = 'nfdr.uk/start'
 
 export async function OPTIONS() {
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we noticed you've called a few times but we can't take calls while we're working on devices.\n\nPlease use the form here: nfdr.uk/start\nOr reply to this message and we'll get back to you.\n\nOur hours and location: nfdr.uk/h\n\nNew Forest Device Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant price: ${QUOTE_URL}\nOr text us here — we'll reply ASAP.\n\nJohn, New Forest Device Repairs`
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
             try {
@@ -396,51 +396,40 @@ function buildMissedCallMessage(ctx: {
   googleMapsUrl: string
   specialHours: { active?: boolean; note?: string | null } | null
 }): string {
-  const lines: string[] = ['Sorry we missed your call!', '']
+  const lines: string[] = ['Hi, sorry we missed your call!']
 
   // Special hours / holiday banner takes priority over regular hours
-  if (ctx.specialHours?.active && ctx.specialHours.note) {
+  if (ctx.specialHours?.active && ctx.specialHours?.note) {
+    lines.push('')
     lines.push(ctx.specialHours.note)
     lines.push('')
-    lines.push('For repair quotes & appointments:')
-    lines.push(REPAIR_REQUEST_URL)
+    lines.push('Get an instant repair price:')
+    lines.push(QUOTE_URL)
     lines.push('')
-    lines.push('Questions or status updates? Text us or visit:')
-    lines.push(START_URL)
-  } else if (ctx.isOpen) {
-    const closeTime = extractCloseTime(ctx.todayFormatted)
-    lines.push(`We're currently OPEN until ${closeTime}.`)
+    lines.push('Or text us here.')
     lines.push('')
-    lines.push(`Need help? Here's the quickest way:`)
-    lines.push('')
-    lines.push('REPAIR QUOTES & APPOINTMENTS:')
-    lines.push(REPAIR_REQUEST_URL)
-    lines.push('')
-    lines.push('QUESTIONS & STATUS CHECKS:')
-    lines.push(`Text us or visit: ${START_URL}`)
-  } else {
-    if (ctx.nextOpen) {
-      lines.push(`We're currently closed. We'll be open ${ctx.nextOpen}.`)
-    } else {
-      lines.push(`We're currently closed. ${ctx.todayFormatted}`)
-    }
-    lines.push('')
-    lines.push(`Need help? Here's the quickest way:`)
-    lines.push('')
-    lines.push('REPAIR QUOTES & APPOINTMENTS:')
-    lines.push(REPAIR_REQUEST_URL)
-    lines.push('')
-    lines.push('QUESTIONS & STATUS CHECKS:')
-    lines.push(`Text us or visit: ${START_URL}`)
+    lines.push('John, New Forest Device Repairs')
+    return lines.join('\n')
   }
 
-  // Use nfdr.uk/h for "Find us" — it redirects to Google Maps and is much shorter
-  lines.push('')
-  lines.push('Find us: nfdr.uk/h')
+  if (ctx.isOpen) {
+    const closeTime = extractCloseTime(ctx.todayFormatted)
+    lines.push(`We're open until ${closeTime}.`)
+  } else {
+    if (ctx.nextOpen) {
+      lines.push(`We're closed now, back ${ctx.nextOpen}.`)
+    } else {
+      lines.push(`We're closed now. ${ctx.todayFormatted}`)
+    }
+  }
 
   lines.push('')
-  lines.push('Many thanks,')
-  lines.push('John — New Forest Device Repairs')
+  lines.push('Get an instant repair price in 60 seconds:')
+  lines.push(QUOTE_URL)
+  lines.push('')
+  lines.push('Or text us here — we\'ll reply ASAP.')
+  lines.push('')
+  lines.push('John, New Forest Device Repairs')
 
   return lines.join('\n')
 }
