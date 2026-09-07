@@ -54,8 +54,6 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const headers = corsHeaders(request)
   try {
-    const headers = corsHeaders(request)
-
     // Rate limit: 10 submissions per minute per IP
     const ip = getClientIP(request)
     const rateLimit = await checkRateLimit(ip, 'enquiries_submit', 10)
