@@ -244,17 +244,214 @@ export function getTurnaroundEstimate(
  */
 export type WorkloadLevel = 'quiet' | 'normal' | 'busy' | 'very_busy'
 
+/**
+ * Priority tier for a job — quick phone repairs get priority over
+ * laptops, consoles, and board-level jobs.
+ */
+export type PriorityTier = 'quick' | 'standard' | 'heavy' | 'board_level'
+
 export interface WorkloadInfo {
   level: WorkloadLevel
   activeJobs: number
   activeJobsSameType: number
   adjustment: number // multiplier for ETA (1.0 = no change, 1.5 = 50% longer)
+  benchHoursAhead: number // estimated bench hours queued ahead of this job
+  priorityTier: PriorityTier
 }
 
 /**
- * Calculate workload adjustment from active job counts.
- * Callers should query the database for active jobs (RECEIVED, IN_REPAIR, DIAGNOSTIC, PARTS_ARRIVED)
- * and pass the counts here.
+ * Classify a job's priority tier based on device type and issue.
+ *
+ * - quick: phone/watch quick repairs (screen, battery, camera, charging port) — 1-6 hours bench time
+ * - standard: phone/tablet/watch non-complex repairs, console HDMI/drive — up to 1-2 days
+ * - heavy: laptop repairs, console complex, tablet complex — 1-3 days
+ * - board_level: motherboard, liquid damage, data recovery, no-power — up to 7-10 days
+ */
+export function getPriorityTier(
+  deviceType: 'phone' | 'tablet' | 'laptop' | 'console' | 'watch' | 'other',
+  issue: string
+): PriorityTier {
+  if (isComplexIssue(issue)) return 'board_level'
+
+  const i = (issue || '').toLowerCase()
+
+  // Quick phone repairs — prioritised
+  if (deviceType === 'phone' || deviceType === 'watch') {
+    if (
+      i.includes('battery') ||
+      i.includes('screen') ||
+      i.includes('display') ||
+      i.includes('lcd') ||
+      i.includes('oled') ||
+      i.includes('camera') ||
+      i.includes('charging port') ||
+      i.includes('microphone') ||
+      i.includes('speaker') ||
+      i.includes('audio') ||
+      i.includes('software') ||
+      i.includes('reset') ||
+      i.includes('restore') ||
+      i.includes('setup') ||
+      i.includes('glue') ||
+      i.includes('back on')
+    ) {
+      return 'quick'
+    }
+    return 'standard'
+  }
+
+  // Tablets — standard unless complex
+  if (deviceType === 'tablet') {
+    if (
+      i.includes('battery') ||
+      i.includes('screen') ||
+      i.includes('display') ||
+      i.includes('charging') ||
+      i.includes('reset') ||
+      i.includes('restore') ||
+      i.includes('software')
+    ) {
+      return 'standard'
+    }
+    return 'heavy'
+  }
+
+  // Laptops — heavy by default
+  if (deviceType === 'laptop') {
+    if (i.includes('sound') || i.includes('speaker') || i.includes('audio') || i.includes('no display')) {
+      return 'standard'
+    }
+    return 'heavy'
+  }
+
+  // Consoles — standard for HDMI/drive, heavy for complex
+  if (deviceType === 'console') {
+    if (i.includes('hdmi') || i.includes('disc') || i.includes('drive') || i.includes('controller') || i.includes('stick') || i.includes('drift') || i.includes('button')) {
+      return 'standard'
+    }
+    return 'heavy'
+  }
+
+  return 'heavy'
+}
+
+/**
+ * Get the expected bench hours for a job based on its priority tier.
+ * Used for workload calculation — these are mid-range estimates, not
+ * the customer-facing turnaround.
+ */
+function benchHoursForTier(tier: PriorityTier): number {
+  switch (tier) {
+    case 'quick': return 3       // phone screen/battery: ~1-6 hours, mid ~3
+    case 'standard': return 8    // phone complex, console HDMI: ~2-48 hours, mid ~8
+    case 'heavy': return 36      // laptop, tablet complex: ~1-3 days, mid ~36h
+    case 'board_level': return 96 // motherboard/liquid: up to 7-10 days, mid ~96h
+  }
+}
+
+/**
+ * Priority-weighted delay factor.
+ * Quick phone repairs get less delay from a busy queue (they can be slotted in).
+ * Board-level jobs absorb more delay (they're long anyway and less urgent).
+ */
+function priorityDelayFactor(tier: PriorityTier): number {
+  switch (tier) {
+    case 'quick': return 0.6      // 40% less delay — phone repairs jump ahead
+    case 'standard': return 0.85  // 15% less delay
+    case 'heavy': return 1.1      // 10% more delay
+    case 'board_level': return 1.3 // 30% more delay — board jobs wait longer
+  }
+}
+
+/**
+ * Calculate workload adjustment from actual job records.
+ *
+ * This is the proper workload engine: instead of just counting active jobs,
+ * it estimates the bench hours queued ahead, classifies each job by priority
+ * tier, and applies priority rules so quick phone repairs are less affected
+ * by a busy queue while board-level jobs absorb more delay.
+ *
+ * @param activeJobs - Array of active job records with device_make, device_model, issue, status
+ * @param currentJob - The job we're calculating ETA for
+ */
+export function calculateWorkloadFromJobs(
+  activeJobs: Array<{ device_make?: string; device_model?: string; issue?: string; status?: string }>,
+  currentJob: { device_make?: string; device_model?: string; issue?: string }
+): WorkloadInfo {
+  const currentDeviceType = getDeviceType(currentJob.device_make || '', currentJob.device_model || '')
+  const currentTier = getPriorityTier(currentDeviceType, currentJob.issue || '')
+  const currentBenchHours = benchHoursForTier(currentTier)
+
+  // Calculate bench hours ahead in the queue, weighted by priority
+  let benchHoursAhead = 0
+  let sameTypeCount = 0
+
+  for (const job of activeJobs) {
+    const jobDeviceType = getDeviceType(job.device_make || '', job.device_model || '')
+    const jobTier = getPriorityTier(jobDeviceType, job.issue || '')
+    const jobBenchHours = benchHoursForTier(jobTier)
+
+    // Jobs already being repaired don't count as "ahead" — they're being worked on
+    if (job.status === 'IN_REPAIR') {
+      benchHoursAhead += jobBenchHours * 0.3 // partial credit — will finish soon
+    } else {
+      benchHoursAhead += jobBenchHours
+    }
+
+    if (jobDeviceType === currentDeviceType) {
+      sameTypeCount++
+    }
+  }
+
+  // Apply priority delay factor to the current job
+  const delayFactor = priorityDelayFactor(currentTier)
+
+  // Calculate adjustment multiplier based on bench hours ahead
+  // A full working day is ~8 bench hours. We scale relative to that.
+  // benchHoursAhead / 8 = number of working days of work queued
+  const workingDaysAhead = benchHoursAhead / 8
+
+  let level: WorkloadLevel = 'quiet'
+  let baseAdjustment = 1.0
+
+  if (workingDaysAhead >= 5) {
+    level = 'very_busy'
+    baseAdjustment = 1.6
+  } else if (workingDaysAhead >= 3) {
+    level = 'busy'
+    baseAdjustment = 1.3
+  } else if (workingDaysAhead >= 1.5) {
+    level = 'normal'
+    baseAdjustment = 1.15
+  } else {
+    level = 'quiet'
+    baseAdjustment = 1.0
+  }
+
+  // Apply priority factor — quick phone repairs get less delay, board-level get more
+  let adjustment = baseAdjustment * delayFactor
+
+  // Same-type jobs add more delay (board-level jobs block each other on equipment)
+  if (sameTypeCount >= 3) {
+    adjustment *= 1.15
+  }
+
+  // Cap adjustment to reasonable bounds
+  adjustment = Math.min(Math.max(adjustment, 1.0), 2.5)
+
+  return {
+    level,
+    activeJobs: activeJobs.length,
+    activeJobsSameType: sameTypeCount,
+    adjustment,
+    benchHoursAhead,
+    priorityTier: currentTier,
+  }
+}
+
+/**
+ * Legacy count-based workload calculation.
+ * Kept for backward compatibility but calculateWorkloadFromJobs is preferred.
  */
 export function calculateWorkload(
   activeJobs: number,
@@ -274,7 +471,7 @@ export function calculateWorkload(
   // Same-type jobs add more delay (board-level jobs block each other)
   if (activeJobsSameType >= 3) adjustment *= 1.2
 
-  return { level, activeJobs, activeJobsSameType, adjustment }
+  return { level, activeJobs, activeJobsSameType, adjustment, benchHoursAhead: 0, priorityTier: 'standard' }
 }
 
 /**

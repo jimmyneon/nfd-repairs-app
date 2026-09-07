@@ -4,7 +4,7 @@ import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
 import { sendViaMacroDroid } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
-import { getTurnaroundEstimate, getShortEta, calculateWorkload, type WorkloadInfo } from '@/lib/tracking-utils'
+import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
 
 /**
  * POST /api/sms/reply
@@ -905,29 +905,27 @@ function getTurnaroundText(job: any, workload?: WorkloadInfo | null): string {
 
 /**
  * Query current workload from the database.
- * Returns counts of active jobs for workload adjustment.
+ * Fetches actual active job records (not just counts) so the workload engine
+ * can calculate bench hours ahead and apply priority rules.
  */
 async function queryWorkload(supabase: SupabaseClient, job: any): Promise<WorkloadInfo | null> {
   try {
     const activeStatuses = ['RECEIVED', 'IN_REPAIR', 'DIAGNOSTIC', 'PARTS_ARRIVED', 'AWAITING_DEVICE']
-    const { count: activeCount } = await supabase
+    const { data: activeJobs, error } = await supabase
       .from('jobs')
-      .select('id', { count: 'exact', head: true })
+      .select('device_make, device_model, issue, status')
       .in('status', activeStatuses)
 
-    // Count same-type jobs (same device_type)
-    const deviceType = job.device_type || ''
-    let sameTypeCount = 0
-    if (deviceType) {
-      const { count } = await supabase
-        .from('jobs')
-        .select('id', { count: 'exact', head: true })
-        .in('status', activeStatuses)
-        .eq('device_type', deviceType)
-      sameTypeCount = count || 0
+    if (error || !activeJobs) {
+      console.error('[sms/reply] Failed to query active jobs for workload:', error)
+      return null
     }
 
-    return calculateWorkload(activeCount || 0, sameTypeCount)
+    return calculateWorkloadFromJobs(activeJobs, {
+      device_make: job.device_make,
+      device_model: job.device_model,
+      issue: job.issue,
+    })
   } catch (e) {
     console.error('[sms/reply] Failed to query workload:', e)
     return null
