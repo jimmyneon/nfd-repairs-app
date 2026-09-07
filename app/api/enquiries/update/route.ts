@@ -23,9 +23,8 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const headers = corsHeaders(request)
   try {
-    const headers = corsHeaders(request)
-
     // Rate limit: 20 updates per minute per IP (higher limit — normal quote flow may make several updates)
     const ip = getClientIP(request)
     const rateLimit = await checkRateLimit(ip, 'enquiries_update', 20)

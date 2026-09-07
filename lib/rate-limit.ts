@@ -31,7 +31,7 @@ export async function checkRateLimit(
     const windowStart = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString()
 
     // Count requests in the current window — fetch all matching rows and count
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('rate_limits')
       .select('id')
       .eq('ip', ip)
@@ -50,7 +50,7 @@ export async function checkRateLimit(
     }
 
     // Log this request
-    const { error: insertError } = await supabase
+    const { error: insertError } = await (supabase as any)
       .from('rate_limits')
       .insert({ ip, endpoint })
 
@@ -61,7 +61,7 @@ export async function checkRateLimit(
     // Best-effort cleanup (1% of requests)
     if (Math.random() < 0.01) {
       const cleanupStart = new Date(Date.now() - 3600 * 1000).toISOString()
-      supabase
+      void (supabase as any)
         .from('rate_limits')
         .delete()
         .lt('created_at', cleanupStart)
