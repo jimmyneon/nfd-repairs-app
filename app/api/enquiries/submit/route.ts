@@ -104,10 +104,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Phone required for repair_quote
-    if (enquiry_type === 'repair_quote' && !customer_phone) {
+    // Phone required for repair_quote (unless email is provided — customer can choose email-only)
+    if (enquiry_type === 'repair_quote' && !customer_phone && !customer_email) {
       return NextResponse.json(
-        { error: 'Missing required field: customer_phone' },
+        { error: 'Missing required field: customer_phone or customer_email' },
         { status: 400, headers: { 'Access-Control-Allow-Origin': '*' } }
       )
     }
