@@ -1100,8 +1100,8 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   const hoursLink = shortHoursLink()
   const status = job.status
   const eta = getTurnaroundText(job, workload)
-  // Strip leading "about " if present, since templates add their own "about"
-  const cleanEta = eta.replace(/^about\s+/i, '')
+  // Strip leading "about " or "Around " if present, since templates add their own "about"
+  const cleanEta = eta.replace(/^(about|Around)\s+/i, '')
 
   // Already done
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {

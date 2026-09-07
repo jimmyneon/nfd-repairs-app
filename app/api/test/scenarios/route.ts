@@ -615,8 +615,8 @@ function buildTurnaroundSms(job: any, workload: WorkloadInfo, eta: string): stri
   const firstName = getFirstName(job.customer_name)
   const hoursLink = shortHoursLink()
   const status = job.status
-  // Strip leading "about " if present, since templates add their own "about"
-  const cleanEta = eta.replace(/^about\s+/i, '')
+  // Strip leading "about " or "Around " if present, since templates add their own "about"
+  const cleanEta = eta.replace(/^(about|Around)\s+/i, '')
 
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
     return `Hi ${firstName},\n\nIt's already done and ready to collect! Pop in whenever we're open: ${hoursLink}\n\nNew Forest Device Repairs`

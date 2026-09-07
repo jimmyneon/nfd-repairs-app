@@ -596,17 +596,19 @@ export function getWorkloadAdjustedEta(
   } else if (adjustedMax <= 8) {
     // Short repairs — express in hours or minutes
     const timeRange = formatTimeRange(adjustedMin, adjustedMax)
+    // Lowercase the base display for inline use (e.g. "Around 30-60 minutes" → "around 30-60 minutes")
+    const baseLower = baseEstimate.display.charAt(0).toLowerCase() + baseEstimate.display.slice(1)
     if (workload.level === 'very_busy') {
       const bumpedMax = adjustedMax + 2
       const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${baseEstimate.display}, but currently closer to ${bumpedRange} due to workload`
+      repairEta = `Usually ${baseLower}, but currently closer to ${bumpedRange} due to workload`
     } else if (workload.level === 'busy') {
       const bumpedMax = adjustedMax + 1
       const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
-      repairEta = `Usually ${baseEstimate.display}, currently around ${bumpedRange} based on today's workload`
+      repairEta = `Usually ${baseLower}, currently around ${bumpedRange} based on today's workload`
     } else {
       // normal — show adjusted time with a light note
-      repairEta = `Usually ${baseEstimate.display}, currently around ${timeRange}`
+      repairEta = `Usually ${baseLower}, currently around ${timeRange}`
     }
   } else {
     // Medium/long repairs — express in days
