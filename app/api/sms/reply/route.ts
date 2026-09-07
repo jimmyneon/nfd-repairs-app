@@ -938,9 +938,9 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "Parts landed! We're starting your repair straight away. We'll be in touch the moment it's finished.",
   ],
   AWAITING_DEPOSIT: [
-    "We need a small deposit to order parts for your repair. Have a look back through your texts for the payment link, or text us and we'll help.",
-    "Still waiting on the deposit to get parts ordered. If you've not got the payment link, text us and we'll send it again.",
-    "We can't order parts until the deposit's sorted. Check your earlier texts for the link, or reply here and we'll sort it out.",
+    "We need a £20 deposit to order parts for your repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away.",
+    "To get parts ordered, we just need a £20 deposit. Pay online here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nWe'll text you as soon as the parts arrive.",
+    "We're ready to order parts — just need a £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.",
   ],
   READY_TO_COLLECT: [
     "Great news — your device is repaired and ready to collect! Pop in during opening hours: nfdr.uk/h",
@@ -1039,7 +1039,7 @@ function buildCollectionReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a deposit to order parts before we can start. Check your earlier texts for the payment link, or text us and we'll help.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start the repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
@@ -1112,7 +1112,7 @@ function buildTurnaroundReply(job: any, smsCount: number): string {
 
   // Awaiting deposit
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nWe need a deposit to order parts first. Once that's sorted, parts take 2-3 days and then the repair is about ${eta}. Check your texts for the payment link.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${eta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
   }
 
   // Diagnostic
@@ -1186,7 +1186,7 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a deposit to order parts before we can start. Check your earlier texts for the payment link, or text us and we'll help.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
