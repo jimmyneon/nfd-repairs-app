@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     // -----------------------------------------------------------------------
     const { data: jobs } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, tracking_token, short_token, review_platforms_completed')
+      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, issue, tracking_token, short_token, review_platforms_completed')
       .in('customer_phone', lookupPhones)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -727,23 +727,182 @@ function normaliseUkPhoneForLookup(raw: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-reply detector: deterministic pattern matching for common questions
+// Auto-reply detector: intent-based pattern matching for common questions
 // Returns null if no match (falls through to staff notification)
 // ---------------------------------------------------------------------------
 type AutoReply = { templateKey: string; body: string }
 
 /**
- * Status message variants for SMS auto-reply.
+ * Intent types for SMS auto-reply.
  *
- * Keyed by job status, each entry is an array of variant messages.
- * We pick a variant based on how many times the customer has texted "update"
- * or status-type messages — so they don't get the same message twice in a row.
- *
- * Language is deliberately different from the tracking page reassurance messages:
- * - SMS is more conversational and direct
- * - Shorter sentences, more informal
- * - Uses "we're" / "we've" contractions
- * - Includes the customer's first name
+ * Different questions need different answers:
+ * - "Can I pick it up?" → collection intent → answer focuses on whether it's
+ *   ready AND opening hours
+ * - "How long will it take?" → turnaround intent → answer gives ETA
+ * - "Is it done?" → done check → yes/no answer
+ * - "Update" / "Any news?" → general status → rotating status message
+ */
+type SmsIntent = 'collection' | 'turnaround' | 'done_check' | 'update' | 'location'
+
+/**
+ * Detect the intent of a customer's SMS message.
+ */
+function detectSmsIntent(message: string): SmsIntent | null {
+  const msg = message.toLowerCase().trim()
+
+  // Words that exclude auto-reply (these are actions, not queries)
+  const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost|cracked|broken|drop\s+off|drop\s+my)\b/i
+  if (excludeRegex.test(msg)) return null
+
+  // --- Location intent ("Where are you?", "What's your address?") ---
+  if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store)\b/i.test(msg)) {
+    return 'location'
+  }
+
+  // --- Collection intent ("Can I pick it up?", "When can I collect?", "Come get it") ---
+  const collectionPatterns: RegExp[] = [
+    /\bcan\s+i\s+(pick|collect)\b/i,
+    /\bcan\s+i\s+come\s+(get|pick|collect)\b/i,
+    /\bready\s+to\s+(collect|pick)\b/i,
+    /\bwhen\s+can\s+i\s+(pick|collect)\b/i,
+    /\bshould\s+i\s+come\b/i,
+    /\bshall\s+i\s+come\b/i,
+    /\bcome\s+get\b/i,
+    /\bcome\s+pick\b/i,
+    /\bpick\s+it\s+up\b/i,
+    /\bpick\s+\w+\s+up\b/i,
+    /\bpick\s*up\b/i,
+    /\bpickup\b/i,
+    /\bcollect\b/i,
+  ]
+  if (collectionPatterns.some(re => re.test(msg))) {
+    return 'collection'
+  }
+
+  // --- Turnaround intent ("How long?", "What time?", "How far along?") ---
+  const turnaroundPatterns: RegExp[] = [
+    /\bhow\s+long\b/i,
+    /\bhow\s+far\s+along\b/i,
+    /\bwhat\s+time\b/i,
+    /\bwhen\s+will\b/i,
+    /\bwhen\s+is\b/i,
+    /\bwhen\s+can\b/i,
+    /\bwhen\s+ready\b/i,
+    /\bwhen\s+done\b/i,
+    /\bwhen\s+finished\b/i,
+    /\bwhen\s+\w+\s+(be\s+)?(ready|done|finished)\b/i,
+  ]
+  if (turnaroundPatterns.some(re => re.test(msg))) {
+    return 'turnaround'
+  }
+
+  // --- Done check intent ("Is it done?", "Is it ready?", "Done yet?") ---
+  const donePatterns: RegExp[] = [
+    /\bis\s+it\s+(ready|done|finished|fixed|sorted)\b/i,
+    /\b(done|finished|fixed|sorted)\s+(yet|now)\b/i,
+    /\byou\s+done\b/i,
+    /\bare\s+you\s+done\b/i,
+    /\bu\s+done\b/i,
+    /\br\s+u\s+done\b/i,
+    /\bhas\s+it\s+been\s+(done|fixed|sorted)\b/i,
+    /\bhas\s+my\s+\w+\s+been\s+(done|fixed|sorted)\b/i,
+    /\bis\s+my\s+\w+\s+(done|fixed|sorted|ready)\b/i,
+    /\bphone\s+ready\b/i,
+    /\bgot\s+my\s+\w+\s+ready\b/i,
+    /\bready\s+yet\b/i,
+  ]
+  if (donePatterns.some(re => re.test(msg))) {
+    return 'done_check'
+  }
+
+  // --- Update intent ("Update", "Any news?", "Status", "How's it going?") ---
+  const updatePatterns: RegExp[] = [
+    /\bupdates?\b/i,
+    /\bany\s+updates?\b/i,
+    /\bcan\s+i\s+get\s+an?\s+update\b/i,
+    /\blooking\s+for\s+an?\s+update\b/i,
+    /\bupdate\s+me\b/i,
+    /\bupdate\s+on\b/i,
+    /\bstatus\b/i,
+    /\bwhat.?s\s+(the\s+)?status\b/i,
+    /\bmy\s+status\b/i,
+    /\bany\s+news\b/i,
+    /\bany\s+word\b/i,
+    /\bany\s+luck\b/i,
+    /\bheard\b/i,
+    /\bnot\s+heard\b/i,
+    /\bprogress\b/i,
+    /\bhow.?s\s+it\s+going\b/i,
+    /\bhow.?s\s+(my|the)\s+\w+\s+(getting|going)\b/i,
+    /\bwhat.?s\s+happening\b/i,
+    /\bwhat.?s\s+going\s+on\b/i,
+    /\bwhere.?s?\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
+    /\bwhere\s+is\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
+  ]
+  if (updatePatterns.some(re => re.test(msg))) {
+    return 'update'
+  }
+
+  return null
+}
+
+/**
+ * Get turnaround estimate text for a job.
+ * Replicates the logic from tracking-utils.ts but returns a short SMS-friendly string.
+ */
+function getTurnaroundText(job: any): string {
+  const make = (job.device_make || '').toLowerCase()
+  const model = (job.device_model || '').toLowerCase()
+  const issue = (job.issue || '').toLowerCase()
+  const combined = `${make} ${model}`
+
+  // Complex issues
+  const complex = issue.includes('motherboard') || issue.includes('logic board') ||
+    issue.includes('no power') || issue.includes('wont turn on') || issue.includes("won't turn on") ||
+    issue.includes('water damage') || issue.includes('liquid damage') || issue.includes('data recovery')
+
+  if (complex) {
+    if (issue.includes('data recovery')) return 'up to 7 days'
+    return 'up to 7 days, often quicker'
+  }
+
+  // Phone
+  if (combined.includes('iphone') || combined.includes('samsung') && !combined.includes('tab') ||
+      combined.includes('pixel') || combined.includes('phone')) {
+    if (issue.includes('battery')) return '1-3 hours'
+    if (issue.includes('screen') || issue.includes('display') || issue.includes('lcd') || issue.includes('oled')) return '2-6 hours, sometimes next day'
+    if (issue.includes('charging')) return '2-4 hours, sometimes 1-2 days'
+    if (issue.includes('camera')) return '1-3 hours'
+    if (issue.includes('back glass') || issue.includes('back cover')) return '1-3 days'
+    return '2-6 hours, sometimes 1-2 days'
+  }
+
+  // Tablet
+  if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
+    if (issue.includes('battery')) return '2-4 hours'
+    if (issue.includes('screen') || issue.includes('display')) return '2-8 hours, sometimes 1-2 days'
+    return '1-3 days'
+  }
+
+  // Laptop
+  if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
+    if (issue.includes('battery')) return '1-2 days'
+    if (issue.includes('screen') || issue.includes('display')) return '1-3 days'
+    if (issue.includes('keyboard')) return '1-2 days'
+    return '1-3 days'
+  }
+
+  // Console
+  if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') || combined.includes('ps4') || combined.includes('ps5')) {
+    return '1-2 days'
+  }
+
+  return '1-5 days depending on the repair'
+}
+
+/**
+ * General status message variants (for "update" intent).
+ * Rotates through 3 variants per status.
  */
 const STATUS_SMS_VARIANTS: Record<string, string[]> = {
   QUOTE_APPROVED: [
@@ -802,8 +961,6 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
 function pickVariant(status: string, messageCount: number): string | null {
   const variants = STATUS_SMS_VARIANTS[status]
   if (!variants || variants.length === 0) return null
-  // Rotate through variants — messageCount 0 = first, 1 = second, etc.
-  // Wraps around if they've texted more than the number of variants
   return variants[messageCount % variants.length]
 }
 
@@ -813,102 +970,277 @@ function fallbackStatusMessage(status: string): string {
   return `Your repair is at the ${readable} stage. We'll text you as soon as there's an update.`
 }
 
-function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoReply | null {
-  const msg = message.toLowerCase().trim()
+/**
+ * Build a collection-specific response.
+ * Answers "Can I pick it up?" / "When can I collect?"
+ */
+function buildCollectionReply(job: any, smsCount: number): string {
+  const firstName = getFirstName(job.customer_name)
+  const hoursLink = shortHoursLink()
+  const status = job.status
 
-  // --- "Update" / "When will it be ready?" / "What's the status?" ---
-  // Comprehensive pattern matching for status/update queries.
-  // Catches: update, updates, any update, status, when ready, how long,
-  // is it done/ready/fixed/sorted, can I pick up/collect, any news/word/luck,
-  // how's it going, what's happening, how far along, etc.
-  const statusPatterns: RegExp[] = [
-    // Direct update requests
-    /\bupdates?\b/i,
-    /\bany\s+updates?\b/i,
-    /\bcan\s+i\s+get\s+an?\s+update\b/i,
-    /\blooking\s+for\s+an?\s+update\b/i,
-    /\bupdate\s+me\b/i,
-    /\bupdate\s+on\b/i,
-
-    // Status queries
-    /\bstatus\b/i,
-    /\bwhat.?s\s+(the\s+)?status\b/i,
-    /\bmy\s+status\b/i,
-
-    // When/ready/done/finished
-    /\bwhen\b/i,
-    /\bwhat\s+time\b/i,
-    /\bhow\s+long\b/i,
-    /\bhow\s+far\s+along\b/i,
-    /\bready\b/i,
-    /\bis\s+it\s+(ready|done|finished|fixed|sorted)\b/i,
-    /\b(done|finished|fixed|sorted)\s+(yet|now)\b/i,
-    /\byou\s+done\b/i,
-    /\bare\s+you\s+done\b/i,
-    /\bu\s+done\b/i,                    // textspeak: "u done?"
-    /\br\s+u\s+done\b/i,                // textspeak: "r u done"
-    /\bhas\s+it\s+been\s+(done|fixed|sorted)\b/i,
-    /\bhas\s+my\s+\w+\s+been\s+(done|fixed|sorted)\b/i,
-    /\bis\s+my\s+\w+\s+(done|fixed|sorted|ready)\b/i,
-    /\bphone\s+ready\b/i,
-    /\bgot\s+my\s+\w+\s+ready\b/i,
-
-    // Pick up / collect
-    /\bpick\s*up\b/i,
-    /\bpickup\b/i,
-    /\bpick\s+it\s+up\b/i,
-    /\bpick\s+\w+\s+up\b/i,
-    /\bcan\s+i\s+(pick|collect)\b/i,
-    /\bcollect\b/i,
-    /\bcome\s+get\b/i,
-    /\bcome\s+pick\b/i,
-    /\bshould\s+i\s+come\b/i,
-    /\bshall\s+i\s+come\b/i,
-
-    // News / word / heard
-    /\bany\s+news\b/i,
-    /\bany\s+word\b/i,
-    /\bany\s+luck\b/i,
-    /\bheard\b/i,
-    /\bnot\s+heard\b/i,
-
-    // Progress
-    /\bprogress\b/i,
-
-    // How's it going / what's happening
-    /\bhow.?s\s+it\s+going\b/i,
-    /\bhow.?s\s+(my|the)\s+\w+\s+(getting|going)\b/i,
-    /\bwhat.?s\s+happening\b/i,
-    /\bwhat.?s\s+going\s+on\b/i,
-
-    // Where's my phone/device
-    /\bwhere.?s?\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
-    /\bwhere\s+is\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
-  ]
-
-  // Words that exclude auto-status-reply (these are actions, not queries)
-  const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost|cracked|broken|drop\s+off|drop\s+my)\b/i
-
-  const isStatusQuery = statusPatterns.some(re => re.test(msg)) && !excludeRegex.test(msg)
-
-  if (isStatusQuery) {
-    const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
-    const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
-    const firstName = getFirstName(job.customer_name)
-    return {
-      templateKey: 'AUTO_STATUS_REPLY',
-      body: `Hi ${firstName},\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
-    }
+  // Ready to collect
+  if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
+    const variants = [
+      `Yes! Your device is ready to collect. Pop in during opening hours: ${hoursLink}`,
+      `It's all done and waiting for you! Come grab it whenever we're open: ${hoursLink}`,
+      `Good news — it's ready! Come in whenever suits you: ${hoursLink}`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
   }
 
-  // --- "Where are you?" / "What's your address?" / "How do I find you?" ---
-  if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store)\b/i.test(msg)) {
+  // Already collected
+  if (status === 'COLLECTED') {
+    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If something's not right, just text us here.\n\nNew Forest Device Repairs`
+  }
+
+  // Not ready yet — tell them current status + when to expect
+  if (status === 'IN_REPAIR') {
+    const variants = [
+      "Not yet — we're still working on it. We'll text you the second it's ready to collect.",
+      "Still being repaired, I'm afraid. We'll give you a buzz the moment it's done and ready for you.",
+      "Not quite there yet — we're still fixing it. We'll text you as soon as it's ready to pick up.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+  }
+
+  if (status === 'PARTS_ORDERED') {
+    const variants = [
+      "Not yet — we're still waiting on parts to arrive. They usually take 2-3 working days. We'll text you the moment it's ready.",
+      "Still waiting on parts, I'm afraid. Once they arrive we'll crack on with the repair and text you when it's done.",
+      "Not yet — parts are on their way. We'll text you as soon as the repair's finished and it's ready to collect.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+  }
+
+  if (status === 'PARTS_ARRIVED') {
+    const variants = [
+      "Not yet — parts have just arrived and we're starting on it now. Shouldn't be too long! We'll text when it's ready.",
+      "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
+      "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+  }
+
+  if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
+    const variants = [
+      "Not yet — your device is in the queue. We'll text you the moment work starts and again when it's ready to collect.",
+      "Still in the queue, I'm afraid. We'll text you as soon as we start on it and again when it's ready.",
+      "Not yet — we've got it checked in and waiting. We'll text you the moment it's ready to pick up.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+  }
+
+  if (status === 'AWAITING_DEPOSIT') {
+    return `Hi ${firstName},\n\nNot yet — we need a deposit to order parts before we can start. Check your earlier texts for the payment link, or text us and we'll help.\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'DIAGNOSTIC') {
+    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
+  }
+
+  // Fallback
+  const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
+  return `Hi ${firstName},\n\n${statusInfo}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+}
+
+/**
+ * Build a turnaround-specific response.
+ * Answers "How long will it take?" / "When will it be ready?"
+ */
+function buildTurnaroundReply(job: any, smsCount: number): string {
+  const firstName = getFirstName(job.customer_name)
+  const hoursLink = shortHoursLink()
+  const status = job.status
+  const eta = getTurnaroundText(job)
+
+  // Already done
+  if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
+    return `Hi ${firstName},\n\nIt's already done and ready to collect! Pop in whenever we're open: ${hoursLink}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'COLLECTED') {
+    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If anything's not right, just text us.\n\nNew Forest Device Repairs`
+  }
+
+  // In repair — give ETA from this point
+  if (status === 'IN_REPAIR') {
+    const variants = [
+      `We're working on it right now — should be about ${eta} from when we started. We'll text you the moment it's done.`,
+      `Currently being repaired — typically ${eta} for this type of job. We'll text you as soon as it's ready.`,
+      `We're on it! Expect about ${eta} for this repair. We'll be in touch the second it's finished.`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  // Parts ordered — add parts wait + repair time
+  if (status === 'PARTS_ORDERED') {
+    const variants = [
+      `Parts take 2-3 working days to arrive, then the repair itself is about ${eta}. We'll text you at every step.`,
+      `We're waiting on parts (2-3 days), then it's about ${eta} to do the repair. We'll let you know when parts land.`,
+      `Once parts arrive (usually 2-3 days), the repair takes about ${eta}. We'll text you the moment it's ready.`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  // Parts arrived — repair time from here
+  if (status === 'PARTS_ARRIVED') {
+    const variants = [
+      `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
+      `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
+      `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  // In queue — full estimate
+  if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
+    const variants = [
+      `Once we start on it, this type of repair takes about ${eta}. Your device is in the queue — we'll text you the moment work begins.`,
+      `Typically ${eta} for this repair once we get started. It's in the queue and we'll text you as soon as we crack on.`,
+      `This repair is usually about ${eta}. We'll text you the moment we start working on it.`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  // Awaiting deposit
+  if (status === 'AWAITING_DEPOSIT') {
+    return `Hi ${firstName},\n\nWe need a deposit to order parts first. Once that's sorted, parts take 2-3 days and then the repair is about ${eta}. Check your texts for the payment link.\n\nNew Forest Device Repairs`
+  }
+
+  // Diagnostic
+  if (status === 'DIAGNOSTIC') {
+    return `Hi ${firstName},\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNew Forest Device Repairs`
+  }
+
+  // Fallback
+  const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
+  return `Hi ${firstName},\n\n${statusInfo}\n\nNew Forest Device Repairs`
+}
+
+/**
+ * Build a done-check response.
+ * Answers "Is it done?" / "Is it ready?" / "Done yet?"
+ */
+function buildDoneCheckReply(job: any, smsCount: number): string {
+  const firstName = getFirstName(job.customer_name)
+  const hoursLink = shortHoursLink()
+  const status = job.status
+
+  // Yes, it's done!
+  if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
+    const variants = [
+      `Yes! It's all done and ready to collect. Pop in during opening hours: ${hoursLink}`,
+      `Done and dusted! Come grab it whenever we're open: ${hoursLink}`,
+      `Yes, it's finished! Ready for collection — come in whenever suits you: ${hoursLink}`,
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'COLLECTED') {
+    return `Hi ${firstName},\n\nYes — it was done and you've already collected it. Hope all's well! If anything's not right, just text us.\n\nNew Forest Device Repairs`
+  }
+
+  // No, not yet
+  if (status === 'IN_REPAIR') {
+    const variants = [
+      "Not yet — we're still working on it. We'll text you the second it's done.",
+      "Still in progress, I'm afraid. We'll text you the moment it's finished.",
+      "Not quite — still being repaired. We'll be in touch as soon as it's done.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'PARTS_ORDERED') {
+    const variants = [
+      "Not yet — still waiting on parts to arrive. We'll text you once they're in and we start the repair.",
+      "Not yet, I'm afraid — parts are on order. We'll text you as soon as the repair's done.",
+      "Still waiting on parts. Once they arrive we'll crack on and text you the moment it's finished.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'PARTS_ARRIVED') {
+    const variants = [
+      "Not yet — parts just arrived and we're starting now. We'll text you when it's done.",
+      "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
+      "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
+    const variants = [
+      "Not yet — it's in the queue. We'll text you the moment we start on it and again when it's done.",
+      "Not yet, I'm afraid — still waiting to be started. We'll text you as soon as it's finished.",
+      "Not yet — it's checked in and in the queue. We'll text you the moment it's done.",
+    ]
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'AWAITING_DEPOSIT') {
+    return `Hi ${firstName},\n\nNot yet — we need a deposit to order parts before we can start. Check your earlier texts for the payment link, or text us and we'll help.\n\nNew Forest Device Repairs`
+  }
+
+  if (status === 'DIAGNOSTIC') {
+    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
+  }
+
+  // Fallback
+  const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
+  return `Hi ${firstName},\n\n${statusInfo}\n\nNew Forest Device Repairs`
+}
+
+/**
+ * Build a general update response (for "update", "any news", "status", etc.)
+ */
+function buildUpdateReply(job: any, smsCount: number): AutoReply {
+  const firstName = getFirstName(job.customer_name)
+  const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
+  const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
+  return {
+    templateKey: 'AUTO_STATUS_REPLY',
+    body: `Hi ${firstName},\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
+  }
+}
+
+function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoReply | null {
+  const intent = detectSmsIntent(message)
+
+  if (!intent) return null
+
+  // --- Location intent ---
+  if (intent === 'location') {
     return {
       templateKey: 'AUTO_LOCATION_REPLY',
       body: `Hi ${getFirstName(job.customer_name)},\n\nHere's where we are and our opening hours: nfdr.uk/h\n\nNew Forest Device Repairs`,
     }
   }
 
-  // No match — let staff handle it
-  return null
+  // --- Collection intent ---
+  if (intent === 'collection') {
+    return {
+      templateKey: 'AUTO_COLLECTION_REPLY',
+      body: buildCollectionReply(job, smsCount),
+    }
+  }
+
+  // --- Turnaround intent ---
+  if (intent === 'turnaround') {
+    return {
+      templateKey: 'AUTO_TURNAROUND_REPLY',
+      body: buildTurnaroundReply(job, smsCount),
+    }
+  }
+
+  // --- Done check intent ---
+  if (intent === 'done_check') {
+    return {
+      templateKey: 'AUTO_DONE_CHECK_REPLY',
+      body: buildDoneCheckReply(job, smsCount),
+    }
+  }
+
+  // --- Update intent (default) ---
+  return buildUpdateReply(job, smsCount)
 }
