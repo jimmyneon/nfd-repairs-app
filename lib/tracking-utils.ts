@@ -625,30 +625,32 @@ export function getWorkloadAdjustedEta(
     }
   } else if (adjustedMax <= 8) {
     // Short repairs — use natural wording
-    const phrase = naturalEtaPhrase(adjustedMin, adjustedMax)
+    // Strip "Around " prefix and lowercase for inline use after "around"
+    const phraseInline = naturalEtaPhrase(adjustedMin, adjustedMax).replace(/^Around\s+/i, '').toLowerCase()
     const baseLower = baseEstimate.display.charAt(0).toLowerCase() + baseEstimate.display.slice(1)
     if (workload.level === 'very_busy') {
-      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 2)
-      repairEta = `Usually ${baseLower}, but currently closer to ${bumpedPhrase} due to workload`
+      const bumpedInline = naturalEtaPhrase(adjustedMin, adjustedMax + 2).replace(/^Around\s+/i, '').toLowerCase()
+      repairEta = `Usually ${baseLower}, but currently closer to ${bumpedInline} due to workload`
     } else if (workload.level === 'busy') {
-      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 1)
-      repairEta = `Usually ${baseLower}, currently around ${bumpedPhrase} based on today's workload`
+      const bumpedInline = naturalEtaPhrase(adjustedMin, adjustedMax + 1).replace(/^Around\s+/i, '').toLowerCase()
+      repairEta = `Usually ${baseLower}, currently around ${bumpedInline} based on today's workload`
     } else {
       // normal — show adjusted time with a light note
-      repairEta = `Usually ${baseLower}, currently around ${phrase}`
+      repairEta = `Usually ${baseLower}, currently around ${phraseInline}`
     }
   } else {
     // Medium/long repairs — use natural wording
-    const phrase = naturalEtaPhrase(adjustedMin, adjustedMax)
+    // Strip "Around " prefix and lowercase for inline use
+    const phraseInline = naturalEtaPhrase(adjustedMin, adjustedMax).replace(/^Around\s+/i, '').toLowerCase()
     if (workload.level === 'very_busy') {
-      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 24)
-      repairEta = `Usually ${phrase}, currently closer to ${bumpedPhrase} due to workload`
+      const bumpedInline = naturalEtaPhrase(adjustedMin, adjustedMax + 24).replace(/^Around\s+/i, '').toLowerCase()
+      repairEta = `Usually ${phraseInline}, currently closer to ${bumpedInline} due to workload`
     } else if (workload.level === 'busy') {
-      const bumpedPhrase = naturalEtaPhrase(adjustedMin, adjustedMax + 12)
-      repairEta = `Usually ${phrase}, currently around ${bumpedPhrase}`
+      const bumpedInline = naturalEtaPhrase(adjustedMin, adjustedMax + 12).replace(/^Around\s+/i, '').toLowerCase()
+      repairEta = `Usually ${phraseInline}, currently around ${bumpedInline}`
     } else {
       // normal
-      repairEta = `Usually ${phrase}, currently around ${phrase}`
+      repairEta = `Usually ${phraseInline}, currently around ${phraseInline}`
     }
   }
 
