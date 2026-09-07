@@ -16,6 +16,8 @@ export async function POST(
 
   try {
     const { jobId } = params
+    const body = await request.json().catch(() => ({}))
+    const depositAmount = body.deposit_amount ? parseFloat(body.deposit_amount) : null
 
     // Get the job
     const { data: job, error: jobError } = await supabase
@@ -28,13 +30,18 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    // Update job status to AWAITING_DEPOSIT
+    // Use provided amount, or existing job amount, or default
+    const finalDepositAmount = depositAmount || job.deposit_amount || 20.00
+
+    // Update job status to AWAITING_DEPOSIT and save deposit amount
     const { error: updateError } = await supabase
       .from('jobs')
       .update({
         status: 'AWAITING_DEPOSIT',
         status_changed_at: new Date().toISOString(),
         deposit_requested_at: new Date().toISOString(),
+        deposit_required: true,
+        deposit_amount: finalDepositAmount,
         updated_at: new Date().toISOString(),
       })
       .eq('id', jobId)
@@ -50,7 +57,7 @@ export async function POST(
         job_id: jobId,
         event_type: 'DEPOSIT_REQUESTED',
         event_data: {
-          deposit_amount: job.deposit_amount || 20.00,
+          deposit_amount: finalDepositAmount,
         },
         created_at: new Date().toISOString(),
       })
@@ -64,7 +71,7 @@ export async function POST(
       const firstName = getFirstName(job.customer_name)
       const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
-      const depositAmount = (job.deposit_amount || 20.00).toFixed(2)
+      const depositAmount = finalDepositAmount.toFixed(2)
 
       // Fetch template from database
       const { data: template } = await supabase
@@ -88,8 +95,8 @@ export async function POST(
           job_ref: job.job_ref,
         })
       } else {
-        // Fallback if template not in database
-        smsMessage = `Hi ${firstName}, we need to order parts for your ${job.device_model || 'device'}. To pay the £${depositAmount} deposit and get that started, please use this link below.\n\n${depositUrl}\n\nIf you would like to check what's happening with it, please use this link below.\n\n${trackingUrl}\n\nMany thanks,\nNew Forest Device Repairs`
+        // Fallback if template not in database — concise, explains why deposit is needed
+        smsMessage = `Hi ${firstName}, your ${job.device_model || 'device'} needs special-order parts. We need a £${depositAmount} deposit to order them — parts are usually next-day delivery.\n\nPay here: ${depositUrl}\n\nReply PAID once done and we'll get them ordered straight away.\n\nNFD Repairs`
       }
 
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL

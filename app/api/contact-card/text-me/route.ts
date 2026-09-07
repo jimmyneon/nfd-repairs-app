@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     const hoursLink = hoursSetting?.value || mapsLink
 
     const vcardUrl = 'https://nfdr.uk/new-forest-device-repairs.vcf'
-    const contactCardUrl = 'https://nfdr.uk/contact-card.html'
+    const contactCardUrl = 'https://nfdr.uk/c'
 
     const smsBody = `New Forest Device Repairs
 Phone, Tablet, Laptop & Console Repairs

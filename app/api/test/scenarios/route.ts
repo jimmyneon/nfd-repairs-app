@@ -566,7 +566,7 @@ function buildTrackingWording(job: any, estimate: TurnaroundEstimate, workload: 
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `We need a £20 deposit to order parts for your repair. Pay here: https://pay.sumup.com/b2c/Q9OZOAJT — Once paid, parts take 2-3 working days to arrive, then ${fullEta}.`
+    return `We need a £20 deposit to order your parts — they're special order. Pay here: https://pay.sumup.com/b2c/Q9OZOAJT — Reply PAID once done. Usually next-day delivery, then ${fullEta}.`
   }
 
   if (status === 'PARTS_ORDERED') {
@@ -658,7 +658,7 @@ function buildTurnaroundSms(job: any, workload: WorkloadInfo, eta: string): stri
     return `Hi ${firstName},\n\nOnce we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.\n\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName}, your device needs special-order parts. We need a £20 deposit to order them — usually next-day delivery, then the repair is about ${cleanEta}.\n\nPay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done and we'll get them ordered straight away.\n\nNFD Repairs`
   }
   if (status === 'DIAGNOSTIC') {
     return `Hi ${firstName},\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNew Forest Device Repairs`
@@ -696,7 +696,7 @@ function buildCollectionSms(job: any): string {
     return `Hi ${firstName},\n\nNot yet — your device is in the queue. We'll text you the moment work starts and again when it's ready to collect.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start the repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order the parts first. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done — usually next-day delivery.\n\nNFD Repairs`
   }
   if (status === 'DIAGNOSTIC') {
     return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
@@ -734,7 +734,7 @@ function buildDoneCheckSms(job: any): string {
     return `Hi ${firstName},\n\nNot yet — it's in the queue. We'll text you the moment we start on it and again when it's done.\n\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — £20 deposit needed to order parts. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done and we'll crack on.\n\nNFD Repairs`
   }
   if (status === 'DIAGNOSTIC') {
     return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
@@ -773,11 +773,9 @@ function getStatusVariant(status: string, count: number): string {
       "Good news — your parts have arrived! Bring your device in whenever suits you during opening hours and we'll get started.",
       "Parts are here! Whenever you're ready, just drop your device in during opening hours and we'll crack on with the repair.",
       "Your parts have landed! Bring your device in during opening hours and we'll get the repair done.",
-    ],
-    AWAITING_DEPOSIT: [
-      "We need a £20 deposit to order parts for your repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away.",
-      "To get parts ordered, we just need a £20 deposit. Pay online here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nWe'll text you as soon as the parts arrive.",
-      "We're ready to order parts — just need a £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.",
+      "We need a £20 deposit to order your parts — they're special order. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done and we'll order them straight away.",
+      "£20 deposit needed to order your parts. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done — usually next-day delivery.",
+      "Your parts need ordering — £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nText PAID once done and we'll crack on.",
     ],
     READY_TO_COLLECT: [
       "Great news — your device is repaired and ready to collect! Pop in during opening hours: nfdr.uk/h",

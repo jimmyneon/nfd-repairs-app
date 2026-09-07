@@ -331,7 +331,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               This repair has been completed and the tracking link has expired for privacy and security.
             </p>
           </div>
-          <a href="https://nfdr.uk/start-repair/" target="_blank" rel="noopener noreferrer"
+          <a href="https://nfdr.uk/quote/" target="_blank" rel="noopener noreferrer"
             className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95">
             <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
             <p className="text-white/90 text-sm mb-3">Start a new repair request online</p>
@@ -350,7 +350,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Job Not Found</h1>
             <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has expired.</p>
           </div>
-          <a href="https://nfdr.uk/start-repair/" target="_blank" rel="noopener noreferrer"
+          <a href="https://nfdr.uk/quote/" target="_blank" rel="noopener noreferrer"
             className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95">
             <p className="text-white font-black text-xl mb-2">Need a Repair?</p>
             <p className="text-white/90 text-sm">Start a new repair request online</p>

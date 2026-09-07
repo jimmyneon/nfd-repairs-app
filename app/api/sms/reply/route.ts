@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
 
       // --- PAID detection: customer says they've paid the deposit ---
       // Only triggers if the job has a deposit required that hasn't been received yet
-      if (/\b(paid|i.*ve.*paid|payment.*done|deposit.*paid|just.*paid|done.*pay)\b/i.test(message.toLowerCase())) {
+      if (/\b(paid|i.*ve.*paid|payment.*done|payment.*made|deposit.*paid|just.*paid|done.*pay|done.*payment|paid.*it|paid.*now|all.*paid|sorted.*it|sorted.*payment|sent.*payment|made.*payment)\b/i.test(message.toLowerCase())) {
         const jobData = await supabase
           .from('jobs')
           .select('id, deposit_required, deposit_received, deposit_amount, device_make, device_model, customer_name, short_token, tracking_token')
@@ -187,10 +187,7 @@ export async function POST(request: NextRequest) {
           // Send confirmation SMS
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
-            const trackingLink = jobData.data.short_token
-              ? shortTrackingLink(jobData.data.short_token)
-              : shortTrackingLink(jobData.data.tracking_token)
-            const smsBody = `Brilliant, thanks ${getFirstName(jobData.data.customer_name)}! We've got your deposit — parts are being ordered now.\n\nWe'll text you the moment they arrive.\n\nTrack your repair: ${trackingLink}\n\nNew Forest Device Repairs`
+            const smsBody = `Brilliant, thanks ${getFirstName(jobData.data.customer_name)}! Got your deposit — parts are being ordered now. Usually next-day delivery during working days. We'll text you when they arrive.\n\nNFD Repairs`
             const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
             await logSms(supabase, 'DEPOSIT_CONFIRMED', smsBody, result.ok, job.id)
           }
@@ -328,9 +325,25 @@ export async function POST(request: NextRequest) {
     }
 
     // -----------------------------------------------------------------------
-    // 3. No match — orphan reply, notify staff
+    // 3. No match — orphan reply
+    //    If the customer is asking for an update/status, send a helpful
+    //    reply explaining we can't find their number and asking for the
+    //    number the repair was booked under. Otherwise just notify staff.
     // -----------------------------------------------------------------------
     console.log(`[sms/reply] No matching enquiry or job for ${phone}`)
+
+    // Check if this looks like a status/update query
+    const orphanIntent = detectSmsIntent(message)
+    if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
+      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+      if (webhookUrl) {
+        const orphanBody = `Hi,\n\nWe can't find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it's booked in under and we'll find it straight away.\n\nNew Forest Device Repairs`
+        const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
+        await logSms(supabase, 'ORPHAN_STATUS_REPLY', orphanBody, result.ok)
+        console.log(`[sms/reply] Sent orphan status reply to ${phone}`)
+      }
+    }
+
     try {
       await supabase.from('notifications').insert({
         type: 'ORPHAN_SMS',
@@ -346,6 +359,7 @@ export async function POST(request: NextRequest) {
       success: true,
       routed_to: 'orphan',
       message: 'No matching enquiry or job found — staff notified',
+      sms_sent: orphanIntent !== null,
     })
   } catch (error) {
     console.error('[sms/reply] Error:', error)
@@ -969,9 +983,9 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "Your parts have landed! Bring your device in during opening hours and we'll get the repair done.",
   ],
   AWAITING_DEPOSIT: [
-    "We need a £20 deposit to order parts for your repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away.",
-    "To get parts ordered, we just need a £20 deposit. Pay online here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nWe'll text you as soon as the parts arrive.",
-    "We're ready to order parts — just need a £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.",
+    "We need a £20 deposit to order your parts — they're special order. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done and we'll order them straight away.",
+    "£20 deposit needed to order your parts. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done — usually next-day delivery.",
+    "Your parts need ordering — £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nText PAID once done and we'll crack on.",
   ],
   READY_TO_COLLECT: [
     "Great news — your device is repaired and ready to collect! Pop in during opening hours: nfdr.uk/h",

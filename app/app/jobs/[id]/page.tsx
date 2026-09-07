@@ -820,9 +820,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setDepositSending(true)
 
     try {
+      const depositAmount = parseFloat(depositAmountInput) || 20.00
       const response = await fetch(`/api/jobs/${job!.id}/request-deposit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deposit_amount: depositAmount }),
       })
       const data = await response.json()
 

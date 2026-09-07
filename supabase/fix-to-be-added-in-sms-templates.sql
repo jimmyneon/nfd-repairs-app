@@ -74,32 +74,20 @@ WHERE key = 'ONBOARDING_REQUIRED';
 
 -- DEPOSIT_REQUIRED / AWAITING_DEPOSIT - Need deposit for parts
 UPDATE sms_templates SET body =
-'Hi {first_name}, we need to order parts for your {device_summary}. To pay the £{deposit_amount} deposit and get that started, please use this link below.
+'Hi {first_name}, your {device_summary} needs special-order parts. We need a £{deposit_amount} deposit to order them — parts are usually next-day delivery.
 
-{deposit_link}
+Pay here: {deposit_link}
 
-If you would like to check what''s happening with it, please use this link below.
+Reply PAID once done and we''ll get them ordered straight away.
 
-{tracking_link}
-
-We''ll update you as soon as possible.
-
-Many thanks,
-New Forest Device Repairs'
+NFD Repairs'
 WHERE key IN ('DEPOSIT_REQUIRED', 'AWAITING_DEPOSIT');
 
 -- DEPOSIT_RECEIVED - Deposit paid, parts being ordered
 UPDATE sms_templates SET body =
-'Hi {first_name}, your £{deposit_amount} deposit for your {device_summary} has been received. Parts are on order and we''ll let you know when they arrive.
+'Hi {first_name}, got your £{deposit_amount} deposit — thanks! Parts are being ordered now. Usually next-day delivery during working days. We''ll text you the moment they arrive.
 
-If you would like to check what''s happening with it, please use this link below.
-
-{tracking_link}
-
-We''ll update you as soon as possible.
-
-Many thanks,
-New Forest Device Repairs'
+NFD Repairs'
 WHERE key = 'DEPOSIT_RECEIVED';
 
 -- PARTS_ORDERED - Parts have been ordered
@@ -199,16 +187,13 @@ WHERE key IN ('DELAYED', 'DELAY_NOTIFICATION');
 
 -- DEPOSIT_REQUEST - Sent when staff manually sends deposit request
 UPDATE sms_templates SET body =
-'Hi {first_name}, we need to order parts for your {device_summary}. To pay the £{deposit_amount} deposit and get that started, please use this link below.
+'Hi {first_name}, your {device_summary} needs special-order parts. We need a £{deposit_amount} deposit to order them — parts are usually next-day delivery.
 
-{deposit_link}
+Pay here: {deposit_link}
 
-If you would like to check what''s happening with it, please use this link below.
+Reply PAID once done and we''ll get them ordered straight away.
 
-{tracking_link}
-
-Many thanks,
-New Forest Device Repairs'
+NFD Repairs'
 WHERE key = 'DEPOSIT_REQUEST';
 
 -- POST_COLLECTION_REVIEW
