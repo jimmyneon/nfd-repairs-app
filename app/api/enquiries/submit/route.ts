@@ -58,9 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Rate limit: 10 submissions per minute per IP
     const ip = getClientIP(request)
-    console.log('[Submit] Rate limit check for IP:', ip)
     const rateLimit = await checkRateLimit(ip, 'enquiries_submit', 10)
-    console.log('[Submit] Rate limit result:', rateLimit)
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait a minute and try again.' },
