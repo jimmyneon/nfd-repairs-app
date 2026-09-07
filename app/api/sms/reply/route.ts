@@ -108,6 +108,21 @@ export async function POST(request: NextRequest) {
     const job = jobs?.[0]
 
     if (job) {
+      // --- Rate limit auto-replies: 1 per 2 minutes per job ---
+      // Prevents flooding from duplicate SMS delivery or rapid re-texting.
+      // Customer messages are still logged and staff still notified,
+      // but we don't send an auto-reply if we just sent one.
+      const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+      const { count: recentAutoReplies } = await supabase
+        .from('job_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('job_id', job.id)
+        .eq('type', 'SYSTEM')
+        .like('message', 'Auto-reply sent:%')
+        .gte('created_at', twoMinAgo)
+
+      const autoReplyRateLimited = (recentAutoReplies || 0) > 0
+
       // Log the reply as a CUSTOMER_SMS event on the job (full chat history)
       await supabase.from('job_events').insert({
         job_id: job.id,
@@ -256,6 +271,18 @@ export async function POST(request: NextRequest) {
 
       const autoReply = detectAutoReply(message, job, statusSmsCount)
       if (autoReply) {
+        // Rate limit: skip sending if we just sent an auto-reply in the last 2 minutes
+        if (autoReplyRateLimited) {
+          console.log(`[sms/reply] Auto-reply rate limited for job ${job.job_ref} — sent one in last 2 min`)
+          return NextResponse.json({
+            success: true,
+            routed_to: 'auto_reply_rate_limited',
+            job_ref: job.job_ref,
+            sms_sent: false,
+            reason: 'Auto-reply sent in last 2 minutes — message logged, no SMS sent',
+          })
+        }
+
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (webhookUrl) {
           const result = await sendViaMacroDroid(webhookUrl, phone, autoReply.body)
