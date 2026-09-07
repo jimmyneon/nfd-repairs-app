@@ -33,6 +33,7 @@ export async function checkRateLimit(
         'apikey': serviceKey,
         'Authorization': `Bearer ${serviceKey}`,
         'Range': '0-0',
+        'Prefer': 'count=exact',
       },
     })
 
