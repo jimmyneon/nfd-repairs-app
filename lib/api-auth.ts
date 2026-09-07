@@ -55,6 +55,10 @@ export function getAllowedOrigin(request: NextRequest): string {
     'https://www.newforestdevicerepairs.co.uk',
     process.env.NEXT_PUBLIC_APP_URL,
   ].filter(Boolean)
+  // Allow localhost / 127.0.0.1 origins for local development (any port)
+  if (origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    return origin
+  }
   if (origin && allowedOrigins.includes(origin)) {
     return origin
   }
