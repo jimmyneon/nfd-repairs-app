@@ -817,9 +817,81 @@ function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoR
   const msg = message.toLowerCase().trim()
 
   // --- "Update" / "When will it be ready?" / "What's the status?" ---
-  // Added "update" as a keyword — this is the main one customers will text
-  if (/\b(update|when|what\s+time|how\s+long|ready|status|where.*my|progress|done|finished|pick\s*up|collect|any\s+news|heard|update\s+me)\b/i.test(msg)
-      && !/\b(yes|no|book|proceed|go ahead|accept|decline|cancel|paid)\b/i.test(msg)) {
+  // Comprehensive pattern matching for status/update queries.
+  // Catches: update, updates, any update, status, when ready, how long,
+  // is it done/ready/fixed/sorted, can I pick up/collect, any news/word/luck,
+  // how's it going, what's happening, how far along, etc.
+  const statusPatterns: RegExp[] = [
+    // Direct update requests
+    /\bupdates?\b/i,
+    /\bany\s+updates?\b/i,
+    /\bcan\s+i\s+get\s+an?\s+update\b/i,
+    /\blooking\s+for\s+an?\s+update\b/i,
+    /\bupdate\s+me\b/i,
+    /\bupdate\s+on\b/i,
+
+    // Status queries
+    /\bstatus\b/i,
+    /\bwhat.?s\s+(the\s+)?status\b/i,
+    /\bmy\s+status\b/i,
+
+    // When/ready/done/finished
+    /\bwhen\b/i,
+    /\bwhat\s+time\b/i,
+    /\bhow\s+long\b/i,
+    /\bhow\s+far\s+along\b/i,
+    /\bready\b/i,
+    /\bis\s+it\s+(ready|done|finished|fixed|sorted)\b/i,
+    /\b(done|finished|fixed|sorted)\s+(yet|now)\b/i,
+    /\byou\s+done\b/i,
+    /\bare\s+you\s+done\b/i,
+    /\bu\s+done\b/i,                    // textspeak: "u done?"
+    /\br\s+u\s+done\b/i,                // textspeak: "r u done"
+    /\bhas\s+it\s+been\s+(done|fixed|sorted)\b/i,
+    /\bhas\s+my\s+\w+\s+been\s+(done|fixed|sorted)\b/i,
+    /\bis\s+my\s+\w+\s+(done|fixed|sorted|ready)\b/i,
+    /\bphone\s+ready\b/i,
+    /\bgot\s+my\s+\w+\s+ready\b/i,
+
+    // Pick up / collect
+    /\bpick\s*up\b/i,
+    /\bpickup\b/i,
+    /\bpick\s+it\s+up\b/i,
+    /\bpick\s+\w+\s+up\b/i,
+    /\bcan\s+i\s+(pick|collect)\b/i,
+    /\bcollect\b/i,
+    /\bcome\s+get\b/i,
+    /\bcome\s+pick\b/i,
+    /\bshould\s+i\s+come\b/i,
+    /\bshall\s+i\s+come\b/i,
+
+    // News / word / heard
+    /\bany\s+news\b/i,
+    /\bany\s+word\b/i,
+    /\bany\s+luck\b/i,
+    /\bheard\b/i,
+    /\bnot\s+heard\b/i,
+
+    // Progress
+    /\bprogress\b/i,
+
+    // How's it going / what's happening
+    /\bhow.?s\s+it\s+going\b/i,
+    /\bhow.?s\s+(my|the)\s+\w+\s+(getting|going)\b/i,
+    /\bwhat.?s\s+happening\b/i,
+    /\bwhat.?s\s+going\s+on\b/i,
+
+    // Where's my phone/device
+    /\bwhere.?s?\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
+    /\bwhere\s+is\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
+  ]
+
+  // Words that exclude auto-status-reply (these are actions, not queries)
+  const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost|cracked|broken|drop\s+off|drop\s+my)\b/i
+
+  const isStatusQuery = statusPatterns.some(re => re.test(msg)) && !excludeRegex.test(msg)
+
+  if (isStatusQuery) {
     const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
     const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
     const firstName = getFirstName(job.customer_name)
