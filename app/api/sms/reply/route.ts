@@ -4,6 +4,7 @@ import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
 import { sendViaMacroDroid } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { getTurnaroundEstimate, getShortEta, calculateWorkload, type WorkloadInfo } from '@/lib/tracking-utils'
 
 /**
  * POST /api/sms/reply
@@ -269,7 +270,7 @@ export async function POST(request: NextRequest) {
         console.error('[sms/reply] Failed to count status SMS:', e)
       }
 
-      const autoReply = detectAutoReply(message, job, statusSmsCount)
+      const autoReply = await detectAutoReply(message, job, statusSmsCount, supabase)
       if (autoReply) {
         // Rate limit: skip sending if we just sent an auto-reply in the last 2 minutes
         if (autoReplyRateLimited) {
@@ -882,56 +883,55 @@ function detectSmsIntent(message: string): SmsIntent | null {
 
 /**
  * Get turnaround estimate text for a job.
- * Replicates the logic from tracking-utils.ts but returns a short SMS-friendly string.
+ * Uses the same getTurnaroundEstimate engine as the tracking page,
+ * then formats it for SMS. Also factors in parts lead time and workload.
  */
-function getTurnaroundText(job: any): string {
-  const make = (job.device_make || '').toLowerCase()
-  const model = (job.device_model || '').toLowerCase()
-  const issue = (job.issue || '').toLowerCase()
-  const combined = `${make} ${model}`
+function getTurnaroundText(job: any, workload?: WorkloadInfo | null): string {
+  const baseEstimate = getTurnaroundEstimate(
+    job.device_make || '',
+    job.device_model || '',
+    job.issue || '',
+    job.status || ''
+  )
 
-  // Complex issues
-  const complex = issue.includes('motherboard') || issue.includes('logic board') ||
-    issue.includes('no power') || issue.includes('wont turn on') || issue.includes("won't turn on") ||
-    issue.includes('water damage') || issue.includes('liquid damage') || issue.includes('data recovery')
-
-  if (complex) {
-    if (issue.includes('data recovery')) return 'up to 7 days'
-    return 'up to 7 days, often quicker'
+  // Determine parts lead time
+  let partsLeadDays = 0
+  if (job.status === 'PARTS_ORDERED' || job.status === 'AWAITING_DEPOSIT') {
+    partsLeadDays = 2 // 2-3 working days for parts
   }
 
-  // Phone
-  if (combined.includes('iphone') || combined.includes('samsung') && !combined.includes('tab') ||
-      combined.includes('pixel') || combined.includes('phone')) {
-    if (issue.includes('battery')) return '1-3 hours'
-    if (issue.includes('screen') || issue.includes('display') || issue.includes('lcd') || issue.includes('oled')) return '2-6 hours, sometimes next day'
-    if (issue.includes('charging')) return '2-4 hours, sometimes 1-2 days'
-    if (issue.includes('camera')) return '1-3 hours'
-    if (issue.includes('back glass') || issue.includes('back cover')) return '1-3 days'
-    return '2-6 hours, sometimes 1-2 days'
-  }
+  return getShortEta(baseEstimate, workload || null, partsLeadDays)
+}
 
-  // Tablet
-  if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
-    if (issue.includes('battery')) return '2-4 hours'
-    if (issue.includes('screen') || issue.includes('display')) return '2-8 hours, sometimes 1-2 days'
-    return '1-3 days'
-  }
+/**
+ * Query current workload from the database.
+ * Returns counts of active jobs for workload adjustment.
+ */
+async function queryWorkload(supabase: SupabaseClient, job: any): Promise<WorkloadInfo | null> {
+  try {
+    const activeStatuses = ['RECEIVED', 'IN_REPAIR', 'DIAGNOSTIC', 'PARTS_ARRIVED', 'AWAITING_DEVICE']
+    const { count: activeCount } = await supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', activeStatuses)
 
-  // Laptop
-  if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
-    if (issue.includes('battery')) return '1-2 days'
-    if (issue.includes('screen') || issue.includes('display')) return '1-3 days'
-    if (issue.includes('keyboard')) return '1-2 days'
-    return '1-3 days'
-  }
+    // Count same-type jobs (same device_type)
+    const deviceType = job.device_type || ''
+    let sameTypeCount = 0
+    if (deviceType) {
+      const { count } = await supabase
+        .from('jobs')
+        .select('id', { count: 'exact', head: true })
+        .in('status', activeStatuses)
+        .eq('device_type', deviceType)
+      sameTypeCount = count || 0
+    }
 
-  // Console
-  if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') || combined.includes('ps4') || combined.includes('ps5')) {
-    return '1-2 days'
+    return calculateWorkload(activeCount || 0, sameTypeCount)
+  } catch (e) {
+    console.error('[sms/reply] Failed to query workload:', e)
+    return null
   }
-
-  return '1-5 days depending on the repair'
 }
 
 /**
@@ -940,9 +940,14 @@ function getTurnaroundText(job: any): string {
  */
 const STATUS_SMS_VARIANTS: Record<string, string[]> = {
   QUOTE_APPROVED: [
-    "Your repair's all approved and ready to go — just bring your device in whenever suits you. No appointment needed!",
-    "All sorted on our end — your repair's booked in and waiting. Pop in with your device whenever you're ready.",
-    "We're ready for your device! Your repair's approved, so just drop in during opening hours and we'll get started.",
+    "We're ready for your device — bring it in whenever suits you during opening hours. No appointment needed!",
+    "All sorted on our end — just pop in with your device whenever you're ready.",
+    "We're ready to start! Drop in during opening hours and we'll get going straight away.",
+  ],
+  AWAITING_DEVICE: [
+    "Great news — we have the parts in stock for your repair! Just bring your device in whenever suits you during opening hours. No appointment needed!",
+    "We've got everything ready for your repair — just bring your device in whenever you're ready. No appointment needed!",
+    "Parts are in stock and we're ready to go! Drop in with your device during opening hours and we'll start straight away.",
   ],
   RECEIVED: [
     "Your device is with us and in the queue. We'll text you the moment work starts — no need to chase us!",
@@ -960,9 +965,10 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "Your parts have been ordered and are on their way. We check deliveries every day and will text you the moment they're in.",
   ],
   PARTS_ARRIVED: [
-    "Your parts have arrived! We're getting started on your repair now — shouldn't be too long.",
-    "Good news — parts are here and we're cracking on with your repair. We'll text when it's done.",
-    "Parts landed! We're starting your repair straight away. We'll be in touch the moment it's finished.",
+    // These are used when device is NOT in shop — customer needs to bring it in
+    "Good news — your parts have arrived! Bring your device in whenever suits you during opening hours and we'll get started.",
+    "Parts are here! Whenever you're ready, just drop your device in during opening hours and we'll crack on with the repair.",
+    "Your parts have landed! Bring your device in during opening hours and we'll get the repair done.",
   ],
   AWAITING_DEPOSIT: [
     "We need a £20 deposit to order parts for your repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away.",
@@ -1048,12 +1054,21 @@ function buildCollectionReply(job: any, smsCount: number): string {
   }
 
   if (status === 'PARTS_ARRIVED') {
-    const variants = [
-      "Not yet — parts have just arrived and we're starting on it now. Shouldn't be too long! We'll text when it's ready.",
-      "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
-      "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
-    ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    if (job.device_in_shop) {
+      const variants = [
+        "Not yet — parts have just arrived and we're starting on it now. Shouldn't be too long! We'll text when it's ready.",
+        "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
+        "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
+      ]
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    } else {
+      // Device still with customer
+      return `Hi ${firstName},\n\nNot yet — the parts have arrived but we need your device first! Bring it in during opening hours and we'll get started straight away.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    }
+  }
+
+  if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+    return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1082,11 +1097,11 @@ function buildCollectionReply(job: any, smsCount: number): string {
  * Build a turnaround-specific response.
  * Answers "How long will it take?" / "When will it be ready?"
  */
-function buildTurnaroundReply(job: any, smsCount: number): string {
+function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInfo | null): string {
   const firstName = getFirstName(job.customer_name)
   const hoursLink = shortHoursLink()
   const status = job.status
-  const eta = getTurnaroundText(job)
+  const eta = getTurnaroundText(job, workload)
 
   // Already done
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
@@ -1117,18 +1132,27 @@ function buildTurnaroundReply(job: any, smsCount: number): string {
     return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
   }
 
-  // Parts arrived — repair time from here
+  // Parts arrived — depends on whether device is in shop
   if (status === 'PARTS_ARRIVED') {
-    const variants = [
-      `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
-      `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
-      `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
-    ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    if (job.device_in_shop) {
+      const variants = [
+        `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
+        `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
+        `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
+      ]
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    } else {
+      // Device still with customer
+      return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${eta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    }
   }
 
   // In queue — full estimate
-  if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
+  if (status === 'RECEIVED' || status === 'QUOTE_APPROVED' || status === 'AWAITING_DEVICE') {
+    if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+      // Device still with customer, parts in stock
+      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    }
     const variants = [
       `Once we start on it, this type of repair takes about ${eta}. Your device is in the queue — we'll text you the moment work begins.`,
       `Typically ${eta} for this repair once we get started. It's in the queue and we'll text you as soon as we crack on.`,
@@ -1195,12 +1219,20 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
   }
 
   if (status === 'PARTS_ARRIVED') {
-    const variants = [
-      "Not yet — parts just arrived and we're starting now. We'll text you when it's done.",
-      "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
-      "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
-    ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    if (job.device_in_shop) {
+      const variants = [
+        "Not yet — parts just arrived and we're starting now. We'll text you when it's done.",
+        "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
+        "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
+      ]
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    } else {
+      return `Hi ${firstName},\n\nNot yet — the parts are here but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    }
+  }
+
+  if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+    return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1238,7 +1270,7 @@ function buildUpdateReply(job: any, smsCount: number): AutoReply {
   }
 }
 
-function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoReply | null {
+async function detectAutoReply(message: string, job: any, smsCount: number = 0, supabase?: SupabaseClient): Promise<AutoReply | null> {
   const intent = detectSmsIntent(message)
 
   if (!intent) return null
@@ -1259,11 +1291,15 @@ function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoR
     }
   }
 
-  // --- Turnaround intent ---
+  // --- Turnaround intent — query workload for accurate ETA ---
   if (intent === 'turnaround') {
+    let workload: WorkloadInfo | null = null
+    if (supabase) {
+      workload = await queryWorkload(supabase, job)
+    }
     return {
       templateKey: 'AUTO_TURNAROUND_REPLY',
-      body: buildTurnaroundReply(job, smsCount),
+      body: buildTurnaroundReply(job, smsCount, workload),
     }
   }
 

@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Determine job status
     const jobStatus = requiresParts
       ? (depositAlreadyPaid ? 'PARTS_ORDERED' : 'AWAITING_DEPOSIT')
-      : 'QUOTE_APPROVED'
+      : 'AWAITING_DEVICE'
 
     // Generate job ref
     const { count: jobCount } = await supabase
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
           })
         : `Hi ${getFirstName(enquiry.customer_name)}, we need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)}. To pay the £20 deposit and get that started, please use this link:\n\n${depositUrl}\n\nTrack your repair: ${trackingUrl}\n\nNew Forest Device Repairs`
     } else {
-      // In stock — booked in
+      // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
         .from('admin_settings')
         .select('value')
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}, your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair is booked in!\n\nPop in with your device whenever you're ready — no appointment needed.\n\nOpening hours and directions: ${hoursLink}\nTrack your repair: ${shortTrackingLink(job.short_token || trackingToken)}\n\nNew Forest Device Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}, great news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust bring your device in whenever suits you during opening hours — no appointment needed.\n\nDirections and hours: ${hoursLink}\nTrack your repair: ${shortTrackingLink(job.short_token || trackingToken)}\n\nNew Forest Device Repairs`
     }
 
     let smsSent = false
@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
 
         await supabase.from('sms_logs').insert({
           job_id: job.id,
-          template_key: depositAlreadyPaid ? 'DEPOSIT_RECEIVED' : requiresParts ? 'DEPOSIT_REQUIRED' : 'QUOTE_APPROVED',
+          template_key: depositAlreadyPaid ? 'DEPOSIT_RECEIVED' : requiresParts ? 'DEPOSIT_REQUIRED' : 'AWAITING_DEVICE',
           body_rendered: smsBody,
           status: deliveryStatus,
           sent_at: deliveryStatus === 'SENT' ? now : null,

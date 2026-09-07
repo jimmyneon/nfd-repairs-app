@@ -3,6 +3,7 @@
 export type JobStatus =
   | 'QUOTE_REQUESTED'
   | 'QUOTE_APPROVED'
+  | 'AWAITING_DEVICE'
   | 'DROPPED_OFF'
   | 'RECEIVED'
   | 'DIAGNOSTIC'

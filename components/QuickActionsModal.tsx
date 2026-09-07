@@ -26,6 +26,7 @@ export default function QuickActionsModal({
 
   const statuses: JobStatus[] = [
     'QUOTE_APPROVED',
+    'AWAITING_DEVICE',
     'RECEIVED',
     'DIAGNOSTIC',
     'AWAITING_DEPOSIT',
@@ -43,6 +44,7 @@ export default function QuickActionsModal({
   const getStatusColor = (status: JobStatus) => {
     const colors: Record<JobStatus, string> = {
       QUOTE_APPROVED: 'bg-cyan-600 hover:bg-cyan-700',
+      AWAITING_DEVICE: 'bg-teal-600 hover:bg-teal-700',
       RECEIVED: 'bg-blue-700 hover:bg-blue-800',
       DIAGNOSTIC: 'bg-indigo-600 hover:bg-indigo-700',
       AWAITING_DEPOSIT: 'bg-yellow-500 hover:bg-yellow-600',
@@ -64,6 +66,7 @@ export default function QuickActionsModal({
   const getStatusIcon = (status: JobStatus) => {
     const icons: Record<JobStatus, typeof CheckCircle> = {
       QUOTE_APPROVED: FileText,
+      AWAITING_DEVICE: Package,
       RECEIVED: Package,
       DIAGNOSTIC: FileText,
       AWAITING_DEPOSIT: Clock,
@@ -85,6 +88,7 @@ export default function QuickActionsModal({
   const getShortLabel = (status: JobStatus) => {
     const shortLabels: Record<JobStatus, string> = {
       QUOTE_APPROVED: 'Approved',
+      AWAITING_DEVICE: 'Wait Dev',
       RECEIVED: 'Received',
       DIAGNOSTIC: 'Diag',
       AWAITING_DEPOSIT: 'Deposit',

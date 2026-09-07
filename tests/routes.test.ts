@@ -17,7 +17,6 @@ describe('API route authentication', () => {
     'app/api/notifications/send-push/route.ts',
     'app/api/quotes/search/route.ts',
     'app/api/quotes/sync/route.ts',
-    'app/api/warranty-tickets/route.ts',
   ]
 
   for (const route of staffRoutes) {
@@ -33,6 +32,7 @@ describe('API route authentication', () => {
   const publicEnquiryRoutes = [
     'app/api/enquiries/get/route.ts',
     'app/api/enquiries/update/route.ts',
+    'app/api/warranty-tickets/route.ts',
   ]
 
   for (const route of publicEnquiryRoutes) {

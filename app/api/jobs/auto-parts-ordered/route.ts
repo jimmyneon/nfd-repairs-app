@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
     // 1. AUTO-CHANGE: RECEIVED → PARTS_ORDERED
     // ============================================
     // Find jobs where parts_ordered_at has passed and status is still RECEIVED or AWAITING_DEPOSIT
+    // IMPORTANT: For AWAITING_DEPOSIT jobs, only auto-change if the deposit has been paid.
+    //   Without this check, parts would be ordered before the customer has paid the deposit.
     const { data: pendingPartsJobs, error: pendingError } = await supabase
       .from('jobs')
       .select('*')
@@ -62,6 +64,13 @@ export async function GET(request: NextRequest) {
 
     if (pendingPartsJobs && pendingPartsJobs.length > 0) {
       for (const job of pendingPartsJobs) {
+        // Skip AWAITING_DEPOSIT jobs where the deposit hasn't been paid yet.
+        // Parts should not be ordered until the customer has paid the deposit.
+        if (job.status === 'AWAITING_DEPOSIT' && !job.deposit_received) {
+          console.log(`Skipping ${job.job_ref}: still AWAITING_DEPOSIT and deposit not paid`)
+          continue
+        }
+
         // Update status to PARTS_ORDERED
         await supabase
           .from('jobs')

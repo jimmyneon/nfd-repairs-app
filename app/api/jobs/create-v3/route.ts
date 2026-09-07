@@ -142,9 +142,11 @@ export async function POST(request: NextRequest) {
       linked_warranty_ticket_id: linked_warranty_ticket_id || null,
     }
 
-    // If parts are required and job starts in RECEIVED or AWAITING_DEPOSIT,
-    // set parts_ordered_at to 1 hour from now so the cron job auto-changes to PARTS_ORDERED
-    if (jobData.requires_parts_order && ['RECEIVED', 'AWAITING_DEPOSIT'].includes(jobData.status)) {
+    // If parts are required and job starts in RECEIVED (device already in shop),
+    // set parts_ordered_at to 1 hour from now so the cron job auto-changes to PARTS_ORDERED.
+    // NOTE: AWAITING_DEPOSIT jobs should NOT get parts_ordered_at until the deposit is paid.
+    //   The deposit payment flow sets parts_ordered_at when the deposit is confirmed.
+    if (jobData.requires_parts_order && jobData.status === 'RECEIVED') {
       const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
       ;(jobData as any).parts_ordered_at = oneHourFromNow.toISOString()
     }

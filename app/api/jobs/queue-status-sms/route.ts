@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only send SMS for key status changes
-    const smsStatuses = ['QUOTE_APPROVED', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED', 'DELAYED']
+    const smsStatuses = ['QUOTE_APPROVED', 'AWAITING_DEVICE', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED', 'DELAYED']
     
     if (!smsStatuses.includes(status)) {
       console.log(`Status ${status} does not trigger SMS notification`)

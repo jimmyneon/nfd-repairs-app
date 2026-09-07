@@ -240,6 +240,152 @@ export function getTurnaroundEstimate(
 }
 
 /**
+ * Workload level — used to adjust ETAs based on current queue.
+ */
+export type WorkloadLevel = 'quiet' | 'normal' | 'busy' | 'very_busy'
+
+export interface WorkloadInfo {
+  level: WorkloadLevel
+  activeJobs: number
+  activeJobsSameType: number
+  adjustment: number // multiplier for ETA (1.0 = no change, 1.5 = 50% longer)
+}
+
+/**
+ * Calculate workload adjustment from active job counts.
+ * Callers should query the database for active jobs (RECEIVED, IN_REPAIR, DIAGNOSTIC, PARTS_ARRIVED)
+ * and pass the counts here.
+ */
+export function calculateWorkload(
+  activeJobs: number,
+  activeJobsSameType: number
+): WorkloadInfo {
+  // Determine level based on total active jobs
+  let level: WorkloadLevel = 'quiet'
+  if (activeJobs >= 10) level = 'very_busy'
+  else if (activeJobs >= 6) level = 'busy'
+  else if (activeJobs >= 3) level = 'normal'
+  else level = 'quiet'
+
+  // Adjustment multiplier
+  let adjustment = 1.0
+  if (level === 'busy') adjustment = 1.3
+  else if (level === 'very_busy') adjustment = 1.6
+  // Same-type jobs add more delay (board-level jobs block each other)
+  if (activeJobsSameType >= 3) adjustment *= 1.2
+
+  return { level, activeJobs, activeJobsSameType, adjustment }
+}
+
+/**
+ * Get a customer-facing ETA string that accounts for workload.
+ * Combines the base estimate with workload adjustment.
+ */
+export function getWorkloadAdjustedEta(
+  baseEstimate: TurnaroundEstimate,
+  workload: WorkloadInfo | null,
+  partsLeadTimeDays: number = 0
+): string {
+  // If no workload info, just return the base estimate + parts lead time
+  if (!workload || workload.level === 'quiet') {
+    if (partsLeadTimeDays > 0) {
+      return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} working days, then ${baseEstimate.display.toLowerCase()}`
+    }
+    return baseEstimate.display
+  }
+
+  // Adjust the estimate based on workload
+  const adjustedMin = baseEstimate.minHours * workload.adjustment
+  const adjustedMax = baseEstimate.maxHours * workload.adjustment
+
+  let repairEta: string
+  if (baseEstimate.isComplex) {
+    // Complex repairs — express in days
+    const minDays = Math.ceil(adjustedMin / 24)
+    const maxDays = Math.ceil(adjustedMax / 24)
+    if (workload.level === 'very_busy') {
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently ${maxDays}–${maxDays + 2} days due to workload`
+    } else if (workload.level === 'busy') {
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays} days`
+    } else {
+      repairEta = baseEstimate.display
+    }
+  } else if (adjustedMax <= 8) {
+    // Short repairs — express in hours
+    const minH = Math.ceil(adjustedMin)
+    const maxH = Math.ceil(adjustedMax)
+    if (workload.level === 'very_busy') {
+      repairEta = `Usually ${minH}–${maxH} hours, but currently closer to ${maxH + 2}–${maxH + 4} hours due to workload`
+    } else if (workload.level === 'busy') {
+      repairEta = `Usually ${minH}–${maxH} hours, currently around ${maxH}–${maxH + 2} hours based on today's workload`
+    } else {
+      repairEta = baseEstimate.display
+    }
+  } else {
+    // Medium repairs — express in days
+    const minDays = Math.ceil(adjustedMin / 24)
+    const maxDays = Math.ceil(adjustedMax / 24)
+    if (workload.level === 'very_busy') {
+      repairEta = `Usually ${minDays}–${maxDays} days, currently ${maxDays + 1}–${maxDays + 2} days due to workload`
+    } else if (workload.level === 'busy') {
+      repairEta = `Usually ${minDays}–${maxDays} days, currently around ${maxDays}–${maxDays + 1} days`
+    } else {
+      repairEta = baseEstimate.display
+    }
+  }
+
+  // Add parts lead time if applicable
+  if (partsLeadTimeDays > 0) {
+    return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} working days, then ${repairEta.toLowerCase()}`
+  }
+
+  return repairEta
+}
+
+/**
+ * Get a short ETA for SMS responses.
+ * Returns a concise string suitable for text messages.
+ */
+export function getShortEta(
+  baseEstimate: TurnaroundEstimate,
+  workload: WorkloadInfo | null,
+  partsLeadTimeDays: number = 0
+): string {
+  if (!workload || workload.level === 'quiet') {
+    if (partsLeadTimeDays > 0) {
+      return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} days, then ${baseEstimate.display.toLowerCase()}`
+    }
+    return baseEstimate.display
+  }
+
+  const adjustedMax = baseEstimate.maxHours * workload.adjustment
+
+  let repairEta: string
+  if (baseEstimate.isComplex) {
+    const maxDays = Math.ceil(adjustedMax / 24)
+    repairEta = workload.level === 'very_busy'
+      ? `about ${maxDays}–${maxDays + 2} working days`
+      : `about ${maxDays} working days`
+  } else if (adjustedMax <= 8) {
+    const maxH = Math.ceil(adjustedMax)
+    repairEta = workload.level === 'very_busy'
+      ? `about ${maxH + 2}–${maxH + 4} hours`
+      : `about ${maxH}–${maxH + 2} hours`
+  } else {
+    const maxDays = Math.ceil(adjustedMax / 24)
+    repairEta = workload.level === 'very_busy'
+      ? `about ${maxDays + 1}–${maxDays + 2} days`
+      : `about ${maxDays}–${maxDays + 1} days`
+  }
+
+  if (partsLeadTimeDays > 0) {
+    return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} days, then ${repairEta}`
+  }
+
+  return repairEta
+}
+
+/**
  * Calculate progress bar percentage based on time elapsed in current step.
  * Caps at 95% until status actually changes.
  */
@@ -411,25 +557,34 @@ export function getReassuranceMessage(
     return "Parts are on their way — we'll update this page when they arrive and start your repair straight away."
   }
 
-  // PARTS_ARRIVED
+  // PARTS_ARRIVED — message depends on whether device is in shop
   if (status === 'PARTS_ARRIVED') {
+    // Note: device_in_shop is checked by the caller via job data,
+    // but tracking-utils doesn't have access to it. The caller
+    // (tracking page) handles this by passing the right context.
+    // Default message assumes device still with customer.
     if (tier === 'first') {
-      return `Good news — your parts have arrived and we're getting started. ${estimate.display} from this point.`
+      return `Good news — your parts have arrived! Bring your device in whenever suits you and we'll get started. ${estimate.display} once we start.`
     }
-    return "Parts have arrived and we're starting your repair. We'll update this page as soon as it's ready."
+    return "Parts have arrived! Bring your device in during opening hours and we'll get started straight away."
   }
 
   // AWAITING_DEPOSIT
   if (status === 'AWAITING_DEPOSIT') {
     if (tier === 'first') {
-      return "We need a small deposit to order parts for your repair. Check your messages for payment details."
+      return "We need a £20 deposit to order parts for your repair. You can pay it here: https://pay.sumup.com/b2c/Q9OZOAJT — once it's paid we'll get parts ordered straight away."
     }
-    return "Still waiting for deposit payment to order parts. We can start as soon as we receive it — check your messages for details."
+    return "Still waiting for the £20 deposit to order parts. Pay here: https://pay.sumup.com/b2c/Q9OZOAJT — we can start as soon as we receive it."
   }
 
-  // QUOTE_APPROVED
+  // AWAITING_DEVICE — parts in stock, waiting for customer to bring device
+  if (status === 'AWAITING_DEVICE') {
+    return "We've got the parts in stock for your repair. Just bring your device in whenever you're ready during opening hours — no appointment needed."
+  }
+
+  // QUOTE_APPROVED — legacy status (now AWAITING_DEVICE)
   if (status === 'QUOTE_APPROVED') {
-    return "Your quote has been approved. Drop off your device whenever you're ready — we'll complete the details when you arrive."
+    return "We're ready for your device — bring it in whenever you're ready during opening hours. No appointment needed."
   }
 
   // Default

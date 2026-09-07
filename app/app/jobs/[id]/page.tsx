@@ -408,8 +408,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const updateData: any = { status: pendingWorkflowStatus, status_changed_at: new Date().toISOString() }
     
     // Set device_in_shop based on status transition
-    if (pendingWorkflowStatus === 'RECEIVED') {
-      updateData.device_in_shop = true  // Device now in shop
+    if (['RECEIVED', 'DIAGNOSTIC', 'IN_REPAIR', 'READY_TO_COLLECT', 'IN_STORAGE', 'DELAYED'].includes(pendingWorkflowStatus)) {
+      updateData.device_in_shop = true  // Device must be in shop for any workshop status
     } else if (pendingWorkflowStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
       updateData.customer_arrived_at = null  // Clear arrival indicator
@@ -705,8 +705,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     const updateData: any = { status: newStatus, status_changed_at: new Date().toISOString() }
     
     // Set device_in_shop based on status transition
-    if (newStatus === 'RECEIVED') {
-      updateData.device_in_shop = true  // Device now in shop
+    if (['RECEIVED', 'DIAGNOSTIC', 'IN_REPAIR', 'READY_TO_COLLECT', 'IN_STORAGE', 'DELAYED'].includes(newStatus)) {
+      updateData.device_in_shop = true  // Device must be in shop for any workshop status
     } else if (newStatus === 'COLLECTED') {
       updateData.device_in_shop = false  // Device no longer in shop
       updateData.customer_arrived_at = null  // Clear arrival indicator

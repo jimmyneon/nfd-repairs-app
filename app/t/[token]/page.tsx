@@ -73,7 +73,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
 
     const { data } = await supabase
       .from('jobs')
-      .select('id, job_ref, tracking_token, short_token, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report')
+      .select('id, job_ref, tracking_token, short_token, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report, device_in_shop')
       .or(`tracking_token.eq.${params.token},short_token.eq.${params.token}`)
       .maybeSingle()
 
@@ -296,12 +296,13 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   // Get a short description for each status step
   const getStatusDescription = (step: string): string => {
     const descriptions: Record<string, string> = {
-      QUOTE_APPROVED: 'Your quote was approved and we booked your device in.',
+      QUOTE_APPROVED: 'Your repair is approved and we are ready to start.',
+      AWAITING_DEVICE: 'We have the parts in stock — just bring your device in whenever you are ready.',
       RECEIVED: 'We received your device and added it to our workshop queue.',
       DIAGNOSTIC: 'We examined your device to identify exactly what needs fixing.',
       AWAITING_DEPOSIT: 'We need a deposit to order the parts for your repair.',
       PARTS_ORDERED: 'Parts have been ordered and are on their way to us.',
-      PARTS_ARRIVED: 'Parts have arrived and we are ready to start the repair.',
+      PARTS_ARRIVED: 'Parts have arrived — bring your device in or we will start if you have already dropped it off.',
       IN_REPAIR: 'Your device is being repaired by our technician.',
       READY_TO_COLLECT: 'Your device is fully repaired and ready for collection.',
       COLLECTED: 'You collected your device. Thank you for choosing us!',
@@ -370,19 +371,26 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
     : 0
   // If repair is agreed, diagnostic stage is 100% complete
   const progressPercent = (job.status === 'DIAGNOSTIC' && repairAgreed) ? 100 : calculateProgressPercent(hoursInStatus, estimate)
-  const reassuranceMessage = getReassuranceMessage(
+  let reassuranceMessage = getReassuranceMessage(
     job.status,
     visitFrequency.tier as any,
     hoursInStatus,
     estimate,
     repairAgreed
   )
+  // Override PARTS_ARRIVED message if device is already in shop
+  if (job.status === 'PARTS_ARRIVED' && job.device_in_shop) {
+    reassuranceMessage = `Good news — your parts have arrived and we're getting started. ${estimate.display} from this point.`
+  }
   const deviceDesc = getDeviceDescription(job.device_make, job.device_model)
 
   // Build status steps
   const buildStatusSteps = () => {
     const steps: string[] = []
-    if (job.source !== 'staff_manual') steps.push('QUOTE_APPROVED')
+    if (job.source !== 'staff_manual') {
+      // Use AWAITING_DEVICE if that's the current status, otherwise QUOTE_APPROVED for legacy
+      steps.push(job.status === 'AWAITING_DEVICE' ? 'AWAITING_DEVICE' : 'QUOTE_APPROVED')
+    }
     steps.push('RECEIVED')
     // Show DIAGNOSTIC step if the job has been through it or is currently in it
     if (job.status === 'DIAGNOSTIC' || job.diagnosis_notes || job.diagnostic_report) {

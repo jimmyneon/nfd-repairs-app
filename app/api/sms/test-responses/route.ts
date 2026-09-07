@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getFirstName } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { getTurnaroundEstimate, getShortEta } from '@/lib/tracking-utils'
 
 /**
  * GET /api/sms/test-responses
  *
- * Returns all possible SMS responses for all intents × statuses
+ * Returns all possible SMS responses for all intents × statuses × device_in_shop
  * WITHOUT sending any actual SMS. Used for testing/review only.
  *
  * Add ?phone=07xxxxxxxxx to use a real customer name/device from the DB.
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       const normalised = normaliseUkPhoneForLookup(phoneParam)
       const { data: jobs } = await supabase
         .from('jobs')
-        .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, issue, tracking_token, short_token')
+        .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, issue, tracking_token, short_token, device_in_shop, device_type')
         .in('customer_phone', [normalised, phoneParam.trim()])
         .order('created_at', { ascending: false })
         .limit(1)
@@ -50,11 +51,27 @@ export async function GET(request: Request) {
     }
   }
 
+  // All statuses to test, including AWAITING_DEVICE
   const statuses = [
-    'QUOTE_APPROVED', 'RECEIVED', 'IN_REPAIR', 'PARTS_ORDERED',
+    'AWAITING_DEVICE', 'QUOTE_APPROVED', 'RECEIVED', 'IN_REPAIR', 'PARTS_ORDERED',
     'PARTS_ARRIVED', 'AWAITING_DEPOSIT', 'READY_TO_COLLECT',
     'COMPLETED', 'COLLECTED', 'DIAGNOSTIC',
   ]
+
+  // For PARTS_ARRIVED and QUOTE_APPROVED, test both device_in_shop values
+  const possessionVariations: Record<string, boolean[]> = {
+    PARTS_ARRIVED: [true, false],
+    QUOTE_APPROVED: [true, false],
+    AWAITING_DEVICE: [false], // Always false by definition
+    AWAITING_DEPOSIT: [false], // Usually false
+    RECEIVED: [true],
+    IN_REPAIR: [true],
+    DIAGNOSTIC: [true],
+    READY_TO_COLLECT: [true],
+    COMPLETED: [true],
+    COLLECTED: [false],
+    PARTS_ORDERED: [false],
+  }
 
   const intents = [
     { key: 'collection', label: 'Can I pick it up?', message: 'Can I pick it up?' },
@@ -69,19 +86,26 @@ export async function GET(request: Request) {
   const results: any[] = []
 
   for (const status of statuses) {
-    const testJob = { ...job, status }
-    const statusResults: any = { status, responses: [] }
+    const possessionValues = possessionVariations[status] || [false]
 
-    for (const intent of intents) {
-      const smsCount = intent.variant !== undefined ? intent.variant : 0
-      const response = buildResponseForIntent(intent.key, testJob, smsCount)
-      statusResults.responses.push({
-        intent: intent.label,
-        message: response,
-      })
+    for (const deviceInShop of possessionValues) {
+      const testJob = { ...job, status, device_in_shop: deviceInShop }
+      const statusKey = possessionValues.length > 1
+        ? `${status} (device_in_shop=${deviceInShop})`
+        : status
+      const statusResults: any = { status: statusKey, responses: [] }
+
+      for (const intent of intents) {
+        const smsCount = intent.variant !== undefined ? intent.variant : 0
+        const response = buildResponseForIntent(intent.key, testJob, smsCount)
+        statusResults.responses.push({
+          intent: intent.label,
+          message: response,
+        })
+      }
+
+      results.push(statusResults)
     }
-
-    results.push(statusResults)
   }
 
   return NextResponse.json({
@@ -90,13 +114,15 @@ export async function GET(request: Request) {
       device: `${job.device_make} ${job.device_model}`,
       issue: job.issue,
       status: job.status,
+      device_in_shop: job.device_in_shop,
     },
+    totalCombinations: results.length * intents.length,
     results,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 // ---------------------------------------------------------------------------
-// Helper functions (copied from sms/reply/route.ts for testing)
+// Helper functions (mirrors sms/reply/route.ts for testing)
 // ---------------------------------------------------------------------------
 
 function normaliseUkPhoneForLookup(raw: string): string {
@@ -109,55 +135,25 @@ function normaliseUkPhoneForLookup(raw: string): string {
 }
 
 function getTurnaroundText(job: any): string {
-  const make = (job.device_make || '').toLowerCase()
-  const model = (job.device_model || '').toLowerCase()
-  const issue = (job.issue || '').toLowerCase()
-  const combined = `${make} ${model}`
-
-  const complex = issue.includes('motherboard') || issue.includes('logic board') ||
-    issue.includes('no power') || issue.includes('wont turn on') || issue.includes("won't turn on") ||
-    issue.includes('water damage') || issue.includes('liquid damage') || issue.includes('data recovery')
-
-  if (complex) {
-    if (issue.includes('data recovery')) return 'up to 7 days'
-    return 'up to 7 days, often quicker'
-  }
-
-  if (combined.includes('iphone') || combined.includes('samsung') && !combined.includes('tab') ||
-      combined.includes('pixel') || combined.includes('phone')) {
-    if (issue.includes('battery')) return '1-3 hours'
-    if (issue.includes('screen') || issue.includes('display') || issue.includes('lcd') || issue.includes('oled')) return '2-6 hours, sometimes next day'
-    if (issue.includes('charging')) return '2-4 hours, sometimes 1-2 days'
-    if (issue.includes('camera')) return '1-3 hours'
-    if (issue.includes('back glass') || issue.includes('back cover')) return '1-3 days'
-    return '2-6 hours, sometimes 1-2 days'
-  }
-
-  if (combined.includes('ipad') || combined.includes('tablet') || combined.includes('tab ')) {
-    if (issue.includes('battery')) return '2-4 hours'
-    if (issue.includes('screen') || issue.includes('display')) return '2-8 hours, sometimes 1-2 days'
-    return '1-3 days'
-  }
-
-  if (combined.includes('macbook') || combined.includes('laptop') || combined.includes('notebook') || combined.includes('chromebook')) {
-    if (issue.includes('battery')) return '1-2 days'
-    if (issue.includes('screen') || issue.includes('display')) return '1-3 days'
-    if (issue.includes('keyboard')) return '1-2 days'
-    return '1-3 days'
-  }
-
-  if (combined.includes('playstation') || combined.includes('xbox') || combined.includes('nintendo') || combined.includes('ps4') || combined.includes('ps5')) {
-    return '1-2 days'
-  }
-
-  return '1-5 days depending on the repair'
+  const baseEstimate = getTurnaroundEstimate(
+    job.device_make || '',
+    job.device_model || '',
+    job.issue || '',
+    job.status || ''
+  )
+  return getShortEta(baseEstimate, null)
 }
 
 const STATUS_SMS_VARIANTS: Record<string, string[]> = {
   QUOTE_APPROVED: [
-    "Your repair's all approved and ready to go — just bring your device in whenever suits you. No appointment needed!",
-    "All sorted on our end — your repair's booked in and waiting. Pop in with your device whenever you're ready.",
-    "We're ready for your device! Your repair's approved, so just drop in during opening hours and we'll get started.",
+    "We're ready for your device — bring it in whenever suits you during opening hours. No appointment needed!",
+    "All sorted on our end — just pop in with your device whenever you're ready.",
+    "We're ready to start! Drop in during opening hours and we'll get going straight away.",
+  ],
+  AWAITING_DEVICE: [
+    "Great news — we have the parts in stock for your repair! Just bring your device in whenever suits you during opening hours. No appointment needed!",
+    "We've got everything ready for your repair — just bring your device in whenever you're ready. No appointment needed!",
+    "Parts are in stock and we're ready to go! Drop in with your device during opening hours and we'll start straight away.",
   ],
   RECEIVED: [
     "Your device is with us and in the queue. We'll text you the moment work starts — no need to chase us!",
@@ -175,9 +171,10 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "Your parts have been ordered and are on their way. We check deliveries every day and will text you the moment they're in.",
   ],
   PARTS_ARRIVED: [
-    "Your parts have arrived! We're getting started on your repair now — shouldn't be too long.",
-    "Good news — parts are here and we're cracking on with your repair. We'll text when it's done.",
-    "Parts landed! We're starting your repair straight away. We'll be in touch the moment it's finished.",
+    // Used when device is NOT in shop — customer needs to bring it in
+    "Good news — your parts have arrived! Bring your device in whenever suits you during opening hours and we'll get started.",
+    "Parts are here! Whenever you're ready, just drop your device in during opening hours and we'll crack on with the repair.",
+    "Your parts have landed! Bring your device in during opening hours and we'll get the repair done.",
   ],
   AWAITING_DEPOSIT: [
     "We need a £20 deposit to order parts for your repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away.",
@@ -257,12 +254,19 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'PARTS_ARRIVED') {
-      const variants = [
-        "Not yet — parts have just arrived and we're starting on it now. Shouldn't be too long! We'll text when it's ready.",
-        "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
-        "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
-      ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      if (job.device_in_shop) {
+        const variants = [
+          "Not yet — parts have just arrived and we're starting on it now. Shouldn't be too long! We'll text when it's ready.",
+          "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
+          "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
+        ]
+        return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      } else {
+        return `Hi ${firstName},\n\nNot yet — the parts have arrived but we need your device first! Bring it in during opening hours and we'll get started straight away.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      }
+    }
+    if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+      return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [
@@ -306,12 +310,19 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
     }
     if (status === 'PARTS_ARRIVED') {
-      const variants = [
-        `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
-        `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
-        `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
-      ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      if (job.device_in_shop) {
+        const variants = [
+          `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
+          `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
+          `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
+        ]
+        return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      } else {
+        return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${eta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      }
+    }
+    if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [
@@ -360,12 +371,19 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
     }
     if (status === 'PARTS_ARRIVED') {
-      const variants = [
-        "Not yet — parts just arrived and we're starting now. We'll text you when it's done.",
-        "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
-        "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
-      ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      if (job.device_in_shop) {
+        const variants = [
+          "Not yet — parts just arrived and we're starting now. We'll text you when it's done.",
+          "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
+          "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
+        ]
+        return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      } else {
+        return `Hi ${firstName},\n\nNot yet — the parts are here but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      }
+    }
+    if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
+      return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [

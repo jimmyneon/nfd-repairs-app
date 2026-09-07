@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
           quote_key: quote_key || null,
           // Common
           additional_info: additional_info || null,
-          status: 'pending',
+          status: proceed_with_repair ? 'approved' : 'pending',
         })
         .select()
         .single() as any
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
             marketing_consent: marketing_consent || false,
             quote_source: quote_source || null,
             additional_info: additional_info || null,
-            status: 'pending',
+            status: proceed_with_repair ? 'approved' : 'pending',
           })
           .select()
           .single() as any
@@ -327,15 +327,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Create notification for staff
+    const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
     const notifTitle = enquiry_type === 'repair_quote'
-      ? `New Repair Quote: ${device_make || ''} ${device_model || ''}`
+      ? isProceed
+        ? `🔥 CUSTOMER WANTS TO PROCEED: ${device_make || ''} ${device_model || ''}`
+        : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
       : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
     const notifBody = enquiry_type === 'repair_quote'
-      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
+      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
       : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
 
     await supabase.from('notifications').insert({
-      type: 'NEW_ENQUIRY',
+      type: isProceed ? 'CUSTOMER_PROCEED' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
       is_read: false,
