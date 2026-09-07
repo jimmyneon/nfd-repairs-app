@@ -111,13 +111,18 @@ function isComplexIssue(issue: string): boolean {
 
 /**
  * Get turnaround estimate for a job based on device type and issue.
- * All times are deliberately generous (under-promise, over-deliver).
+ *
+ * Base estimates reflect realistic bench time for each specific repair type,
+ * deliberately under-promised (we say "40–60 minutes" for a 30-min job).
+ *
+ * minHours/maxHours are used for progress bar and workload calculations.
+ * For sub-hour repairs, minHours/maxHours are in fractional hours (0.5 = 30min).
  */
 export function getTurnaroundEstimate(
   deviceMake: string,
   deviceModel: string,
   issue: string,
-  status: string
+  _status: string
 ): TurnaroundEstimate {
   const deviceType = getDeviceType(deviceMake, deviceModel)
   const issueLower = (issue || '').toLowerCase()
@@ -128,115 +133,112 @@ export function getTurnaroundEstimate(
     if (issueLower.includes('data recovery')) {
       return { display: 'Usually up to 7 days — we want to make sure we recover everything safely, and quite often we get it back to you quicker', minHours: 72, maxHours: 168, isComplex: true }
     }
-    if (deviceType === 'phone' || deviceType === 'watch') {
-      return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
-    }
-    if (deviceType === 'tablet') {
-      return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
-    }
     if (deviceType === 'laptop') {
       return { display: 'Usually up to 10 days, but quite often we get it back to you quicker than that', minHours: 96, maxHours: 240, isComplex: true }
     }
     return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
   }
 
-  // Phone repairs
+  // Phone repairs — realistic bench times
   if (deviceType === 'phone') {
     if (issueLower.includes('battery')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+      return { display: 'Around 30–60 minutes', minHours: 0.5, maxHours: 1, isComplex: false }
     }
     if (issueLower.includes('screen') || issueLower.includes('display') || issueLower.includes('lcd') || issueLower.includes('oled')) {
-      return { display: 'Usually 2–6 hours, sometimes next day', minHours: 2, maxHours: 24, isComplex: false }
+      return { display: 'Around 45–90 minutes', minHours: 0.75, maxHours: 1.5, isComplex: false }
     }
     if (issueLower.includes('charging port') || issueLower.includes('charging')) {
-      return { display: 'Usually 2–4 hours, sometimes 1–2 days', minHours: 2, maxHours: 48, isComplex: false }
+      return { display: 'Around 45–90 minutes', minHours: 0.75, maxHours: 1.5, isComplex: false }
     }
     if (issueLower.includes('camera')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+      return { display: 'Around 30–60 minutes', minHours: 0.5, maxHours: 1, isComplex: false }
+    }
+    if (issueLower.includes('speaker') || issueLower.includes('microphone') || issueLower.includes('audio')) {
+      return { display: 'Around 45–90 minutes', minHours: 0.75, maxHours: 1.5, isComplex: false }
     }
     if (issueLower.includes('back glass') || issueLower.includes('back cover')) {
-      return { display: 'Usually 1–3 days', minHours: 24, maxHours: 72, isComplex: false }
+      return { display: 'Around 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
     }
     if (issueLower.includes('virus') || issueLower.includes('software') || issueLower.includes('reset') || issueLower.includes('restore') || issueLower.includes('setup')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+      return { display: 'Around 30–60 minutes', minHours: 0.5, maxHours: 1, isComplex: false }
     }
     if (issueLower.includes('glue') || issueLower.includes('back on')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
-    }
-    if (issueLower.includes('microphone') || issueLower.includes('speaker') || issueLower.includes('audio')) {
-      return { display: 'Usually 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
+      return { display: 'Around 30–60 minutes', minHours: 0.5, maxHours: 1, isComplex: false }
     }
     // Phone — other/unknown
-    return { display: 'Usually 2–6 hours, sometimes 1–2 days', minHours: 2, maxHours: 48, isComplex: false }
+    return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
   }
 
-  // Tablet repairs
+  // Tablet / iPad repairs
   if (deviceType === 'tablet') {
     if (issueLower.includes('battery')) {
-      return { display: 'Usually 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
     }
     if (issueLower.includes('screen') || issueLower.includes('display')) {
-      return { display: 'Usually 2–8 hours, sometimes 1–2 days', minHours: 2, maxHours: 48, isComplex: false }
+      return { display: 'Around 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
     }
     if (issueLower.includes('charging')) {
-      return { display: 'Usually 2–4 hours, sometimes 1–2 days', minHours: 2, maxHours: 48, isComplex: false }
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
     }
-    if (issueLower.includes('reset') || issueLower.includes('restore') || issueLower.includes('software')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+    if (issueLower.includes('reset') || issueLower.includes('restore') || issueLower.includes('software') || issueLower.includes('transfer') || issueLower.includes('photos')) {
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
     }
     // Tablet — other/unknown
-    return { display: 'Usually 1–3 days, complex issues up to 7 days', minHours: 24, maxHours: 168, isComplex: false }
+    return { display: 'Usually 1–3 working days', minHours: 24, maxHours: 72, isComplex: false }
   }
 
   // Laptop repairs
   if (deviceType === 'laptop') {
     if (issueLower.includes('battery')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
     }
     if (issueLower.includes('screen') || issueLower.includes('display')) {
-      return { display: 'Usually 1–3 days', minHours: 24, maxHours: 72, isComplex: false }
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     if (issueLower.includes('keyboard')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
-    if (issueLower.includes('software') || issueLower.includes('windows') || issueLower.includes('os') || issueLower.includes('virus') || issueLower.includes('reinstall') || issueLower.includes('outlook') || issueLower.includes('word') || issueLower.includes('email')) {
-      return { display: 'Usually 1–3 days', minHours: 24, maxHours: 72, isComplex: false }
+    if (issueLower.includes('software') || issueLower.includes('windows') || issueLower.includes('os') || issueLower.includes('virus') || issueLower.includes('reinstall') || issueLower.includes('outlook') || issueLower.includes('word') || issueLower.includes('email') || issueLower.includes('compatib')) {
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     if (issueLower.includes('sound') || issueLower.includes('speaker') || issueLower.includes('audio')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
     }
     if (issueLower.includes('no display') || issueLower.includes('not displaying')) {
-      return { display: 'Usually 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+      return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
+    }
+    if (issueLower.includes('slow')) {
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     // Laptop — other/unknown
-    return { display: 'Usually 1–3 days, complex issues up to 10 days', minHours: 24, maxHours: 240, isComplex: false }
+    return { display: 'Usually 1–3 working days', minHours: 24, maxHours: 72, isComplex: false }
   }
 
   // Console repairs
   if (deviceType === 'console') {
     if (issueLower.includes('hdmi')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     if (issueLower.includes('overheat')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     if (issueLower.includes('disc') || issueLower.includes('drive')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Usually 1–2 working days', minHours: 24, maxHours: 48, isComplex: false }
     }
     if (issueLower.includes('controller') || issueLower.includes('stick') || issueLower.includes('drift') || issueLower.includes('button')) {
-      return { display: 'Usually 1–2 days', minHours: 24, maxHours: 48, isComplex: false }
+      return { display: 'Around 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
     }
     // Console — other/unknown
-    return { display: 'Usually 1–3 days', minHours: 24, maxHours: 72, isComplex: false }
+    return { display: 'Usually 1–3 working days', minHours: 24, maxHours: 72, isComplex: false }
   }
 
   // Watch repairs
   if (deviceType === 'watch') {
-    return { display: 'Usually 2–4 hours', minHours: 2, maxHours: 4, isComplex: false }
+    return { display: 'Around 1–3 hours', minHours: 1, maxHours: 3, isComplex: false }
   }
 
   // Unknown device
-  return { display: 'Usually 1–5 days depending on the repair', minHours: 24, maxHours: 120, isComplex: false }
+  return { display: 'Usually 1–5 working days depending on the repair', minHours: 24, maxHours: 120, isComplex: false }
 }
 
 /**
@@ -255,8 +257,10 @@ export interface WorkloadInfo {
   activeJobs: number
   activeJobsSameType: number
   adjustment: number // multiplier for ETA (1.0 = no change, 1.5 = 50% longer)
-  benchHoursAhead: number // estimated bench hours queued ahead of this job
+  benchHoursAhead: number // raw total bench hours queued ahead of this job
+  weightedBenchHoursAhead: number // impact-matrix-weighted hours that actually delay this job
   priorityTier: PriorityTier
+  jobsByTier: { quick: number; standard: number; heavy: number; board_level: number }
 }
 
 /**
@@ -337,39 +341,77 @@ export function getPriorityTier(
 
 /**
  * Get the expected bench hours for a job based on its priority tier.
- * Used for workload calculation — these are mid-range estimates, not
- * the customer-facing turnaround.
+ * These are realistic mid-range bench-time estimates (not customer-facing
+ * turnaround), used for workload/queue calculations.
  */
 function benchHoursForTier(tier: PriorityTier): number {
   switch (tier) {
-    case 'quick': return 3       // phone screen/battery: ~1-6 hours, mid ~3
-    case 'standard': return 8    // phone complex, console HDMI: ~2-48 hours, mid ~8
-    case 'heavy': return 36      // laptop, tablet complex: ~1-3 days, mid ~36h
-    case 'board_level': return 96 // motherboard/liquid: up to 7-10 days, mid ~96h
+    case 'quick': return 1        // phone screen/battery/camera: ~30-90 min
+    case 'standard': return 3     // tablet screen, console HDMI, controller: ~2-4h
+    case 'heavy': return 8        // laptop screen/software, tablet complex: ~4-24h
+    case 'board_level': return 24 // motherboard/liquid/data recovery: 1-10 days
   }
 }
 
 /**
- * Priority-weighted delay factor.
- * Quick phone repairs get less delay from a busy queue (they can be slotted in).
- * Board-level jobs absorb more delay (they're long anyway and less urgent).
+ * Queue impact matrix: how much does a queued job of tier X delay
+ * a target job of tier Y?
+ *
+ * Key rules:
+ * - Quick jobs ahead of quick jobs = STRONG impact (they compete for the same bench slot)
+ * - Heavy/board jobs ahead of quick jobs = MINIMAL impact (quick job jumps ahead)
+ * - Quick jobs ahead of heavy jobs = MODERATE impact (quick jobs jump ahead, heavy job waits)
+ * - Heavy jobs ahead of heavy jobs = MODERATE impact
+ * - Board-level jobs ahead of anything = LOW impact (they occupy bench for long
+ *   but don't block other jobs the same way — we work around them)
  */
-function priorityDelayFactor(tier: PriorityTier): number {
-  switch (tier) {
-    case 'quick': return 0.6      // 40% less delay — phone repairs jump ahead
-    case 'standard': return 0.85  // 15% less delay
-    case 'heavy': return 1.1      // 10% more delay
-    case 'board_level': return 1.3 // 30% more delay — board jobs wait longer
+function queueImpactWeight(
+  queuedTier: PriorityTier,
+  targetTier: PriorityTier
+): number {
+  // Impact matrix: [queued][target]
+  // Rows = queued job tier, Columns = target job tier
+  // Values = what fraction of the queued job's bench time actually delays the target
+  const matrix: Record<PriorityTier, Record<PriorityTier, number>> = {
+    // queued: quick
+    quick: {
+      quick: 1.0,        // Another quick job ahead = full impact (same slot)
+      standard: 0.7,     // Quick job ahead of standard = mostly impacts
+      heavy: 0.5,        // Quick job ahead of heavy = moderate (quick finishes fast)
+      board_level: 0.3,  // Quick job ahead of board = low (board is long anyway)
+    },
+    // queued: standard
+    standard: {
+      quick: 0.3,        // Standard job ahead of quick = low (quick jumps ahead)
+      standard: 0.8,     // Standard ahead of standard = high
+      heavy: 0.7,        // Standard ahead of heavy = moderate-high
+      board_level: 0.4,  // Standard ahead of board = low-moderate
+    },
+    // queued: heavy
+    heavy: {
+      quick: 0.15,       // Heavy job ahead of quick = minimal (quick jumps ahead!)
+      standard: 0.4,     // Heavy ahead of standard = moderate
+      heavy: 0.7,        // Heavy ahead of heavy = high
+      board_level: 0.5,  // Heavy ahead of board = moderate
+    },
+    // queued: board_level
+    board_level: {
+      quick: 0.1,        // Board job ahead of quick = almost no impact (quick jumps ahead!)
+      standard: 0.25,    // Board ahead of standard = low
+      heavy: 0.4,        // Board ahead of heavy = moderate
+      board_level: 0.6,  // Board ahead of board = moderate-high (equipment contention)
+    },
   }
+  return matrix[queuedTier][targetTier]
 }
 
 /**
  * Calculate workload adjustment from actual job records.
  *
  * This is the proper workload engine: instead of just counting active jobs,
- * it estimates the bench hours queued ahead, classifies each job by priority
- * tier, and applies priority rules so quick phone repairs are less affected
- * by a busy queue while board-level jobs absorb more delay.
+ * it estimates the bench hours queued ahead using a priority-weighted impact
+ * matrix. Quick phone repairs are barely affected by heavy/board jobs ahead
+ * (they jump the queue), but ARE affected by other quick jobs ahead.
  *
  * @param activeJobs - Array of active job records with device_make, device_model, issue, status
  * @param currentJob - The job we're calculating ETA for
@@ -380,47 +422,49 @@ export function calculateWorkloadFromJobs(
 ): WorkloadInfo {
   const currentDeviceType = getDeviceType(currentJob.device_make || '', currentJob.device_model || '')
   const currentTier = getPriorityTier(currentDeviceType, currentJob.issue || '')
-  const currentBenchHours = benchHoursForTier(currentTier)
 
-  // Calculate bench hours ahead in the queue, weighted by priority
-  let benchHoursAhead = 0
-  let sameTypeCount = 0
+  // Calculate weighted bench hours ahead using the impact matrix
+  let weightedBenchHoursAhead = 0
+  let totalBenchHoursAhead = 0
+  let sameTierCount = 0
+  let jobsByTier: Record<PriorityTier, number> = { quick: 0, standard: 0, heavy: 0, board_level: 0 }
 
   for (const job of activeJobs) {
     const jobDeviceType = getDeviceType(job.device_make || '', job.device_model || '')
     const jobTier = getPriorityTier(jobDeviceType, job.issue || '')
     const jobBenchHours = benchHoursForTier(jobTier)
 
-    // Jobs already being repaired don't count as "ahead" — they're being worked on
-    if (job.status === 'IN_REPAIR') {
-      benchHoursAhead += jobBenchHours * 0.3 // partial credit — will finish soon
-    } else {
-      benchHoursAhead += jobBenchHours
+    jobsByTier[jobTier]++
+
+    if (jobTier === currentTier) {
+      sameTierCount++
     }
 
-    if (jobDeviceType === currentDeviceType) {
-      sameTypeCount++
-    }
+    // Jobs already being repaired count 30% (will finish soon)
+    const statusFactor = job.status === 'IN_REPAIR' ? 0.3 : 1.0
+    const effectiveBenchHours = jobBenchHours * statusFactor
+
+    totalBenchHoursAhead += effectiveBenchHours
+    // Apply the impact matrix: how much does this job actually delay our target?
+    const impactWeight = queueImpactWeight(jobTier, currentTier)
+    weightedBenchHoursAhead += effectiveBenchHours * impactWeight
   }
 
-  // Apply priority delay factor to the current job
-  const delayFactor = priorityDelayFactor(currentTier)
+  // The weighted bench hours ahead is what actually delays this job.
+  // Convert to "effective working days ahead" (8 bench hours = 1 working day)
+  const effectiveWorkingDaysAhead = weightedBenchHoursAhead / 8
 
-  // Calculate adjustment multiplier based on bench hours ahead
-  // A full working day is ~8 bench hours. We scale relative to that.
-  // benchHoursAhead / 8 = number of working days of work queued
-  const workingDaysAhead = benchHoursAhead / 8
-
+  // Determine workload level based on effective delay, not raw count
   let level: WorkloadLevel = 'quiet'
   let baseAdjustment = 1.0
 
-  if (workingDaysAhead >= 5) {
+  if (effectiveWorkingDaysAhead >= 3) {
     level = 'very_busy'
     baseAdjustment = 1.6
-  } else if (workingDaysAhead >= 3) {
+  } else if (effectiveWorkingDaysAhead >= 1.5) {
     level = 'busy'
     baseAdjustment = 1.3
-  } else if (workingDaysAhead >= 1.5) {
+  } else if (effectiveWorkingDaysAhead >= 0.5) {
     level = 'normal'
     baseAdjustment = 1.15
   } else {
@@ -428,24 +472,23 @@ export function calculateWorkloadFromJobs(
     baseAdjustment = 1.0
   }
 
-  // Apply priority factor — quick phone repairs get less delay, board-level get more
-  let adjustment = baseAdjustment * delayFactor
-
-  // Same-type jobs add more delay (board-level jobs block each other on equipment)
-  if (sameTypeCount >= 3) {
-    adjustment *= 1.15
+  // Same-tier jobs add extra delay (equipment/tooling contention)
+  if (sameTierCount >= 3) {
+    baseAdjustment *= 1.15
   }
 
   // Cap adjustment to reasonable bounds
-  adjustment = Math.min(Math.max(adjustment, 1.0), 2.5)
+  const adjustment = Math.min(Math.max(baseAdjustment, 1.0), 2.5)
 
   return {
     level,
     activeJobs: activeJobs.length,
-    activeJobsSameType: sameTypeCount,
+    activeJobsSameType: sameTierCount,
     adjustment,
-    benchHoursAhead,
+    benchHoursAhead: totalBenchHoursAhead, // raw total for reporting
+    weightedBenchHoursAhead, // impact-matrix-weighted
     priorityTier: currentTier,
+    jobsByTier,
   }
 }
 
@@ -471,7 +514,49 @@ export function calculateWorkload(
   // Same-type jobs add more delay (board-level jobs block each other)
   if (activeJobsSameType >= 3) adjustment *= 1.2
 
-  return { level, activeJobs, activeJobsSameType, adjustment, benchHoursAhead: 0, priorityTier: 'standard' }
+  return { level, activeJobs, activeJobsSameType, adjustment, benchHoursAhead: 0, weightedBenchHoursAhead: 0, priorityTier: 'standard', jobsByTier: { quick: 0, standard: 0, heavy: 0, board_level: 0 } }
+}
+
+/**
+ * Format a time range in hours as natural customer-facing text.
+ * Handles sub-hour times (e.g. 0.5h → "30 minutes", 1.5h → "1.5 hours")
+ * and converts to "later today" / "tomorrow" where appropriate.
+ */
+function formatTimeRange(minHours: number, maxHours: number): string {
+  // Sub-hour: express in minutes
+  if (maxHours <= 1) {
+    const minMin = Math.round(minHours * 60)
+    const maxMin = Math.round(maxHours * 60)
+    if (minMin === maxMin) return `${maxMin} minutes`
+    return `${minMin}–${maxMin} minutes`
+  }
+
+  // 1-8 hours: express in hours
+  if (maxHours <= 8) {
+    const minH = minHours < 1 ? Math.round(minHours * 60) / 60 : Math.ceil(minHours)
+    const maxH = Math.ceil(maxHours)
+    if (minH < 1) {
+      // e.g. 0.5-2 hours → "30 mins to 2 hours"
+      const minMin = Math.round(minHours * 60)
+      return `${minMin} minutes to ${maxH} hours`
+    }
+    return `${minH}–${maxH} hours`
+  }
+
+  // 8-48 hours: express in hours or "1-2 days"
+  if (maxHours <= 48) {
+    const minDays = Math.round(minHours / 24 * 10) / 10
+    const maxDays = Math.round(maxHours / 24 * 10) / 10
+    if (minDays < 1 && maxDays <= 1) {
+      return `${Math.ceil(minHours)}–${Math.ceil(maxHours)} hours`
+    }
+    return `${Math.ceil(minHours / 24)}–${Math.ceil(maxHours / 24)} working days`
+  }
+
+  // > 48 hours: express in working days
+  const minDays = Math.ceil(minHours / 24)
+  const maxDays = Math.ceil(maxHours / 24)
+  return `${minDays}–${maxDays} working days`
 }
 
 /**
@@ -498,7 +583,7 @@ export function getWorkloadAdjustedEta(
 
   let repairEta: string
   if (baseEstimate.isComplex) {
-    // Complex repairs — express in days
+    // Complex repairs — express in days, never fake precision
     const minDays = Math.ceil(adjustedMin / 24)
     const maxDays = Math.ceil(adjustedMax / 24)
     if (workload.level === 'very_busy') {
@@ -509,24 +594,27 @@ export function getWorkloadAdjustedEta(
       repairEta = baseEstimate.display
     }
   } else if (adjustedMax <= 8) {
-    // Short repairs — express in hours
-    const minH = Math.ceil(adjustedMin)
-    const maxH = Math.ceil(adjustedMax)
+    // Short repairs — express in hours or minutes
+    const timeRange = formatTimeRange(adjustedMin, adjustedMax)
     if (workload.level === 'very_busy') {
-      repairEta = `Usually ${minH}–${maxH} hours, but currently closer to ${maxH + 2}–${maxH + 4} hours due to workload`
+      const bumpedMax = adjustedMax + 2
+      const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
+      repairEta = `Usually ${timeRange}, but currently closer to ${bumpedRange} due to workload`
     } else if (workload.level === 'busy') {
-      repairEta = `Usually ${minH}–${maxH} hours, currently around ${maxH}–${maxH + 2} hours based on today's workload`
+      const bumpedMax = adjustedMax + 1
+      const bumpedRange = formatTimeRange(adjustedMin, bumpedMax)
+      repairEta = `Usually ${timeRange}, currently around ${bumpedRange} based on today's workload`
     } else {
       repairEta = baseEstimate.display
     }
   } else {
-    // Medium repairs — express in days
+    // Medium/long repairs — express in days
     const minDays = Math.ceil(adjustedMin / 24)
     const maxDays = Math.ceil(adjustedMax / 24)
     if (workload.level === 'very_busy') {
-      repairEta = `Usually ${minDays}–${maxDays} days, currently ${maxDays + 1}–${maxDays + 2} days due to workload`
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently ${maxDays + 1}–${maxDays + 2} days due to workload`
     } else if (workload.level === 'busy') {
-      repairEta = `Usually ${minDays}–${maxDays} days, currently around ${maxDays}–${maxDays + 1} days`
+      repairEta = `Usually ${minDays}–${maxDays} working days, currently around ${maxDays}–${maxDays + 1} days`
     } else {
       repairEta = baseEstimate.display
     }
@@ -558,6 +646,7 @@ export function getShortEta(
     return baseEstimate.display
   }
 
+  const adjustedMin = baseEstimate.minHours * workload.adjustment
   const adjustedMax = baseEstimate.maxHours * workload.adjustment
 
   let repairEta: string
@@ -567,15 +656,16 @@ export function getShortEta(
       ? `about ${maxDays}–${maxDays + 2} working days`
       : `about ${maxDays} working days`
   } else if (adjustedMax <= 8) {
-    const maxH = Math.ceil(adjustedMax)
+    // Short repairs — use natural time formatting
+    const timeRange = formatTimeRange(adjustedMin, adjustedMax)
     repairEta = workload.level === 'very_busy'
-      ? `about ${maxH + 2}–${maxH + 4} hours`
-      : `about ${maxH}–${maxH + 2} hours`
+      ? `about ${formatTimeRange(adjustedMin, adjustedMax + 2)}`
+      : `about ${timeRange}`
   } else {
     const maxDays = Math.ceil(adjustedMax / 24)
     repairEta = workload.level === 'very_busy'
-      ? `about ${maxDays + 1}–${maxDays + 2} days`
-      : `about ${maxDays}–${maxDays + 1} days`
+      ? `about ${maxDays + 1}–${maxDays + 2} working days`
+      : `about ${maxDays}–${maxDays + 1} working days`
   }
 
   if (partsLeadTimeDays > 0) {
