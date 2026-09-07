@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
 import { corsHeaders } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 function escapeHtml(str: string): string {
   return String(str || '')
@@ -22,9 +23,19 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const headers = corsHeaders(request)
-
   try {
+    const headers = corsHeaders(request)
+
+    // Rate limit: 20 updates per minute per IP (higher limit — normal quote flow may make several updates)
+    const ip = getClientIP(request)
+    const rateLimit = await checkRateLimit(ip, 'enquiries_update', 20)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429, headers }
+      )
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

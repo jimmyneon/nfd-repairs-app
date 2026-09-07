@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { corsHeaders } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 // Server-side price verification: fetch catalogue and look up the real price by quote_key
 async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
@@ -53,6 +54,18 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const headers = corsHeaders(request)
   try {
+    const headers = corsHeaders(request)
+
+    // Rate limit: 10 submissions per minute per IP
+    const ip = getClientIP(request)
+    const rateLimit = await checkRateLimit(ip, 'enquiries_submit', 10)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429, headers }
+      )
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

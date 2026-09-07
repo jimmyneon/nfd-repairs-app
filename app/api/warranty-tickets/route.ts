@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { corsHeaders } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 /**
  * OPTIONS /api/warranty-tickets
@@ -23,6 +24,16 @@ export async function POST(request: NextRequest) {
   const headers = corsHeaders(request)
 
   try {
+    // Rate limit: 5 warranty submissions per minute per IP
+    const ip = getClientIP(request)
+    const rateLimit = await checkRateLimit(ip, 'warranty_submit', 5)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429, headers }
+      )
+    }
+
     // Use service role key to bypass RLS
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
