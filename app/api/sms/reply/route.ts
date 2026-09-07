@@ -232,7 +232,22 @@ export async function POST(request: NextRequest) {
       // --- Auto-detect common questions (deterministic, no AI) ---
       // Only auto-reply to unambiguous questions. Never jump into conversations.
       // If the message doesn't match any pattern, it falls through to staff notification.
-      const autoReply = detectAutoReply(message, job)
+      // Count how many status-type auto-replies we've already sent for this job
+      // so we can rotate through different message variants.
+      let statusSmsCount = 0
+      try {
+        const { count: autoCount } = await supabase
+          .from('job_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('job_id', job.id)
+          .eq('type', 'SYSTEM')
+          .like('message', 'Auto-reply sent: AUTO_STATUS_REPLY%')
+        statusSmsCount = autoCount || 0
+      } catch (e) {
+        console.error('[sms/reply] Failed to count status SMS:', e)
+      }
+
+      const autoReply = detectAutoReply(message, job, statusSmsCount)
       if (autoReply) {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (webhookUrl) {
@@ -717,29 +732,100 @@ function normaliseUkPhoneForLookup(raw: string): string {
 // ---------------------------------------------------------------------------
 type AutoReply = { templateKey: string; body: string }
 
-const STATUS_LABELS: Record<string, string> = {
-  QUOTE_APPROVED: 'Your repair\'s approved and ready to book in — just pop in with your device whenever suits you.',
-  RECEIVED: 'Your device is booked in and in the queue for repair.',
-  IN_REPAIR: 'Your device is being repaired right now — we\'ll text you the moment it\'s ready.',
-  PARTS_ORDERED: 'We\'ve ordered parts for your device and are waiting on them to arrive.',
-  PARTS_ARRIVED: 'Parts are here for your device — repair will start shortly.',
-  AWAITING_DEPOSIT: 'We need a deposit to order parts. Have a look back through your texts for the payment link, or reply here and we\'ll sort it.',
-  READY_TO_COLLECT: 'Great news — your device is repaired and ready to collect!',
-  COMPLETED: 'Your device is repaired and ready to collect. Pop in during opening hours: nfdr.uk/h',
-  COLLECTED: 'Your device has been collected — thanks for choosing us!',
+/**
+ * Status message variants for SMS auto-reply.
+ *
+ * Keyed by job status, each entry is an array of variant messages.
+ * We pick a variant based on how many times the customer has texted "update"
+ * or status-type messages — so they don't get the same message twice in a row.
+ *
+ * Language is deliberately different from the tracking page reassurance messages:
+ * - SMS is more conversational and direct
+ * - Shorter sentences, more informal
+ * - Uses "we're" / "we've" contractions
+ * - Includes the customer's first name
+ */
+const STATUS_SMS_VARIANTS: Record<string, string[]> = {
+  QUOTE_APPROVED: [
+    "Your repair's all approved and ready to go — just bring your device in whenever suits you. No appointment needed!",
+    "All sorted on our end — your repair's booked in and waiting. Pop in with your device whenever you're ready.",
+    "We're ready for your device! Your repair's approved, so just drop in during opening hours and we'll get started.",
+  ],
+  RECEIVED: [
+    "Your device is with us and in the queue. We'll text you the moment work starts — no need to chase us!",
+    "We've got your device safely checked in. It's in the queue and we'll update you as soon as things get moving.",
+    "Good news — your device is booked in and waiting for repair. We'll be in touch the minute there's progress.",
+  ],
+  IN_REPAIR: [
+    "Your device is being worked on right now. We'll text you the second it's ready — sit tight!",
+    "We're repairing your device as we speak. Getting it sorted for you — we'll text the moment it's done.",
+    "Your repair is underway! We're working on it now and will text you the moment it's finished.",
+  ],
+  PARTS_ORDERED: [
+    "We've ordered the parts for your device. They usually take 2-3 working days to arrive — we'll text you when they turn up.",
+    "Parts are on order for your repair. Typically a 2-3 day wait, then we'll crack on with it. We'll let you know when they arrive.",
+    "Your parts have been ordered and are on their way. We check deliveries every day and will text you the moment they're in.",
+  ],
+  PARTS_ARRIVED: [
+    "Your parts have arrived! We're getting started on your repair now — shouldn't be too long.",
+    "Good news — parts are here and we're cracking on with your repair. We'll text when it's done.",
+    "Parts landed! We're starting your repair straight away. We'll be in touch the moment it's finished.",
+  ],
+  AWAITING_DEPOSIT: [
+    "We need a small deposit to order parts for your repair. Have a look back through your texts for the payment link, or text us and we'll help.",
+    "Still waiting on the deposit to get parts ordered. If you've not got the payment link, text us and we'll send it again.",
+    "We can't order parts until the deposit's sorted. Check your earlier texts for the link, or reply here and we'll sort it out.",
+  ],
+  READY_TO_COLLECT: [
+    "Great news — your device is repaired and ready to collect! Pop in during opening hours: nfdr.uk/h",
+    "Your device is all fixed and waiting for you! Come and grab it during our opening hours: nfdr.uk/h",
+    "It's done! Your device is ready to collect. We're open: nfdr.uk/h — come whenever suits you.",
+  ],
+  COMPLETED: [
+    "Your device is all repaired and ready to collect. Pop in during opening hours: nfdr.uk/h",
+    "All done! Your device is fixed and waiting for you. Come grab it during opening hours: nfdr.uk/h",
+    "Your repair's complete and ready for collection. We're open: nfdr.uk/h — see you soon!",
+  ],
+  COLLECTED: [
+    "Your device has been collected — thanks for choosing us! If anything's not right, just text us here.",
+    "All sorted — you've collected your device. Thanks for the business! Give us a shout if you need anything else.",
+    "Thanks for coming in! Your device's all sorted. If you have any issues, just text us here anytime.",
+  ],
+  DIAGNOSTIC: [
+    "We're checking your device over to see what's needed. We'll text you with our findings and a quote — no obligation until you're happy.",
+    "Your device is in diagnostics — we're working out what's going on. We'll be in touch with a quote as soon as we know.",
+    "We're testing your device to pin down the issue. Once we know what's needed, we'll text you with a price. No pressure to go ahead.",
+  ],
 }
 
-function detectAutoReply(message: string, job: any): AutoReply | null {
+/** Pick a variant based on how many times the customer has texted (rotates through) */
+function pickVariant(status: string, messageCount: number): string | null {
+  const variants = STATUS_SMS_VARIANTS[status]
+  if (!variants || variants.length === 0) return null
+  // Rotate through variants — messageCount 0 = first, 1 = second, etc.
+  // Wraps around if they've texted more than the number of variants
+  return variants[messageCount % variants.length]
+}
+
+/** Fallback for statuses not in the variants table */
+function fallbackStatusMessage(status: string): string {
+  const readable = status.replace(/_/g, ' ').toLowerCase()
+  return `Your repair is at the ${readable} stage. We'll text you as soon as there's an update.`
+}
+
+function detectAutoReply(message: string, job: any, smsCount: number = 0): AutoReply | null {
   const msg = message.toLowerCase().trim()
 
-  // --- "When will it be ready?" / "What's the status?" ---
-  if (/\b(when|what\s+time|how\s+long|ready|status|where.*my|progress|done|finished|pick\s*up|collect)\b/i.test(msg)
+  // --- "Update" / "When will it be ready?" / "What's the status?" ---
+  // Added "update" as a keyword — this is the main one customers will text
+  if (/\b(update|when|what\s+time|how\s+long|ready|status|where.*my|progress|done|finished|pick\s*up|collect|any\s+news|heard|update\s+me)\b/i.test(msg)
       && !/\b(yes|no|book|proceed|go ahead|accept|decline|cancel|paid)\b/i.test(msg)) {
-    const statusInfo = STATUS_LABELS[job.status] || `Your repair is at the ${job.status} stage — we\'ll text you as soon as there's an update.`
+    const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
     const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
+    const firstName = getFirstName(job.customer_name)
     return {
       templateKey: 'AUTO_STATUS_REPLY',
-      body: `Hi ${getFirstName(job.customer_name)},\n\n${statusInfo}\n\nYou can track it here anytime: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
+      body: `Hi ${firstName},\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
     }
   }
 
@@ -747,7 +833,7 @@ function detectAutoReply(message: string, job: any): AutoReply | null {
   if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store)\b/i.test(msg)) {
     return {
       templateKey: 'AUTO_LOCATION_REPLY',
-      body: `Hi ${getFirstName(job.customer_name)},\n\nHere\'s where we are and our opening hours: nfdr.uk/h\n\nNew Forest Device Repairs`,
+      body: `Hi ${getFirstName(job.customer_name)},\n\nHere's where we are and our opening hours: nfdr.uk/h\n\nNew Forest Device Repairs`,
     }
   }
 
