@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant price: ${QUOTE_URL}\nOr text us here — we'll reply ASAP.\n\nJohn, New Forest Device Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNew Forest Device Repairs`
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
             try {
@@ -396,25 +396,29 @@ function buildMissedCallMessage(ctx: {
   googleMapsUrl: string
   specialHours: { active?: boolean; note?: string | null } | null
 }): string {
-  const lines: string[] = ['Hi, sorry we missed your call!']
+  const lines: string[] = ['Hi, sorry we missed your call.']
 
   // Special hours / holiday banner takes priority over regular hours
   if (ctx.specialHours?.active && ctx.specialHours?.note) {
-    lines.push('')
     lines.push(ctx.specialHours.note)
     lines.push('')
-    lines.push('Get an instant repair price:')
+    lines.push('Get an instant repair price in 60 seconds:')
     lines.push(QUOTE_URL)
     lines.push('')
-    lines.push('Or text us here.')
+    lines.push('Live hours & directions:')
+    lines.push('nfdr.uk/h')
     lines.push('')
-    lines.push('John, New Forest Device Repairs')
+    lines.push('Existing repair? Reply UPDATE.')
+    lines.push('Anything else? Just reply here.')
+    lines.push('')
+    lines.push('John')
+    lines.push('New Forest Device Repairs')
     return lines.join('\n')
   }
 
   if (ctx.isOpen) {
     const closeTime = extractCloseTime(ctx.todayFormatted)
-    lines.push(`We're open until ${closeTime}.`)
+    lines.push(`We're open today until ${closeTime}.`)
   } else {
     if (ctx.nextOpen) {
       lines.push(`We're closed now, back ${ctx.nextOpen}.`)
@@ -427,9 +431,14 @@ function buildMissedCallMessage(ctx: {
   lines.push('Get an instant repair price in 60 seconds:')
   lines.push(QUOTE_URL)
   lines.push('')
-  lines.push('Or text us here — we\'ll reply ASAP.')
+  lines.push('Live hours & directions:')
+  lines.push('nfdr.uk/h')
   lines.push('')
-  lines.push('John, New Forest Device Repairs')
+  lines.push('Existing repair? Reply UPDATE.')
+  lines.push('Anything else? Just reply here.')
+  lines.push('')
+  lines.push('John')
+  lines.push('New Forest Device Repairs')
 
   return lines.join('\n')
 }
