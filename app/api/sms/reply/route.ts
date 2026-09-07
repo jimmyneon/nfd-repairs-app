@@ -1100,6 +1100,8 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   const hoursLink = shortHoursLink()
   const status = job.status
   const eta = getTurnaroundText(job, workload)
+  // Strip leading "about " if present, since templates add their own "about"
+  const cleanEta = eta.replace(/^about\s+/i, '')
 
   // Already done
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
@@ -1113,9 +1115,9 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   // In repair — give ETA from this point
   if (status === 'IN_REPAIR') {
     const variants = [
-      `We're working on it right now — should be about ${eta} from when we started. We'll text you the moment it's done.`,
-      `Currently being repaired — typically ${eta} for this type of job. We'll text you as soon as it's ready.`,
-      `We're on it! Expect about ${eta} for this repair. We'll be in touch the second it's finished.`,
+      `We're working on it right now — should be about ${cleanEta} from when we started. We'll text you the moment it's done.`,
+      `Currently being repaired — typically ${cleanEta} for this type of job. We'll text you as soon as it's ready.`,
+      `We're on it! Expect about ${cleanEta} for this repair. We'll be in touch the second it's finished.`,
     ]
     return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
   }
@@ -1123,9 +1125,9 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   // Parts ordered — add parts wait + repair time
   if (status === 'PARTS_ORDERED') {
     const variants = [
-      `Parts take 2-3 working days to arrive, then the repair itself is about ${eta}. We'll text you at every step.`,
-      `We're waiting on parts (2-3 days), then it's about ${eta} to do the repair. We'll let you know when parts land.`,
-      `Once parts arrive (usually 2-3 days), the repair takes about ${eta}. We'll text you the moment it's ready.`,
+      `Parts take 2-3 working days to arrive, then the repair itself is about ${cleanEta}. We'll text you at every step.`,
+      `We're waiting on parts (2-3 days), then it's about ${cleanEta} to do the repair. We'll let you know when parts land.`,
+      `Once parts arrive (usually 2-3 days), the repair takes about ${cleanEta}. We'll text you the moment it's ready.`,
     ]
     return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
   }
@@ -1134,14 +1136,14 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   if (status === 'PARTS_ARRIVED') {
     if (job.device_in_shop) {
       const variants = [
-        `Parts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.`,
-        `Parts just landed — now it's about ${eta} to do the repair. We'll be in touch the moment it's done.`,
-        `Good news — parts are in. Expect about ${eta} for the repair. We'll text you as soon as it's finished.`,
+        `Parts are here! The repair itself should take about ${cleanEta}. We'll text you when it's ready to collect.`,
+        `Parts just landed — now it's about ${cleanEta} to do the repair. We'll be in touch the moment it's done.`,
+        `Good news — parts are in. Expect about ${cleanEta} for the repair. We'll text you as soon as it's finished.`,
       ]
       return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
     } else {
       // Device still with customer
-      return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${eta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${cleanEta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
   }
 
@@ -1149,19 +1151,19 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED' || status === 'AWAITING_DEVICE') {
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
       // Device still with customer, parts in stock
-      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     const variants = [
-      `Once we start on it, this type of repair takes about ${eta}. Your device is in the queue — we'll text you the moment work begins.`,
-      `Typically ${eta} for this repair once we get started. It's in the queue and we'll text you as soon as we crack on.`,
-      `This repair is usually about ${eta}. We'll text you the moment we start working on it.`,
+      `Once we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.`,
+      `Typically ${cleanEta} for this repair once we get started. It's in the queue and we'll text you as soon as we crack on.`,
+      `This repair is usually about ${cleanEta}. We'll text you the moment we start working on it.`,
     ]
     return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
   }
 
   // Awaiting deposit
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${eta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
   }
 
   // Diagnostic

@@ -483,8 +483,9 @@ export function getWorkloadAdjustedEta(
   workload: WorkloadInfo | null,
   partsLeadTimeDays: number = 0
 ): string {
-  // If no workload info, just return the base estimate + parts lead time
-  if (!workload || workload.level === 'quiet') {
+  // If no workload info, quiet, or adjustment is 1.0 (quick repairs that jump the queue),
+  // just return the base estimate + parts lead time
+  if (!workload || workload.level === 'quiet' || workload.adjustment <= 1.0) {
     if (partsLeadTimeDays > 0) {
       return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} working days, then ${baseEstimate.display.toLowerCase()}`
     }
@@ -548,7 +549,9 @@ export function getShortEta(
   workload: WorkloadInfo | null,
   partsLeadTimeDays: number = 0
 ): string {
-  if (!workload || workload.level === 'quiet') {
+  // If no workload, quiet, or adjustment is 1.0 (quick repairs that jump the queue),
+  // just return the base estimate — no workload delay to communicate
+  if (!workload || workload.level === 'quiet' || workload.adjustment <= 1.0) {
     if (partsLeadTimeDays > 0) {
       return `Parts ${partsLeadTimeDays}–${partsLeadTimeDays + 1} days, then ${baseEstimate.display.toLowerCase()}`
     }

@@ -457,6 +457,8 @@ function buildTurnaroundSms(job: any, workload: WorkloadInfo, eta: string): stri
   const firstName = getFirstName(job.customer_name)
   const hoursLink = shortHoursLink()
   const status = job.status
+  // Strip leading "about " if present, since templates add their own "about"
+  const cleanEta = eta.replace(/^about\s+/i, '')
 
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
     return `Hi ${firstName},\n\nIt's already done and ready to collect! Pop in whenever we're open: ${hoursLink}\n\nNew Forest Device Repairs`
@@ -465,25 +467,25 @@ function buildTurnaroundSms(job: any, workload: WorkloadInfo, eta: string): stri
     return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If anything's not right, just text us.\n\nNew Forest Device Repairs`
   }
   if (status === 'IN_REPAIR') {
-    return `Hi ${firstName},\n\nWe're working on it right now — should be about ${eta} from when we started. We'll text you the moment it's done.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe're working on it right now — should be about ${cleanEta} from when we started. We'll text you the moment it's done.\n\nNew Forest Device Repairs`
   }
   if (status === 'PARTS_ORDERED') {
-    return `Hi ${firstName},\n\nParts take 2-3 working days to arrive, then the repair itself is about ${eta}. We'll text you at every step.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nParts take 2-3 working days to arrive, then the repair itself is about ${cleanEta}. We'll text you at every step.\n\nNew Forest Device Repairs`
   }
   if (status === 'PARTS_ARRIVED') {
     if (job.device_in_shop) {
-      return `Hi ${firstName},\n\nParts are here! The repair itself should take about ${eta}. We'll text you when it's ready to collect.\n\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nParts are here! The repair itself should take about ${cleanEta}. We'll text you when it's ready to collect.\n\nNew Forest Device Repairs`
     }
-    return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${eta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${cleanEta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
-    return `Hi ${firstName},\n\nOnce we start on it, this type of repair takes about ${eta}. Your device is in the queue — we'll text you the moment work begins.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nOnce we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.\n\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${eta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
   }
   if (status === 'DIAGNOSTIC') {
     return `Hi ${firstName},\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNew Forest Device Repairs`
