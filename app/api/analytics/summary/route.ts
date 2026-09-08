@@ -1,40 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
+import { reportRange, visitorOverview, readAllPages, QuoteEvent } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
-
-function emptyResponse(days: number, tableMissing = false) {
-  return NextResponse.json({
-    success: true,
-    period_days: days,
-    total_sessions: 0,
-    funnel: {
-      steps: { 1: { count: 0, label: 'Category' }, 2: { count: 0, label: 'Brand' }, 3: { count: 0, label: 'Model' }, 4: { count: 0, label: 'Repair' }, 5: { count: 0, label: 'Quote Details' } },
-      actions: { Form_Started: 0, Form_Submitted: 0, Quote_Revealed: 0, Action_Clicked: 0 },
-    },
-    action_breakdown: [],
-    hesitation_breakdown: [],
-    traffic_sources: { utm_sources: [], utm_mediums: [], source_tags: [], referrers: [] },
-    avg_step_times: {},
-    popular: { categories: [], brands: [], repairs: [], combos: [] },
-    search_queries: [],
-    additional_repairs: { total_added: 0, breakdown: [] },
-    device_breakdown: { mobile: 0, desktop: 0 },
-    accept_page: { views: 0, clicks: 0, conversion_rate: 0 },
-    form_errors: [],
-    budget_comparisons: [] as Array<{ budget: number; quoted_price: number | null }>,
-    exit_intent: { sessions: 0, total_events: 0 },
-    abandonment: { by_step: [], total_abandoned: 0 },
-    back_navigation: [],
-    start_again: { sessions: 0, by_step: [] },
-    option_selections: { total: 0, breakdown: [] },
-    quote_journey: { submitted: 0, sent: 0, follow_up: 0, accepted: 0, booked: 0, dismissed: 0, no_next_action: 0 },
-    conversion_rate: 0,
-    table_missing: tableMissing,
-  })
-}
 
 export async function GET(request: NextRequest) {
   const { response: authResponse } = await requireStaffUser(request)
@@ -55,74 +25,45 @@ export async function GET(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     })
 
-    const searchParams = request.nextUrl.searchParams
-    const days = parseInt(searchParams.get('days') || '30', 10)
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-    const startDateISO = startDate.toISOString()
-
-    // Check if the table exists by doing a minimal query
-    const { error: tableCheckError } = await supabase
-      .from('quote_analytics_events')
-      .select('id')
-      .limit(1)
-
-    if (tableCheckError) {
-      console.error('Analytics table check error:', tableCheckError.message)
-      return emptyResponse(days, true)
+    let range: ReturnType<typeof reportRange>
+    try {
+      range = reportRange(request.nextUrl.searchParams)
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
-
-    // Run all queries in parallel for speed
-    const [
-      funnelRes, stepEnterRes, actionRes, hesitationRes, sourceRes,
-      timeRes, popularRes, searchRes, addonRes, deviceRes,
-      acceptRes, errorRes, budgetRes,
-      exitIntentRes, backNavRes, startAgainRes, optionSelectedRes, enquiryJourneyRes,
-    ] = await Promise.all([
-      supabase.from('quote_analytics_events').select('event_type, session_id').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_action_click').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_hesitation_reason').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, referrer, utm_source, utm_medium, source_tag').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_type, event_data, created_at').in('event_type', ['quote_step_enter', 'quote_form_submit']).gte('created_at', startDateISO).order('created_at', { ascending: true }),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_form_submit').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_search').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_additional_repair_added').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, is_mobile').eq('event_type', 'quote_step_enter').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_type, session_id').in('event_type', ['quote_accept_page_view', 'quote_accept_clicked']).gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_form_error').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('event_data').eq('event_type', 'quote_budget_submitted').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_exit_intent').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_back_navigation').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_start_again').gte('created_at', startDateISO),
-      supabase.from('quote_analytics_events').select('session_id, event_data').eq('event_type', 'quote_option_selected').gte('created_at', startDateISO),
-      supabase.from('enquiries')
-        .select('status, quote_sent_method, hesitation_reason, customer_budget, part_reserved, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
-        .eq('enquiry_type', 'repair_quote')
-        .gte('created_at', startDateISO),
+    const days = range.days
+    // One consistent snapshot for all breakdowns, paginated beyond the row cap.
+    // Include 30 minutes before the range to recognise visits crossing midnight.
+    const lookback = new Date(Date.parse(range.startISO) - 30 * 60 * 1000).toISOString()
+    const [allEvents, enquiryJourneyData] = await Promise.all([
+      readAllPages<QuoteEvent>((from, to) => supabase.from('quote_analytics_events')
+        .select('id, session_id, event_type, event_data, created_at, referrer, utm_source, utm_medium, source_tag, is_mobile')
+        .gte('created_at', lookback).lt('created_at', range.endISO)
+        .order('created_at').order('id').range(from, to)),
+      readAllPages<any>((from, to) => supabase.from('enquiries')
+        .select('id, status, quote_sent_method, hesitation_reason, customer_budget, part_reserved, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
+        .eq('enquiry_type', 'repair_quote').gte('created_at', range.startISO).lt('created_at', range.endISO)
+        .order('created_at').order('id').range(from, to)),
     ])
-
-    // Helper: safely get array from Supabase response
-    const arr = (res: { data: any[] | null }): any[] => Array.isArray(res?.data) ? res.data : []
-
-    const funnelData = arr(funnelRes)
-    const stepEnterData = arr(stepEnterRes)
-    const actionData = arr(actionRes)
-    const hesitationData = arr(hesitationRes)
-    const sourceData = arr(sourceRes)
-    const timeData = arr(timeRes)
-    const popularData = arr(popularRes)
-    const searchData = arr(searchRes)
-    const addonData = arr(addonRes)
-    const deviceData = arr(deviceRes)
-    const acceptData = arr(acceptRes)
-    const errorData = arr(errorRes)
-    const budgetData = arr(budgetRes)
-    const exitIntentData = arr(exitIntentRes)
-    const backNavData = arr(backNavRes)
-    const startAgainData = arr(startAgainRes)
-    const optionSelectedData = arr(optionSelectedRes)
-    const enquiryJourneyData = arr(enquiryJourneyRes)
+    const overview = visitorOverview(allEvents, range)
+    const funnelData = allEvents.filter(e => Date.parse(e.created_at) >= Date.parse(range.startISO))
+    const byType = (...types: string[]) => funnelData.filter(e => types.includes(e.event_type))
+    const stepEnterData = byType('quote_step_enter')
+    const actionData = byType('quote_action_click')
+    const hesitationData = byType('quote_hesitation_reason')
+    const sourceData = stepEnterData
+    const timeData = byType('quote_step_enter', 'quote_form_submit')
+    const popularData = byType('quote_form_submit')
+    const searchData = byType('quote_search')
+    const addonData = byType('quote_additional_repair_added')
+    const deviceData = stepEnterData
+    const acceptData = byType('quote_accept_page_view', 'quote_accept_clicked')
+    const errorData = byType('quote_form_error')
+    const budgetData = byType('quote_budget_submitted')
+    const exitIntentData = byType('quote_exit_intent')
+    const backNavData = byType('quote_back_navigation')
+    const startAgainData = byType('quote_start_again')
+    const optionSelectedData = byType('quote_option_selected')
 
     // Build funnel counts
     const funnelSteps = ['quote_step_enter', 'quote_form_start', 'quote_form_submit', 'quote_reveal', 'quote_action_click']
@@ -305,7 +246,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 11. Total unique sessions
-    const totalSessions = seenSessions.size || deviceSessions.size
+    const totalSessions = overview.unique_visitors
 
     // 12. Form errors
     const formErrors: Record<string, number> = {}
@@ -327,25 +268,6 @@ export async function GET(request: NextRequest) {
     const exitIntentSessions = new Set<string>()
     for (const row of exitIntentData) {
       exitIntentSessions.add(row.session_id)
-    }
-
-    // Find the last step each session reached (for abandonment analysis)
-    const lastStepBySession: Record<string, number> = {}
-    for (const row of stepEnterData) {
-      const stepNum = row.event_data?.step || 1
-      const sid = row.session_id
-      if (!lastStepBySession[sid] || stepNum > lastStepBySession[sid]) {
-        lastStepBySession[sid] = stepNum
-      }
-    }
-    // Count how many sessions abandoned at each step
-    const abandonmentByStep: Record<number, number> = {}
-    for (const sid of Object.keys(lastStepBySession)) {
-      const lastStep = lastStepBySession[sid]
-      // Only count as abandoned if they didn't submit the form
-      if (!stepSessions['quote_form_submit'].has(sid)) {
-        abandonmentByStep[lastStep] = (abandonmentByStep[lastStep] || 0) + 1
-      }
     }
 
     // 15. Back navigation
@@ -413,6 +335,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       period_days: days,
+      range,
+      overview,
       total_sessions: totalSessions,
       funnel: {
         steps: stepFunnel,
@@ -459,10 +383,8 @@ export async function GET(request: NextRequest) {
         total_events: exitIntentData.length,
       },
       abandonment: {
-        by_step: Object.entries(abandonmentByStep)
-          .map(([step, count]) => ({ step: parseInt(step), label: ['', 'Category', 'Brand', 'Model', 'Repair', 'Quote Details'][parseInt(step)] || 'Unknown', count }))
-          .sort((a, b) => a.step - b.step),
-        total_abandoned: Object.values(abandonmentByStep).reduce((s, c) => s + c, 0),
+        by_step: overview.drop_off_steps,
+        total_abandoned: overview.dropped_before_quote,
       },
       back_navigation: sortDesc(backNavBreakdown),
       start_again: {
