@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { BarChart3, TrendingDown, Clock, Search, Users, Smartphone, Monitor, ArrowRight, RefreshCw, ExternalLink, Link2, Home, AlertCircle, Lightbulb, LogOut, Undo2, RotateCcw, MousePointerClick, Target } from 'lucide-react'
 import Link from 'next/link'
+import { ukDate, shiftDate, VisitorOverview } from '@/lib/quote-analytics'
 
 interface AnalyticsData {
+  overview: VisitorOverview
+  range: { start: string; end: string; timezone: string }
   success: boolean
   period_days: number
   total_sessions: number
@@ -83,14 +86,29 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [days, setDays] = useState(30)
+  const [preset, setPreset] = useState('7')
+  const [customStart, setCustomStart] = useState(() => shiftDate(ukDate(), -6))
+  const [customEnd, setCustomEnd] = useState(() => ukDate())
+  const [customRange, setCustomRange] = useState({ start: shiftDate(ukDate(), -6), end: ukDate() })
+  const requestId = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
   const [activeSheet, setActiveSheet] = useState<SheetType>(null)
 
   const fetchData = useCallback(async () => {
+    const id = ++requestId.current
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     setError(null)
+    setData(null)
+    setActiveSheet(null)
     try {
-      const res = await fetch(`/api/analytics/summary?days=${days}`)
+      const today = ukDate()
+      const range = preset === 'custom' ? customRange : preset === 'yesterday'
+        ? { start: shiftDate(today, -1), end: shiftDate(today, -1) }
+        : { start: shiftDate(today, 1 - Number(preset)), end: today }
+      const res = await fetch(`/api/analytics/summary?${new URLSearchParams(range)}`, { signal: controller.signal, cache: 'no-store' })
       if (!res.ok) {
         let detail = `HTTP ${res.status}`
         try {
@@ -100,24 +118,22 @@ export default function AnalyticsPage() {
         throw new Error(detail)
       }
       const json = await res.json()
-      setData(json)
+      if (id === requestId.current) setData(json)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      if (id === requestId.current && !controller.signal.aborted) setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
-      setLoading(false)
+      if (id === requestId.current) setLoading(false)
     }
-  }, [days])
+  }, [preset, customRange])
 
   useEffect(() => {
     fetchData()
+    return () => abortRef.current?.abort()
   }, [fetchData])
 
   const maxStepCount = data ? Math.max(...Object.values(data.funnel.steps).map(s => s.count), 1) : 1
   const totalDevices = data ? data.device_breakdown.mobile + data.device_breakdown.desktop : 0
   const mobilePct = totalDevices > 0 && data ? Math.round((data.device_breakdown.mobile / totalDevices) * 100) : 0
-  const biggestDropStep = data && data.abandonment.by_step.length > 0
-    ? data.abandonment.by_step.reduce((max, s) => s.count > max.count ? s : max, data.abandonment.by_step[0])
-    : null
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -131,19 +147,10 @@ export default function AnalyticsPage() {
               </Link>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-green-600" />
-                Analytics
+                Quote analytics
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <select
-                value={days}
-                onChange={(e) => setDays(parseInt(e.target.value))}
-                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value={7}>7 days</option>
-                <option value={30}>30 days</option>
-                <option value={90}>90 days</option>
-              </select>
               <button
                 onClick={fetchData}
                 className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
@@ -172,7 +179,22 @@ export default function AnalyticsPage() {
         </div>
       </header>
 
-      <main className="p-4 space-y-3 max-w-2xl mx-auto pb-20">
+      <main className="p-4 space-y-5 max-w-5xl mx-auto pb-20">
+        <section aria-label="Date range" className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {[['1', 'Today'], ['yesterday', 'Yesterday'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['custom', 'Custom']].map(([value, label]) => (
+              <button key={value} aria-pressed={preset === value} onClick={() => setPreset(value)} className={`rounded-lg px-3 py-2 text-sm font-medium ${preset === value ? 'bg-green-700 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}>{label}</button>
+            ))}
+          </div>
+          {preset === 'custom' && (
+            <form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); setCustomRange({ start: customStart, end: customEnd }) }}>
+              <label className="text-sm text-gray-600 dark:text-gray-300">From<input required type="date" value={customStart} max={customEnd || ukDate()} onChange={e => setCustomStart(e.target.value)} className="block mt-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-2 text-gray-900 dark:text-white" /></label>
+              <label className="text-sm text-gray-600 dark:text-gray-300">To<input required type="date" value={customEnd} min={customStart} max={ukDate()} onChange={e => setCustomEnd(e.target.value)} className="block mt-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-2 text-gray-900 dark:text-white" /></label>
+              <button type="submit" className="rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white">Apply dates</button>
+            </form>
+          )}
+          <p className="text-xs text-gray-500 dark:text-gray-400" aria-live="polite">{data ? `${displayDate(data.range.start)} – ${displayDate(data.range.end)} · ` : ''}UK time · Date ranges include both selected days.</p>
+        </section>
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
@@ -200,10 +222,13 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {data && (data.total_sessions > 0 || data.quote_journey.submitted > 0) && (
+        {data && (
           <>
-            {/* Compact Grid of Tappable Tiles */}
-            <div className="grid grid-cols-3 gap-2.5">
+            <Overview data={data} onDetails={setActiveSheet} />
+            <details className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+              <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white">Explore detailed breakdowns</summary>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-4">Traffic sources, devices, customer actions and form diagnostics.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
               <Tile
                 onClick={() => setActiveSheet('insights')}
                 icon={<Lightbulb className="w-4 h-4" />}
@@ -229,20 +254,20 @@ export default function AnalyticsPage() {
                 onClick={() => setActiveSheet('abandonment')}
                 icon={<LogOut className="w-4 h-4" />}
                 label="Drop-off"
-                value={data.abandonment.total_abandoned}
+                value={data.overview.dropped_before_quote}
                 color="red"
               />
               <Tile
                 onClick={() => setActiveSheet('traffic')}
                 icon={<Users className="w-4 h-4" />}
-                label="Traffic"
-                value={data.traffic_sources.utm_sources.length + data.traffic_sources.referrers.length}
+                label="Visitors by source"
+                value={data.total_sessions}
                 color="teal"
               />
               <Tile
                 onClick={() => setActiveSheet('devices')}
                 icon={<Smartphone className="w-4 h-4" />}
-                label="Devices"
+                label="Device categories"
                 value={data.popular.categories.length}
                 color="indigo"
               />
@@ -263,15 +288,15 @@ export default function AnalyticsPage() {
               <Tile
                 onClick={() => setActiveSheet('behavior')}
                 icon={<Undo2 className="w-4 h-4" />}
-                label="Behavior"
-                value={data.back_navigation.length + data.start_again.sessions + data.exit_intent.sessions}
+                label="Visitors starting again"
+                value={data.start_again.sessions}
                 color="orange"
               />
               <Tile
                 onClick={() => setActiveSheet('search')}
                 icon={<Search className="w-4 h-4" />}
-                label="Searches"
-                value={data.search_queries.length}
+                label="Search events"
+                value={data.search_queries.reduce((total, q) => total + q.count, 0)}
                 color="cyan"
               />
               <Tile
@@ -307,6 +332,7 @@ export default function AnalyticsPage() {
                 color="purple"
               />
             </div>
+            </details>
           </>
         )}
       </main>
@@ -475,7 +501,7 @@ function DetailBar({ label, count, max, color = 'green' }: { label: string; coun
       <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
         <div
           className={`h-full bg-gradient-to-r ${colors[color] || colors.green} rounded-full transition-all`}
-          style={{ width: Math.max(width, 2) + '%' }}
+          style={{ width: Math.min(100, Math.max(width, 0)) + '%' }}
         />
       </div>
     </div>
@@ -543,7 +569,7 @@ function SourceList({ title, items }: { title: string; items: [string, number][]
 function InsightsSheet({ data }: { data: AnalyticsData }) {
   return (
     <div className="space-y-2.5 text-sm">
-      <InsightRow icon={<Users className="w-4 h-4 text-blue-500" />} text={`${data.total_sessions} ${data.total_sessions === 1 ? 'person has' : 'people have'} visited the quote form in the last ${data.period_days} days`} />
+      <InsightRow icon={<Users className="w-4 h-4 text-blue-500" />} text={`${data.total_sessions} unique browsers used the quote tool during the selected dates`} />
       <InsightRow icon={<Target className="w-4 h-4 text-green-500" />} text={`${data.conversion_rate}% of visitors completed and submitted the form (${data.funnel.actions.Form_Submitted} out of ${data.total_sessions})`} />
       {data.popular.categories.length > 0 && (
         <InsightRow icon={<BarChart3 className="w-4 h-4 text-purple-500" />} text={`Most popular device category: ${data.popular.categories[0][0]} (${data.popular.categories[0][1]} ${data.popular.categories[0][1] === 1 ? 'quote' : 'quotes'})`} />
@@ -560,9 +586,7 @@ function InsightsSheet({ data }: { data: AnalyticsData }) {
       {data.traffic_sources.referrers.length > 0 && (
         <InsightRow icon={<ExternalLink className="w-4 h-4 text-cyan-500" />} text={`Top referrer: ${data.traffic_sources.referrers[0][0]} (${data.traffic_sources.referrers[0][1]} ${data.traffic_sources.referrers[0][1] === 1 ? 'visit' : 'visits'})`} />
       )}
-      {data.abandonment.total_abandoned > 0 && data.abandonment.by_step.length > 0 && (
-        <InsightRow icon={<LogOut className="w-4 h-4 text-red-500" />} text={`${data.abandonment.total_abandoned} ${data.abandonment.total_abandoned === 1 ? 'person left' : 'people left'} without completing — most dropped off at ${data.abandonment.by_step.reduce((max, s) => s.count > max.count ? s : max, data.abandonment.by_step[0])?.label || 'unknown'}`} />
-      )}
+      <InsightRow icon={<LogOut className="w-4 h-4 text-red-500" />} text={`${data.overview.dropped_before_quote} visits ended before viewing a quote; ${data.overview.viewed_without_submitting} viewed a quote without submitting.`} />
       {data.device_breakdown.mobile + data.device_breakdown.desktop > 0 && (
         <InsightRow icon={data.device_breakdown.mobile > data.device_breakdown.desktop ? <Smartphone className="w-4 h-4 text-blue-500" /> : <Monitor className="w-4 h-4 text-gray-500" />} text={`${Math.round((data.device_breakdown.mobile / (data.device_breakdown.mobile + data.device_breakdown.desktop)) * 100)}% on mobile, ${Math.round((data.device_breakdown.desktop / (data.device_breakdown.mobile + data.device_breakdown.desktop)) * 100)}% on desktop`} />
       )}
@@ -579,14 +603,13 @@ function InsightsSheet({ data }: { data: AnalyticsData }) {
 function FunnelSheet({ data, maxStepCount }: { data: AnalyticsData; maxStepCount: number }) {
   return (
     <div className="space-y-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400">Unique browser IDs reaching each step or action during the selected dates. Visitors can skip steps or return, so these are reach counts rather than a strict sequence.</p>
       <div className="space-y-2">
         {Object.entries(data.funnel.steps).map(([step, info]) => {
-          const prevCount = step > '1' ? data.funnel.steps[parseInt(step) - 1]?.count : 0
-          const dropOff = prevCount > 0 ? Math.round(((prevCount - info.count) / prevCount) * 100) : 0
           return (
             <DetailBar
               key={step}
-              label={`${info.label}${prevCount > 0 && dropOff > 0 ? ` (↓${dropOff}%)` : ''}`}
+              label={info.label}
               count={info.count}
               max={maxStepCount}
               color="green"
@@ -664,10 +687,10 @@ function QuoteJourneySheet({ data }: { data: AnalyticsData }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600 dark:text-gray-300">
-        These are saved enquiry outcomes. A record is created when someone presses Reveal My Quote; approval is only counted after they explicitly choose to proceed.
+        Current outcomes of enquiries created during the selected dates. Wanting to proceed is counted separately from recording or sending a quote. Some outcomes overlap.
       </p>
       <div className="space-y-2">
-        <DetailBar label="Details submitted / quote revealed" count={journey.submitted} max={max} color="blue" />
+        <DetailBar label="Enquiries recorded" count={journey.submitted} max={max} color="blue" />
         <DetailBar label="Asked for quote by text/email" count={journey.sent} max={max} color="purple" />
         <DetailBar label="Question, budget or other follow-up" count={journey.follow_up} max={max} color="orange" />
         <DetailBar label="Accepted repair" count={journey.accepted} max={max} color="green" />
@@ -684,31 +707,12 @@ function QuoteJourneySheet({ data }: { data: AnalyticsData }) {
 }
 
 function AbandonmentSheet({ data }: { data: AnalyticsData }) {
-  const maxAbandon = Math.max(...data.abandonment.by_step.map(x => x.count), 1)
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{data.abandonment.total_abandoned}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Left Without Completing</div>
-        </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{data.exit_intent.sessions}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Showed Exit Intent</div>
-        </div>
-      </div>
-      {data.abandonment.by_step.length > 0 ? (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Drop-off by Step</h3>
-          {data.abandonment.by_step.map((s) => (
-            <DetailBar key={s.step} label={s.label} count={s.count} max={maxAbandon} color="red" />
-          ))}
-        </div>
-      ) : (
-        <EmptyState text="No abandonment data yet" />
-      )}
-    </div>
-  )
+  return <div className="space-y-4">
+    <p className="text-sm text-gray-500 dark:text-gray-400">Visits with no quote view or form submission recorded, after 30 minutes without activity. Grouped by furthest step reached; recent unfinished visits are excluded.</p>
+    {data.overview.drop_off_steps.map(step => <DetailBar key={step.step} label={step.label} count={step.count} max={Math.max(1, data.overview.dropped_before_quote)} color="red" />)}
+    {!data.overview.dropped_before_quote && <EmptyState text="No drop-offs before a quote in this period." />}
+    <p className="text-sm text-gray-600 dark:text-gray-300">{data.overview.viewed_without_submitting} visits viewed a quote without submitting. {data.overview.recent_unfinished} unfinished visits had recent activity at the end of this range.</p>
+  </div>
 }
 
 function TrafficSheet({ data }: { data: AnalyticsData }) {
@@ -891,4 +895,76 @@ function BudgetSheet({ data }: { data: AnalyticsData }) {
       ))}
     </div>
   )
+}
+
+function displayDate(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' })
+}
+function Metric({ label, value, note }: { label: string; value: number | string; note: string }) {
+  return <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 sm:p-5">
+    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{label}</p>
+    <p className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 dark:text-white mt-2 tabular-nums">{typeof value === 'number' ? value.toLocaleString('en-GB') : value}</p>
+    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{note}</p>
+  </div>
+}
+function Overview({ data, onDetails }: { data: AnalyticsData; onDetails: (sheet: SheetType) => void }) {
+  const o = data.overview
+  const peak = Math.max(1, ...o.daily.map(d => d.visitors))
+  const biggest = [...o.drop_off_steps].sort((a, b) => b.count - a.count)[0]
+  return <>
+    <div>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Who is using your quote tool?</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Metric label="Unique visitors" value={o.unique_visitors} note="Anonymous browser IDs, counted once in this range" />
+        <Metric label="Total visits" value={o.visits} note="A new visit after 30 minutes without activity" />
+        <Metric label="Repeat visitors" value={o.repeat_visitors} note={`${pct(o.repeat_visitors, o.unique_visitors)} visited more than once in this range`} />
+        <Metric label="Repeat visits" value={o.repeat_visits} note="Extra visits beyond each visitor’s first in this range" />
+      </div>
+      <details className="mt-3 text-xs text-gray-500 dark:text-gray-400"><summary className="cursor-pointer">How visitors and visits are counted</summary><p className="mt-2 max-w-3xl">Visitors use the quote tracker’s stored browser ID. Another device, private browsing or cleared storage can count separately. Visits are estimated from recorded activity with a 30-minute gap. Repeat means within these dates, not necessarily a returning customer from before this period. Only the quote tool is measured, not all website traffic.</p></details>
+    </div>
+    <div className="grid lg:grid-cols-2 gap-4">
+      <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="font-semibold text-gray-900 dark:text-white">What happened during those visits?</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-4">Each visit appears in one outcome below.</p>
+        <div className="space-y-3">
+          {[
+            ['Submitted the form', o.submitted_visits, 'bg-green-600'],
+            ['Viewed quote, no submission', o.viewed_without_submitting, 'bg-blue-500'],
+            ['Left before seeing a quote', o.dropped_before_quote, 'bg-orange-500'],
+            ['Recent activity, unfinished', o.recent_unfinished, 'bg-gray-400'],
+          ].map(([label, count, colour]) => <div key={label as string}>
+            <div className="flex justify-between gap-3 text-sm mb-1"><span className="text-gray-700 dark:text-gray-200">{label}</span><span className="font-semibold text-gray-900 dark:text-white">{count} <span className="font-normal text-gray-500">· {pct(count as number, o.visits)}</span></span></div>
+            <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden"><div className={`h-full rounded-full ${colour}`} style={{ width: pct(count as number, o.visits) }} /></div>
+          </div>)}
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">A quote view is useful even without a submission. Recent unfinished visits are held aside for 30 minutes, measured at the end of the selected range.</p>
+      </section>
+      <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="font-semibold text-gray-900 dark:text-white">Where do visits drop off?</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-4">Furthest step reached before leaving without a quote or submission.</p>
+        {biggest ? <>
+          <p className="text-sm text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 mb-4">Largest drop-off: <strong>{biggest.label}</strong> · {biggest.count} {biggest.count === 1 ? 'visit' : 'visits'}</p>
+          <div className="space-y-3">{o.drop_off_steps.map(step => <DetailBar key={step.step} label={step.label} count={step.count} max={Math.max(1, o.dropped_before_quote)} color="orange" />)}</div>
+        </> : <EmptyState text="No visits dropped off before a quote in this range." />}
+        <button onClick={() => onDetails('funnel')} className="mt-4 text-sm font-medium text-green-700 dark:text-green-400">See all quote steps →</button>
+      </section>
+    </div>
+    <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-3"><h2 className="font-semibold text-gray-900 dark:text-white">Visitors by day</h2><span className="text-xs text-gray-500 dark:text-gray-400">Daily unique counts can include the same visitor on different days.</span></div>
+      <div className="overflow-x-auto">
+        <div className="flex items-end gap-2 h-36" style={{ minWidth: `${Math.max(240, o.daily.length * 34)}px` }}>
+          {o.daily.map(day => <div key={day.date} className="flex-1 h-full flex flex-col justify-end items-center gap-1" title={`${displayDate(day.date)}: ${day.visitors} unique visitors; ${day.visits} visits assigned to this day`}>
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-200">{day.visitors}</span>
+            <div className="w-full max-w-10 bg-green-600 rounded-t" style={{ height: `${day.visitors / peak * 88}px` }} />
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap">{day.date.slice(8)}/{day.date.slice(5, 7)}</span>
+          </div>)}
+        </div>
+      </div>
+    </section>
+    <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
+      <div className="flex justify-between items-center gap-3 mb-2"><h2 className="font-semibold text-gray-900 dark:text-white">Did enquiries become repairs?</h2><button onClick={() => onDetails('journey')} className="text-sm text-green-700 dark:text-green-400 font-medium">Details →</button></div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Current outcomes of quote enquiries created during these dates. Counts can overlap and are separate from anonymous visits.</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">{[['Enquiries recorded', data.quote_journey.submitted], ['Quote sent', data.quote_journey.sent], ['Want to proceed', data.quote_journey.accepted], ['Converted to jobs', data.quote_journey.booked]].map(([label, count]) => <div key={label}><p className="text-2xl font-bold text-gray-900 dark:text-white">{count}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{label}</p></div>)}</div>
+    </section>
+  </>
 }
