@@ -122,19 +122,33 @@ export function getTurnaroundEstimate(
   deviceMake: string,
   deviceModel: string,
   issue: string,
-  _status: string
+  status: string
 ): TurnaroundEstimate {
   const deviceType = getDeviceType(deviceMake, deviceModel)
   const issueLower = (issue || '').toLowerCase()
   const complex = isComplexIssue(issue)
 
-  // Complex repairs — long turnaround regardless of device
+  // Once parts have arrived or repair has started, the long diagnostic/parts
+  // wait is over — the customer just needs to know the actual repair time.
+  // Complex repairs are still longer, but not "10 days" longer.
+  const repairInProgress = ['PARTS_ARRIVED', 'IN_REPAIR'].includes(status)
+
+  // Complex repairs — long turnaround during diagnostic/parts phase
   if (complex) {
     if (issueLower.includes('data recovery')) {
+      if (repairInProgress) {
+        return { display: 'Usually 1–3 days from now — we want to make sure we recover everything safely', minHours: 24, maxHours: 72, isComplex: true }
+      }
       return { display: 'Usually up to 7 days — we want to make sure we recover everything safely, and quite often we get it back to you quicker', minHours: 72, maxHours: 168, isComplex: true }
     }
     if (deviceType === 'laptop') {
+      if (repairInProgress) {
+        return { display: 'Usually 2–4 days from now', minHours: 48, maxHours: 96, isComplex: true }
+      }
       return { display: 'Usually up to 10 days, but quite often we get it back to you quicker than that', minHours: 96, maxHours: 240, isComplex: true }
+    }
+    if (repairInProgress) {
+      return { display: 'Usually 1–3 days from now', minHours: 24, maxHours: 72, isComplex: true }
     }
     return { display: 'Usually up to 7 days, but quite often we get it back to you quicker than that', minHours: 72, maxHours: 168, isComplex: true }
   }
