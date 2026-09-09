@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase-browser'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
 import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
-import { isTrackingLinkExpired } from '@/lib/job-utils'
 import { shortTrackingLink } from '@/lib/utils'
 import {
   getDeviceType,
@@ -39,7 +37,6 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const [statusTimestamps, setStatusTimestamps] = useState<Record<string, string>>({})
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
   const [showDiagnosisResults, setShowDiagnosisResults] = useState(false)
-  const supabase = createClient() as any
 
   const getDeviceIcon = (deviceMake: string, deviceModel: string) => {
     const combined = `${deviceMake} ${deviceModel}`.toLowerCase()
@@ -71,32 +68,26 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   const loadJob = useCallback(async (showSpinner = false) => {
     if (showSpinner) setIsRefreshing(true)
 
-    const { data } = await supabase
-      .from('jobs')
-      .select('id, job_ref, tracking_token, short_token, status, device_make, device_model, issue, description, created_at, status_changed_at, parts_required, deposit_required, source, delay_reason, delay_notes, cancellation_reason, cancellation_notes, customer_notes, tracking_link_expires_at, closed_at, show_tracking_to_customer, parts_tracking_status, repair_agreed_at, repair_declined_at, diagnosis_notes, diagnostic_report, device_in_shop')
-      .or(`tracking_token.eq.${params.token},short_token.eq.${params.token}`)
-      .maybeSingle()
-
-    if (data) {
-      if (isTrackingLinkExpired(data.tracking_link_expires_at)) {
+    try {
+      const res = await fetch(`/api/tracking/${params.token}`)
+      if (res.status === 410) {
         setIsExpired(true)
         setLoading(false)
         return
       }
+      if (!res.ok) {
+        setLoading(false)
+        return
+      }
+      const data = await res.json()
+      const jobData = data.job
+      const events = data.events || []
+      const views = data.views || []
 
-      setJob(data)
+      setJob(jobData)
       setLastUpdated(new Date())
 
-      // Get status change events
-      const { data: events } = await supabase
-        .from('job_events')
-        .select('created_at, message')
-        .eq('job_id', data.id)
-        .eq('type', 'STATUS_CHANGE')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (events && events.length > 0) {
+      if (events.length > 0) {
         setStatusChangedAt(new Date(events[0].created_at))
         setJobEvents(events)
 
@@ -114,13 +105,12 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
             }
           }
         }
-        // Also add the job creation time as the initial timestamp
         if (!timestamps['QUOTE_APPROVED'] && !timestamps['RECEIVED']) {
-          timestamps['RECEIVED'] = data.created_at
+          timestamps['RECEIVED'] = jobData.created_at
         }
         setStatusTimestamps(timestamps)
 
-        if (data.status === 'DELAYED' && events.length > 1) {
+        if (jobData.status === 'DELAYED' && events.length > 1) {
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
             if (message && !message.includes('Delayed')) {
@@ -141,87 +131,37 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
           setPreviousStatus(null)
         }
       } else {
-        setStatusChangedAt(new Date(data.status_changed_at || data.created_at))
+        setStatusChangedAt(new Date(jobData.status_changed_at || jobData.created_at))
         setPreviousStatus(null)
       }
 
-      // Load page views
-      const { data: views } = await supabase
-        .from('tracking_page_views')
-        .select('viewed_at')
-        .eq('job_id', data.id)
-        .order('viewed_at', { ascending: false })
-        .limit(50)
-
-      if (views) {
+      if (views.length > 0) {
         setPageViews(views)
         const freq = calculateVisitFrequency(views)
         setVisitFrequency(freq)
       }
+
+      if (data.shopCoordinates) {
+        setShopCoordinates(data.shopCoordinates)
+      }
+    } catch (e) {
+      console.error('[tracking] Failed to load job:', e)
     }
+
     setLoading(false)
 
     if (showSpinner) {
       setTimeout(() => setIsRefreshing(false), 800)
     }
-  }, [params.token, supabase])
-
-  // Log page view on mount
-  useEffect(() => {
-    fetch('/api/tracking/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trackingToken: params.token }),
-    }).catch(() => {})
   }, [params.token])
 
   useEffect(() => {
     loadJob()
-    // Load shop coordinates
-    supabase
-      .from('admin_settings')
-      .select('shop_latitude, shop_longitude, gps_radius_meters')
-      .limit(1)
-      .single()
-      .then(({ data }: any) => {
-        if (data) {
-          setShopCoordinates({
-            latitude: data.shop_latitude || 55.7558,
-            longitude: data.shop_longitude || -3.9626,
-            radius: data.gps_radius_meters || 100,
-          })
-        }
-      })
-
-    // Real-time subscription
-    const channel = supabase
-      .channel('job-tracking')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'jobs',
-          filter: `tracking_token=eq.${job?.tracking_token || params.token}`,
-        },
-        (payload: any) => {
-          setJob(payload.new)
-          setLastUpdated(new Date())
-          if (payload.new.status_changed_at) {
-            setStatusChangedAt(new Date(payload.new.status_changed_at))
-          }
-        }
-      )
-      .subscribe()
-
-    // Poll every 30 seconds
+    // Poll every 30 seconds for updates (replaces real-time subscription
+    // which required auth — tracking links must work without login)
     const pollInterval = setInterval(() => loadJob(), 30000)
-
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(pollInterval)
-    }
-  }, [params.token, loadJob, supabase])
+    return () => clearInterval(pollInterval)
+  }, [loadJob])
 
   // Generate activity log when data changes
   useEffect(() => {
