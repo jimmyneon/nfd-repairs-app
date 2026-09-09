@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
       deposit_amount: depositAmount,
       deposit_received: depositAlreadyPaid,
       deposit_received_at: depositAlreadyPaid ? now : null,
+      deposit_requested_at: requiresParts && !depositAlreadyPaid ? now : null,
 
       // Device possession — customer has device, needs to drop off
       device_in_shop: false,

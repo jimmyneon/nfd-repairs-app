@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
               deposit_received_at: new Date().toISOString(),
               status: 'PARTS_ORDERED',
               status_changed_at: new Date().toISOString(),
+              parts_ordered_at: new Date().toISOString(),
             } as any)
             .eq('id', job.id)
 

@@ -793,20 +793,25 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setActionLoading(true)
 
     const depositAmount = 20.00
+    const now = new Date().toISOString()
 
     await supabase
       .from('jobs')
-      .update({ 
+      .update({
         deposit_received: true,
+        deposit_received_at: now,
         deposit_amount: depositAmount,
-        status: 'PARTS_ORDERED'
+        status: 'PARTS_ORDERED',
+        status_changed_at: now,
+        parts_ordered_at: now,
       } as any)
       .eq('id', job!.id)
 
     await supabase.from('job_events').insert({
       job_id: job!.id,
-      type: 'STATUS_CHANGE',
-      message: `Deposit of £${depositAmount.toFixed(2)} received`,
+      type: 'DEPOSIT_PAID',
+      message: `Deposit of £${depositAmount.toFixed(2)} received (marked by staff)`,
+      metadata: { amount: depositAmount, source: 'staff_manual' },
     } as any)
 
     await loadJobData()

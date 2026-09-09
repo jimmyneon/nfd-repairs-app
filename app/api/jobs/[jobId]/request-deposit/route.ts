@@ -30,6 +30,14 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
+    // Idempotency: don't send a deposit request if it's already been received
+    if (job.deposit_received) {
+      return NextResponse.json({
+        error: 'Deposit has already been received — no need to request again',
+        deposit_received: true,
+      }, { status: 409 })
+    }
+
     // Use provided amount, or existing job amount, or default
     const finalDepositAmount = depositAmount || job.deposit_amount || 20.00
 
