@@ -17,3 +17,17 @@ WHERE status = 'AWAITING_DEPOSIT'
 CREATE INDEX IF NOT EXISTS idx_jobs_deposit_requested_at
 ON jobs(deposit_requested_at)
 WHERE deposit_requested_at IS NOT NULL;
+
+-- Fix: The valid_status constraint was never updated when AWAITING_DEVICE
+-- was added. The jobs_status_check constraint was updated, but valid_status
+-- was not. This caused job inserts with status='AWAITING_DEVICE' to fail.
+ALTER TABLE jobs DROP CONSTRAINT IF EXISTS valid_status;
+ALTER TABLE jobs ADD CONSTRAINT valid_status CHECK (
+  status IN (
+    'QUOTE_REQUESTED', 'QUOTE_APPROVED', 'AWAITING_DEVICE',
+    'RECEIVED', 'DIAGNOSTIC', 'AWAITING_DEPOSIT',
+    'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR',
+    'DELAYED', 'READY_TO_COLLECT', 'IN_STORAGE',
+    'COLLECTED', 'COMPLETED', 'CANCELLED'
+  )
+);
