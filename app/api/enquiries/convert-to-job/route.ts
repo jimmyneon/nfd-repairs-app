@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
     const depositRequired = requiresParts
     const depositAmount = requiresParts ? 20.00 : null
 
+    // Calculate total price including additional repairs
+    // The enquiry stores quoted_price (primary repair only) and additional_repairs
+    // (array of { repair, display_name, price }). The job's price_total must
+    // include all repairs.
+    const primaryPrice = enquiry.quoted_price || 0
+    let additionalRepairsTotal = 0
+    if (Array.isArray(enquiry.additional_repairs)) {
+      additionalRepairsTotal = enquiry.additional_repairs.reduce((sum: number, r: any) => {
+        return sum + (typeof r.price === 'number' ? r.price : 0)
+      }, 0)
+    }
+    const totalPrice = primaryPrice + additionalRepairsTotal
+
     // Determine job status
     const jobStatus = requiresParts
       ? (depositAlreadyPaid ? 'PARTS_ORDERED' : 'AWAITING_DEPOSIT')
@@ -107,9 +120,9 @@ export async function POST(request: NextRequest) {
       source: 'enquiry_conversion',
       page: enquiry.quote_source || null,
 
-      // Pricing
-      quoted_price: enquiry.quoted_price || 0,
-      price_total: enquiry.quoted_price || 0,
+      // Pricing — includes additional repairs in the total
+      quoted_price: primaryPrice,
+      price_total: totalPrice,
       quoted_at: enquiry.quoted_price ? now : null,
 
       // Parts & deposit

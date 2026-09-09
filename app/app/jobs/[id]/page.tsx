@@ -88,7 +88,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [showReviewReason, setShowReviewReason] = useState(false)
   const [showReviewPlatforms, setShowReviewPlatforms] = useState(false)
   const [repairOutcome, setRepairOutcome] = useState<'repaired' | 'unrepaired'>('repaired')
-  const [depositAmountInput, setDepositAmountInput] = useState('20.00')
   const [partsCarrier, setPartsCarrier] = useState<'auto' | 'royalmail' | 'dpd' | 'evri'>('auto')
   const [partsTrackingNumber, setPartsTrackingNumber] = useState('')
   const [showPartsTrackingForm, setShowPartsTrackingForm] = useState(false)
@@ -793,7 +792,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (!job) return
     setActionLoading(true)
 
-    const depositAmount = parseFloat(depositAmountInput) || 20.00
+    const depositAmount = 20.00
 
     await supabase
       .from('jobs')
@@ -820,11 +819,10 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setDepositSending(true)
 
     try {
-      const depositAmount = parseFloat(depositAmountInput) || 20.00
       const response = await fetch(`/api/jobs/${job!.id}/request-deposit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deposit_amount: depositAmount }),
+        body: JSON.stringify({ deposit_amount: 20.00 }),
       })
       const data = await response.json()
 
@@ -1300,44 +1298,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <p className="font-bold text-yellow-900 text-lg mb-1">
-                  Deposit Required
+                  £20 Deposit Required
                 </p>
                 <p className="text-yellow-800 text-sm mb-3">
-                  Deposit needed before ordering parts
+                  Special-order parts need a £20 deposit. The deposit request SMS was sent automatically when the job was created.
                 </p>
-                <div>
-                  <label className="block text-sm font-semibold text-yellow-900 mb-1">
-                    Deposit Amount (£)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={depositAmountInput}
-                    onChange={(e) => setDepositAmountInput(e.target.value)}
-                    className="w-full px-4 py-3 text-2xl font-bold border-2 border-yellow-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-yellow-900"
-                    placeholder="20.00"
-                  />
-                  {job!.price_total > 0 && (
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Balance after deposit: £{(job!.price_total - (parseFloat(depositAmountInput) || 0)).toFixed(2)}
-                    </p>
-                  )}
-                </div>
+                {job!.price_total > 0 && (
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Repair total: £{job!.price_total.toFixed(2)} · Balance after deposit: £{(job!.price_total - 20).toFixed(2)}
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-3">
-              <button
-                onClick={sendDepositRequest}
-                disabled={depositSending || actionLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-2xl text-lg disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                {depositSending ? (
-                  <><RefreshCw className="h-6 w-6 animate-spin" /><span>Sending...</span></>
-                ) : (
-                  <><Send className="h-6 w-6" /><span>Send Deposit Request SMS</span></>
-                )}
-              </button>
               <button
                 onClick={markDepositReceived}
                 disabled={actionLoading || depositSending}
@@ -1348,8 +1321,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 ) : (
                   <>
                     <CheckCircle className="h-8 w-8" />
-                    <span>Mark Deposit Received (£{(parseFloat(depositAmountInput) || 20).toFixed(2)})</span>
+                    <span>Mark £20 Deposit Received</span>
                   </>
+                )}
+              </button>
+              <button
+                onClick={sendDepositRequest}
+                disabled={depositSending || actionLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-2xl text-sm disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-2"
+              >
+                {depositSending ? (
+                  <><RefreshCw className="h-5 w-5 animate-spin" /><span>Sending...</span></>
+                ) : (
+                  <><Send className="h-5 w-5" /><span>Resend Deposit Request SMS</span></>
                 )}
               </button>
             </div>

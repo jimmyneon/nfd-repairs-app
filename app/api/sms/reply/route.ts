@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
@@ -328,19 +328,46 @@ export async function POST(request: NextRequest) {
     // 3. No match — orphan reply
     //    If the customer is asking for an update/status, send a helpful
     //    reply explaining we can't find their number and asking for the
-    //    number the repair was booked under. Otherwise just notify staff.
+    //    number the repair was booked under. Otherwise, if this is a
+    //    first-time texter (or we haven't sent them a welcome in 2 days),
+    //    send a generic welcome message with hours/directions/quote link.
+    //    Staff are always notified.
     // -----------------------------------------------------------------------
     console.log(`[sms/reply] No matching enquiry or job for ${phone}`)
+
+    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+    let orphanSmsSent = false
 
     // Check if this looks like a status/update query
     const orphanIntent = detectSmsIntent(message)
     if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
-      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl) {
         const orphanBody = `Hi,\n\nWe can't find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it's booked in under and we'll find it straight away.\n\nNew Forest Device Repairs`
         const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
         await logSms(supabase, 'ORPHAN_STATUS_REPLY', orphanBody, result.ok)
+        orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent orphan status reply to ${phone}`)
+      }
+    } else if (webhookUrl && isWithinUKSendingHours()) {
+      // Not a status query — this is a first-time or general text.
+      // Check if we've sent any SMS to this number in the last 2 days.
+      // If not, send a welcome message with useful links.
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      const { count: recentSentCount } = await supabase
+        .from('sms_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_phone', phone)
+        .gte('created_at', twoDaysAgo)
+
+      if ((recentSentCount || 0) === 0) {
+        // No SMS sent to this number in the last 2 days — send welcome
+        const welcomeBody = `Hi, thanks for texting New Forest Device Repairs.\n\nGet an instant repair price in 60 seconds:\nnfdr.uk/quote\n\nNo need to book — just pop in with your device during opening hours:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNew Forest Device Repairs`
+        const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
+        await logSms(supabase, 'FIRST_TEXT_WELCOME', welcomeBody, result.ok)
+        orphanSmsSent = result.ok
+        console.log(`[sms/reply] Sent first-text welcome to ${phone}`)
+      } else {
+        console.log(`[sms/reply] Welcome rate-limited for ${phone} (sent SMS in last 2 days)`)
       }
     }
 
@@ -359,7 +386,7 @@ export async function POST(request: NextRequest) {
       success: true,
       routed_to: 'orphan',
       message: 'No matching enquiry or job found — staff notified',
-      sms_sent: orphanIntent !== null,
+      sms_sent: orphanSmsSent,
     })
   } catch (error) {
     console.error('[sms/reply] Error:', error)
