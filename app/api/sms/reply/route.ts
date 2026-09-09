@@ -185,6 +185,19 @@ export async function POST(request: NextRequest) {
             },
           })
 
+          // Notify staff so they can actually order the parts
+          try {
+            await supabase.from('notifications').insert({
+              type: 'DEPOSIT_PAID',
+              title: `Deposit paid — order parts for ${job.job_ref}`,
+              body: `${job.customer_name} has paid the £${(jobData.data.deposit_amount || 20).toFixed(2)} deposit for ${jobData.data.device_make || ''} ${jobData.data.device_model || ''}. Order the parts now.`,
+              job_id: job.id,
+              is_read: false,
+            } as any)
+          } catch (e) {
+            console.error('[sms/reply] Failed to notify staff of deposit payment:', e)
+          }
+
           // Send confirmation SMS
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {

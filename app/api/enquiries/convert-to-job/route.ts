@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           })
-        : `Hi ${getFirstName(enquiry.customer_name)}, we need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)}. To pay the £20 deposit and get that started, please use this link:\n\n${depositUrl}\n\nTrack your repair: ${trackingUrl}\n\nNew Forest Device Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}, your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} needs special-order parts. We need a £20 deposit to order them — parts are usually next-day delivery during working days.\n\nPay here: ${depositUrl}\n\nReply PAID once done and we'll get them ordered straight away.\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
