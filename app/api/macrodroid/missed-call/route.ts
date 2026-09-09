@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNew Forest Device Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nNo need to book — just pop in. Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNew Forest Device Repairs`
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
             try {
@@ -415,7 +415,7 @@ function buildMissedCallMessage(ctx: {
     lines.push('Get an instant repair price in 60 seconds:')
     lines.push(QUOTE_URL)
     lines.push('')
-    lines.push('No need to book — just pop in with your device during opening hours:')
+    lines.push('No need to book — just pop in. Hours & directions:')
     lines.push('nfdr.uk/h')
     lines.push('')
     lines.push('Existing repair? Reply UPDATE.')
@@ -428,10 +428,10 @@ function buildMissedCallMessage(ctx: {
 
   if (ctx.isOpen) {
     const closeTime = extractCloseTime(ctx.todayFormatted)
-    lines.push(`We're open today until ${closeTime} — no need to book, just pop in with your device.`)
+    lines.push(`We're open today until ${closeTime}.`)
   } else {
     if (ctx.nextOpen) {
-      lines.push(`We're closed now, back ${ctx.nextOpen}. No need to book — just pop in with your device.`)
+      lines.push(`We're closed now, back ${ctx.nextOpen}.`)
     } else {
       lines.push(`We're closed now. ${ctx.todayFormatted}`)
     }
@@ -441,7 +441,7 @@ function buildMissedCallMessage(ctx: {
   lines.push('Get an instant repair price in 60 seconds:')
   lines.push(QUOTE_URL)
   lines.push('')
-  lines.push('No need to book — just pop in with your device during opening hours:')
+  lines.push('No need to book — just pop in. Hours & directions:')
   lines.push('nfdr.uk/h')
   lines.push('')
   lines.push('Existing repair? Reply UPDATE.')

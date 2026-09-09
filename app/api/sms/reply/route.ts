@@ -929,12 +929,12 @@ function buildWelcomeMessage(hoursStatus: {
     lines.push(hoursStatus.specialHours.note)
   } else if (hoursStatus.isOpen) {
     const closeTime = extractCloseTimeFromFormatted(hoursStatus.todayFormatted)
-    lines.push(`We're open today until ${closeTime} — no need to book, just pop in with your device.`)
+    lines.push(`We're open today until ${closeTime}.`)
   } else {
     if (hoursStatus.nextOpen) {
-      lines.push(`We're closed now, back ${hoursStatus.nextOpen}. No need to book — just pop in with your device.`)
+      lines.push(`We're closed now, back ${hoursStatus.nextOpen}.`)
     } else {
-      lines.push(`We're closed now. No need to book — just pop in during opening hours.`)
+      lines.push(`We're closed now.`)
     }
   }
 
@@ -942,7 +942,7 @@ function buildWelcomeMessage(hoursStatus: {
   lines.push('Get an instant repair price in 60 seconds:')
   lines.push('nfdr.uk/quote')
   lines.push('')
-  lines.push('Hours & directions:')
+  lines.push('No need to book — just pop in. Hours & directions:')
   lines.push('nfdr.uk/h')
   lines.push('')
   lines.push('Existing repair? Reply UPDATE.')
