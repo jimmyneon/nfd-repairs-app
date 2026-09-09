@@ -361,7 +361,9 @@ export async function POST(request: NextRequest) {
 
       if ((recentSentCount || 0) === 0) {
         // No SMS sent to this number in the last 2 days — send welcome
-        const welcomeBody = `Hi, thanks for texting New Forest Device Repairs.\n\nGet an instant repair price in 60 seconds:\nnfdr.uk/quote\n\nNo need to book — just pop in with your device during opening hours:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNew Forest Device Repairs`
+        // Build context-aware hours message (like the missed-call handler)
+        const hoursStatus = await computeHoursStatus(supabase)
+        const welcomeBody = buildWelcomeMessage(hoursStatus)
         const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
         await logSms(supabase, 'FIRST_TEXT_WELCOME', welcomeBody, result.ok)
         orphanSmsSent = result.ok
@@ -788,6 +790,129 @@ async function logSms(
   } catch (e) {
     console.error('[sms/reply] SMS log failed:', e)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: compute opening hours status (reused from missed-call logic)
+// ---------------------------------------------------------------------------
+const FALLBACK_HOURS: Record<string, { isOpen: boolean; formatted: string; open?: string; close?: string }> = {
+  Sunday:    { isOpen: false, formatted: 'Closed' },
+  Monday:    { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Tuesday:   { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Wednesday: { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Thursday:  { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Friday:    { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Saturday:  { isOpen: true,  formatted: '10:00 AM - 3:00 PM', open: '10:00', close: '15:00' },
+}
+
+async function computeHoursStatus(supabase: SupabaseClient<any, any, any>): Promise<{
+  isOpen: boolean
+  todayFormatted: string
+  nextOpen: string | null
+}> {
+  let weeklyHours = FALLBACK_HOURS
+  try {
+    const { data: settings } = await supabase
+      .from('admin_settings')
+      .select('key, value')
+      .eq('key', 'opening_hours')
+    if (settings && settings.length > 0) {
+      const parsed = typeof settings[0].value === 'string' ? JSON.parse(settings[0].value) : settings[0].value
+      if (parsed && typeof parsed === 'object') weeklyHours = parsed
+    }
+  } catch (e) {
+    console.error('[sms/reply] Failed to load opening hours, using fallback:', e)
+  }
+
+  const now = new Date()
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const ukParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+
+  const weekdayPart = ukParts.find(p => p.type === 'weekday')?.value || days[now.getDay()]
+  const hourPart = ukParts.find(p => p.type === 'hour')?.value || String(now.getHours())
+  const minutePart = ukParts.find(p => p.type === 'minute')?.value || String(now.getMinutes())
+
+  const currentDay = days.find(d => d.toLowerCase() === weekdayPart.toLowerCase()) || days[now.getDay()]
+  const currentHour = parseInt(hourPart, 10)
+  const currentMin = parseInt(minutePart, 10)
+  const currentMins = currentHour * 60 + currentMin
+
+  const todayHours = weeklyHours[currentDay] || FALLBACK_HOURS[currentDay]
+  let isOpen = false
+  if (todayHours?.isOpen && todayHours.open && todayHours.close) {
+    const [openH, openM] = String(todayHours.open).split(':').map(Number)
+    const [closeH, closeM] = String(todayHours.close).split(':').map(Number)
+    isOpen = currentMins >= openH * 60 + openM && currentMins < closeH * 60 + closeM
+  }
+
+  let nextOpen: string | null = null
+  if (!isOpen) {
+    const todayIdx = days.indexOf(currentDay)
+    for (let i = 0; i <= 7; i++) {
+      const checkIdx = (todayIdx + i) % 7
+      const checkDay = days[checkIdx]
+      const checkHours = weeklyHours[checkDay]
+      if (checkHours?.isOpen && checkHours.open) {
+        if (i === 0) {
+          const [openH] = String(checkHours.open).split(':').map(Number)
+          if (currentHour < openH) {
+            nextOpen = `today at ${checkHours.open}`
+            break
+          }
+        } else {
+          nextOpen = `${checkDay} at ${checkHours.open}`
+          break
+        }
+      }
+    }
+  }
+
+  return {
+    isOpen,
+    todayFormatted: todayHours?.formatted || 'Closed',
+    nextOpen,
+  }
+}
+
+function buildWelcomeMessage(hoursStatus: { isOpen: boolean; todayFormatted: string; nextOpen: string | null }): string {
+  const lines: string[] = ['Hi, thanks for texting New Forest Device Repairs.']
+
+  if (hoursStatus.isOpen) {
+    const closeTime = extractCloseTimeFromFormatted(hoursStatus.todayFormatted)
+    lines.push(`We're open today until ${closeTime} — no need to book, just pop in with your device.`)
+  } else {
+    if (hoursStatus.nextOpen) {
+      lines.push(`We're closed now, back ${hoursStatus.nextOpen}. No need to book — just pop in with your device.`)
+    } else {
+      lines.push(`We're closed now. No need to book — just pop in during opening hours.`)
+    }
+  }
+
+  lines.push('')
+  lines.push('Get an instant repair price in 60 seconds:')
+  lines.push('nfdr.uk/quote')
+  lines.push('')
+  lines.push('Hours & directions:')
+  lines.push('nfdr.uk/h')
+  lines.push('')
+  lines.push('Existing repair? Reply UPDATE.')
+  lines.push('Anything else? Just reply here.')
+  lines.push('')
+  lines.push('John')
+  lines.push('New Forest Device Repairs')
+
+  return lines.join('\n')
+}
+
+function extractCloseTimeFromFormatted(hoursString: string): string {
+  const match = hoursString.match(/-\s*(\d{1,2}:\d{2}\s*[AP]M)/i)
+  return match ? match[1].trim() : hoursString
 }
 
 // ---------------------------------------------------------------------------

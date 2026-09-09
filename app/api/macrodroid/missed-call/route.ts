@@ -418,10 +418,10 @@ function buildMissedCallMessage(ctx: {
 
   if (ctx.isOpen) {
     const closeTime = extractCloseTime(ctx.todayFormatted)
-    lines.push(`We're open today until ${closeTime}.`)
+    lines.push(`We're open today until ${closeTime} — no need to book, just pop in with your device.`)
   } else {
     if (ctx.nextOpen) {
-      lines.push(`We're closed now, back ${ctx.nextOpen}.`)
+      lines.push(`We're closed now, back ${ctx.nextOpen}. No need to book — just pop in with your device.`)
     } else {
       lines.push(`We're closed now. ${ctx.todayFormatted}`)
     }
