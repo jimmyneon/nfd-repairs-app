@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { corsHeaders } from '@/lib/api-auth'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { sendViaMacroDroid } from '@/lib/resilience'
+import { SHOP_INFO } from '@/lib/constants'
 
 // Server-side price verification: fetch catalogue and look up the real price by quote_key
 async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
@@ -344,8 +346,19 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Note: MacroDroid webhook is NOT triggered here — only on quote approval.
-    // Quote SMS/email is NOT sent here — it's only sent when the customer
+    // Send staff SMS via MacroDroid for high-intent enquiries
+    // (customer wants to proceed) so you know to check stock and convert
+    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+    if (isProceed && webhookUrl) {
+      try {
+        const staffSms = `🔥 CUSTOMER WANTS TO PROCEED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nCheck stock & convert to job in the app.`
+        await sendViaMacroDroid(webhookUrl, SHOP_INFO.phone, staffSms)
+      } catch (e) {
+        console.error('Failed to send staff SMS:', e)
+      }
+    }
+
+    // Note: Customer-facing SMS is NOT sent here — it's only sent when the customer
     // explicitly clicks "Send Me This Quote" via the /api/enquiries/update endpoint
     // with action: 'send_quote'. This prevents double-sending.
 
