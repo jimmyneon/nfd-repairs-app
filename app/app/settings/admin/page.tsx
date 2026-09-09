@@ -36,6 +36,7 @@ export default function AdminSettingsPage() {
   })
   const [specialHoursActive, setSpecialHoursActive] = useState(false)
   const [specialHoursNote, setSpecialHoursNote] = useState('')
+  const [specialHoursExpiry, setSpecialHoursExpiry] = useState('')
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export default function AdminSettingsPage() {
           if (parsed && typeof parsed === 'object') {
             setSpecialHoursActive(parsed.active ?? false)
             setSpecialHoursNote(parsed.note ?? '')
+            setSpecialHoursExpiry(parsed.expiry_date ?? '')
           }
         } catch (e) {
           console.error('Failed to parse special_hours:', e)
@@ -239,7 +241,7 @@ export default function AdminSettingsPage() {
       .from('admin_settings')
       .upsert({ key: 'opening_hours', value: hoursData, description: 'Weekly opening hours for shop status API' }, { onConflict: 'key' })
 
-    const specialData = { active: specialHoursActive, note: specialHoursNote || null }
+    const specialData = { active: specialHoursActive, note: specialHoursNote || null, expiry_date: specialHoursExpiry || null }
     const { error: specialError } = await supabase
       .from('admin_settings')
       .upsert({ key: 'special_hours', value: specialData, description: 'Special hours for holidays/closures' }, { onConflict: 'key' })
@@ -501,13 +503,27 @@ export default function AdminSettingsPage() {
               </label>
             </div>
             {specialHoursActive && (
-              <input
-                type="text"
-                value={specialHoursNote}
-                onChange={(e) => setSpecialHoursNote(e.target.value)}
-                placeholder="e.g., Closed for Christmas Dec 24-Jan 2"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm mb-3"
-              />
+              <div className="space-y-3 mb-3">
+                <input
+                  type="text"
+                  value={specialHoursNote}
+                  onChange={(e) => setSpecialHoursNote(e.target.value)}
+                  placeholder="e.g., Closed for Christmas Dec 24-Jan 2"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Expiry date (auto-deactivates after this date)
+                  </label>
+                  <input
+                    type="date"
+                    value={specialHoursExpiry}
+                    onChange={(e) => setSpecialHoursExpiry(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to stay active until manually turned off.</p>
+                </div>
+              </div>
             )}
           </div>
 

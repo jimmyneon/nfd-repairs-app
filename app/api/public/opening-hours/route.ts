@@ -129,6 +129,14 @@ export async function GET() {
               ? JSON.parse(setting.value) 
               : setting.value
             if (parsed && typeof parsed === 'object') {
+              // Check expiry: if expiry_date is set and past, deactivate
+              if (parsed.active && parsed.expiry_date) {
+                const expiry = new Date(parsed.expiry_date + 'T23:59:59')
+                if (expiry < new Date()) {
+                  console.log('[opening-hours] Special hours expired, deactivating:', parsed.expiry_date)
+                  parsed.active = false
+                }
+              }
               specialHours = parsed
             }
           } catch (e) {

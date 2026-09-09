@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
     }
 
     let weeklyHours = FALLBACK_HOURS
-    let specialHours: { active?: boolean; note?: string | null } | null = null
+    let specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null = null
     let googleMapsUrl = DEFAULT_MAPS_URL
 
     try {
@@ -223,7 +223,17 @@ export async function POST(request: NextRequest) {
             googleMapsUrl = typeof s.value === 'string' ? s.value : String(s.value)
           } else if (s.key === 'special_hours' && s.value) {
             const parsed = typeof s.value === 'string' ? JSON.parse(s.value) : s.value
-            if (parsed && typeof parsed === 'object') specialHours = parsed
+            if (parsed && typeof parsed === 'object') {
+              // Check expiry: if expiry_date is set and past, deactivate
+              if (parsed.active && parsed.expiry_date) {
+                const expiry = new Date(parsed.expiry_date + 'T23:59:59')
+                if (expiry < new Date()) {
+                  console.log('[missed-call] Special hours expired, ignoring:', parsed.expiry_date)
+                  parsed.active = false
+                }
+              }
+              specialHours = parsed
+            }
           }
         }
       }
@@ -394,7 +404,7 @@ function buildMissedCallMessage(ctx: {
   todayFormatted: string
   nextOpen: string | null
   googleMapsUrl: string
-  specialHours: { active?: boolean; note?: string | null } | null
+  specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
 }): string {
   const lines: string[] = ['Hi, sorry we missed your call.']
 

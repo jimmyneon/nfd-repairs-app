@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
-import { sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { sendViaMacroDroid } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
@@ -348,10 +348,12 @@ export async function POST(request: NextRequest) {
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent orphan status reply to ${phone}`)
       }
-    } else if (webhookUrl && isWithinUKSendingHours()) {
+    } else if (webhookUrl) {
       // Not a status query — this is a first-time or general text.
       // Check if we've sent any SMS to this number in the last 2 days.
       // If not, send a welcome message with useful links.
+      // Note: no sending-hours restriction — people text at all hours and
+      // should get a helpful reply whenever they reach out.
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
       const { count: recentSentCount } = await supabase
         .from('sms_logs')
@@ -809,16 +811,35 @@ async function computeHoursStatus(supabase: SupabaseClient<any, any, any>): Prom
   isOpen: boolean
   todayFormatted: string
   nextOpen: string | null
+  specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
 }> {
   let weeklyHours = FALLBACK_HOURS
+  let specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null = null
   try {
     const { data: settings } = await supabase
       .from('admin_settings')
       .select('key, value')
-      .eq('key', 'opening_hours')
+      .in('key', ['opening_hours', 'special_hours'])
     if (settings && settings.length > 0) {
-      const parsed = typeof settings[0].value === 'string' ? JSON.parse(settings[0].value) : settings[0].value
-      if (parsed && typeof parsed === 'object') weeklyHours = parsed
+      for (const s of settings) {
+        if (s.key === 'opening_hours' && s.value) {
+          const parsed = typeof s.value === 'string' ? JSON.parse(s.value) : s.value
+          if (parsed && typeof parsed === 'object') weeklyHours = parsed
+        } else if (s.key === 'special_hours' && s.value) {
+          const parsed = typeof s.value === 'string' ? JSON.parse(s.value) : s.value
+          if (parsed && typeof parsed === 'object') {
+            // Check expiry: if expiry_date is set and past, deactivate
+            if (parsed.active && parsed.expiry_date) {
+              const expiry = new Date(parsed.expiry_date + 'T23:59:59')
+              if (expiry < new Date()) {
+                console.log('[sms/reply] Special hours expired, ignoring:', parsed.expiry_date)
+                parsed.active = false
+              }
+            }
+            specialHours = parsed
+          }
+        }
+      }
     }
   } catch (e) {
     console.error('[sms/reply] Failed to load opening hours, using fallback:', e)
@@ -877,13 +898,22 @@ async function computeHoursStatus(supabase: SupabaseClient<any, any, any>): Prom
     isOpen,
     todayFormatted: todayHours?.formatted || 'Closed',
     nextOpen,
+    specialHours,
   }
 }
 
-function buildWelcomeMessage(hoursStatus: { isOpen: boolean; todayFormatted: string; nextOpen: string | null }): string {
+function buildWelcomeMessage(hoursStatus: {
+  isOpen: boolean
+  todayFormatted: string
+  nextOpen: string | null
+  specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
+}): string {
   const lines: string[] = ['Hi, thanks for texting New Forest Device Repairs.']
 
-  if (hoursStatus.isOpen) {
+  // Special hours / holiday notice takes priority
+  if (hoursStatus.specialHours?.active && hoursStatus.specialHours?.note) {
+    lines.push(hoursStatus.specialHours.note)
+  } else if (hoursStatus.isOpen) {
     const closeTime = extractCloseTimeFromFormatted(hoursStatus.todayFormatted)
     lines.push(`We're open today until ${closeTime} — no need to book, just pop in with your device.`)
   } else {
