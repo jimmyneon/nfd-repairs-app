@@ -1,0 +1,224 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient, sendViaMacroDroid } from '@/lib/resilience'
+import { corsHeaders } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
+import { shortQuoteApprovalLink } from '@/lib/utils'
+
+const MIN_DAYS_AHEAD = 3
+const MAX_DAYS_AHEAD = 180
+const REMINDER_LEAD_DAYS = 2
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function dateOnlyUtc(value: string): Date {
+  return new Date(`${value}T12:00:00Z`)
+}
+
+function calculateReminderAt(plannedRepairDate: string): string {
+  // 09:00 UTC two days before the target repair date = 09:00 GMT / 10:00 BST.
+  // This remains inside the app's UK SMS sending window year-round.
+  const d = new Date(`${plannedRepairDate}T09:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - REMINDER_LEAD_DAYS)
+  return d.toISOString()
+}
+
+function formatDate(value: string): string {
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Europe/London',
+  })
+}
+
+function repairLabel(value: string | null): string {
+  if (!value) return 'repair'
+  return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 200, headers: corsHeaders(request) })
+}
+
+/**
+ * POST /api/enquiries/plan-later
+ *
+ * Saves a repair quote as a future follow-up. This is deliberately NOT a booking,
+ * repair approval or paid reservation. The customer chooses the date they hope to
+ * get the repair done; one service reminder is scheduled two days beforehand.
+ *
+ * Body: {
+ *   enquiry_ref: string,
+ *   planned_repair_date: YYYY-MM-DD,
+ *   reminder_requested?: boolean
+ * }
+ */
+export async function POST(request: NextRequest) {
+  const headers = corsHeaders(request)
+
+  try {
+    const ip = getClientIP(request)
+    const rateLimit = await checkRateLimit(ip, 'enquiries_plan_later', 10)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429, headers }
+      )
+    }
+
+    const body = await request.json()
+    const enquiryRef = String(body?.enquiry_ref || '').trim()
+    const plannedRepairDate = body?.planned_repair_date || body?.follow_up_date
+    const reminderRequested = body?.reminder_requested !== false
+
+    if (!enquiryRef || !isIsoDate(plannedRepairDate)) {
+      return NextResponse.json(
+        { error: 'enquiry_ref and a valid planned_repair_date are required' },
+        { status: 400, headers }
+      )
+    }
+
+    const today = new Date()
+    const candidate = dateOnlyUtc(plannedRepairDate)
+    const minDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + MIN_DAYS_AHEAD, 12))
+    const maxDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + MAX_DAYS_AHEAD, 12))
+
+    if (Number.isNaN(candidate.getTime()) || candidate < minDate || candidate > maxDate) {
+      return NextResponse.json(
+        { error: `Please choose a repair date between ${MIN_DAYS_AHEAD} and ${MAX_DAYS_AHEAD} days from now.` },
+        { status: 400, headers }
+      )
+    }
+
+    const supabase = createServiceClient()
+    const { data: enquiry, error: enquiryError } = await supabase
+      .from('enquiries')
+      .select('id, enquiry_ref, enquiry_type, status, converted_to_job, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, warranty, estimated_time, quote_key, planned_repair_date, reminder_requested')
+      .eq('enquiry_ref', enquiryRef)
+      .single()
+
+    if (enquiryError || !enquiry) {
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404, headers })
+    }
+
+    if (enquiry.enquiry_type !== 'repair_quote') {
+      return NextResponse.json({ error: 'This action is only available for repair quotes.' }, { status: 400, headers })
+    }
+
+    if (enquiry.status === 'rejected') {
+      return NextResponse.json({ error: 'This quote has been dismissed.' }, { status: 409, headers })
+    }
+
+    if (enquiry.converted_to_job) {
+      return NextResponse.json(
+        { error: 'This enquiry has already become a repair job.' },
+        { status: 409, headers }
+      )
+    }
+
+    if (reminderRequested && !enquiry.customer_phone) {
+      return NextResponse.json(
+        { error: 'A mobile number is required for a text reminder.' },
+        { status: 400, headers }
+      )
+    }
+
+    // Idempotency: a double-tap should not send a second confirmation SMS.
+    if (enquiry.planned_repair_date === plannedRepairDate && Boolean(enquiry.reminder_requested) === reminderRequested) {
+      return NextResponse.json({
+        success: true,
+        enquiry_ref: enquiryRef,
+        planned_repair_date: plannedRepairDate,
+        reminder_requested: reminderRequested,
+        reminder_at: reminderRequested ? calculateReminderAt(plannedRepairDate) : null,
+        already_saved: true,
+      }, { headers })
+    }
+
+    const reminderAt = reminderRequested ? calculateReminderAt(plannedRepairDate) : null
+    const now = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('enquiries')
+      .update({
+        commitment_type: 'remind_later',
+        planned_repair_date: plannedRepairDate,
+        reminder_requested: reminderRequested,
+        reminder_at: reminderAt,
+        reminder_sent_at: null,
+        reminder_cancelled_at: null,
+        reminder_last_attempt_at: null,
+        reminder_count: 0,
+        // Retained lead only — NOT a booking or repair approval.
+        proceed_with_repair: false,
+        quote_source: 'remind_later',
+        quote_sent_method: enquiry.customer_phone ? 'sms' : null,
+        status: 'pending',
+        updated_at: now,
+      } as any)
+      .eq('id', enquiry.id)
+
+    if (updateError) {
+      console.error('[plan-later] Failed to update enquiry:', updateError)
+      const migrationMissing = /column|schema cache|planned_repair|reminder_/i.test(updateError.message || '')
+      return NextResponse.json(
+        {
+          error: migrationMissing
+            ? 'Quote reminder database migration has not been applied yet.'
+            : 'Failed to save repair reminder.',
+          migration_required: migrationMissing,
+        },
+        { status: migrationMissing ? 503 : 500, headers }
+      )
+    }
+
+    let confirmationSmsSent = false
+    if (enquiry.customer_phone) {
+      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+      if (webhookUrl) {
+        const firstName = getFirstName(enquiry.customer_name)
+        const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
+        const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
+        const priceText = enquiry.display_price
+          ? ` Your saved quote is ${enquiry.display_price}.`
+          : enquiry.quoted_price
+            ? ` Your saved quote is £${enquiry.quoted_price}.`
+            : ''
+        const reminderDate = new Date(reminderAt || `${plannedRepairDate}T09:00:00Z`).toLocaleDateString('en-GB', {
+          weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London'
+        })
+        const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
+        const smsBody = `Hi ${firstName}, we've saved your ${device} ${repairLabel(enquiry.repair_type)}${optionText} quote for later.${priceText}\n\nYou said you're hoping to get it repaired around ${formatDate(plannedRepairDate)}. We'll give you a reminder on ${reminderDate}.\n\nYour quote: ${quoteLink}\n\nNothing is booked and there's nothing to pay now. When you're ready, use the quote link to go ahead. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
+
+        try {
+          const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
+          confirmationSmsSent = smsResult.ok
+          await supabase.from('sms_logs').insert({
+            template_key: 'QUOTE_REMIND_LATER_SAVED',
+            body_rendered: smsBody,
+            status: smsResult.ok ? 'SENT' : 'FAILED',
+            sent_at: smsResult.ok ? new Date().toISOString() : null,
+            error_message: smsResult.ok ? null : String(smsResult.body || '').substring(0, 500),
+          } as any)
+        } catch (smsError) {
+          console.error('[plan-later] Confirmation SMS failed:', smsError)
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      enquiry_ref: enquiryRef,
+      planned_repair_date: plannedRepairDate,
+      reminder_requested: reminderRequested,
+      reminder_at: reminderAt,
+      confirmation_sms_sent: confirmationSmsSent,
+    }, { headers })
+  } catch (error) {
+    console.error('[plan-later] Unexpected error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers })
+  }
+}
