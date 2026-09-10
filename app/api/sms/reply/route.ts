@@ -365,7 +365,9 @@ export async function POST(request: NextRequest) {
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent opening hours reply to ${phone}`)
       }
-    } else if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
+    } else if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'collection') {
+      // These are clearly about an existing repair — send the "cannot find your
+      // number" reply so the customer knows to text the booking number.
       if (webhookUrl) {
         const orphanBody = `Hi,\n\nWe cannot find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it is booked in under and we will find it straight away.\n\nNFD Repairs`
         const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
@@ -374,11 +376,10 @@ export async function POST(request: NextRequest) {
         console.log(`[sms/reply] Sent orphan status reply to ${phone}`)
       }
     } else if (webhookUrl) {
-      // Not a status query — this is a first-time or general text.
-      // Check if we've sent any SMS to this number in the last 2 days.
-      // If not, send a welcome message with useful links.
-      // Note: no sending-hours restriction — people text at all hours and
-      // should get a helpful reply whenever they reach out.
+      // Not a clear status query (includes turnaround, location, and anything
+      // not understood) — send the generic welcome message with useful links
+      // rather than the unhelpful "cannot find a repair job" reply.
+      // Rate-limited to 1 per 2 days per number to avoid flooding.
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
       const { count: recentSentCount } = await supabase
         .from('sms_logs')
@@ -387,8 +388,6 @@ export async function POST(request: NextRequest) {
         .gte('created_at', twoDaysAgo)
 
       if ((recentSentCount || 0) === 0) {
-        // No SMS sent to this number in the last 2 days — send welcome
-        // Build context-aware hours message (like the missed-call handler)
         const hoursStatus = await computeHoursStatus(supabase)
         const welcomeBody = buildWelcomeMessage(hoursStatus)
         const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
@@ -1079,11 +1078,12 @@ function detectSmsIntent(message: string): SmsIntent | null {
     return 'opening_hours'
   }
 
-  // --- Turnaround intent ("How long?", "What time?", "How far along?") ---
+  // --- Turnaround intent ("How long?", "How far along?", "When will it be ready?") ---
+  // Note: "what time" is NOT included here — "what time" is almost always about
+  // opening hours, not repair ETA. Opening hours is checked above.
   const turnaroundPatterns: RegExp[] = [
     /\bhow\s+long\b/i,
     /\bhow\s+far\s+along\b/i,
-    /\bwhat\s+time\b/i,
     /\bwhen\s+will\b/i,
     /\bwhen\s+is\b/i,
     /\bwhen\s+can\b/i,
