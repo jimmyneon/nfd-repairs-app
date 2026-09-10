@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid']
+    const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
     if (!validStatuses.includes(stock_status)) {
       return NextResponse.json(
-        { error: 'stock_status must be "in_stock", "parts_needed", or "parts_deposit_paid"' },
+        { error: 'stock_status must be "in_stock", "parts_needed", "parts_deposit_paid", or "device_in_shop"' },
         { status: 400 }
       )
     }
