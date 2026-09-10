@@ -11,7 +11,7 @@ function repairLabel(value: string | null): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function formatPlannedDate(value: string | null): string {
+function formatDate(value: string | null): string {
   if (!value) return 'the date you chose'
   try {
     return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', {
@@ -28,9 +28,9 @@ function formatPlannedDate(value: string | null): string {
 /**
  * GET /api/enquiries/send-plan-reminders
  *
- * Cron-only endpoint. Sends ONE neutral service reminder for a repair quote
- * when the customer explicitly asked to be reminded. It intentionally contains
- * no discounts, cross-sells or marketing copy.
+ * Cron-only endpoint. Sends one neutral service follow-up for a repair quote
+ * on the date explicitly selected by the customer. No discounts, cross-sells
+ * or marketing copy are included.
  */
 export async function GET(request: NextRequest) {
   const authResponse = requireCronSecret(request)
@@ -52,24 +52,30 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createServiceClient()
-    const now = new Date().toISOString()
+    const nowDate = new Date()
+    const now = nowDate.toISOString()
+    const today = nowDate.toISOString().slice(0, 10)
+    const oneHourAgo = new Date(nowDate.getTime() - 60 * 60 * 1000).toISOString()
 
     const { data: reminders, error: fetchError } = await supabase
       .from('enquiries')
-      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, planned_visit_date, reminder_at, reminder_count, status, converted_to_job')
+      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, follow_up_date, reminder_at, reminder_count, reminder_last_attempt_at, status, converted_to_job, proceed_with_repair')
       .eq('enquiry_type', 'repair_quote')
       .eq('reminder_requested', true)
       .is('reminder_sent_at', null)
       .is('reminder_cancelled_at', null)
       .lte('reminder_at', now)
-      .in('status', ['pending', 'approved', 'more_info_requested'])
-      .eq('converted_to_job', false)
+      .gte('follow_up_date', today)
+      .in('status', ['pending', 'more_info_requested'])
+      .or('converted_to_job.is.null,converted_to_job.eq.false')
+      .or('proceed_with_repair.is.null,proceed_with_repair.eq.false')
+      .or(`reminder_last_attempt_at.is.null,reminder_last_attempt_at.lt.${oneHourAgo}`)
       .order('reminder_at', { ascending: true })
       .limit(20)
 
     if (fetchError) {
       console.error('[quote-reminders] Fetch failed:', fetchError)
-      const migrationMissing = /column|schema cache|reminder_/i.test(fetchError.message || '')
+      const migrationMissing = /column|schema cache|follow_up|reminder_/i.test(fetchError.message || '')
       return NextResponse.json({
         error: migrationMissing
           ? 'Quote reminder database migration has not been applied yet.'
@@ -88,21 +94,35 @@ export async function GET(request: NextRequest) {
 
     for (let i = 0; i < reminders.length; i++) {
       const enquiry = reminders[i]
+      const attemptAt = new Date().toISOString()
+
+      // Claim the attempt before contacting MacroDroid so a 15-minute cron cannot
+      // repeatedly hammer the same customer if the SMS service is temporarily down.
+      await supabase
+        .from('enquiries')
+        .update({ reminder_last_attempt_at: attemptAt, updated_at: attemptAt } as any)
+        .eq('id', enquiry.id)
 
       if (!enquiry.customer_phone) {
+        await supabase
+          .from('enquiries')
+          .update({ reminder_cancelled_at: attemptAt, updated_at: attemptAt } as any)
+          .eq('id', enquiry.id)
         failed++
-        results.push({ enquiry_ref: enquiry.enquiry_ref, status: 'SKIPPED', reason: 'no phone' })
+        results.push({ enquiry_ref: enquiry.enquiry_ref, status: 'CANCELLED', reason: 'no phone' })
         continue
       }
 
       const firstName = getFirstName(enquiry.customer_name)
       const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
       const repair = repairLabel(enquiry.repair_type)
-      const plannedDate = formatPlannedDate(enquiry.planned_visit_date)
+      const followUpDate = formatDate(enquiry.follow_up_date)
       const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
-      const priceText = enquiry.quoted_price ? ` Your saved price was £${enquiry.quoted_price}.` : ''
+      const priceText = enquiry.quoted_price
+        ? ` The quote you saved was £${enquiry.quoted_price}.`
+        : ''
 
-      const smsBody = `Hi ${firstName}, you asked us to remind you about your ${device} ${repair}. You were thinking of coming in around ${plannedDate}.${priceText}\n\nYour repair plan is here: ${quoteLink}\n\nIf your plans have changed, that's fine — just reply to this text.\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}, here's the repair reminder you asked us to send on ${followUpDate}. Your ${device} ${repair} quote is still saved.${priceText}\n\nView it or go ahead here: ${quoteLink}\n\nIf you'd like to proceed, we'll check parts availability before you make a trip. If your plans have changed, that's absolutely fine.\n\nNFD Repairs`
 
       try {
         const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
@@ -110,7 +130,7 @@ export async function GET(request: NextRequest) {
 
         try {
           await supabase.from('sms_logs').insert({
-            template_key: 'QUOTE_PLAN_REMINDER',
+            template_key: 'QUOTE_FOLLOW_UP_REMINDER',
             body_rendered: smsBody,
             status: sentOk ? 'SENT' : 'FAILED',
             sent_at: sentOk ? new Date().toISOString() : null,
@@ -121,12 +141,13 @@ export async function GET(request: NextRequest) {
         }
 
         if (sentOk) {
+          const sentAt = new Date().toISOString()
           await supabase
             .from('enquiries')
             .update({
-              reminder_sent_at: new Date().toISOString(),
+              reminder_sent_at: sentAt,
               reminder_count: (enquiry.reminder_count || 0) + 1,
-              updated_at: new Date().toISOString(),
+              updated_at: sentAt,
             } as any)
             .eq('id', enquiry.id)
 
@@ -142,7 +163,6 @@ export async function GET(request: NextRequest) {
         results.push({ enquiry_ref: enquiry.enquiry_ref, status: 'FAILED' })
       }
 
-      // Keep MacroDroid traffic comfortably spaced.
       if (i < reminders.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 3000))
       }
