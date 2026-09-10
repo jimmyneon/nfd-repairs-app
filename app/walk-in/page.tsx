@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { CheckCircle, Loader2, AlertCircle, Send, ArrowLeft, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { CheckCircle, Loader2, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react'
 
 const TOTAL_STEPS = 3 // 0: name, 1: phone, 2: device, 3: summary
+const STORAGE_KEY = 'nfd-walk-in-progress'
 
 // Map walk-in device types to catalogue categories
 const DEVICE_TYPE_TO_CATEGORY: Record<string, string[]> = {
@@ -15,30 +16,40 @@ const DEVICE_TYPE_TO_CATEGORY: Record<string, string[]> = {
   other: ['Other devices', 'Wearables'],
 }
 
+interface SavedProgress {
+  step: number
+  formData: typeof defaultFormData
+  jobId: string | null
+  jobRef: string | null
+}
+
+const defaultFormData = {
+  customerName: '',
+  customerPhone: '',
+  customerEmail: '',
+  deviceType: 'phone' as string,
+  deviceMake: '',
+  deviceModel: '',
+  issue: '',
+  description: '',
+  notSure: false,
+  termsAccepted: false,
+}
+
 export default function WalkInSelfBookingPage() {
   const [loading, setLoading] = useState(false)
-  const [finishLaterLoading, setFinishLaterLoading] = useState(false)
+  const [autoSaving, setAutoSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [finishLaterSuccess, setFinishLaterSuccess] = useState(false)
   const [jobRef, setJobRef] = useState('')
   const [currentStep, setCurrentStep] = useState(0)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [catalogue, setCatalogue] = useState<Record<string, Record<string, string[]>> | null>(null)
   const [catalogueError, setCatalogueError] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [restored, setRestored] = useState(false)
 
-  const [formData, setFormData] = useState({
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    deviceType: 'phone' as string,
-    deviceMake: '',
-    deviceModel: '',
-    issue: '',
-    description: '',
-    notSure: false,
-    termsAccepted: false,
-  })
+  const [formData, setFormData] = useState(defaultFormData)
 
   const issueOptions: Record<string, string[]> = {
     phone: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Data Recovery', 'Software Issues', 'Other'],
@@ -49,12 +60,59 @@ export default function WalkInSelfBookingPage() {
     other: ['Hardware Issue', 'Software Issue', 'Data Recovery', 'Other'],
   }
 
-  // Fetch device catalogue on mount
+  // --- Restore from localStorage on mount ---
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed: SavedProgress = JSON.parse(saved)
+        // Only restore if the saved data has a name and phone (meaningful progress)
+        if (parsed.formData?.customerName || parsed.formData?.customerPhone) {
+          setFormData({ ...defaultFormData, ...parsed.formData })
+          setCurrentStep(parsed.step || 0)
+          setJobId(parsed.jobId || null)
+          setJobRef(parsed.jobRef || '')
+          setRestored(true)
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, [])
+
+  // --- Fetch device catalogue on mount ---
   useEffect(() => {
     fetch('/api/public/device-catalogue')
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setCatalogue(data.categories || null))
       .catch(() => setCatalogueError(true))
+  }, [])
+
+  // --- Auto-save to localStorage whenever form data or step changes ---
+  useEffect(() => {
+    // Only save if there's something to save
+    if (!formData.customerName && !formData.customerPhone) return
+
+    const progress: SavedProgress = {
+      step: currentStep,
+      formData,
+      jobId,
+      jobRef,
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
+    } catch {
+      // localStorage might be full or unavailable
+    }
+  }, [formData, currentStep, jobId, jobRef])
+
+  // --- Clear localStorage on success ---
+  const clearProgress = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignore
+    }
   }, [])
 
   // Get available brands for the selected device type
@@ -65,7 +123,6 @@ export default function WalkInSelfBookingPage() {
     for (const cat of cats) {
       if (catalogue[cat]) {
         for (const brand of Object.keys(catalogue[cat])) {
-          // For laptop, only show Apple if macbook; for laptop (Windows), exclude Apple
           if (formData.deviceType === 'laptop' && brand === 'Apple') continue
           if (formData.deviceType === 'macbook' && brand !== 'Apple') continue
           brands.add(brand)
@@ -105,6 +162,71 @@ export default function WalkInSelfBookingPage() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
+  // --- Auto-create job when moving past the phone step ---
+  const autoCreateJob = async () => {
+    if (jobId) return // Already have a job
+    if (!formData.customerName.trim() || !formData.customerPhone.trim()) return
+
+    setAutoSaving(true)
+    try {
+      // First, check if there's an existing incomplete job for this phone
+      const lookupRes = await fetch('/api/public/walk-in/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lookup: true, phone: formData.customerPhone.trim() }),
+      })
+      const lookupData = await lookupRes.json()
+
+      if (lookupData.found && lookupData.job) {
+        // Restore from existing job
+        setJobId(lookupData.job.id)
+        setJobRef(lookupData.job.job_ref || '')
+        // Pre-fill any missing fields from the existing job
+        setFormData(prev => ({
+          ...prev,
+          customer_name: prev.customerName || lookupData.job.customer_name || '',
+          customer_phone: prev.customerPhone || lookupData.job.customer_phone || '',
+          customerEmail: prev.customerEmail || lookupData.job.customer_email || '',
+          deviceType: prev.deviceType !== 'phone' ? prev.deviceType : (lookupData.job.device_type || 'phone'),
+          deviceMake: prev.deviceMake || (lookupData.job.device_make && lookupData.job.device_make !== 'To be added' ? lookupData.job.device_make : ''),
+          deviceModel: prev.deviceModel || (lookupData.job.device_model && lookupData.job.device_model !== 'To be added' ? lookupData.job.device_model : ''),
+          issue: prev.issue || (lookupData.job.issue && lookupData.job.issue !== 'To be assessed' ? lookupData.job.issue : ''),
+          description: prev.description || lookupData.job.description || '',
+        }))
+        setAutoSaving(false)
+        return
+      }
+
+      // No existing job — create a new quick-intake job
+      const createRes = await fetch('/api/public/walk-in/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: formData.customerName.trim(),
+          customer_phone: formData.customerPhone.trim(),
+          customer_email: formData.customerEmail.trim() || null,
+          device_type: formData.deviceType,
+          device_make: formData.deviceMake || 'Unknown',
+          device_model: formData.deviceModel || 'Unknown',
+          issue: formData.issue || 'To be assessed',
+          description: formData.description || null,
+          terms_accepted: false,
+        }),
+      })
+      const createData = await createRes.json()
+
+      if (createData.success) {
+        setJobId(createData.job_id)
+        setJobRef(createData.job_ref || '')
+      }
+    } catch (err) {
+      console.error('Auto-create job error:', err)
+      // Don't block the user — they can still continue and submit later
+    } finally {
+      setAutoSaving(false)
+    }
+  }
+
   const goNext = () => {
     const errors: Record<string, string> = {}
     if (currentStep === 0 && !formData.customerName.trim()) {
@@ -114,15 +236,21 @@ export default function WalkInSelfBookingPage() {
       errors.customerPhone = 'Please enter your mobile number'
     }
     if (currentStep === 2 && !formData.notSure) {
-      if (!formData.deviceMake.trim()) errors.deviceMake = 'Please enter the device make or choose “Not sure”'
-      if (!formData.deviceModel.trim()) errors.deviceModel = 'Please enter the device model or choose “Not sure”'
-      if (!formData.issue.trim()) errors.issue = 'Please select the main problem or choose “Not sure”'
+      if (!formData.deviceMake.trim()) errors.deviceMake = 'Please enter the device make or choose "Not sure"'
+      if (!formData.deviceModel.trim()) errors.deviceModel = 'Please enter the device model or choose "Not sure"'
+      if (!formData.issue.trim()) errors.issue = 'Please select the main problem or choose "Not sure"'
     }
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors)
       return
     }
     setValidationErrors({})
+
+    // Auto-create job when moving from step 1 (phone) to step 2 (device)
+    if (currentStep === 1 && !jobId) {
+      autoCreateJob()
+    }
+
     setCurrentStep(prev => Math.min(prev + 1, TOTAL_STEPS))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -131,72 +259,6 @@ export default function WalkInSelfBookingPage() {
     setValidationErrors({})
     setCurrentStep(prev => Math.max(prev - 1, 0))
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleFinishLater = async () => {
-    const errors: Record<string, string> = {}
-    if (!formData.customerName.trim()) {
-      errors.customerName = 'Please enter your name first'
-    }
-    if (!formData.customerPhone.trim()) {
-      errors.customerPhone = 'Please enter your phone number first'
-    }
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors)
-      return
-    }
-
-    setFinishLaterLoading(true)
-    setError(null)
-
-    try {
-      const payload = {
-        customer_name: formData.customerName.trim(),
-        customer_phone: formData.customerPhone.trim(),
-        customer_email: formData.customerEmail.trim() || null,
-        device_type: formData.deviceType,
-        device_make: 'To be added',
-        device_model: 'To be added',
-        issue: 'To be assessed',
-        description: 'Customer started walk-in form but chose to finish later',
-        price_total: 0,
-        quoted_price: 0,
-        requires_parts_order: false,
-        source: 'walk_in_self',
-        device_password: null,
-        password_not_applicable: false,
-        passcode_requirement: 'not_required',
-        customer_signature: null,
-        terms_accepted: false,
-        onboarding_completed: false,
-        device_in_shop: false,
-        linked_quote_id: null,
-        skip_sms: false,
-        quick_intake: true,
-        initial_status: 'RECEIVED',
-      }
-
-      const response = await fetch('/api/jobs/create-v3', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const result = await response.json()
-
-      if (response.ok) {
-        setJobRef(result.job_ref)
-
-        setFinishLaterSuccess(true)
-      } else {
-        setError(result.error || 'Failed to send link')
-      }
-    } catch (err) {
-      console.error('Finish later error:', err)
-      setError('Something went wrong. Please ask staff for help.')
-    } finally {
-      setFinishLaterLoading(false)
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -217,27 +279,15 @@ export default function WalkInSelfBookingPage() {
         customer_phone: formData.customerPhone.trim(),
         customer_email: formData.customerEmail.trim() || null,
         device_type: formData.deviceType,
-        device_make: formData.deviceMake.trim() || 'Unknown',
-        device_model: formData.deviceModel.trim() || 'Unknown',
+        device_make: formData.notSure ? 'To be assessed' : (formData.deviceMake.trim() || 'Unknown'),
+        device_model: formData.notSure ? 'To be assessed' : (formData.deviceModel.trim() || 'Unknown'),
         issue: formData.notSure ? 'To be assessed' : (formData.issue.trim() || 'To be assessed'),
         description: formData.description.trim() || null,
-        price_total: 0,
-        quoted_price: 0,
-        requires_parts_order: false,
-        source: 'walk_in_self',
-        device_password: null,
-        password_not_applicable: false,
-        passcode_requirement: 'not_required',
-        customer_signature: null,
-        terms_accepted: formData.termsAccepted,
-        onboarding_completed: formData.termsAccepted,
-        device_in_shop: true,
-        linked_quote_id: null,
-        skip_sms: false,
-        initial_status: 'RECEIVED',
+        terms_accepted: true,
+        job_id: jobId, // Include if we already created a job
       }
 
-      const response = await fetch('/api/jobs/create-v3', {
+      const response = await fetch('/api/public/walk-in/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -245,58 +295,19 @@ export default function WalkInSelfBookingPage() {
 
       const result = await response.json()
 
-      if (response.ok) {
+      if (response.ok && result.success) {
         setJobRef(result.job_ref)
         setSuccess(true)
+        clearProgress()
       } else {
         setError(result.error || 'Failed to create booking')
       }
     } catch (err) {
       console.error('Walk-in booking error:', err)
-      setError('Something went wrong. Please ask staff for help.')
+      setError('Something went wrong. Please try again or ask staff for help.')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (finishLaterSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-        <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 sm:p-12 text-center">
-          <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full mb-6">
-            <Send className="h-14 w-14 text-green-600 dark:text-green-400" />
-          </div>
-
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
-            Saved!
-          </h1>
-
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-            We&apos;ve sent you an SMS with a link to complete your details. You can fill them in whenever you&apos;re ready.
-          </p>
-
-          {jobRef && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-2xl p-6 mb-6">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                Your Reference
-              </p>
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 font-mono">
-                {jobRef}
-              </p>
-            </div>
-          )}
-
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-5 text-left">
-            <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg mb-2">What happens next?</h3>
-            <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
-              <li>1. Check your phone for an SMS from us</li>
-              <li>2. Click the link to complete your device details</li>
-              <li>3. We&apos;ll assess it and text you a quote</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   if (success) {
@@ -329,9 +340,9 @@ export default function WalkInSelfBookingPage() {
           <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-5 text-left">
             <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg mb-2">What happens next?</h3>
             <ul className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
-              <li>1. Hand your device to a member of staff</li>
-              <li>2. We&apos;ll assess it and text you a quote</li>
-              <li>3. Track your repair via SMS updates</li>
+              <li>1. We&apos;ll assess your device and text you a quote</li>
+              <li>2. Track your repair via SMS updates</li>
+              <li>3. We&apos;ll text you when it&apos;s ready to collect</li>
             </ul>
           </div>
         </div>
@@ -350,9 +361,15 @@ export default function WalkInSelfBookingPage() {
               Check In Your Device
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Fill in your details below — you can do this now or come back to it later
+              Fill in your details below — your progress is saved automatically
             </p>
           </div>
+
+          {restored && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-center text-sm text-blue-700 dark:text-blue-300">
+              Welcome back! We&apos;ve saved your progress from last time.
+            </div>
+          )}
 
           {/* Progress bar */}
           <div className="flex items-center justify-center gap-2 mb-6">
@@ -399,7 +416,7 @@ export default function WalkInSelfBookingPage() {
                     autoFocus
                   />
                   {validationErrors.customerName && (
-                    <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <p className="p-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                       <AlertCircle className="h-4 w-4" />
                       {validationErrors.customerName}
                     </p>
@@ -429,7 +446,7 @@ export default function WalkInSelfBookingPage() {
                       autoFocus
                     />
                     {validationErrors.customerPhone && (
-                      <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <p className="p-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                         <AlertCircle className="h-4 w-4" />
                         {validationErrors.customerPhone}
                       </p>
@@ -647,10 +664,20 @@ export default function WalkInSelfBookingPage() {
                 <button
                   type="button"
                   onClick={goNext}
-                  className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl transition-colors active:scale-95 text-lg"
+                  disabled={autoSaving}
+                  className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-4 px-6 rounded-xl transition-colors active:scale-95 text-lg disabled:opacity-50"
                 >
-                  Next
-                  <ArrowRight className="h-5 w-5" />
+                  {autoSaving ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
                 </button>
               ) : (
                 <button
@@ -672,28 +699,6 @@ export default function WalkInSelfBookingPage() {
                 </button>
               )}
             </div>
-
-            {/* Send me a link — available from step 1 onwards (when phone is entered) */}
-            {currentStep >= 1 && (
-              <button
-                type="button"
-                onClick={handleFinishLater}
-                disabled={finishLaterLoading}
-                className="w-full flex items-center justify-center gap-2 text-primary hover:text-primary-dark font-semibold py-3 px-6 rounded-xl border-2 border-primary/30 hover:border-primary/50 transition-colors disabled:opacity-50"
-              >
-                {finishLaterLoading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Sending link...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-5 w-5" />
-                    Save and finish later
-                  </>
-                )}
-              </button>
-            )}
           </form>
         </div>
       </div>
