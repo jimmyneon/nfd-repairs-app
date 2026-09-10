@@ -27,9 +27,12 @@ function QuoteApprovalContent() {
 
   useEffect(() => {
     if (jobId) {
-      fetch(`/api/jobs/${jobId}`)
+      fetch(`/api/public/quote/${jobId}`)
         .then(res => res.json())
-        .then(data => { setJob(data); setLoading(false) })
+        .then(data => {
+          if (data.error) { setError(data.error); setLoading(false) }
+          else { setJob(data); setLoading(false) }
+        })
         .catch(() => { setLoading(false); setError('Failed to load quote') })
     }
   }, [jobId])
@@ -111,7 +114,7 @@ function QuoteApprovalContent() {
           price: a.discountPrice,
         }))
       }
-      const response = await fetch(`/api/jobs/${jobId}/approve-quote`, {
+      const response = await fetch(`/api/public/quote/${jobId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -127,7 +130,7 @@ function QuoteApprovalContent() {
   const handleReject = async () => {
     setRejecting(true)
     try {
-      const response = await fetch(`/api/jobs/${jobId}/reject-quote`, { method: 'POST' })
+      const response = await fetch(`/api/public/quote/${jobId}/reject`, { method: 'POST' })
       if (!response.ok) throw new Error('Failed to reject quote')
       router.push(`/quote/rejected?jobId=${jobId}`)
     } catch (err) {
