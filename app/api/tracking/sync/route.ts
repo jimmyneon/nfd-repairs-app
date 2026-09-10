@@ -97,7 +97,10 @@ export async function GET(request: NextRequest) {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
             await fetch(`${appUrl}/api/jobs/queue-status-sms`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+              },
               body: JSON.stringify({ jobId: job.id, status: 'PARTS_ARRIVED' }),
             })
           } catch (smsError) {

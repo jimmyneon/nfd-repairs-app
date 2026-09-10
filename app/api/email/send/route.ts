@@ -3,13 +3,13 @@ import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
 import { shortTrackingLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
-import { requireCronSecret } from '@/lib/api-auth'
+import { requireStaffOrCron } from '@/lib/api-auth'
 
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
-  const cronResponse = requireCronSecret(request)
-  if (cronResponse) return cronResponse
+  const authResponse = await requireStaffOrCron(request)
+  if (authResponse) return authResponse
 
   try {
     const body = await request.json()

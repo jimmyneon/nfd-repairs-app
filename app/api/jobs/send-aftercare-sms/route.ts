@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortReviewLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
-import { requireCronSecret } from '@/lib/api-auth'
+import { requireStaffOrCron } from '@/lib/api-auth'
 
 export const maxDuration = 300;
 
@@ -13,8 +13,8 @@ export const maxDuration = 300;
  * Unlike the old automatic scheduling, this is opt-in only.
  */
 export async function POST(request: NextRequest) {
-  const cronResponse = requireCronSecret(request)
-  if (cronResponse) return cronResponse
+  const authResponse = await requireStaffOrCron(request)
+  if (authResponse) return authResponse
 
   try {
     const supabase = createServiceClient()

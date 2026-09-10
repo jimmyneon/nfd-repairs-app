@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
-import { requireCronSecret } from '@/lib/api-auth'
+import { requireStaffOrCron } from '@/lib/api-auth'
 
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
-  const cronResponse = requireCronSecret(request)
-  if (cronResponse) return cronResponse
+  const authResponse = await requireStaffOrCron(request)
+  if (authResponse) return authResponse
 
   try {
     const { jobId, status, sendPriceInSms } = await request.json()
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
           const appUrl = 'https://nfd-repairs-app.vercel.app'
           await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
             body: JSON.stringify({ jobId })
           })
           console.log('Post-collection SMS scheduled for job:', job.job_ref)
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         const appUrl = 'https://nfd-repairs-app.vercel.app'
         await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
           body: JSON.stringify({ jobId })
         })
         console.log('Post-collection SMS scheduled for job:', job.job_ref)
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
           const appUrl = 'https://nfd-repairs-app.vercel.app'
           await fetch(`${appUrl}/api/jobs/schedule-collection-sms`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
             body: JSON.stringify({ jobId })
           })
           console.log('Post-collection SMS scheduled for COMPLETED job (missed at COLLECTED):', job.job_ref)
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
         const appUrl = 'https://nfd-repairs-app.vercel.app'
         const response = await fetchWithTimeout(`${appUrl}/api/sms/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
           body: JSON.stringify({ sms_log_id: smsLog.id }),
         }, 15000)
         console.log('SMS send trigger response:', response.status, response.ok)

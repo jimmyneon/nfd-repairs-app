@@ -45,6 +45,27 @@ export function requireCronSecret(request: NextRequest): NextResponse | null {
   return null
 }
 
+/**
+ * Allow either a logged-in staff user (cookie auth) OR a cron secret (Bearer token).
+ * Use this for routes called from both the authenticated job page and cron jobs.
+ * Returns null if authorised, or a 401 NextResponse if not.
+ */
+export async function requireStaffOrCron(request: NextRequest): Promise<NextResponse | null> {
+  // Try cron secret first (fast, no DB call)
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    return null
+  }
+
+  // Fall back to staff user cookie auth
+  const { response } = await requireStaffUser(request)
+  if (response) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return null
+}
+
 /** Get allowed CORS origin based on request origin. */
 export function getAllowedOrigin(request: NextRequest): string {
   const origin = request.headers.get('origin')
