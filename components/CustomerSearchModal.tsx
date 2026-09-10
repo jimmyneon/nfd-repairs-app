@@ -119,17 +119,42 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
           .limit(50)
       }
 
+      // Search enquiries table (new quote system)
+      const enquiriesPromise = supabase
+        .from('enquiries')
+        .select('*')
+        .eq('enquiry_type', 'repair_quote')
+        .or(`customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      let enquiriesPhonePromise: any = null
+      if (normalizedPhone.length >= 7 && /^\d+$/.test(normalizedPhone)) {
+        enquiriesPhonePromise = supabase
+          .from('enquiries')
+          .select('*')
+          .eq('enquiry_type', 'repair_quote')
+          .ilike('customer_phone', `%${normalizedPhone}%`)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      }
+
       // Run all searches in parallel
-      const [jobsResult, jobsPhoneResult, quotesResult, quotesPhoneResult] = await Promise.all([
+      const [jobsResult, jobsPhoneResult, quotesResult, quotesPhoneResult, enquiriesResult, enquiriesPhoneResult] = await Promise.all([
         jobsPromise,
         jobsPhonePromise || Promise.resolve({ data: [], error: null }),
         quotesPromise,
         quotesPhonePromise || Promise.resolve({ data: [], error: null }),
+        enquiriesPromise,
+        enquiriesPhonePromise || Promise.resolve({ data: [], error: null }),
       ])
 
       if (jobsResult.error) throw jobsResult.error
       if (quotesResult.error) {
         console.error('Quotes search error (non-fatal):', quotesResult.error)
+      }
+      if (enquiriesResult.error) {
+        console.error('Enquiries search error (non-fatal):', enquiriesResult.error)
       }
 
       // Merge job results
@@ -187,8 +212,39 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         }
       }
 
+      // Convert enquiries to CustomerJob format and merge
+      const enquiryCustomers: CustomerJob[] = []
+      const mapEnquiry = (e: any) => ({
+        id: e.id,
+        job_ref: e.enquiry_ref || 'ENQUIRY',
+        customer_name: e.customer_name,
+        customer_phone: e.customer_phone || '',
+        customer_email: e.customer_email,
+        device_make: e.device_make || '',
+        device_model: e.device_model || '',
+        issue: e.repair_type || '',
+        description: e.issue_description,
+        price_total: e.quoted_price || 0,
+        requires_parts_order: false,
+        created_at: e.created_at,
+        status: e.status || 'pending',
+        source: 'enquiry',
+      })
+      if (enquiriesResult.data) {
+        for (const e of enquiriesResult.data) {
+          enquiryCustomers.push(mapEnquiry(e))
+        }
+      }
+      if (enquiriesPhoneResult.data) {
+        for (const e of enquiriesPhoneResult.data) {
+          if (!enquiryCustomers.find(q => q.id === e.id)) {
+            enquiryCustomers.push(mapEnquiry(e))
+          }
+        }
+      }
+
       // Combine all results and group by normalized phone
-      const allResults = [...allJobs, ...quoteCustomers]
+      const allResults = [...allJobs, ...quoteCustomers, ...enquiryCustomers]
       const uniqueCustomers = allResults.reduce((acc: CustomerJob[], item: CustomerJob) => {
         const normalizedItemPhone = normalizePhone(item.customer_phone || '')
         const exists = acc.find(c => normalizePhone(c.customer_phone || '') === normalizedItemPhone)
@@ -217,7 +273,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
       const normalizedPhone = normalizePhone(customer.customer_phone)
 
       // Search jobs by exact phone and by normalized phone
-      const [jobsExact, jobsNormalized, quotesExact, quotesNormalized] = await Promise.all([
+      const [jobsExact, jobsNormalized, quotesExact, quotesNormalized, enquiriesExact, enquiriesNormalized] = await Promise.all([
         supabase
           .from('jobs')
           .select('*')
@@ -238,6 +294,18 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
           .select('*')
           .ilike('customer_phone', `%${normalizedPhone}%`)
           .order('original_created_at', { ascending: false }),
+        supabase
+          .from('enquiries')
+          .select('*')
+          .eq('enquiry_type', 'repair_quote')
+          .eq('customer_phone', customer.customer_phone)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('enquiries')
+          .select('*')
+          .eq('enquiry_type', 'repair_quote')
+          .ilike('customer_phone', `%${normalizedPhone}%`)
+          .order('created_at', { ascending: false }),
       ])
 
       // Merge jobs, deduplicating by id
@@ -274,8 +342,32 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         }
       }
 
+      // Merge enquiries, deduplicating by id
+      const allEnquiries: CustomerJob[] = []
+      const allEnquiryData = [...(enquiriesExact.data || []), ...(enquiriesNormalized.data || [])]
+      for (const e of allEnquiryData) {
+        if (!allEnquiries.find(q => q.id === e.id)) {
+          allEnquiries.push({
+            id: e.id,
+            job_ref: e.enquiry_ref || 'ENQUIRY',
+            customer_name: e.customer_name,
+            customer_phone: e.customer_phone || '',
+            customer_email: e.customer_email,
+            device_make: e.device_make || '',
+            device_model: e.device_model || '',
+            issue: e.repair_type || '',
+            description: e.issue_description,
+            price_total: e.quoted_price || 0,
+            requires_parts_order: false,
+            created_at: e.created_at,
+            status: e.status || 'pending',
+            source: 'enquiry',
+          })
+        }
+      }
+
       // Combine and sort by date
-      const combined = [...allJobs, ...allQuotes]
+      const combined = [...allJobs, ...allQuotes, ...allEnquiries]
       combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
       setCustomerJobs(combined)
@@ -424,9 +516,9 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {customer.issue}
                       </div>
-                      {customer.source === 'quote' && (
+                      {(customer.source === 'quote' || customer.source === 'enquiry') && (
                         <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
-                          Quote only
+                          {customer.source === 'enquiry' ? 'Enquiry' : 'Quote only'}
                         </div>
                       )}
                     </div>
