@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     let smsBody = ''
     if (depositAlreadyPaid) {
       // Parts needed + deposit paid
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 💳\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\n🔗 Track your repair: ${shortTrackingLink(trackingToken)}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}\n\nNFD Repairs`
     } else if (requiresParts) {
       // Parts needed — request the deposit before ordering
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'

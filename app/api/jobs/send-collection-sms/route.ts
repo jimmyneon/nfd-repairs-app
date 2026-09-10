@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}!\n\nHope you are happy with your ${job.device_model || 'device'} repair! ✅\n\nIf so, a 5-star Google review would mean the world to our small business:\n⭐⭐⭐⭐⭐\n\nIt takes 60 seconds — just tap here:\n${reviewLink}\n\nIf anything is not right, please text us — we will sort it.\n\nNFD Repairs`
+      smsBody = `Hi ${firstName}!\n\nHope you are happy with your ${job.device_model || 'device'} repair!\n\nIf so, a 5-star Google review would mean the world to our small business:\n\nIt takes 60 seconds — just tap here:\n${reviewLink}\n\nIf anything is not right, please text us — we will sort it.\n\nNFD Repairs`
     }
 
     // Guard: don't send empty SMS to MacroDroid (causes MacroDroid failures)
@@ -566,7 +566,7 @@ export async function GET(request: NextRequest) {
             })
           } else {
             // Fallback if template not in database
-            reminderBody = `Hi ${firstName},\n\nJust a quick follow-up — if you have not had a chance yet, we would really appreciate a review. ⭐\n\nIt takes 2 mins and means a lot to our small business:\n${reminderReviewLink}\n\nNFD Repairs`
+            reminderBody = `Hi ${firstName},\n\nJust a quick follow-up — if you have not had a chance yet, we would really appreciate a review.\n\nIt takes 2 mins and means a lot to our small business:\n${reminderReviewLink}\n\nNFD Repairs`
           }
 
           // Guard: don't send empty SMS to MacroDroid

@@ -46,6 +46,7 @@ interface Enquiry {
   repair_type?: string
   screen_option?: string
   quoted_price?: number | null
+  display_price?: string | null
   quote_type?: string
   issue_description?: string
   terms_accepted?: boolean
@@ -451,7 +452,7 @@ function EnquiriesContent() {
         setQuotePriceHigh('')
         setQuotePersonalisedMsg('')
         setShowQuoteForm(false)
-        setSelectedEnquiry({ ...selectedEnquiry, quoted_price: price, quote_type: 'personalised', quote_sent_method: quoteMethod })
+        setSelectedEnquiry({ ...selectedEnquiry, quoted_price: price, display_price: priceDisplay, quote_type: 'personalised', quote_sent_method: quoteMethod })
         loadEnquiries()
       } else {
         setQuoteResult({ success: false, message: data.error || 'Failed to send quote.' })
@@ -709,7 +710,7 @@ function EnquiriesContent() {
                             <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
                             <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
                             {enquiry.quoted_price != null && (
-                              <p className="text-lg font-black mt-1 text-green-700 dark:text-green-400">£{enquiry.quoted_price}</p>
+                              <p className="text-lg font-black mt-1 text-green-700 dark:text-green-400">{enquiry.display_price || `£${enquiry.quoted_price}`}</p>
                             )}
                           </div>
                           <div className={`flex items-center justify-between text-xs border-t pt-1.5 ${isPQ ? 'border-purple-200 dark:border-purple-800' : 'border-green-200 dark:border-green-800'}`}>
@@ -765,7 +766,7 @@ function EnquiriesContent() {
                             <p className="text-sm font-bold leading-tight mb-1 truncate text-gray-900 dark:text-white">{enquiry.customer_name}</p>
                             <p className="text-xs font-medium truncate text-gray-500 dark:text-gray-400">{summary}</p>
                             {enquiry.quoted_price != null && (
-                              <p className="text-lg font-black mt-1 text-gray-900 dark:text-white">£{enquiry.quoted_price}</p>
+                              <p className="text-lg font-black mt-1 text-gray-900 dark:text-white">{enquiry.display_price || `£${enquiry.quoted_price}`}</p>
                             )}
                           </div>
                           <div className="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700 pt-1.5">
@@ -807,7 +808,7 @@ function EnquiriesContent() {
                 return <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${cfg.bg} ${cfg.text}`}>{label}</span>
               })()}
               {selectedEnquiry.enquiry_type === 'repair_quote' && selectedEnquiry.quoted_price != null && (
-                <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">£{selectedEnquiry.quoted_price}</span>
+                <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">{selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</span>
               )}
               {selectedEnquiry.repair_reserved && (
                 <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">Reserved</span>
@@ -942,7 +943,7 @@ function EnquiriesContent() {
                       <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
                       <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
                       {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
-                      {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> £{selectedEnquiry.quoted_price}</p>}
+                      {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
                       {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
                     </div>
                   </div>

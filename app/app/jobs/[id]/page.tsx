@@ -492,6 +492,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             body: JSON.stringify({
               jobId: job!.id,
               type: 'STATUS_UPDATE',
+              sendPriceInSms,
             }),
           })
           await emailResponse.json()
@@ -585,6 +586,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             body: JSON.stringify({
               jobId: job!.id,
               type: 'STATUS_UPDATE',
+              sendPriceInSms,
             }),
           })
         } catch (error) {
@@ -677,6 +679,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             body: JSON.stringify({
               jobId: job!.id,
               type: 'STATUS_UPDATE',
+              sendPriceInSms,
             }),
           })
         } catch (error) {
@@ -773,6 +776,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             body: JSON.stringify({
               jobId: job!.id,
               type: 'STATUS_UPDATE',
+              sendPriceInSms,
             }),
           })
           await emailResponse.json()

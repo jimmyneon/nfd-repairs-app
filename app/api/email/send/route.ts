@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { jobId, type } = body
+    const { jobId, type, sendPriceInSms } = body
 
     if (!jobId || !type) {
       return NextResponse.json(
@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
         job,
         trackingUrl,
         depositUrl: job.deposit_required ? depositUrl : undefined,
-        statusMessage: type === 'STATUS_UPDATE' ? statusMessages[job.status] : undefined
+        statusMessage: type === 'STATUS_UPDATE' ? statusMessages[job.status] : undefined,
+        includePrice: sendPriceInSms !== false,
       },
       type as 'JOB_CREATED' | 'STATUS_UPDATE'
     )

@@ -354,7 +354,18 @@ export async function POST(request: NextRequest) {
 
     // Check if this looks like a status/update query
     const orphanIntent = detectSmsIntent(message)
-    if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
+    if (orphanIntent === 'opening_hours') {
+      // Customer is asking about opening hours/directions — send a helpful
+      // reply with hours + directions, not the "cannot find a repair job" message.
+      if (webhookUrl) {
+        const hoursStatus = await computeHoursStatus(supabase)
+        const hoursBody = buildHoursReply(hoursStatus)
+        const result = await sendViaMacroDroid(webhookUrl, phone, hoursBody)
+        await logSms(supabase, 'OPENING_HOURS_REPLY', hoursBody, result.ok)
+        orphanSmsSent = result.ok
+        console.log(`[sms/reply] Sent opening hours reply to ${phone}`)
+      }
+    } else if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
       if (webhookUrl) {
         const orphanBody = `Hi,\n\nWe cannot find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it is booked in under and we will find it straight away.\n\nNFD Repairs`
         const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
@@ -959,6 +970,43 @@ function extractCloseTimeFromFormatted(hoursString: string): string {
   return match ? match[1].trim() : hoursString
 }
 
+/**
+ * Build a concise opening-hours reply for customers who text asking
+ * "what time do you open?" etc. — works for both orphan (no job) and
+ * active-job customers. Uses the same hoursStatus as the welcome message.
+ */
+function buildHoursReply(hoursStatus: {
+  isOpen: boolean
+  todayFormatted: string
+  nextOpen: string | null
+  specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
+}): string {
+  const lines: string[] = ['Hi, thanks for texting New Forest Device Repairs.']
+
+  if (hoursStatus.specialHours?.active && hoursStatus.specialHours?.note) {
+    lines.push(hoursStatus.specialHours.note)
+  } else if (hoursStatus.isOpen) {
+    const closeTime = extractCloseTimeFromFormatted(hoursStatus.todayFormatted)
+    lines.push(`We're open today until ${closeTime}.`)
+  } else {
+    if (hoursStatus.nextOpen) {
+      lines.push(`We're closed now, back ${hoursStatus.nextOpen}.`)
+    } else {
+      lines.push(`We're closed now.`)
+    }
+  }
+
+  lines.push('')
+  lines.push('No need to book — just pop in. Hours & directions:')
+  lines.push('nfdr.uk/h')
+  lines.push('')
+  lines.push('Anything else? Just reply here.')
+  lines.push('')
+  lines.push('NFD Repairs')
+
+  return lines.join('\n')
+}
+
 // ---------------------------------------------------------------------------
 // Helper: normalise UK phone to +44XXXXXXXXX for DB lookup
 // ---------------------------------------------------------------------------
@@ -987,7 +1035,7 @@ type AutoReply = { templateKey: string; body: string }
  * - "Is it done?" → done check → yes/no answer
  * - "Update" / "Any news?" → general status → rotating status message
  */
-type SmsIntent = 'collection' | 'turnaround' | 'done_check' | 'update' | 'location'
+type SmsIntent = 'collection' | 'turnaround' | 'done_check' | 'update' | 'location' | 'opening_hours'
 
 /**
  * Detect the intent of a customer's SMS message.
@@ -1022,6 +1070,13 @@ function detectSmsIntent(message: string): SmsIntent | null {
   ]
   if (collectionPatterns.some(re => re.test(msg))) {
     return 'collection'
+  }
+
+  // --- Opening hours intent ("What time do you open?", "When do you close?", "Opening times?") ---
+  // Must be checked BEFORE turnaround, because "what time do you open" contains
+  // "what time" which would otherwise match the turnaround pattern.
+  if (/\b(what\s+time.*open|what\s+time.*close|when\s+(do|are).*open|when\s+(do|are).*close|opening\s+(times?|hours?)|closing\s+(times?|hours?)|what\s+are.*hours?|your\s+hours?|open\s+and\s+close)\b/i.test(msg)) {
+    return 'opening_hours'
   }
 
   // --- Turnaround intent ("How long?", "What time?", "How far along?") ---
@@ -1490,6 +1545,14 @@ async function detectAutoReply(message: string, job: any, smsCount: number = 0, 
     return {
       templateKey: 'AUTO_LOCATION_REPLY',
       body: `Hi ${getFirstName(job.customer_name)},\n\nHere's where we are and our opening hours: nfdr.uk/h\n\nNFD Repairs`,
+    }
+  }
+
+  // --- Opening hours intent ---
+  if (intent === 'opening_hours') {
+    return {
+      templateKey: 'AUTO_OPENING_HOURS_REPLY',
+      body: `Hi ${getFirstName(job.customer_name)},\n\nOur opening hours and directions: nfdr.uk/h\n\nNFD Repairs`,
     }
   }
 

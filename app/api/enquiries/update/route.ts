@@ -431,8 +431,8 @@ export async function POST(request: NextRequest) {
             : ''
           const personalisedText = personalisedMessage ? `\n\n${personalisedMessage}` : ''
           const smsMessage = isInstant
-            ? `Hi ${enquiry.customer_name}!\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNFD Repairs`
-            : `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNFD Repairs`
+            ? `Hi ${enquiry.customer_name}!\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
+            : `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
             const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {

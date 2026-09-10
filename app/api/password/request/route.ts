@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         job_ref: job.job_ref,
       })
     } else {
-      smsBody = `Hi ${firstName}!\n\nTo complete your repair, we need your device passcode.\n\n🔐 Please enter it securely using this link:\n${passwordLink}\n\nThis link expires in 24 hours.\n\nYour passcode is stored securely and deleted 7 days after collection.\n\nNFD Repairs`
+      smsBody = `Hi ${firstName}!\n\nTo complete your repair, we need your device passcode.\n\nPlease enter it securely using this link:\n${passwordLink}\n\nThis link expires in 24 hours.\n\nYour passcode is stored securely and deleted 7 days after collection.\n\nNFD Repairs`
     }
 
     // Send SMS via MacroDroid

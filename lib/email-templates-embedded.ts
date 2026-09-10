@@ -5,10 +5,15 @@ export interface EmbeddedEmailData {
   trackingUrl: string
   depositUrl?: string
   statusMessage?: string
+  includePrice?: boolean
 }
 
 export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CREATED' | 'STATUS_UPDATE'): { subject: string; html: string; text: string } {
   const { job, trackingUrl, depositUrl, statusMessage } = data
+  // Suppress price when explicitly disabled or when price is 0/null (backup measure
+  // so customers never see "£0.00" and think the repair is free)
+  const hasValidPrice = job.price_total != null && parseFloat(job.price_total.toString()) > 0
+  const showPrice = hasValidPrice && data.includePrice !== false
 
   // Generate QR code for READY_TO_COLLECT status
   const qrCodeUrl = job.status === 'READY_TO_COLLECT' 
@@ -83,13 +88,15 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
             <span style="color: #111827; font-size: 16px;">${job.issue}</span>
           </td>
         </tr>
+        ${showPrice ? `
         <tr>
           <td style="border-bottom: 1px solid #e5e7eb; padding: 12px 0;">
             <strong style="color: #6B7280; font-size: 14px;">Total Price</strong><br>
             <span style="color: #111827; font-size: 20px; font-weight: bold;">£${job.price_total.toFixed(2)}</span>
           </td>
         </tr>
-        ${job.deposit_required ? `
+        ` : ''}
+        ${showPrice && job.deposit_required ? `
         <tr>
           <td style="border-bottom: 1px solid #e5e7eb; padding: 12px 0;">
             <strong style="color: #6B7280; font-size: 14px;">Deposit Required</strong><br>
@@ -310,8 +317,8 @@ Job Reference: ${job.job_ref}
 Device: ${job.device_make} ${job.device_model}
 Issue: ${job.issue}
 Status: ${statusLabels[job.status]}
-Total Price: £${job.price_total.toFixed(2)}
-${job.deposit_required ? `Deposit Required: £${job.deposit_amount?.toFixed(2) || '20.00'} ${!job.deposit_received ? '(Not yet received)' : '(Received)'}` : ''}
+${showPrice ? `Total Price: £${job.price_total.toFixed(2)}
+${job.deposit_required ? `Deposit Required: £${job.deposit_amount?.toFixed(2) || '20.00'} ${!job.deposit_received ? '(Not yet received)' : '(Received)'}` : ''}` : ''}
 Created: ${new Date(job.created_at).toLocaleDateString('en-GB')}
 
 ${job.deposit_required && !job.deposit_received && depositUrl ? `
