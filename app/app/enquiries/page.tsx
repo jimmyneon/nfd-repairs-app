@@ -262,15 +262,16 @@ function EnquiriesContent() {
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && e.status !== 'rejected' && !isConverted(e) && !isAccepted(e) && Boolean(e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const hasQuoteBeenSent = (e: Enquiry) => Boolean(e.quote_sent_method && e.quote_sent_method !== 'none')
   // A personalised quote that needs staff to manually enter a price and send it.
-  // This is a repair_quote enquiry with no price, not yet accepted/converted,
-  // not dismissed, and not already sent (or sent but still no price).
+  // This is a repair_quote enquiry with no price set yet, not yet
+  // accepted/converted, and not dismissed. The quote_sent_method being set
+  // just means the customer asked to receive a quote — it does NOT mean staff
+  // have sent one. So we don't check hasQuoteBeenSent here.
   const isPersonalisedQuoteNeeded = (e: Enquiry) =>
     e.enquiry_type === 'repair_quote'
     && !isConverted(e)
     && !isAccepted(e)
     && e.status !== 'rejected'
     && !e.quoted_price
-    && !hasQuoteBeenSent(e)
   const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e) || isPersonalisedQuoteNeeded(e)
 
   const getJourneyStage = (e: Enquiry): { key: string; label: string; detail: string } => {
