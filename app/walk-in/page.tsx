@@ -10,11 +10,20 @@ const STORAGE_KEY = 'nfd-walk-in-progress'
 const DEVICE_TYPE_TO_CATEGORY: Record<string, string[]> = {
   phone: ['Phones'],
   tablet: ['Tablets'],
-  laptop: ['Computers'],
+  computer: ['Computers'],
   macbook: ['Computers'],
   console: ['Gaming & Controllers'],
   other: ['Other devices', 'Wearables'],
 }
+
+// Generic placeholder brands/models that shouldn't appear in dropdowns
+const GENERIC_BRANDS = new Set([
+  'Any other computer', 'Multi-brand', 'Any other phone', 'Any other tablet',
+  'Any other console/handheld', 'Other electronic device',
+])
+const GENERIC_MODELS = new Set([
+  'Model not listed', 'All computers', 'All phones', 'All tablets',
+])
 
 interface SavedProgress {
   step: number
@@ -54,7 +63,7 @@ export default function WalkInSelfBookingPage() {
   const issueOptions: Record<string, string[]> = {
     phone: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Data Recovery', 'Software Issues', 'Other'],
     tablet: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Software Issues', 'Other'],
-    laptop: ['Screen Replacement', 'Keyboard Replacement', 'Battery Replacement', 'Charging Issues', 'Windows Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
+    computer: ['Screen Replacement', 'Keyboard Replacement', 'Battery Replacement', 'Charging Issues', 'Windows Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
     macbook: ['Screen Replacement', 'Battery Replacement', 'Keyboard Replacement', 'Charging Issues', 'macOS Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
     console: ['HDMI Port Replacement', 'Disc Drive Issues', 'Overheating', 'No Power', 'Software Issues', 'Controller Issues', 'Other'],
     other: ['Hardware Issue', 'Software Issue', 'Data Recovery', 'Other'],
@@ -123,7 +132,9 @@ export default function WalkInSelfBookingPage() {
     for (const cat of cats) {
       if (catalogue[cat]) {
         for (const brand of Object.keys(catalogue[cat])) {
-          if (formData.deviceType === 'laptop' && brand === 'Apple') continue
+          // Filter generic placeholder brands
+          if (GENERIC_BRANDS.has(brand)) continue
+          if (formData.deviceType === 'computer' && brand === 'Apple') continue
           if (formData.deviceType === 'macbook' && brand !== 'Apple') continue
           brands.add(brand)
         }
@@ -140,6 +151,8 @@ export default function WalkInSelfBookingPage() {
     for (const cat of cats) {
       if (catalogue[cat] && catalogue[cat][formData.deviceMake]) {
         for (const model of catalogue[cat][formData.deviceMake]) {
+          // Filter generic placeholder models
+          if (GENERIC_MODELS.has(model)) continue
           models.add(model)
         }
       }
@@ -535,7 +548,7 @@ export default function WalkInSelfBookingPage() {
                         >
                           <option value="phone">Phone</option>
                           <option value="tablet">Tablet</option>
-                          <option value="laptop">Laptop (Windows)</option>
+                          <option value="computer">Computer / Laptop</option>
                           <option value="macbook">MacBook (Apple)</option>
                           <option value="console">Games Console</option>
                           <option value="other">Other</option>
