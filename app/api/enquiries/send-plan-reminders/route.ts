@@ -96,8 +96,6 @@ export async function GET(request: NextRequest) {
       const enquiry = reminders[i]
       const attemptAt = new Date().toISOString()
 
-      // Claim the attempt before contacting MacroDroid so a 15-minute cron cannot
-      // repeatedly hammer the same customer if the SMS service is temporarily down.
       await supabase
         .from('enquiries')
         .update({ reminder_last_attempt_at: attemptAt, updated_at: attemptAt } as any)
@@ -125,7 +123,7 @@ export async function GET(request: NextRequest) {
           : ''
       const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
 
-      const smsBody = `Hi ${firstName}, just a reminder about your ${device} ${repair}${optionText}.${priceText}\n\nYou said you were hoping to get it repaired around ${targetDate}. If you'd like to go ahead, open your saved quote here: ${quoteLink}\n\nWe'll check parts availability before you make a trip. If a part needs ordering, we'll let you know before asking for any deposit. If your plans have changed, that's absolutely fine.\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}, just a reminder about your ${device} ${repair}${optionText}.${priceText}\n\nYou said you were hoping to get it repaired around ${targetDate}. If you'd like to go ahead, open your saved quote here: ${quoteLink} or simply reply to this text.\n\nWe'll check parts availability before you make a trip. If a part needs ordering, we'll let you know before asking for any deposit. If your plans have changed, that's absolutely fine.\n\nNFD Repairs`
 
       try {
         const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
