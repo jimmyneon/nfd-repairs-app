@@ -16,7 +16,7 @@ export async function OPTIONS() {
 const FALLBACK_HOURS = {
   Sunday:    { isOpen: false, formatted: 'Closed' },
   Monday:    { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
-  Tuesday:   { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
+  Tuesday:   { isOpen: false, formatted: 'Closed' },
   Wednesday: { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
   Thursday:  { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
   Friday:    { isOpen: true,  formatted: '10:00 AM - 5:00 PM', open: '10:00', close: '17:00' },
