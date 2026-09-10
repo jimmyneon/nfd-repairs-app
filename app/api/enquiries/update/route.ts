@@ -223,6 +223,9 @@ export async function POST(request: NextRequest) {
         updateFields.quote_type = 'personalised'
         updateFields.quote_sent_method = method
         updateFields.status = 'pending'
+        // Store the display price (range or single) so the customer-facing
+        // quote acceptance page can show it
+        updateFields.display_price = priceHigh !== null ? `£${price}-£${priceHigh}` : `£${price}`
         enquiry.quoted_price = price
         enquiry.quote_type = 'personalised'
 
@@ -261,9 +264,9 @@ export async function POST(request: NextRequest) {
         const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'your device'
 
         const variantMessages: Record<string, string> = {
-          diagnostics: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'd need to run a quick diagnostic on it before we can give you an accurate quote.\n\nPop in to the shop during opening hours and we'll take a look — no charge for the diagnostic.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
-          quick_look: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. I'll need to have a quick look at it before I can give you a proper quote.\n\nPop in whenever suits during opening hours and we'll take a look.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
-          unable_to_quote: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. I'm unable to give you a quote without seeing it first — the repairability depends on the extent of the damage.\n\nPop in during opening hours and we'll assess it in person. No charge for the assessment.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
+          diagnostics: `Hi ${enquiry.customer_name}! 🔧\n\nThanks for your enquiry about your ${deviceName}. We'd need to run a proper diagnostic on it before we can give you an accurate quote.\n\nThe diagnostic is £40 and is deducted from the total repair bill if you go ahead.\n\nPop in to the shop during opening hours and we'll take a look.\n\nNFD Repairs\nnfdr.uk/h`,
+          quick_look: `Hi ${enquiry.customer_name}! 👀\n\nThanks for your enquiry about your ${deviceName}. I'll need to have a quick look at it before I can give you a proper quote.\n\nPop in whenever suits during opening hours — no charge for a quick look.\n\nNFD Repairs\nnfdr.uk/h`,
+          unable_to_quote: `Hi ${enquiry.customer_name}! 🔍\n\nThanks for your enquiry about your ${deviceName}. I'm unable to give you a quote without seeing it first — the repairability depends on the extent of the damage.\n\nPop in during opening hours and we'll assess it in person. No charge for the assessment.\n\nNFD Repairs\nnfdr.uk/h`,
         }
 
         const inspectionMessage = variantMessages[variant] || variantMessages.quick_look
