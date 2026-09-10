@@ -155,6 +155,11 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
                   W
                 </span>
               )}
+              {job.quick_intake && !job.onboarding_completed && (
+                <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full" title="Customer hasn't finished their intake form">
+                  FORM PENDING
+                </span>
+              )}
               {missingIntakeCount > 0 && (
                 <span className="bg-amber-300 text-amber-950 text-[10px] font-black px-1.5 py-0.5 rounded-full" title={`${missingIntakeCount} intake item${missingIntakeCount === 1 ? '' : 's'} missing`}>
                   {missingIntakeCount} MISSING

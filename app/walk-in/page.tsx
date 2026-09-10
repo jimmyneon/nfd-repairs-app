@@ -1,9 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle, Loader2, AlertCircle, Send, ArrowLeft, ArrowRight } from 'lucide-react'
 
 const TOTAL_STEPS = 3 // 0: name, 1: phone, 2: device, 3: summary
+
+// Map walk-in device types to catalogue categories
+const DEVICE_TYPE_TO_CATEGORY: Record<string, string[]> = {
+  phone: ['Phones'],
+  tablet: ['Tablets'],
+  laptop: ['Computers'],
+  macbook: ['Computers'],
+  console: ['Gaming & Controllers'],
+  other: ['Other devices', 'Wearables'],
+}
 
 export default function WalkInSelfBookingPage() {
   const [loading, setLoading] = useState(false)
@@ -14,6 +24,8 @@ export default function WalkInSelfBookingPage() {
   const [jobRef, setJobRef] = useState('')
   const [currentStep, setCurrentStep] = useState(0)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [catalogue, setCatalogue] = useState<Record<string, Record<string, string[]>> | null>(null)
+  const [catalogueError, setCatalogueError] = useState(false)
 
   const [formData, setFormData] = useState({
     customerName: '',
@@ -35,6 +47,47 @@ export default function WalkInSelfBookingPage() {
     macbook: ['Screen Replacement', 'Battery Replacement', 'Keyboard Replacement', 'Charging Issues', 'macOS Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
     console: ['HDMI Port Replacement', 'Disc Drive Issues', 'Overheating', 'No Power', 'Software Issues', 'Controller Issues', 'Other'],
     other: ['Hardware Issue', 'Software Issue', 'Data Recovery', 'Other'],
+  }
+
+  // Fetch device catalogue on mount
+  useEffect(() => {
+    fetch('/api/public/device-catalogue')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setCatalogue(data.categories || null))
+      .catch(() => setCatalogueError(true))
+  }, [])
+
+  // Get available brands for the selected device type
+  const getAvailableBrands = (): string[] => {
+    if (!catalogue) return []
+    const cats = DEVICE_TYPE_TO_CATEGORY[formData.deviceType] || []
+    const brands = new Set<string>()
+    for (const cat of cats) {
+      if (catalogue[cat]) {
+        for (const brand of Object.keys(catalogue[cat])) {
+          // For laptop, only show Apple if macbook; for laptop (Windows), exclude Apple
+          if (formData.deviceType === 'laptop' && brand === 'Apple') continue
+          if (formData.deviceType === 'macbook' && brand !== 'Apple') continue
+          brands.add(brand)
+        }
+      }
+    }
+    return Array.from(brands).sort()
+  }
+
+  // Get available models for the selected brand
+  const getAvailableModels = (): string[] => {
+    if (!catalogue || !formData.deviceMake) return []
+    const cats = DEVICE_TYPE_TO_CATEGORY[formData.deviceType] || []
+    const models = new Set<string>()
+    for (const cat of cats) {
+      if (catalogue[cat] && catalogue[cat][formData.deviceMake]) {
+        for (const model of catalogue[cat][formData.deviceMake]) {
+          models.add(model)
+        }
+      }
+    }
+    return Array.from(models).sort()
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -215,7 +268,7 @@ export default function WalkInSelfBookingPage() {
           </div>
 
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
-            Link Sent!
+            Saved!
           </h1>
 
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
@@ -259,7 +312,7 @@ export default function WalkInSelfBookingPage() {
           </h1>
 
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-            Please hand your device to a member of staff.
+            Your device is now booked in with us.
           </p>
 
           {jobRef && (
@@ -294,10 +347,10 @@ export default function WalkInSelfBookingPage() {
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-6">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
-              Check In Your Repair
+              Check In Your Device
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Fill in what you know below, then hand your device to staff
+              Fill in your details below — you can do this now or come back to it later
             </p>
           </div>
 
@@ -440,28 +493,59 @@ export default function WalkInSelfBookingPage() {
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Device Make
                         </label>
-                        <input
-                          type="text"
-                          name="deviceMake"
-                          value={formData.deviceMake}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="e.g., Apple, Samsung, HP"
-                        />
+                        {catalogue && getAvailableBrands().length > 0 ? (
+                          <select
+                            name="deviceMake"
+                            value={formData.deviceMake}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="">Select a brand...</option>
+                            {getAvailableBrands().map(brand => (
+                              <option key={brand} value={brand}>{brand}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name="deviceMake"
+                            value={formData.deviceMake}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="e.g., Apple, Samsung, HP"
+                          />
+                        )}
+                        {catalogueError && (
+                          <p className="mt-1 text-xs text-gray-400">Could not load brand list — type it in instead.</p>
+                        )}
                       </div>
 
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Device Model
                         </label>
-                        <input
-                          type="text"
-                          name="deviceModel"
-                          value={formData.deviceModel}
-                          onChange={handleChange}
-                          className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="e.g., iPhone 14 Pro, Galaxy S23"
-                        />
+                        {catalogue && formData.deviceMake && getAvailableModels().length > 0 ? (
+                          <select
+                            name="deviceModel"
+                            value={formData.deviceModel}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="">Select a model...</option>
+                            {getAvailableModels().map(model => (
+                              <option key={model} value={model}>{model}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name="deviceModel"
+                            value={formData.deviceModel}
+                            onChange={handleChange}
+                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="e.g., iPhone 14 Pro, Galaxy S23"
+                          />
+                        )}
                       </div>
 
                       <div>
@@ -532,7 +616,7 @@ export default function WalkInSelfBookingPage() {
                     )}
                   </div>
                   <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-                    Please hand your device to a member of staff after checking in.
+                    Your device is booked in with us.
                   </p>
                   <label className={`mt-5 flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer ${validationErrors.termsAccepted ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-blue-200 bg-blue-50 dark:bg-blue-900/20'}`}>
                     <input type="checkbox" name="termsAccepted" checked={formData.termsAccepted} onChange={handleChange} className="h-6 w-6 mt-0.5 rounded text-primary" />
@@ -605,7 +689,7 @@ export default function WalkInSelfBookingPage() {
                 ) : (
                   <>
                     <Send className="h-5 w-5" />
-                    Just send me a link to finish later
+                    Save and finish later
                   </>
                 )}
               </button>

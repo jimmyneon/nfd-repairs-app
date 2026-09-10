@@ -124,6 +124,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
     message: `Customer completed intake and accepted repair terms${job.is_warranty ? '' : ' and diagnostic fee policy'}`,
   } as any)
 
+  // Notify staff that the customer completed their intake form
+  await supabase.from('notifications').insert({
+    type: 'INTAKE_COMPLETED',
+    title: 'Intake form completed',
+    body: `${job.is_warranty ? 'Warranty' : 'Walk-in'}: customer finished their check-in form`,
+    job_id: job.id,
+    is_read: false,
+  } as any)
+
   // If the customer just added an email that wasn't on the job before,
   // send the "Job Created" confirmation email so they get a record of the
   // booking (quick-intake jobs are created without an email).

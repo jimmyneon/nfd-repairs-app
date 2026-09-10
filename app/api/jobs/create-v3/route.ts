@@ -140,6 +140,8 @@ export async function POST(request: NextRequest) {
       // Warranty
       is_warranty: is_warranty || false,
       linked_warranty_ticket_id: linked_warranty_ticket_id || null,
+      // Quick intake flag (walk-in self-booking with finish-later)
+      quick_intake: quick_intake || false,
     }
 
     // If parts are required and job starts in RECEIVED (device already in shop),

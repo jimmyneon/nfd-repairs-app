@@ -101,6 +101,8 @@ export interface Job {
   device_type?: string | null
   is_warranty?: boolean
   linked_warranty_ticket_id?: string | null
+  quick_intake?: boolean
+  intake_reminder_sent_at?: string | null
   
   // Multi-platform review tracking
   review_platforms_completed?: string[] | null
