@@ -197,14 +197,22 @@ export async function POST(request: NextRequest) {
       }
 
       case 'send_personalised_quote': {
-        // Staff manually sends a quote with a price and optional personalised
-        // message paragraph. The price is saved on the enquiry so the customer
-        // can see it on the quote acceptance page, and the message + quote link
-        // are sent via SMS and/or email.
+        // Staff manually sends a quote with a price (or price range) and optional
+        // personalised message paragraph. The price is saved on the enquiry so the
+        // customer can see it on the quote acceptance page, and the message + quote
+        // link are sent via SMS and/or email.
         const price = Number(data?.quoted_price)
         if (!price || price <= 0 || price > 10000) {
           return NextResponse.json(
             { error: 'A valid quote price is required' },
+            { status: 400, headers }
+          )
+        }
+        // Optional high end of a price range (e.g. £39-£75)
+        const priceHigh = data?.quoted_price_high ? Number(data.quoted_price_high) : null
+        if (priceHigh !== null && (isNaN(priceHigh) || priceHigh < price || priceHigh > 10000)) {
+          return NextResponse.json(
+            { error: 'Price range high must be greater than the low price and under £10000' },
             { status: 400, headers }
           )
         }
@@ -218,8 +226,9 @@ export async function POST(request: NextRequest) {
         enquiry.quoted_price = price
         enquiry.quote_type = 'personalised'
 
+        const priceText = priceHigh !== null ? `£${price}-£${priceHigh}` : `£${price}`
         notificationTitle = `Personalised Quote Sent: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
-        notificationBody = `${enquiry.customer_name} sent a personalised quote of £${price} via ${method}.`
+        notificationBody = `${enquiry.customer_name} sent a personalised quote of ${priceText} via ${method}.`
 
         // Build the quote send payload (sent after DB update)
         const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
@@ -230,7 +239,7 @@ export async function POST(request: NextRequest) {
           method,
           quoteUrl,
           isInstant: true, // now has a price → treat like instant quote for link purposes
-          priceText: `£${price}`,
+          priceText,
           deviceName,
           repairName,
           customerName,

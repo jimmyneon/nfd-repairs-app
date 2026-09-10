@@ -118,6 +118,7 @@ function EnquiriesContent() {
   // Personalised quote response panel state
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quotePrice, setQuotePrice] = useState('')
+  const [quotePriceHigh, setQuotePriceHigh] = useState('')
   const [quotePersonalisedMsg, setQuotePersonalisedMsg] = useState('')
   const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both'>('sms')
   const [sendingQuote, setSendingQuote] = useState(false)
@@ -420,6 +421,11 @@ function EnquiriesContent() {
       setQuoteResult({ success: false, message: 'Please enter a valid price.' })
       return
     }
+    const priceHigh = quotePriceHigh ? parseFloat(quotePriceHigh) : null
+    if (priceHigh !== null && priceHigh <= price) {
+      setQuoteResult({ success: false, message: 'The high end of the range must be greater than the price.' })
+      return
+    }
     setSendingQuote(true)
     setQuoteResult(null)
     try {
@@ -431,6 +437,7 @@ function EnquiriesContent() {
           action: 'send_personalised_quote',
           data: {
             quoted_price: price,
+            quoted_price_high: priceHigh,
             personalised_message: quotePersonalisedMsg.trim(),
             method: quoteMethod,
           },
@@ -438,8 +445,10 @@ function EnquiriesContent() {
       })
       const data = await res.json()
       if (data.success) {
-        setQuoteResult({ success: true, message: `Quote of £${price} sent to ${selectedEnquiry.customer_name} via ${quoteMethod}.` })
+        const priceDisplay = priceHigh !== null ? `£${price}-£${priceHigh}` : `£${price}`
+        setQuoteResult({ success: true, message: `Quote of ${priceDisplay} sent to ${selectedEnquiry.customer_name} via ${quoteMethod}.` })
         setQuotePrice('')
+        setQuotePriceHigh('')
         setQuotePersonalisedMsg('')
         setShowQuoteForm(false)
         setSelectedEnquiry({ ...selectedEnquiry, quoted_price: price, quote_type: 'personalised', quote_sent_method: quoteMethod })
@@ -497,6 +506,7 @@ function EnquiriesContent() {
     setShowQuoteForm(false)
     setQuoteResult(null)
     setQuotePrice('')
+    setQuotePriceHigh('')
     setQuotePersonalisedMsg('')
     setShowDetail(true)
   }
@@ -1034,22 +1044,39 @@ function EnquiriesContent() {
                       </button>
                     </div>
 
-                    {/* Price input */}
+                    {/* Price input — single price or range */}
                     <div>
                       <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Quote Price (£)</p>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">£</span>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.01"
-                          min="0"
-                          value={quotePrice}
-                          onChange={(e) => setQuotePrice(e.target.value)}
-                          placeholder="0.00"
-                          className="w-full h-14 pl-8 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-bold"
-                        />
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">£</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={quotePrice}
+                            onChange={(e) => setQuotePrice(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full h-14 pl-8 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-bold"
+                          />
+                        </div>
+                        <span className="text-gray-400 font-bold text-lg">–</span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">£</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={quotePriceHigh}
+                            onChange={(e) => setQuotePriceHigh(e.target.value)}
+                            placeholder="max (optional)"
+                            className="w-full h-14 pl-8 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-bold"
+                          />
+                        </div>
                       </div>
+                      <p className="text-xs text-gray-500 mt-1">Enter a single price, or a range (e.g. £39 – £75).</p>
                     </div>
 
                     {/* Personalised message */}
@@ -1091,7 +1118,7 @@ function EnquiriesContent() {
                       className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors active:scale-95 disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" />
-                      {sendingQuote ? 'Sending Quote...' : `Send £${quotePrice || '0'} Quote`}
+                      {sendingQuote ? 'Sending Quote...' : `Send £${quotePrice || '0'}${quotePriceHigh ? '-£' + quotePriceHigh : ''} Quote`}
                     </button>
                   </div>
                 )}
