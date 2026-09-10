@@ -139,16 +139,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      smsBody = `Hi ${firstName}, hope you are happy with your ${job.device_model || 'device'} repair!
-
-If so, a 5-star Google review would mean the world to our small business →
-${reviewLink}
-
-(Takes 60 seconds — just tap the link above)
-
-If anything is not right, just reply here.
-
-– New Forest Device Repairs`
+      smsBody = `Hi ${firstName}!\n\nHope you are happy with your ${job.device_model || 'device'} repair! ✅\n\nIf so, a 5-star Google review would mean the world to our small business:\n⭐⭐⭐⭐⭐\n\nIt takes 60 seconds — just tap here:\n${reviewLink}\n\nIf anything is not right, please text us — we will sort it.\n\nNFD Repairs`
     }
 
     // Guard: don't send empty SMS to MacroDroid (causes MacroDroid failures)
@@ -468,12 +459,7 @@ export async function GET(request: NextRequest) {
             })
           } else {
             // Fallback if template not in database - includes review link
-            aftercareBody = `Hi ${firstName}, just checking in — how is your ${job.device_model} getting on? Any issues at all, just reply here and we will sort it.
-
-If you are happy with the repair, a quick review really helps us →
-${aftercareReviewLink}
-
-New Forest Device Repairs`
+            aftercareBody = `Hi ${firstName},\n\nJust checking in — how is your ${job.device_model} getting on? Any issues at all, just reply here and we will sort it.\n\nIf you are happy with the repair, a quick review really helps us →\n${aftercareReviewLink}\n\nNFD Repairs`
           }
 
           // Guard: don't send empty SMS to MacroDroid
@@ -580,10 +566,7 @@ New Forest Device Repairs`
             })
           } else {
             // Fallback if template not in database
-            reminderBody = `Hi ${firstName}, just a quick follow-up — if you haven't had a chance yet, we'd really appreciate a review. It takes 2 mins and means a lot to our small business →
-${reminderReviewLink}
-
-– New Forest Device Repairs`
+            reminderBody = `Hi ${firstName},\n\nJust a quick follow-up — if you have not had a chance yet, we would really appreciate a review. ⭐\n\nIt takes 2 mins and means a lot to our small business:\n${reminderReviewLink}\n\nNFD Repairs`
           }
 
           // Guard: don't send empty SMS to MacroDroid

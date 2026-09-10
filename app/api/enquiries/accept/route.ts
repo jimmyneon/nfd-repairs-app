@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     // Send confirmation SMS to customer
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (webhookUrl && enquiry.customer_phone) {
-      const smsMessage = `Great choice, ${enquiry.customer_name}! We've got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}. We'll be in touch ASAP to let you know what to do next. - NFD Repairs`
+      const smsMessage = `Hi ${enquiry.customer_name}! ✅\n\nGreat choice — we have got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe will be in touch ASAP to let you know what to do next.\n\nNFD Repairs`
 
       let smsOk = false
       try {

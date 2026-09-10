@@ -103,12 +103,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Fallback if template not in database
-      aftercareBody = `Hi ${firstName}, just checking in — how is your ${job.device_model} getting on? Any issues at all, just reply here and we will sort it.
-
-If you are happy with the repair, a quick review really helps us →
-${aftercareReviewLink}
-
-New Forest Device Repairs`
+      aftercareBody = `Hi ${firstName},\n\nJust checking in — how is your ${job.device_model} getting on? Any issues at all, just reply here and we will sort it.\n\nIf you are happy with the repair, a quick review really helps us →\n${aftercareReviewLink}\n\nNFD Repairs`
     }
 
     // Guard: don't send empty SMS

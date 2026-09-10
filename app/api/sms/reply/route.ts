@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
           // Send confirmation SMS
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
-            const smsBody = `Brilliant, thanks ${getFirstName(jobData.data.customer_name)}! Got your deposit — parts are being ordered now. Usually next-day delivery during working days. We'll text you when they arrive.\n\nNFD Repairs`
+            const smsBody = `Hi ${getFirstName(jobData.data.customer_name)}! 💳\n\nGot your deposit — thanks! Parts are being ordered now. Usually next-day delivery during working days.\n\nWe will text you when they arrive.\n\nNFD Repairs`
             const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
             await logSms(supabase, 'DEPOSIT_CONFIRMED', smsBody, result.ok, job.id)
           }
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
             const trustpilotLink = process.env.TRUSTPILOT_REVIEW_LINK || 'https://www.trustpilot.com'
             const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
             if (webhookUrl) {
-              const reviewBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for the Google review — it really means a lot.\n\nIf you have a spare minute, we'd love a Trustpilot one too:\n${trustpilotLink}\n\nNo pressure at all — every review helps us a lot.\n\nNew Forest Device Repairs`
+              const reviewBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for the Google review — it really means a lot. ⭐\n\nIf you have a spare minute, we would love a Trustpilot one too:\n${trustpilotLink}\n\nNo pressure at all — every review helps us a lot.\n\nNFD Repairs`
               const result = await sendViaMacroDroid(webhookUrl, phone, reviewBody)
               await logSms(supabase, 'REVIEW_FLIP_TRUSTPILOT', reviewBody, result.ok, job.id)
             }
@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
             // Both platforms done — just acknowledge
             const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
             if (webhookUrl) {
-              const ackBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for leaving a review — we really appreciate it!\n\nNew Forest Device Repairs`
+              const ackBody = `Hi ${getFirstName(job.customer_name)},\n\nThank you so much for leaving a review — we really appreciate it! ⭐\n\nNFD Repairs`
               const result = await sendViaMacroDroid(webhookUrl, phone, ackBody)
               await logSms(supabase, 'AUTO_REVIEW_ACK', ackBody, result.ok, job.id)
             }
@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
     const orphanIntent = detectSmsIntent(message)
     if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'turnaround' || orphanIntent === 'collection') {
       if (webhookUrl) {
-        const orphanBody = `Hi,\n\nWe can't find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it's booked in under and we'll find it straight away.\n\nNew Forest Device Repairs`
+        const orphanBody = `Hi,\n\nWe cannot find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it is booked in under and we will find it straight away.\n\nNFD Repairs`
         const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
         await logSms(supabase, 'ORPHAN_STATUS_REPLY', orphanBody, result.ok)
         orphanSmsSent = result.ok
@@ -460,7 +460,7 @@ async function handleEnquiryReply({
   // ---- Medium confidence → send "Reply YES to confirm" prompt ----
   if (detection.classification === 'medium') {
     const deviceLabel = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
-    const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nJust to confirm — would you like to go ahead with the ${deviceLabel} repair${enquiry.quoted_price ? ` at £${enquiry.quoted_price}` : ''}?\n\nReply YES to book it in, or let me know if you have any questions.\n\nNew Forest Device Repairs`
+    const smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nJust to confirm — would you like to go ahead with the ${deviceLabel} repair${enquiry.quoted_price ? ` at £${enquiry.quoted_price}` : ''}?\n\nReply YES to book it in, or let me know if you have any questions.\n\nNFD Repairs`
 
     if (webhookUrl) {
       const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
@@ -495,7 +495,7 @@ async function handleEnquiryReply({
       .update({ status: 'rejected', updated_at: now })
       .eq('id', enquiry.id)
 
-    const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nNo problem at all. If you change your mind or need anything else in the future, just give us a call or text.\n\nTake care,\nNew Forest Device Repairs`
+    const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nNo problem at all. If you change your mind or need anything else in the future, just give us a call or text.\n\nTake care,\nNFD Repairs`
 
     if (webhookUrl) {
       const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
@@ -657,7 +657,7 @@ async function autoConvertEnquiry({
 
   // Send confirmation SMS to customer
   const deviceLabel = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
-  const smsBody = `Hi ${getFirstName(enquiry.customer_name)},\n\nGreat news — your ${deviceLabel} repair is booked in!\n\nPop in with your device whenever you're ready — no appointment needed.\n\nOpening hours: ${shortHoursLink()}\nTrack your repair: ${shortTrackingLink(shortToken)}\n\nSee you soon,\nNew Forest Device Repairs`
+  const smsBody = `Hi ${getFirstName(enquiry.customer_name)}! ✅\n\nGreat news — your ${deviceLabel} repair is booked in!\n\nPop in with your device whenever you are ready — no appointment needed.\n\n📍 Opening hours: ${shortHoursLink()}\n🔗 Track your repair: ${shortTrackingLink(shortToken)}\n\nSee you soon!\nNFD Repairs`
 
   if (webhookUrl) {
     const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
@@ -949,7 +949,7 @@ function buildWelcomeMessage(hoursStatus: {
   lines.push('Anything else? Just reply here.')
   lines.push('')
   lines.push('John')
-  lines.push('New Forest Device Repairs')
+  lines.push('NFD Repairs')
 
   return lines.join('\n')
 }
@@ -1230,16 +1230,16 @@ function buildCollectionReply(job: any, smsCount: number): string {
   // Ready to collect
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
     const variants = [
-      `Yes! Your device is ready to collect. Pop in during opening hours: ${hoursLink}`,
-      `It's all done and waiting for you! Come grab it whenever we're open: ${hoursLink}`,
-      `Good news — it's ready! Come in whenever suits you: ${hoursLink}`,
+      `Yes! ✅ Your device is ready to collect. Pop in during opening hours: ${hoursLink}`,
+      `It's all done and waiting for you! ✅ Come grab it whenever we're open: ${hoursLink}`,
+      `Good news — it's ready! ✅ Come in whenever suits you: ${hoursLink}`,
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   // Already collected
   if (status === 'COLLECTED') {
-    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If something's not right, just text us here.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If something's not right, just text us here.\n\nNFD Repairs`
   }
 
   // Not ready yet — tell them current status + when to expect
@@ -1249,7 +1249,7 @@ function buildCollectionReply(job: any, smsCount: number): string {
       "Still being repaired, I'm afraid. We'll give you a buzz the moment it's done and ready for you.",
       "Not quite there yet — we're still fixing it. We'll text you as soon as it's ready to pick up.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'PARTS_ORDERED') {
@@ -1258,7 +1258,7 @@ function buildCollectionReply(job: any, smsCount: number): string {
       "Still waiting on parts, I'm afraid. Once they arrive we'll crack on with the repair and text you when it's done.",
       "Not yet — parts are on their way. We'll text you as soon as the repair's finished and it's ready to collect.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'PARTS_ARRIVED') {
@@ -1268,15 +1268,15 @@ function buildCollectionReply(job: any, smsCount: number): string {
         "Almost there — parts are in and we're working on it. We'll text you the moment it's ready to collect.",
         "Not quite — we've just started the repair with the new parts. We'll text you as soon as it's done.",
       ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNFD Repairs`
     } else {
       // Device still with customer
-      return `Hi ${firstName},\n\nNot yet — the parts have arrived but we need your device first! Bring it in during opening hours and we'll get started straight away.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nNot yet — the parts have arrived but we need your device first! Bring it in during opening hours and we'll get started straight away.\n\nOur hours: ${hoursLink}\nNFD Repairs`
     }
   }
 
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1285,20 +1285,20 @@ function buildCollectionReply(job: any, smsCount: number): string {
       "Still in the queue, I'm afraid. We'll text you as soon as we start on it and again when it's ready.",
       "Not yet — we've got it checked in and waiting. We'll text you the moment it's ready to pick up.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start the repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start the repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
-    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNFD Repairs`
   }
 
   // Fallback
   const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
-  return `Hi ${firstName},\n\n${statusInfo}\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+  return `Hi ${firstName},\n\n${statusInfo}\n\nOur hours: ${hoursLink}\nNFD Repairs`
 }
 
 /**
@@ -1315,11 +1315,11 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
 
   // Already done
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
-    return `Hi ${firstName},\n\nIt's already done and ready to collect! Pop in whenever we're open: ${hoursLink}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nIt's already done and ready to collect! Pop in whenever we're open: ${hoursLink}\n\nNFD Repairs`
   }
 
   if (status === 'COLLECTED') {
-    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If anything's not right, just text us.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nYour device was already collected — hope all's well! If anything's not right, just text us.\n\nNFD Repairs`
   }
 
   // In repair — give ETA from this point
@@ -1329,7 +1329,7 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
       `Currently being repaired — typically ${cleanEta} for this type of job. We'll text you as soon as it's ready.`,
       `We're on it! Expect about ${cleanEta} for this repair. We'll be in touch the second it's finished.`,
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   // Parts ordered — add parts wait + repair time
@@ -1339,7 +1339,7 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
       `We're waiting on parts (2-3 days), then it's about ${cleanEta} to do the repair. We'll let you know when parts land.`,
       `Once parts arrive (usually 2-3 days), the repair takes about ${cleanEta}. We'll text you the moment it's ready.`,
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   // Parts arrived — depends on whether device is in shop
@@ -1350,10 +1350,10 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
         `Parts just landed — now it's about ${cleanEta} to do the repair. We'll be in touch the moment it's done.`,
         `Good news — parts are in. Expect about ${cleanEta} for the repair. We'll text you as soon as it's finished.`,
       ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
     } else {
       // Device still with customer
-      return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${cleanEta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${cleanEta}.\n\nOur hours: ${hoursLink}\nNFD Repairs`
     }
   }
 
@@ -1361,29 +1361,29 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED' || status === 'AWAITING_DEVICE') {
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
       // Device still with customer, parts in stock
-      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNFD Repairs`
     }
     const variants = [
       `Once we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.`,
       `Typically ${cleanEta} for this repair once we get started. It's in the queue and we'll text you as soon as we crack on.`,
       `This repair is usually about ${cleanEta}. We'll text you the moment we start working on it.`,
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   // Awaiting deposit
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNFD Repairs`
   }
 
   // Diagnostic
   if (status === 'DIAGNOSTIC') {
-    return `Hi ${firstName},\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNFD Repairs`
   }
 
   // Fallback
   const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
-  return `Hi ${firstName},\n\n${statusInfo}\n\nNew Forest Device Repairs`
+  return `Hi ${firstName},\n\n${statusInfo}\n\nNFD Repairs`
 }
 
 /**
@@ -1398,15 +1398,15 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
   // Yes, it's done!
   if (status === 'READY_TO_COLLECT' || status === 'COMPLETED') {
     const variants = [
-      `Yes! It's all done and ready to collect. Pop in during opening hours: ${hoursLink}`,
-      `Done and dusted! Come grab it whenever we're open: ${hoursLink}`,
-      `Yes, it's finished! Ready for collection — come in whenever suits you: ${hoursLink}`,
+      `Yes! ✅ It's all done and ready to collect. Pop in during opening hours: ${hoursLink}`,
+      `Done and dusted! ✅ Come grab it whenever we're open: ${hoursLink}`,
+      `Yes, it's finished! ✅ Ready for collection — come in whenever suits you: ${hoursLink}`,
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   if (status === 'COLLECTED') {
-    return `Hi ${firstName},\n\nYes — it was done and you've already collected it. Hope all's well! If anything's not right, just text us.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nYes — it was done and you've already collected it. Hope all's well! If anything's not right, just text us.\n\nNFD Repairs`
   }
 
   // No, not yet
@@ -1416,7 +1416,7 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
       "Still in progress, I'm afraid. We'll text you the moment it's finished.",
       "Not quite — still being repaired. We'll be in touch as soon as it's done.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   if (status === 'PARTS_ORDERED') {
@@ -1425,7 +1425,7 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
       "Not yet, I'm afraid — parts are on order. We'll text you as soon as the repair's done.",
       "Still waiting on parts. Once they arrive we'll crack on and text you the moment it's finished.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   if (status === 'PARTS_ARRIVED') {
@@ -1435,14 +1435,14 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
         "Not quite — we've just started the repair with the new parts. We'll text you the moment it's finished.",
         "Almost — parts are in and we're on it. We'll text you as soon as it's done.",
       ]
-      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
     } else {
-      return `Hi ${firstName},\n\nNot yet — the parts are here but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nNot yet — the parts are here but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
     }
   }
 
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1451,20 +1451,20 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
       "Not yet, I'm afraid — still waiting to be started. We'll text you as soon as it's finished.",
       "Not yet — it's checked in and in the queue. We'll text you the moment it's done.",
     ]
-    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\n${variants[smsCount % variants.length]}\n\nNFD Repairs`
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need a £20 deposit to order parts before we can start. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
-    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNFD Repairs`
   }
 
   // Fallback
   const statusInfo = pickVariant(status, smsCount) || fallbackStatusMessage(status)
-  return `Hi ${firstName},\n\n${statusInfo}\n\nNew Forest Device Repairs`
+  return `Hi ${firstName},\n\n${statusInfo}\n\nNFD Repairs`
 }
 
 /**
@@ -1476,7 +1476,7 @@ function buildUpdateReply(job: any, smsCount: number): AutoReply {
   const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
   return {
     templateKey: 'AUTO_STATUS_REPLY',
-    body: `Hi ${firstName},\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNew Forest Device Repairs`,
+    body: `Hi ${firstName},\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNFD Repairs`,
   }
 }
 
@@ -1489,7 +1489,7 @@ async function detectAutoReply(message: string, job: any, smsCount: number = 0, 
   if (intent === 'location') {
     return {
       templateKey: 'AUTO_LOCATION_REPLY',
-      body: `Hi ${getFirstName(job.customer_name)},\n\nHere's where we are and our opening hours: nfdr.uk/h\n\nNew Forest Device Repairs`,
+      body: `Hi ${getFirstName(job.customer_name)},\n\nHere's where we are and our opening hours: nfdr.uk/h\n\nNFD Repairs`,
     }
   }
 

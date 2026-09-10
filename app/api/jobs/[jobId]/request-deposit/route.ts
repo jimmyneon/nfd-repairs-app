@@ -104,7 +104,7 @@ export async function POST(
         })
       } else {
         // Fallback if template not in database — concise, explains why deposit is needed
-        smsMessage = `Hi ${firstName}, your ${job.device_model || 'device'} needs special-order parts. We need a £${depositAmount} deposit to order them — parts are usually next-day delivery.\n\nPay here: ${depositUrl}\n\nReply PAID once done and we'll get them ordered straight away.\n\nNFD Repairs`
+        smsMessage = `Hi ${firstName}!\n\nWe need to order parts for your ${job.device_model || 'device'} repair.\n\n💳 To get the order started, we just need a £${depositAmount} deposit.\n\nThis secures the part and your repair slot. The £${depositAmount} comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
       }
 
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL

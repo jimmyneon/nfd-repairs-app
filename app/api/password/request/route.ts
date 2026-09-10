@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer has no phone number' }, { status: 400 })
     }
 
-    // Generate a secure random token
-    const token = randomBytes(32).toString('hex')
+    // Generate a secure random token (12 hex chars = 48 bits = 281 trillion combinations)
+    // Short enough for SMS-friendly links, still impossible to brute-force with 24h expiry + rate limiting
+    const token = randomBytes(6).toString('hex')
 
     // Create password request record
     const { data: passwordRequest, error: reqError } = await supabase
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
         job_ref: job.job_ref,
       })
     } else {
-      smsBody = `Hi ${firstName}, to complete your repair we need your device passcode. Please enter it securely using this link:\n\n${passwordLink}\n\nThis link expires in 24 hours. Your passcode is stored securely and deleted 7 days after collection.\n\nMany thanks,\nNew Forest Device Repairs`
+      smsBody = `Hi ${firstName}!\n\nTo complete your repair, we need your device passcode.\n\n🔐 Please enter it securely using this link:\n${passwordLink}\n\nThis link expires in 24 hours.\n\nYour passcode is stored securely and deleted 7 days after collection.\n\nNFD Repairs`
     }
 
     // Send SMS via MacroDroid

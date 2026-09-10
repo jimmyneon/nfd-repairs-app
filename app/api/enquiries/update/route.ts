@@ -337,8 +337,8 @@ export async function POST(request: NextRequest) {
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl && enquiry.customer_phone) {
         const smsMessage = action === 'reserve_repair'
-          ? `Thanks ${enquiry.customer_name}!\n\nWe've got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request.\n\nWe'll be in touch ASAP with next steps.\n\nNew Forest Device Repairs\nnfdr.uk/h`
-          : `Thanks ${enquiry.customer_name}!\n\nWe'll look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe'll be in touch to confirm.\n\nNew Forest Device Repairs\nnfdr.uk/h`
+          ? `Hi ${enquiry.customer_name}! ✅\n\nWe have got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request.\n\nWe will be in touch ASAP with next steps.\n\nNFD Repairs\nnfdr.uk/h`
+          : `Hi ${enquiry.customer_name}! ✅\n\nWe will look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe will be in touch to confirm.\n\nNFD Repairs\nnfdr.uk/h`
         try {
           const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
           try {
@@ -419,8 +419,8 @@ export async function POST(request: NextRequest) {
             : ''
           const personalisedText = personalisedMessage ? `\n\n${personalisedMessage}` : ''
           const smsMessage = isInstant
-            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
-            : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
+            ? `Hi ${enquiry.customer_name}!\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNFD Repairs`
+            : `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
             const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {

@@ -72,18 +72,18 @@ export async function POST(request: NextRequest) {
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     const statusMessages: Record<string, string> = {
-      'QUOTE_APPROVED': 'Your repair quote has been approved! Please drop off your device at New Forest Device Repairs to begin the repair.',
+      'QUOTE_APPROVED': 'Your repair quote has been approved! Please use the booking link below to get started.',
       'DROPPED_OFF': 'We have received your device and will begin the repair process.',
-      'RECEIVED': 'We have received your device and will assess it shortly.',
+      'RECEIVED': 'Your device is now booked in with us. We will keep you updated throughout the repair.',
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
-      'PARTS_ORDERED': 'Parts have been ordered and we\'ll notify you when they arrive.',
-      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. We\'re ready to start your repair.',
-      'IN_REPAIR': 'Our technicians are working on your repair. We\'ll update you when it\'s ready.',
-      'READY_TO_COLLECT': 'Your repair is complete! Your device is ready to collect at New Forest Device Repairs.',
+      'PARTS_ORDERED': 'Parts have been ordered. We will let you know as soon as they arrive — usually 2-3 working days.',
+      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please bring your device in whenever suits you.',
+      'IN_REPAIR': 'Your device is now being repaired. We will update you as soon as it is ready to collect.',
+      'READY_TO_COLLECT': 'Your repair is complete! Your device is ready to collect.',
       'COLLECTED': 'Thank you for collecting your device!',
-      'COMPLETED': 'Thank you for choosing New Forest Device Repairs!',
+      'COMPLETED': 'Your repair is all done. If you notice any issues, just let us know.',
       'CANCELLED': 'This repair has been cancelled. If you have any questions, please contact us.',
-      'DELAYED': 'Your repair is experiencing a delay. We\'ll contact you with more information shortly.',
+      'DELAYED': 'There is a slight delay with your repair. We will contact you with more information shortly.',
     }
 
     const emailTemplate = generateEmbeddedJobEmail(

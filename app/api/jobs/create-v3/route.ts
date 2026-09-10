@@ -398,7 +398,7 @@ export async function POST(request: NextRequest) {
       } as any)
       effectiveTemplate = {
         key: 'QUICK_INTAKE',
-        body: 'Hi {first_name}, your device is now booked in with us. We just need a few more details — please use this link to complete your check-in:\n\n{tracking_link}\n\nWe\'ll update you as soon as possible.\n\nMany thanks,\nNew Forest Device Repairs',
+        body: 'Hi {first_name}! 🔧\n\nYour device is now booked in with us.\n\nWe just need a few more details — please use this link to complete your check-in:\n{tracking_link}\n\nNFD Repairs',
         is_active: true,
       } as any
     }

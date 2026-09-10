@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     let smsBody = ''
     if (depositAlreadyPaid) {
       // Parts needed + deposit paid
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}, thanks for your deposit!\n\nWe've ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it's usually next-day delivery, but can occasionally take a little longer.\n\nWe'll text you as soon as it arrives. Track your repair: ${shortTrackingLink(trackingToken)}\n\nNew Forest Device Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 💳\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\n🔗 Track your repair: ${shortTrackingLink(trackingToken)}\n\nNFD Repairs`
     } else if (requiresParts) {
       // Parts needed — request the deposit before ordering
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           })
-        : `Hi ${getFirstName(enquiry.customer_name)}, your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} needs special-order parts. We need a £20 deposit to order them — parts are usually next-day delivery during working days.\n\nPay here: ${depositUrl}\n\nReply PAID once done and we'll get them ordered straight away.\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}, great news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust bring your device in whenever suits you during opening hours — no appointment needed.\n\nDirections and hours: ${hoursLink}\nTrack your repair: ${shortTrackingLink(job.short_token || trackingToken)}\n\nNew Forest Device Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust bring your device in whenever suits you during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}\n\nNFD Repairs`
     }
 
     let smsSent = false
