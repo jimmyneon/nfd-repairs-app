@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
 
       // If terms accepted, send SMS and notify staff
       if (terms_accepted) {
-        await sendWalkInSms(supabase, existing.job_ref, existing.short_token || existing.tracking_token, customer_name, customer_phone)
+        await sendWalkInSms(supabase, job_id, existing.job_ref, existing.short_token || existing.tracking_token, customer_name, customer_phone, device_make || '', device_model || '')
         await sendWalkInEmail(supabase, job_id)
 
         await supabase.from('notifications').insert({
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
 
   if (terms_accepted) {
     // Send SMS to customer
-    await sendWalkInSms(supabase, newJob.job_ref, newJob.short_token || trackingToken, customer_name, customer_phone)
+    await sendWalkInSms(supabase, newJob.id, newJob.job_ref, newJob.short_token || trackingToken, customer_name, customer_phone, device_make || '', device_model || '')
     await sendWalkInEmail(supabase, newJob.id)
 
     // Notify staff
@@ -260,16 +260,27 @@ export async function POST(request: NextRequest) {
 
 async function sendWalkInSms(
   supabase: any,
+  jobId: string,
   jobRef: string,
   shortToken: string | null,
   customerName: string,
-  customerPhone: string
+  customerPhone: string,
+  deviceMake: string,
+  deviceModel: string
 ) {
   const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-  if (!webhookUrl) return
+  if (!webhookUrl) {
+    console.error('[walk-in] MACRODROID_WEBHOOK_URL not set')
+    return
+  }
 
   const firstName = getFirstName(customerName)
   const trackingUrl = shortTrackingLink(shortToken || '')
+
+  // Build device summary for template
+  const deviceSummary = (deviceMake && deviceModel)
+    ? `${deviceMake} ${deviceModel}`.trim()
+    : (deviceMake || deviceModel || 'device')
 
   // Try to get the RECEIVED template from the database
   const { data: template } = await supabase
@@ -281,23 +292,26 @@ async function sendWalkInSms(
 
   let smsBody: string
   if (template?.body) {
-    // Simple template rendering
     smsBody = template.body
       .replace(/\{first_name\}/g, firstName)
       .replace(/\{customer_name\}/g, customerName)
+      .replace(/\{device_summary\}/g, deviceSummary)
+      .replace(/\{device_make\}/g, deviceMake || '')
+      .replace(/\{device_model\}/g, deviceModel || '')
       .replace(/\{tracking_link\}/g, trackingUrl)
       .replace(/\{job_ref\}/g, jobRef)
   } else {
-    smsBody = `Hi ${firstName}! 👋\n\nYour device is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.\n\nNFD Repairs`
+    smsBody = `Hi ${firstName}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.\n\nNFD Repairs`
   }
 
   try {
     const result = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
     await supabase.from('sms_logs').insert({
-      phone: customerPhone,
-      message: smsBody,
-      status: result.ok ? 'SENT' : 'FAILED',
+      job_id: jobId,
       template_key: 'RECEIVED',
+      body_rendered: smsBody,
+      status: result.ok ? 'SENT' : 'FAILED',
+      recipient_phone: customerPhone,
     } as any)
   } catch (err) {
     console.error('Walk-in SMS error:', err)

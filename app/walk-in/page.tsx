@@ -63,10 +63,15 @@ export default function WalkInSelfBookingPage() {
   const issueOptions: Record<string, string[]> = {
     phone: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Data Recovery', 'Software Issues', 'Other'],
     tablet: ['Screen Replacement', 'Battery Replacement', 'Charging Port Replacement', 'Not Charging', 'Water Damage', 'No Power', 'Black Screen', 'Software Issues', 'Other'],
-    computer: ['Screen Replacement', 'Keyboard Replacement', 'Battery Replacement', 'Charging Issues', 'Windows Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
+    computer: ['Screen Replacement', 'Keyboard Replacement', 'Battery Replacement', 'Charging Issues', 'Windows 10 Install', 'Windows 11 Install', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
     macbook: ['Screen Replacement', 'Battery Replacement', 'Keyboard Replacement', 'Charging Issues', 'macOS Reinstall', 'Software Issues', 'Hardware Diagnostics', 'Data Recovery', 'Other'],
     console: ['HDMI Port Replacement', 'Disc Drive Issues', 'Overheating', 'No Power', 'Software Issues', 'Controller Issues', 'Other'],
     other: ['Hardware Issue', 'Software Issue', 'Data Recovery', 'Other'],
+  }
+
+  // Manual brand lists for device types where the catalogue is too generic
+  const MANUAL_BRANDS: Record<string, string[]> = {
+    computer: ['Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'MSI', 'Samsung', 'Microsoft Surface', 'Toshiba', 'Custom-built Desktop', 'Custom-built Gaming PC', 'Other'],
   }
 
   // --- Restore from localStorage on mount ---
@@ -126,6 +131,11 @@ export default function WalkInSelfBookingPage() {
 
   // Get available brands for the selected device type
   const getAvailableBrands = (): string[] => {
+    // Use manual brand list if one exists for this device type
+    if (MANUAL_BRANDS[formData.deviceType]) {
+      return MANUAL_BRANDS[formData.deviceType]
+    }
+
     if (!catalogue) return []
     const cats = DEVICE_TYPE_TO_CATEGORY[formData.deviceType] || []
     const brands = new Set<string>()
@@ -559,12 +569,14 @@ export default function WalkInSelfBookingPage() {
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Device Make
                         </label>
-                        {catalogue && getAvailableBrands().length > 0 ? (
+                        {getAvailableBrands().length > 0 ? (
                           <select
                             name="deviceMake"
                             value={formData.deviceMake}
                             onChange={handleChange}
-                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              validationErrors.deviceMake ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            }`}
                           >
                             <option value="">Select a brand...</option>
                             {getAvailableBrands().map(brand => (
@@ -577,12 +589,17 @@ export default function WalkInSelfBookingPage() {
                             name="deviceMake"
                             value={formData.deviceMake}
                             onChange={handleChange}
-                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              validationErrors.deviceMake ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            }`}
                             placeholder="e.g., Apple, Samsung, HP"
                           />
                         )}
-                        {catalogueError && (
-                          <p className="mt-1 text-xs text-gray-400">Could not load brand list — type it in instead.</p>
+                        {validationErrors.deviceMake && (
+                          <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            {validationErrors.deviceMake}
+                          </p>
                         )}
                       </div>
 
@@ -595,7 +612,9 @@ export default function WalkInSelfBookingPage() {
                             name="deviceModel"
                             value={formData.deviceModel}
                             onChange={handleChange}
-                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              validationErrors.deviceModel ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            }`}
                           >
                             <option value="">Select a model...</option>
                             {getAvailableModels().map(model => (
@@ -608,9 +627,17 @@ export default function WalkInSelfBookingPage() {
                             name="deviceModel"
                             value={formData.deviceModel}
                             onChange={handleChange}
-                            className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                              validationErrors.deviceModel ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                            }`}
                             placeholder="e.g., iPhone 14 Pro, Galaxy S23"
                           />
+                        )}
+                        {validationErrors.deviceModel && (
+                          <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            {validationErrors.deviceModel}
+                          </p>
                         )}
                       </div>
 
@@ -622,13 +649,21 @@ export default function WalkInSelfBookingPage() {
                           name="issue"
                           value={formData.issue}
                           onChange={handleChange}
-                          className="w-full px-4 py-3 text-lg border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                            validationErrors.issue ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                          }`}
                         >
                           <option value="">Select an issue...</option>
                           {(issueOptions[formData.deviceType] || []).map(issue => (
                             <option key={issue} value={issue}>{issue}</option>
                           ))}
                         </select>
+                        {validationErrors.issue && (
+                          <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4" />
+                            {validationErrors.issue}
+                          </p>
+                        )}
                       </div>
 
                       <div>
