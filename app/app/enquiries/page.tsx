@@ -67,6 +67,11 @@ interface Enquiry {
   staff_response?: string | null
   responded_at?: string | null
   updated_at?: string | null
+  commitment_type?: string | null
+  planned_repair_date?: string | null
+  reminder_at?: string | null
+  reminder_sent_at?: string | null
+  reminder_requested?: boolean
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string }> = {
@@ -325,6 +330,7 @@ function EnquiriesContent() {
   const getTileBadge = (e: Enquiry): { text: string; color: string } | null => {
     if (e.repair_reserved || e.proceed_with_repair) return { text: 'RESERVED', color: 'bg-green-500' }
     if (e.part_reserved) return { text: 'PART HELD', color: 'bg-blue-500' }
+    if (e.commitment_type === 'remind_later' && e.status === 'pending') return { text: 'REMIND LATER', color: 'bg-indigo-500' }
     if (e.hesitation_reason) return { text: 'HESITATING', color: 'bg-orange-500' }
     if (isPersonalisedQuoteNeeded(e)) return { text: 'QUOTE NEEDED', color: 'bg-purple-500' }
     return null
@@ -945,6 +951,21 @@ function EnquiriesContent() {
                       {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
                       {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
                       {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
+                      {selectedEnquiry.commitment_type === 'remind_later' && (
+                        <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 space-y-1">
+                          <p className="font-semibold text-indigo-700 dark:text-indigo-400">Remind Me Later</p>
+                          {selectedEnquiry.planned_repair_date && (
+                            <p><span className="font-semibold">Target repair date:</span> {new Date(selectedEnquiry.planned_repair_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                          )}
+                          {selectedEnquiry.reminder_at && !selectedEnquiry.reminder_sent_at && (
+                            <p><span className="font-semibold">Reminder due:</span> {new Date(selectedEnquiry.reminder_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                          )}
+                          {selectedEnquiry.reminder_sent_at && (
+                            <p className="text-green-600 dark:text-green-400"><span className="font-semibold">Reminder sent:</span> {new Date(selectedEnquiry.reminder_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">No booking, no deposit. Staff must check stock before booking in.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -463,7 +463,13 @@ async function handleEnquiryReply({
   }
 
   // ---- High-confidence ACCEPTANCE → auto-convert to job ----
+  // EXCEPT for remind-later leads: these need a stock/parts check first,
+  // so we mark the enquiry as accepted for staff action instead of
+  // auto-creating a job.
   if (detection.classification === 'accept') {
+    if (enquiry.commitment_type === 'remind_later') {
+      return handleRemindLaterAcceptance({ supabase, enquiry, phone, webhookUrl })
+    }
     return autoConvertEnquiry({ supabase, enquiry, phone, webhookUrl })
   }
 
@@ -548,6 +554,59 @@ async function handleEnquiryReply({
     routed_to: 'enquiry_unclear',
     enquiry_ref: enquiry.enquiry_ref,
     classification: detection.classification,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Handle acceptance from a Remind Me Later lead.
+// Does NOT auto-create a job — staff must check stock/parts first.
+// ---------------------------------------------------------------------------
+async function handleRemindLaterAcceptance({
+  supabase,
+  enquiry,
+  phone,
+  webhookUrl,
+}: {
+  supabase: SupabaseClient<any, any, any>
+  enquiry: any
+  phone: string
+  webhookUrl?: string
+}) {
+  const now = new Date().toISOString()
+
+  // Mark enquiry as accepted for staff action, cancel any outstanding reminder
+  await supabase
+    .from('enquiries')
+    .update({
+      status: 'approved',
+      proceed_with_repair: true,
+      reminder_cancelled_at: now,
+      updated_at: now,
+    } as any)
+    .eq('id', enquiry.id)
+
+  // Notify staff: customer wants to proceed, check stock/parts
+  await supabase.from('notifications').insert({
+    type: 'ENQUIRY_ACCEPTED',
+    title: 'Customer wants to proceed — check stock',
+    body: `${enquiry.customer_name} replied YES to their saved quote for ${enquiry.device_make || ''} ${enquiry.device_model || ''}${enquiry.quoted_price ? ` (£${enquiry.quoted_price})` : ''}. Check parts availability before booking in.`,
+    enquiry_id: enquiry.id,
+    is_read: false,
+  } as any)
+
+  // Send customer acknowledgement
+  if (webhookUrl) {
+    const smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks — we've got your request to go ahead with the ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\nWe'll check parts availability and text you with the next step. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
+    const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+    await logSms(supabase, 'REMIND_LATER_ACCEPTED', smsBody, result.ok)
+  }
+
+  console.log(`[sms/reply] Remind-later enquiry ${enquiry.enquiry_ref} accepted, pending stock check`)
+
+  return NextResponse.json({
+    success: true,
+    routed_to: 'remind_later_accepted',
+    enquiry_ref: enquiry.enquiry_ref,
   })
 }
 
