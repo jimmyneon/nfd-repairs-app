@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName } from '@/lib/sms-template'
-import { shortTrackingLink } from '@/lib/utils'
+import { getAppUrl } from '@/lib/utils'
 import { createServiceClient, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
 
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, count: 0, message: 'No pending intake reminders' })
     }
 
+    const walkInUrl = `${getAppUrl()}/walk-in`
     let sentCount = 0
     let failedCount = 0
     const now = new Date().toISOString()
@@ -79,9 +80,8 @@ export async function GET(request: NextRequest) {
       }
 
       const firstName = getFirstName(job.customer_name)
-      const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
 
-      const smsBody = `Hi ${firstName}! 👋\n\nJust a friendly reminder — you started checking in your device with us but haven't finished yet.\n\nTap here to complete it (takes 2 minutes):\n${trackingUrl}\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}! 👋\n\nJust a friendly reminder — you started checking in your device with us but haven't finished yet.\n\nTap here to complete it (takes 2 minutes):\n${walkInUrl}\n\nNFD Repairs`
 
       try {
         const result = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
@@ -91,10 +91,10 @@ export async function GET(request: NextRequest) {
           // Log the SMS
           await supabase.from('sms_logs').insert({
             job_id: job.id,
-            phone: job.customer_phone,
-            message: smsBody,
-            status: 'SENT',
             template_key: 'INTAKE_REMINDER',
+            body_rendered: smsBody,
+            status: 'SENT',
+            recipient_phone: job.customer_phone,
           } as any)
         } else {
           failedCount++
