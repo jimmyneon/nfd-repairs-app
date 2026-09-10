@@ -19,7 +19,6 @@ interface CustomerJob {
   requires_parts_order: boolean
   created_at: string
   status: string
-  source?: string
 }
 
 function normalizePhone(phone: string): string {
@@ -82,7 +81,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
       const searchTerm = searchQuery.trim()
       const normalizedPhone = normalizePhone(searchTerm)
 
-      // Search jobs table
+      // Search jobs table only — customer search is for previous booked-in jobs
       const jobsPromise = supabase
         .from('jobs')
         .select('*')
@@ -101,63 +100,14 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
           .limit(50)
       }
 
-      // Search quotes table (for customers who have quotes but no jobs yet)
-      const quotesPromise = supabase
-        .from('quotes')
-        .select('*')
-        .or(`customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`)
-        .order('original_created_at', { ascending: false })
-        .limit(50)
-
-      let quotesPhonePromise: any = null
-      if (normalizedPhone.length >= 7 && /^\d+$/.test(normalizedPhone)) {
-        quotesPhonePromise = supabase
-          .from('quotes')
-          .select('*')
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('original_created_at', { ascending: false })
-          .limit(50)
-      }
-
-      // Search enquiries table (new quote system)
-      const enquiriesPromise = supabase
-        .from('enquiries')
-        .select('*')
-        .eq('enquiry_type', 'repair_quote')
-        .or(`customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      let enquiriesPhonePromise: any = null
-      if (normalizedPhone.length >= 7 && /^\d+$/.test(normalizedPhone)) {
-        enquiriesPhonePromise = supabase
-          .from('enquiries')
-          .select('*')
-          .eq('enquiry_type', 'repair_quote')
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('created_at', { ascending: false })
-          .limit(50)
-      }
-
-      // Run all searches in parallel
-      const [jobsResult, jobsPhoneResult, quotesResult, quotesPhoneResult, enquiriesResult, enquiriesPhoneResult] = await Promise.all([
+      const [jobsResult, jobsPhoneResult] = await Promise.all([
         jobsPromise,
         jobsPhonePromise || Promise.resolve({ data: [], error: null }),
-        quotesPromise,
-        quotesPhonePromise || Promise.resolve({ data: [], error: null }),
-        enquiriesPromise,
-        enquiriesPhonePromise || Promise.resolve({ data: [], error: null }),
       ])
 
       if (jobsResult.error) throw jobsResult.error
-      if (quotesResult.error) {
-        console.error('Quotes search error (non-fatal):', quotesResult.error)
-      }
-      if (enquiriesResult.error) {
-        console.error('Enquiries search error (non-fatal):', enquiriesResult.error)
-      }
 
-      // Merge job results
+      // Merge job results, deduplicating by id
       const allJobs: CustomerJob[] = [...(jobsResult.data || [])]
       if (jobsPhoneResult.data) {
         for (const job of jobsPhoneResult.data) {
@@ -167,85 +117,8 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         }
       }
 
-      // Convert quotes to CustomerJob format and merge
-      const quoteCustomers: CustomerJob[] = []
-      if (quotesResult.data) {
-        for (const quote of quotesResult.data) {
-          quoteCustomers.push({
-            id: quote.id,
-            job_ref: quote.quote_request_id || 'QUOTE',
-            customer_name: quote.customer_name,
-            customer_phone: quote.customer_phone,
-            customer_email: quote.customer_email,
-            device_make: quote.device_make || '',
-            device_model: quote.device_model || '',
-            issue: quote.issue || '',
-            description: quote.description,
-            price_total: quote.quoted_price || 0,
-            requires_parts_order: false,
-            created_at: quote.original_created_at || quote.created_at,
-            status: quote.status || 'QUOTE',
-            source: 'quote',
-          })
-        }
-      }
-      if (quotesPhoneResult.data) {
-        for (const quote of quotesPhoneResult.data) {
-          if (!quoteCustomers.find(q => q.id === quote.id)) {
-            quoteCustomers.push({
-              id: quote.id,
-              job_ref: quote.quote_request_id || 'QUOTE',
-              customer_name: quote.customer_name,
-              customer_phone: quote.customer_phone,
-              customer_email: quote.customer_email,
-              device_make: quote.device_make || '',
-              device_model: quote.device_model || '',
-              issue: quote.issue || '',
-              description: quote.description,
-              price_total: quote.quoted_price || 0,
-              requires_parts_order: false,
-              created_at: quote.original_created_at || quote.created_at,
-              status: quote.status || 'QUOTE',
-              source: 'quote',
-            })
-          }
-        }
-      }
-
-      // Convert enquiries to CustomerJob format and merge
-      const enquiryCustomers: CustomerJob[] = []
-      const mapEnquiry = (e: any) => ({
-        id: e.id,
-        job_ref: e.enquiry_ref || 'ENQUIRY',
-        customer_name: e.customer_name,
-        customer_phone: e.customer_phone || '',
-        customer_email: e.customer_email,
-        device_make: e.device_make || '',
-        device_model: e.device_model || '',
-        issue: e.repair_type || '',
-        description: e.issue_description,
-        price_total: e.quoted_price || 0,
-        requires_parts_order: false,
-        created_at: e.created_at,
-        status: e.status || 'pending',
-        source: 'enquiry',
-      })
-      if (enquiriesResult.data) {
-        for (const e of enquiriesResult.data) {
-          enquiryCustomers.push(mapEnquiry(e))
-        }
-      }
-      if (enquiriesPhoneResult.data) {
-        for (const e of enquiriesPhoneResult.data) {
-          if (!enquiryCustomers.find(q => q.id === e.id)) {
-            enquiryCustomers.push(mapEnquiry(e))
-          }
-        }
-      }
-
-      // Combine all results and group by normalized phone
-      const allResults = [...allJobs, ...quoteCustomers, ...enquiryCustomers]
-      const uniqueCustomers = allResults.reduce((acc: CustomerJob[], item: CustomerJob) => {
+      // Group by normalized phone (one entry per customer)
+      const uniqueCustomers = allJobs.reduce((acc: CustomerJob[], item: CustomerJob) => {
         const normalizedItemPhone = normalizePhone(item.customer_phone || '')
         const exists = acc.find(c => normalizePhone(c.customer_phone || '') === normalizedItemPhone)
         if (!exists) {
@@ -268,12 +141,12 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
   const handleSelectCustomer = async (customer: CustomerJob) => {
     setSelectedCustomer(customer)
     
-    // Load all jobs AND quotes for this customer
+    // Load all jobs for this customer (previous booked-in jobs only)
     try {
       const normalizedPhone = normalizePhone(customer.customer_phone)
 
       // Search jobs by exact phone and by normalized phone
-      const [jobsExact, jobsNormalized, quotesExact, quotesNormalized, enquiriesExact, enquiriesNormalized] = await Promise.all([
+      const [jobsExact, jobsNormalized] = await Promise.all([
         supabase
           .from('jobs')
           .select('*')
@@ -282,28 +155,6 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         supabase
           .from('jobs')
           .select('*')
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('quotes')
-          .select('*')
-          .eq('customer_phone', customer.customer_phone)
-          .order('original_created_at', { ascending: false }),
-        supabase
-          .from('quotes')
-          .select('*')
-          .ilike('customer_phone', `%${normalizedPhone}%`)
-          .order('original_created_at', { ascending: false }),
-        supabase
-          .from('enquiries')
-          .select('*')
-          .eq('enquiry_type', 'repair_quote')
-          .eq('customer_phone', customer.customer_phone)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('enquiries')
-          .select('*')
-          .eq('enquiry_type', 'repair_quote')
           .ilike('customer_phone', `%${normalizedPhone}%`)
           .order('created_at', { ascending: false }),
       ])
@@ -318,59 +169,10 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
         }
       }
 
-      // Merge quotes, deduplicating by id
-      const allQuotes: CustomerJob[] = []
-      const allQuoteData = [...(quotesExact.data || []), ...(quotesNormalized.data || [])]
-      for (const quote of allQuoteData) {
-        if (!allQuotes.find(q => q.id === quote.id)) {
-          allQuotes.push({
-            id: quote.id,
-            job_ref: quote.quote_request_id || 'QUOTE',
-            customer_name: quote.customer_name,
-            customer_phone: quote.customer_phone,
-            customer_email: quote.customer_email,
-            device_make: quote.device_make || '',
-            device_model: quote.device_model || '',
-            issue: quote.issue || '',
-            description: quote.description,
-            price_total: quote.quoted_price || 0,
-            requires_parts_order: false,
-            created_at: quote.original_created_at || quote.created_at,
-            status: quote.status || 'QUOTE',
-            source: 'quote',
-          })
-        }
-      }
+      // Sort by date
+      allJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-      // Merge enquiries, deduplicating by id
-      const allEnquiries: CustomerJob[] = []
-      const allEnquiryData = [...(enquiriesExact.data || []), ...(enquiriesNormalized.data || [])]
-      for (const e of allEnquiryData) {
-        if (!allEnquiries.find(q => q.id === e.id)) {
-          allEnquiries.push({
-            id: e.id,
-            job_ref: e.enquiry_ref || 'ENQUIRY',
-            customer_name: e.customer_name,
-            customer_phone: e.customer_phone || '',
-            customer_email: e.customer_email,
-            device_make: e.device_make || '',
-            device_model: e.device_model || '',
-            issue: e.repair_type || '',
-            description: e.issue_description,
-            price_total: e.quoted_price || 0,
-            requires_parts_order: false,
-            created_at: e.created_at,
-            status: e.status || 'pending',
-            source: 'enquiry',
-          })
-        }
-      }
-
-      // Combine and sort by date
-      const combined = [...allJobs, ...allQuotes, ...allEnquiries]
-      combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-      setCustomerJobs(combined)
+      setCustomerJobs(allJobs)
     } catch (error) {
       console.error('Error loading customer jobs:', error)
     }
@@ -516,11 +318,6 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {customer.issue}
                       </div>
-                      {(customer.source === 'quote' || customer.source === 'enquiry') && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
-                          {customer.source === 'enquiry' ? 'Enquiry' : 'Quote only'}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </button>
@@ -566,7 +363,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
 
               <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" />
-                Previous Jobs & Quotes ({customerJobs.length})
+                Previous Jobs ({customerJobs.length})
               </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Click a job to copy its device and repair details
@@ -611,7 +408,7 @@ export default function CustomerSearchModal({ isOpen, onClose, onSelectCustomer 
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
-                          {job.source === 'quote' ? 'QUOTE' : job.status.replace(/_/g, ' ')}
+                          {job.status.replace(/_/g, ' ')}
                         </span>
                         <span className="text-gray-400">#{job.job_ref}</span>
                       </div>
