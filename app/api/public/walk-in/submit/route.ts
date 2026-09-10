@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendViaMacroDroid, supabaseRetry } from '@/lib/resilience'
 import { shortTrackingLink } from '@/lib/utils'
 import { getFirstName } from '@/lib/sms-template'
+import { sendEmail } from '@/lib/email'
+import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
 
 export const dynamic = 'force-dynamic'
 
@@ -150,6 +152,7 @@ export async function POST(request: NextRequest) {
       // If terms accepted, send SMS and notify staff
       if (terms_accepted) {
         await sendWalkInSms(supabase, existing.job_ref, existing.short_token || existing.tracking_token, customer_name, customer_phone)
+        await sendWalkInEmail(supabase, job_id)
 
         await supabase.from('notifications').insert({
           type: 'NEW_JOB',
@@ -234,6 +237,7 @@ export async function POST(request: NextRequest) {
   if (terms_accepted) {
     // Send SMS to customer
     await sendWalkInSms(supabase, newJob.job_ref, newJob.short_token || trackingToken, customer_name, customer_phone)
+    await sendWalkInEmail(supabase, newJob.id)
 
     // Notify staff
     await supabase.from('notifications').insert({
@@ -297,5 +301,78 @@ async function sendWalkInSms(
     } as any)
   } catch (err) {
     console.error('Walk-in SMS error:', err)
+  }
+}
+
+/**
+ * Send a confirmation email to the customer (if they provided an email).
+ * Uses the same email template as the main job creation flow.
+ */
+async function sendWalkInEmail(supabase: any, jobId: string) {
+  try {
+    const { data: job } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
+
+    if (!job || !job.customer_email) return
+
+    const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
+    const emailTemplate = generateEmbeddedJobEmail(
+      {
+        job,
+        trackingUrl,
+        statusMessage: 'Your device is now booked in with us. We will keep you updated throughout the repair.',
+        includePrice: false,
+      },
+      'JOB_CREATED'
+    )
+
+    // Log email
+    const { data: emailLog }: any = await supabaseRetry(() =>
+      supabase
+        .from('email_logs')
+        .insert({
+          job_id: jobId,
+          template_key: 'JOB_CREATED',
+          subject: emailTemplate.subject,
+          body_html: emailTemplate.html,
+          body_text: emailTemplate.text,
+          recipient_email: job.customer_email,
+          status: 'PENDING',
+        } as any)
+        .select()
+        .single()
+    )
+
+    const result = await sendEmail(
+      job.customer_email,
+      emailTemplate.subject,
+      emailTemplate.html,
+      emailTemplate.text
+    )
+
+    if (result.success && emailLog) {
+      await supabaseRetry(() =>
+        supabase
+          .from('email_logs')
+          .update({
+            status: 'SENT',
+            sent_at: new Date().toISOString(),
+            resend_id: result.data?.id || null,
+          })
+          .eq('id', emailLog.id)
+      )
+    } else if (emailLog) {
+      await supabaseRetry(() =>
+        supabase
+          .from('email_logs')
+          .update({ status: 'FAILED', error_message: JSON.stringify(result.error) })
+          .eq('id', emailLog.id)
+      )
+    }
+  } catch (err) {
+    console.error('Walk-in email error:', err)
   }
 }
