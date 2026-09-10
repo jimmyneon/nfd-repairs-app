@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
       warranty,
       estimated_time,
       quote_key,
+      payday_date,
+      accessories,
       // Common
       additional_info,
     } = body
@@ -259,6 +261,8 @@ export async function POST(request: NextRequest) {
           warranty: warranty || null,
           estimated_time: estimated_time || null,
           quote_key: quote_key || null,
+          payday_date: payday_date || null,
+          accessories: accessories || null,
           // Common
           additional_info: additional_info || null,
           status: proceed_with_repair ? 'approved' : 'pending',
@@ -303,6 +307,8 @@ export async function POST(request: NextRequest) {
             proceed_with_repair: proceed_with_repair || false,
             marketing_consent: marketing_consent || false,
             quote_source: quote_source || null,
+            payday_date: payday_date || null,
+            accessories: accessories || null,
             additional_info: additional_info || null,
             status: proceed_with_repair ? 'approved' : 'pending',
           })
@@ -330,28 +336,33 @@ export async function POST(request: NextRequest) {
 
     // Create notification for staff
     const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
+    const isPayday = quote_source === 'reserve_for_payday' && proceed_with_repair
     const notifTitle = enquiry_type === 'repair_quote'
-      ? isProceed
-        ? `🔥 CUSTOMER WANTS TO PROCEED: ${device_make || ''} ${device_model || ''}`
-        : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
+      ? isPayday
+        ? `💰 RESERVE FOR PAYDAY: ${device_make || ''} ${device_model || ''}`
+        : isProceed
+          ? `🔥 CUSTOMER WANTS TO PROCEED: ${device_make || ''} ${device_model || ''}`
+          : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
       : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
     const notifBody = enquiry_type === 'repair_quote'
-      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
+      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
       : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
 
     await supabase.from('notifications').insert({
-      type: isProceed ? 'CUSTOMER_PROCEED' : 'NEW_ENQUIRY',
+      type: isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
       is_read: false,
     } as any)
 
     // Send staff SMS via MacroDroid for high-intent enquiries
-    // (customer wants to proceed) so you know to check stock and convert
+    // (customer wants to proceed or reserve for payday)
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (isProceed && webhookUrl) {
+    if ((isProceed || isPayday) && webhookUrl) {
       try {
-        const staffSms = `🔥 CUSTOMER WANTS TO PROCEED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nCheck stock & convert to job in the app.`
+        const staffSms = isPayday
+          ? `💰 RESERVE FOR PAYDAY\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nPayday: ${payday_date} - Order part & hold slot.`
+          : `🔥 CUSTOMER WANTS TO PROCEED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nCheck stock & convert to job in the app.`
         await sendViaMacroDroid(webhookUrl, SHOP_INFO.phone, staffSms)
       } catch (e) {
         console.error('Failed to send staff SMS:', e)
