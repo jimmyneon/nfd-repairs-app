@@ -133,8 +133,12 @@ export async function POST(request: NextRequest) {
         currency: 'GBP',
         merchant_code: merchantCode,
         description: `Repair reservation ${enquiry.enquiry_ref}`,
+        // SumUp posts checkout status changes here. The webhook then re-fetches
+        // the checkout from SumUp before trusting the payment state.
         return_url: `${appUrl}/api/payments/sumup`,
-        redirect_url: `${websiteUrl}/quote-v2/?reservation=return&ref=${encodeURIComponent(enquiry.enquiry_ref)}`,
+        // The temporary V2 test page is never relied on for payment completion.
+        // When the final journey goes live it will replace the canonical /quote/ UI.
+        redirect_url: `${websiteUrl}/quote/?reservation=return&ref=${encodeURIComponent(enquiry.enquiry_ref)}`,
         hosted_checkout: { enabled: true },
       }),
     })
