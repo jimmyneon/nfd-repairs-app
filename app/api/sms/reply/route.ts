@@ -590,7 +590,6 @@ async function handleRemindLaterAcceptance({
     type: 'ENQUIRY_ACCEPTED',
     title: 'Customer wants to proceed — check stock',
     body: `${enquiry.customer_name} replied YES to their saved quote for ${enquiry.device_make || ''} ${enquiry.device_model || ''}${enquiry.quoted_price ? ` (£${enquiry.quoted_price})` : ''}. Check parts availability before booking in.`,
-    enquiry_id: enquiry.id,
     is_read: false,
   } as any)
 
