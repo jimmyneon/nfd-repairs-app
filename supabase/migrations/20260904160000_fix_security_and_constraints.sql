@@ -10,42 +10,12 @@
 -- public access to a SECURITY DEFINER function that checks the token against the row.
 
 -- Drop the broken policy
-ALTER TABLE jobs DROP POLICY IF EXISTS "Public can view job by tracking token";
+DROP POLICY IF EXISTS "Public can view job by tracking token" ON jobs;
 
--- Create a function that checks if a tracking_token query parameter matches
--- Note: PostgREST passes query params as GUC headers. We use current_setting().
-CREATE OR REPLACE FUNCTION public.is_tracking_token_match(token text)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM jobs
-    WHERE tracking_token = token
-    AND id = $1  -- Not needed for SELECT policy but kept for clarity
-  );
-$$;
-
--- Actually, the cleanest approach: the tracking page API route uses the service
--- role key (bypasses RLS). The anon key is only used by the browser Supabase
--- client for auth. So we can safely restrict anon SELECT to only work when
--- a tracking_token is provided as a filter.
-
--- Drop the function we just created (not needed)
-DROP FUNCTION IF EXISTS public.is_tracking_token_match(text);
-
--- Simplest safe approach: only allow anon to select when tracking_token is not null
--- The API routes use service role key and bypass RLS entirely.
--- The browser client only uses anon key for auth, not for reading jobs.
--- So we restrict anon SELECT to rows where tracking_token IS NOT NULL
--- (still not ideal, but vastly better than USING(true)).
--- 
--- Better: use request.jwt.claims or request.headers — but the tracking page
--- doesn't use JWT. The real fix is: the tracking page API route uses service
--- role key, so we can just deny anon SELECT entirely.
-ALTER TABLE jobs DROP POLICY IF EXISTS "Public can view job by tracking token";
+-- The tracking page API route uses the service role key (bypasses RLS).
+-- The anon key is only used by the browser Supabase client for auth.
+-- So we can safely deny anon SELECT entirely.
+DROP POLICY IF EXISTS "Public can view job by tracking token" ON jobs;
 
 -- No anon SELECT on jobs. The tracking page uses /api/tracking/view (service role).
 -- The public intake uses /api/public/intake/[token] (service role).
@@ -56,6 +26,7 @@ CREATE POLICY "Public can view job by tracking token"
     USING (false);
 
 -- Allow authenticated (staff) to view all jobs
+DROP POLICY IF EXISTS "Staff can view jobs" ON jobs;
 CREATE POLICY "Staff can view jobs"
     ON jobs FOR SELECT
     TO authenticated
@@ -72,13 +43,16 @@ DROP POLICY IF EXISTS "Public can view by token" ON password_requests;
 DROP POLICY IF EXISTS "Public can update by token" ON password_requests;
 
 -- No anon access. API routes use service role key.
+DROP POLICY IF EXISTS "Public can view by token" ON password_requests;
 CREATE POLICY "Public can view by token" ON password_requests
     FOR SELECT TO anon USING (false);
 
+DROP POLICY IF EXISTS "Public can update by token" ON password_requests;
 CREATE POLICY "Public can update by token" ON password_requests
     FOR UPDATE TO anon USING (false);
 
 -- Allow authenticated (staff) to view
+DROP POLICY IF EXISTS "Staff can view password requests" ON password_requests;
 CREATE POLICY "Staff can view password requests" ON password_requests
     FOR SELECT TO authenticated USING (true);
 
@@ -95,6 +69,7 @@ CHECK (
     'RECEIVED',
     'DIAGNOSTIC',
     'AWAITING_DEPOSIT',
+    'AWAITING_DEVICE',
     'PARTS_ORDERED',
     'PARTS_ARRIVED',
     'IN_REPAIR',
@@ -117,6 +92,7 @@ CHECK (status_key IN (
     'RECEIVED',
     'DIAGNOSTIC',
     'AWAITING_DEPOSIT',
+    'AWAITING_DEVICE',
     'PARTS_ORDERED',
     'PARTS_ARRIVED',
     'IN_REPAIR',

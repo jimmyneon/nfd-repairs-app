@@ -3,7 +3,7 @@
 -- but the customer has not yet brought their device in.
 
 -- 1. SMS template for AWAITING_DEVICE status
-INSERT INTO sms_templates (key, body, is_active, description)
+INSERT INTO sms_templates (key, body, is_active)
 VALUES (
   'AWAITING_DEVICE',
   'Hi {customer_name}, great news — we have the parts in stock for your {device_make} {device_model} repair!
@@ -14,20 +14,17 @@ Directions and hours: {google_maps_link}
 Track your repair: {tracking_link}
 
 New Forest Device Repairs',
-  true,
-  'Sent when a quote is proceeded with and parts are in stock. Customer needs to bring device in.'
+  true
 )
 ON CONFLICT (key) DO UPDATE SET
   body = EXCLUDED.body,
-  is_active = true,
-  description = EXCLUDED.description;
+  is_active = true;
 
 -- 2. Notification config for AWAITING_DEVICE status
-INSERT INTO notification_config (status_key, send_sms, send_push, send_email, is_active)
-VALUES ('AWAITING_DEVICE', true, true, false, true)
+INSERT INTO notification_config (status_key, status_label, send_sms, send_email, is_active)
+VALUES ('AWAITING_DEVICE', 'Awaiting Device', true, false, true)
 ON CONFLICT (status_key) DO UPDATE SET
   send_sms = true,
-  send_push = true,
   send_email = false,
   is_active = true;
 

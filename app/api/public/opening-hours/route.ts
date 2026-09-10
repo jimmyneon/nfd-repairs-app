@@ -24,11 +24,27 @@ const FALLBACK_HOURS = {
 }
 
 function buildResponse(weeklyHours: Record<string, any>, specialHours: any, googleMapsUrl: string) {
+  // Use Europe/London timezone so BST is handled correctly
+  // Vercel runs in UTC, so new Date().getHours() returns UTC time
   const now = new Date()
+  const londonParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+
+  const weekdayPart = londonParts.find(p => p.type === 'weekday')?.value || ''
+  const hourPart = londonParts.find(p => p.type === 'hour')?.value || '0'
+  const minPart = londonParts.find(p => p.type === 'minute')?.value || '0'
+
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const currentDay = days[now.getDay()]
-  const currentHour = now.getHours()
-  const currentMin = now.getMinutes()
+  const currentDayIdx = dayMap[weekdayPart] ?? now.getDay()
+  const currentDay = days[currentDayIdx]
+  const currentHour = parseInt(hourPart, 10)
+  const currentMin = parseInt(minPart, 10)
 
   const weeklySchedule = days.map(day => ({
     day,
@@ -52,7 +68,7 @@ function buildResponse(weeklyHours: Record<string, any>, specialHours: any, goog
   let nextOpen: string | null = null
   if (!isOpen) {
     for (let i = 0; i <= 7; i++) {
-      const checkIdx = (now.getDay() + i) % 7
+      const checkIdx = (currentDayIdx + i) % 7
       const checkDay = days[checkIdx]
       const checkHours = weeklyHours[checkDay]
       if (checkHours?.isOpen) {
