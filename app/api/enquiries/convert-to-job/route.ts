@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    const requiresParts = stock_status !== 'in_stock'
+    const isDeviceInShop = stock_status === 'device_in_shop'
+    const requiresParts = stock_status !== 'in_stock' && !isDeviceInShop
     const depositAlreadyPaid = stock_status === 'parts_deposit_paid'
     const partsRequired = requiresParts
     const depositRequired = requiresParts
@@ -85,9 +86,11 @@ export async function POST(request: NextRequest) {
     const totalPrice = primaryPrice + additionalRepairsTotal
 
     // Determine job status
-    const jobStatus = requiresParts
-      ? (depositAlreadyPaid ? 'PARTS_ORDERED' : 'AWAITING_DEPOSIT')
-      : 'AWAITING_DEVICE'
+    const jobStatus = isDeviceInShop
+      ? 'RECEIVED'
+      : requiresParts
+        ? (depositAlreadyPaid ? 'PARTS_ORDERED' : 'AWAITING_DEPOSIT')
+        : 'AWAITING_DEVICE'
 
     // Generate job ref
     const { count: jobCount } = await supabase
@@ -135,7 +138,8 @@ export async function POST(request: NextRequest) {
       deposit_requested_at: requiresParts && !depositAlreadyPaid ? now : null,
 
       // Device possession — customer has device, needs to drop off
-      device_in_shop: false,
+      // (unless they've already dropped it off in the shop)
+      device_in_shop: isDeviceInShop,
 
       // Status
       status: jobStatus,
@@ -196,7 +200,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'SYSTEM',
-      message: `Job created from enquiry ${enquiry.enquiry_ref} (${depositAlreadyPaid ? 'Parts needed - deposit paid' : requiresParts ? 'Parts needed - awaiting deposit' : 'In stock'})`,
+      message: `Job created from enquiry ${enquiry.enquiry_ref} (${isDeviceInShop ? 'Device dropped off - booked in' : depositAlreadyPaid ? 'Parts needed - deposit paid' : requiresParts ? 'Parts needed - awaiting deposit' : 'In stock'})`,
     })
 
     // Create staff notification
@@ -213,7 +217,29 @@ export async function POST(request: NextRequest) {
     const customerPhone = enquiry.customer_phone
 
     let smsBody = ''
-    if (depositAlreadyPaid) {
+    if (isDeviceInShop) {
+      // Device already dropped off in the shop — send the normal "booked in" message
+      const trackingUrl = shortTrackingLink(job.short_token || trackingToken)
+      const { data: templates } = await supabase
+        .from('sms_templates')
+        .select('key, body')
+        .eq('key', 'RECEIVED')
+        .eq('is_active', true)
+        .single()
+
+      const deviceSummary = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
+      smsBody = templates?.body
+        ? renderSmsTemplate(templates.body, {
+            first_name: getFirstName(enquiry.customer_name),
+            customer_name: enquiry.customer_name || '',
+            device_make: enquiry.device_make || '',
+            device_model: enquiry.device_model || '',
+            device_summary: deviceSummary,
+            tracking_link: trackingUrl,
+            job_ref: job.job_ref,
+          })
+        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.\n\nNFD Repairs`
+    } else if (depositAlreadyPaid) {
       // Parts needed + deposit paid
       smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}\n\nNFD Repairs`
     } else if (requiresParts) {

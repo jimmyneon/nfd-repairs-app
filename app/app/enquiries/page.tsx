@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
@@ -344,7 +344,7 @@ function EnquiriesContent() {
     setShowTemplatePicker(false)
   }
 
-  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_needed') => {
+  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_needed' | 'device_in_shop') => {
     if (!selectedEnquiry) return
     setConverting(true)
     try {
@@ -1143,7 +1143,18 @@ function EnquiriesContent() {
                 {/* === MAIN ACTIONS === */}
                 {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
                   <div className="space-y-3 pt-2">
-                    <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Check stock — what do we need?</p>
+                    <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Convert to job — what's the situation?</p>
+                    <div className="grid grid-cols-1 gap-3">
+                      <button
+                        onClick={() => handleConvertToJob('device_in_shop')}
+                        disabled={converting}
+                        className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 disabled:opacity-50"
+                      >
+                        <Store className="h-5 w-5" />
+                        <span className="text-sm">Device Dropped Off</span>
+                        <span className="text-xs opacity-80">— Book in & send received message</span>
+                      </button>
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         onClick={() => handleConvertToJob('in_stock')}
