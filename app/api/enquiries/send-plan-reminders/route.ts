@@ -28,9 +28,8 @@ function formatDate(value: string | null): string {
 /**
  * GET /api/enquiries/send-plan-reminders
  *
- * Cron-only endpoint. Sends one neutral service follow-up for a repair quote
- * on the date explicitly selected by the customer. No discounts, cross-sells
- * or marketing copy are included.
+ * Cron-only endpoint. Sends one neutral service reminder two days before the
+ * repair date selected by the customer. No discounts, cross-sells or marketing.
  */
 export async function GET(request: NextRequest) {
   const authResponse = requireCronSecret(request)
@@ -59,13 +58,14 @@ export async function GET(request: NextRequest) {
 
     const { data: reminders, error: fetchError } = await supabase
       .from('enquiries')
-      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, follow_up_date, reminder_at, reminder_count, reminder_last_attempt_at, status, converted_to_job, proceed_with_repair')
+      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, planned_repair_date, reminder_at, reminder_count, reminder_last_attempt_at, status, converted_to_job, proceed_with_repair')
       .eq('enquiry_type', 'repair_quote')
+      .eq('commitment_type', 'remind_later')
       .eq('reminder_requested', true)
       .is('reminder_sent_at', null)
       .is('reminder_cancelled_at', null)
       .lte('reminder_at', now)
-      .gte('follow_up_date', today)
+      .gte('planned_repair_date', today)
       .in('status', ['pending', 'more_info_requested'])
       .or('converted_to_job.is.null,converted_to_job.eq.false')
       .or('proceed_with_repair.is.null,proceed_with_repair.eq.false')
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     if (fetchError) {
       console.error('[quote-reminders] Fetch failed:', fetchError)
-      const migrationMissing = /column|schema cache|follow_up|reminder_/i.test(fetchError.message || '')
+      const migrationMissing = /column|schema cache|planned_repair|reminder_/i.test(fetchError.message || '')
       return NextResponse.json({
         error: migrationMissing
           ? 'Quote reminder database migration has not been applied yet.'
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!reminders || reminders.length === 0) {
-      return NextResponse.json({ success: true, sent: 0, message: 'No quote reminders due.' })
+      return NextResponse.json({ success: true, sent: 0, message: 'No repair reminders due.' })
     }
 
     let sent = 0
@@ -116,13 +116,16 @@ export async function GET(request: NextRequest) {
       const firstName = getFirstName(enquiry.customer_name)
       const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
       const repair = repairLabel(enquiry.repair_type)
-      const followUpDate = formatDate(enquiry.follow_up_date)
+      const targetDate = formatDate(enquiry.planned_repair_date)
       const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
-      const priceText = enquiry.quoted_price
-        ? ` The quote you saved was £${enquiry.quoted_price}.`
-        : ''
+      const priceText = enquiry.display_price
+        ? ` Your saved quote is ${enquiry.display_price}.`
+        : enquiry.quoted_price
+          ? ` Your saved quote is £${enquiry.quoted_price}.`
+          : ''
+      const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
 
-      const smsBody = `Hi ${firstName}, here's the repair reminder you asked us to send on ${followUpDate}. Your ${device} ${repair} quote is still saved.${priceText}\n\nView it or go ahead here: ${quoteLink}\n\nIf you'd like to proceed, we'll check parts availability before you make a trip. If your plans have changed, that's absolutely fine.\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}, just a reminder about your ${device} ${repair}${optionText}.${priceText}\n\nYou said you were hoping to get it repaired around ${targetDate}. If you'd like to go ahead, open your saved quote here: ${quoteLink}\n\nWe'll check parts availability before you make a trip. If a part needs ordering, we'll let you know before asking for any deposit. If your plans have changed, that's absolutely fine.\n\nNFD Repairs`
 
       try {
         const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
@@ -130,7 +133,7 @@ export async function GET(request: NextRequest) {
 
         try {
           await supabase.from('sms_logs').insert({
-            template_key: 'QUOTE_FOLLOW_UP_REMINDER',
+            template_key: 'QUOTE_REMIND_LATER_DUE',
             body_rendered: smsBody,
             status: sentOk ? 'SENT' : 'FAILED',
             sent_at: sentOk ? new Date().toISOString() : null,
