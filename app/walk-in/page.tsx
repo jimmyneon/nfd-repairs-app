@@ -688,12 +688,12 @@ export default function WalkInSelfBookingPage() {
                   {loading ? (
                     <>
                       <Loader2 className="h-6 w-6 animate-spin" />
-                      Checking In...
+                      Submitting...
                     </>
                   ) : (
                     <>
                       <CheckCircle className="h-6 w-6" />
-                      Check In
+                      Submit
                     </>
                   )}
                 </button>
