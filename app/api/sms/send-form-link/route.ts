@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     : 'there'
   const isQuote = type === 'quote'
   const message = isQuote
-    ? `Hi ${firstName}!\n\nPlease use this short form to tell us about your device and request a repair quote:\n${LINKS.quote}\n\nNFD Repairs`
-    : `Hi ${firstName}!\n\nPlease use this form to check in your device while you wait:\n${LINKS.walk_in}\n\nOnce finished, show a member of staff.\n\nNFD Repairs`
+    ? `Hi ${firstName}! 👋\n\nPlease use this short form to tell us about your device and request a repair quote:\n${LINKS.quote}\n\nNFD Repairs`
+    : `Hi ${firstName}! 👋\n\nPlease use this form to check in your device while you wait:\n${LINKS.walk_in}\n\nOnce finished, show a member of staff.\n\nNFD Repairs`
 
   const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
   if (!webhookUrl) return NextResponse.json({ error: 'SMS service is not configured' }, { status: 500 })

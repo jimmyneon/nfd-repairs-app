@@ -264,9 +264,9 @@ export async function POST(request: NextRequest) {
         const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'your device'
 
         const variantMessages: Record<string, string> = {
-          diagnostics: `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. We'd need to run a proper diagnostic on it before we can give you an accurate quote.\n\nThe diagnostic is £40 and is deducted from the total repair bill if you go ahead.\n\nPop in to the shop during opening hours and we'll take a look.\n\nNFD Repairs\nnfdr.uk/h`,
-          quick_look: `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. I'll need to have a quick look at it before I can give you a proper quote.\n\nPop in whenever suits during opening hours — no charge for a quick look.\n\nNFD Repairs\nnfdr.uk/h`,
-          unable_to_quote: `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. I'm unable to give you a quote without seeing it first — the repairability depends on the extent of the damage.\n\nPop in during opening hours and we'll assess it in person. No charge for the assessment.\n\nNFD Repairs\nnfdr.uk/h`,
+          diagnostics: `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. We'd need to run a proper diagnostic on it before we can give you an accurate quote.\n\nThe diagnostic is £40 and is deducted from the total repair bill if you go ahead.\n\nPop in to the shop during opening hours and we'll take a look.\n\nNFD Repairs\nnfdr.uk/h`,
+          quick_look: `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. I'll need to have a quick look at it before I can give you a proper quote.\n\nPop in whenever suits during opening hours — no charge for a quick look.\n\nNFD Repairs\nnfdr.uk/h`,
+          unable_to_quote: `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. I'm unable to give you a quote without seeing it first — the repairability depends on the extent of the damage.\n\nPop in during opening hours and we'll assess it in person. No charge for the assessment.\n\nNFD Repairs\nnfdr.uk/h`,
         }
 
         const inspectionMessage = variantMessages[variant] || variantMessages.quick_look
@@ -349,8 +349,8 @@ export async function POST(request: NextRequest) {
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
       if (webhookUrl && enquiry.customer_phone) {
         const smsMessage = action === 'reserve_repair'
-          ? `Hi ${enquiry.customer_name}! ✅\n\nWe have got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request.\n\nWe will be in touch ASAP with next steps.\n\nNFD Repairs\nnfdr.uk/h`
-          : `Hi ${enquiry.customer_name}! ✅\n\nWe will look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''}.\n\nWe will be in touch to confirm.\n\nNFD Repairs\nnfdr.uk/h`
+          ? `Hi ${enquiry.customer_name}! 👋\n\nWe have got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request ✅\n\nWe will be in touch ASAP with next steps.\n\nNFD Repairs\nnfdr.uk/h`
+          : `Hi ${enquiry.customer_name}! 👋\n\nWe will look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ✅\n\nWe will be in touch to confirm.\n\nNFD Repairs\nnfdr.uk/h`
         try {
           const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
           try {
@@ -431,8 +431,8 @@ export async function POST(request: NextRequest) {
             : ''
           const personalisedText = personalisedMessage ? `\n\n${personalisedMessage}` : ''
           const smsMessage = isInstant
-            ? `Hi ${enquiry.customer_name}!\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
-            : `Hi ${enquiry.customer_name}!\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
+            ? `Hi ${enquiry.customer_name}! 👋\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
+            : `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
             const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {

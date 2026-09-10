@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
         .single()
 
       const fallbackTemplates: Record<string, string> = {
-        WARRANTY_APPROVED: 'Hi {first_name}! ✅\n\nGood news — we have approved your warranty request for your {device_model}.\n\nPlease bring it in when convenient.\n\nRef: {ticket_ref}\nNFD Repairs',
-        WARRANTY_APPROVED_PARTS: 'Hi {first_name}! ✅\n\nGood news — we have approved your warranty request for your {device_model}.\n\nWe need to order parts and will text when they arrive.\n\nRef: {ticket_ref}\nNFD Repairs',
-        WARRANTY_DECLINED: 'Hi {first_name},\n\nWe have reviewed your warranty request for your {device_model}.\n\nUnfortunately this issue is not covered: {decline_reason}\n\nPlease reply if you would like a paid repair quote.\n\nNFD Repairs',
+        WARRANTY_APPROVED: 'Hi {first_name}! 👋\n\nGood news — we have approved your warranty request for your {device_model} ✅\n\nPlease bring it in when convenient.\n\nRef: {ticket_ref}\nNFD Repairs',
+        WARRANTY_APPROVED_PARTS: 'Hi {first_name}! 👋\n\nGood news — we have approved your warranty request for your {device_model} ✅\n\nWe need to order parts and will text when they arrive.\n\nRef: {ticket_ref}\nNFD Repairs',
+        WARRANTY_DECLINED: 'Hi {first_name} 👋\n\nWe have reviewed your warranty request for your {device_model}.\n\nUnfortunately this issue is not covered: {decline_reason}\n\nPlease reply if you would like a paid repair quote.\n\nNFD Repairs',
       }
 
       smsBody = renderSmsTemplate(template?.body || fallbackTemplates[templateKey] || '', {

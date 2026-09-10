@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you.\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl) {
             try {
@@ -406,7 +406,7 @@ function buildMissedCallMessage(ctx: {
   googleMapsUrl: string
   specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
 }): string {
-  const lines: string[] = ['Hi, sorry we missed your call.']
+  const lines: string[] = ['Hi, sorry we missed your call! 👋']
 
   // Special hours / holiday banner takes priority over regular hours
   if (ctx.specialHours?.active && ctx.specialHours?.note) {

@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     let smsSent = false
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     if (webhookUrl) {
-      const ackMessage = `Hi ${getFirstName(name)}!\n\nThanks for your repair request${device_make || device_model ? ` for your ${device_make || ''} ${device_model || ''}`.trim() : ''}.\n\nJohn will review it and get back to you with a quote — usually within 2 hours during business hours.\n\n📍 Opening hours: nfdr.uk/h\n\nNFD Repairs`
+      const ackMessage = `Hi ${getFirstName(name)}! 👋\n\nThanks for your repair request${device_make || device_model ? ` for your ${device_make || ''} ${device_model || ''}`.trim() : ''}.\n\nJohn will review it and get back to you with a quote — usually within 2 hours during business hours.\n\n📍 Opening hours: nfdr.uk/h\n\nNFD Repairs`
 
       try {
         const result = await sendViaMacroDroid(webhookUrl, normalisedPhone, ackMessage)
