@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const event = await request.json().catch(() => null)
     if (!event || event.event_type !== 'CHECKOUT_STATUS_CHANGED' || !event.id) {
-      // Ignore unknown future event types as recommended by SumUp.
+      // SumUp recommends silently ignoring unknown future event types.
       return new NextResponse(null, { status: 204 })
     }
 
@@ -41,8 +41,9 @@ export async function POST(request: NextRequest) {
     const checkout = await checkoutResponse.json()
     if (!checkout?.id) return new NextResponse(null, { status: 502 })
 
-    // Ensure the checkout belongs to this merchant before touching local state.
-    if (checkout.merchant_code && checkout.merchant_code !== merchantCode) {
+    // A webhook id alone is never sufficient proof. The checkout retrieved from
+    // SumUp must belong to our configured merchant.
+    if (checkout.merchant_code !== merchantCode) {
       console.error('[sumup-webhook] Merchant mismatch for checkout', checkout.id)
       return new NextResponse(null, { status: 403 })
     }
@@ -50,17 +51,16 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, reservation_amount, reservation_checkout_id, reservation_checkout_reference, reservation_payment_status')
+      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, reservation_amount, reservation_checkout_id, reservation_checkout_reference, reservation_transaction_id, reservation_payment_status')
       .eq('reservation_checkout_id', checkout.id)
       .single()
 
     if (enquiryError || !enquiry) {
       console.error('[sumup-webhook] No enquiry found for checkout', checkout.id)
-      // A real checkout we cannot reconcile needs attention; ask SumUp to retry.
       return new NextResponse(null, { status: 404 })
     }
 
-    if (enquiry.reservation_checkout_reference && checkout.checkout_reference !== enquiry.reservation_checkout_reference) {
+    if (!enquiry.reservation_checkout_reference || checkout.checkout_reference !== enquiry.reservation_checkout_reference) {
       console.error('[sumup-webhook] Checkout reference mismatch', checkout.id)
       return new NextResponse(null, { status: 409 })
     }
@@ -95,9 +95,28 @@ export async function POST(request: NextRequest) {
       return new NextResponse(null, { status: 204 })
     }
 
+    // A paid checkout should contain the successful ECOM transaction. We retain
+    // its id so a later staff-authorised refund can be made against the exact payment.
+    const transactions: any[] = Array.isArray(checkout.transactions) ? checkout.transactions : []
+    const successfulTransaction = transactions.find(tx => String(tx?.status || '').toUpperCase() === 'SUCCESSFUL')
+      || transactions[0]
+
+    if (!successfulTransaction?.id) {
+      console.error('[sumup-webhook] Paid checkout has no transaction id yet', checkout.id)
+      // Ask SumUp to retry; the transaction may not have propagated into the checkout response yet.
+      return new NextResponse(null, { status: 502 })
+    }
+
     // Idempotency: webhook retries must never send a second confirmation or
     // create a second staff action once payment is already recorded.
     if (enquiry.reservation_payment_status === 'PAID') {
+      // Backfill transaction id if an earlier webhook version did not record it.
+      if (!enquiry.reservation_transaction_id) {
+        await supabase
+          .from('enquiries')
+          .update({ reservation_transaction_id: successfulTransaction.id, updated_at: now } as any)
+          .eq('id', enquiry.id)
+      }
       return new NextResponse(null, { status: 204 })
     }
 
@@ -106,6 +125,7 @@ export async function POST(request: NextRequest) {
       .update({
         reservation_payment_status: 'PAID',
         reservation_paid_at: now,
+        reservation_transaction_id: successfulTransaction.id,
         commitment_type: 'paid_reservation',
         proceed_with_repair: true,
         status: 'approved',
