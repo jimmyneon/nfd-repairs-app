@@ -337,35 +337,67 @@ export async function POST(request: NextRequest) {
     // Create notification for staff
     const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
     const isPayday = quote_source === 'reserve_for_payday' && proceed_with_repair
+    const isPersonalisedQuoteNeeded = enquiry_type === 'repair_quote'
+      && !verifiedQuotedPrice
+      && !isProceed
+      && !isPayday
     const notifTitle = enquiry_type === 'repair_quote'
       ? isPayday
         ? `💰 RESERVE FOR PAYDAY: ${device_make || ''} ${device_model || ''}`
         : isProceed
           ? `🔥 CUSTOMER WANTS TO PROCEED: ${device_make || ''} ${device_model || ''}`
-          : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
+          : isPersonalisedQuoteNeeded
+            ? `📝 PERSONALISED QUOTE NEEDED: ${device_make || ''} ${device_model || ''}`
+            : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
       : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
     const notifBody = enquiry_type === 'repair_quote'
-      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
+      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : isPersonalisedQuoteNeeded ? ' - SEND QUOTE FROM APP' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
       : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
 
     await supabase.from('notifications').insert({
-      type: isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : 'NEW_ENQUIRY',
+      type: isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
       is_read: false,
     } as any)
 
     // Send staff SMS via MacroDroid for high-intent enquiries
-    // (customer wants to proceed or reserve for payday)
+    // (customer wants to proceed, reserve for payday, OR submitted a personalised
+    // quote request that needs a manual price from staff)
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if ((isProceed || isPayday) && webhookUrl) {
+    if ((isProceed || isPayday || isPersonalisedQuoteNeeded) && webhookUrl) {
       try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const staffSms = isPayday
           ? `💰 RESERVE FOR PAYDAY\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nPayday: ${payday_date} - Order part & hold slot.`
-          : `🔥 CUSTOMER WANTS TO PROCEED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nCheck stock & convert to job in the app.`
+          : isProceed
+            ? `🔥 CUSTOMER WANTS TO PROCEED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nCheck stock & convert to job in the app.`
+            : `📝 PERSONALISED QUOTE NEEDED\n${device_make || ''} ${device_model || ''} - ${repair_type || 'Repair'}\n${customer_name} - ${customer_phone || 'no phone'}\nOpen the app to send a quote.\n${appUrl}/app/enquiries?ref=${enquiryRef}`
         await sendViaMacroDroid(webhookUrl, SHOP_INFO.phone, staffSms)
       } catch (e) {
         console.error('Failed to send staff SMS:', e)
+      }
+    }
+
+    // Send NF Hub push notification for personalised quotes (so a banner appears
+    // even if the staff member misses the MacroDroid SMS)
+    if (isPersonalisedQuoteNeeded) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
+        await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            app_id: 'nfd-repairs',
+            title: notifTitle,
+            body: notifBody,
+            category: 'status_update',
+            priority: 'high',
+            deep_link: `${appUrl}/app/enquiries?ref=${enquiryRef}`,
+          }),
+        })
+      } catch (e) {
+        console.error('[Notify] Failed to send push for personalised quote:', e)
       }
     }
 

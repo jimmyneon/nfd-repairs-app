@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
-import { corsHeaders } from '@/lib/api-auth'
+import { corsHeaders, requireStaffUser } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
@@ -13,6 +13,10 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
+}
+
+function clampLength(str: string, max: number): string {
+  return String(str || '').substring(0, max)
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -46,6 +50,13 @@ export async function POST(request: NextRequest) {
 
     if (!enquiry_ref || !action) {
       return NextResponse.json({ error: 'Missing enquiry_ref or action' }, { status: 400, headers })
+    }
+
+    // Staff-only actions require an authenticated staff session
+    const staffOnlyActions = ['send_personalised_quote', 'send_needs_inspection']
+    if (staffOnlyActions.includes(action)) {
+      const { response: authResponse } = await requireStaffUser(request)
+      if (authResponse) return authResponse
     }
 
     // Find the enquiry
@@ -185,6 +196,85 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'send_personalised_quote': {
+        // Staff manually sends a quote with a price and optional personalised
+        // message paragraph. The price is saved on the enquiry so the customer
+        // can see it on the quote acceptance page, and the message + quote link
+        // are sent via SMS and/or email.
+        const price = Number(data?.quoted_price)
+        if (!price || price <= 0 || price > 10000) {
+          return NextResponse.json(
+            { error: 'A valid quote price is required' },
+            { status: 400, headers }
+          )
+        }
+        const personalisedMessage = clampLength(data?.personalised_message || '', 2000)
+        const method = data?.method || 'sms'
+
+        updateFields.quoted_price = price
+        updateFields.quote_type = 'personalised'
+        updateFields.quote_sent_method = method
+        updateFields.status = 'pending'
+        enquiry.quoted_price = price
+        enquiry.quote_type = 'personalised'
+
+        notificationTitle = `Personalised Quote Sent: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
+        notificationBody = `${enquiry.customer_name} sent a personalised quote of £${price} via ${method}.`
+
+        // Build the quote send payload (sent after DB update)
+        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
+        const deviceName = escapeHtml(`${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim())
+        const repairName = escapeHtml(enquiry.repair_type || 'repair')
+        const customerName = escapeHtml(enquiry.customer_name || '')
+        pendingQuoteSend = {
+          method,
+          quoteUrl,
+          isInstant: true, // now has a price → treat like instant quote for link purposes
+          priceText: `£${price}`,
+          deviceName,
+          repairName,
+          customerName,
+          partOption: escapeHtml(enquiry.part_option || enquiry.screen_option || ''),
+          additionalRepairs: enquiry.additional_repairs && enquiry.additional_repairs.length > 0
+            ? escapeHtml(enquiry.additional_repairs.map((r: any) => r.display_name || r.repair).join(', '))
+            : '',
+        }
+        // Stash the personalised message so the send block below can include it
+        ;(pendingQuoteSend as any).personalisedMessage = personalisedMessage
+        break
+      }
+
+      case 'send_needs_inspection': {
+        // Staff tells the customer we need to see the device before quoting.
+        // variant: 'diagnostics' | 'quick_look' | 'unable_to_quote'
+        const variant = data?.variant || 'quick_look'
+        const method = data?.method || 'sms'
+        const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'your device'
+
+        const variantMessages: Record<string, string> = {
+          diagnostics: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'd need to run a quick diagnostic on it before we can give you an accurate quote.\n\nPop in to the shop during opening hours and we'll take a look — no charge for the diagnostic.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
+          quick_look: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. I'll need to have a quick look at it before I can give you a proper quote.\n\nPop in whenever suits during opening hours and we'll take a look.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
+          unable_to_quote: `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. I'm unable to give you a quote without seeing it first — the repairability depends on the extent of the damage.\n\nPop in during opening hours and we'll assess it in person. No charge for the assessment.\n\nNew Forest Device Repairs\nnfdr.uk/h`,
+        }
+
+        const inspectionMessage = variantMessages[variant] || variantMessages.quick_look
+        updateFields.quote_sent_method = method
+        updateFields.staff_response = inspectionMessage
+        updateFields.responded_at = now
+        updateFields.status = 'more_info_requested'
+
+        notificationTitle = `Inspection Requested: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
+        notificationBody = `${enquiry.customer_name} told to bring device in (${variant}).`
+
+        // Send the inspection message via SMS/email (after DB update)
+        ;(pendingQuoteSend as any) = {
+          method,
+          inspectionMessage,
+          isInspection: true,
+        }
+        break
+      }
+
       default: {
         return NextResponse.json({ error: 'Unknown action: ' + action }, { status: 400, headers })
       }
@@ -265,8 +355,58 @@ export async function POST(request: NextRequest) {
 
     // Send quote SMS/email — AFTER DB update so data is committed first
     if (pendingQuoteSend) {
-      const { method, quoteUrl, isInstant, priceText, deviceName, repairName, customerName, partOption, additionalRepairs } = pendingQuoteSend
+      const pqs: any = pendingQuoteSend
+      const { method, quoteUrl, isInstant, priceText, deviceName, repairName, customerName, partOption, additionalRepairs } = pqs
+      const personalisedMessage: string = pqs.personalisedMessage || ''
+      const isInspection: boolean = pqs.isInspection === true
+      const inspectionMessage: string = pqs.inspectionMessage || ''
 
+      // --- Inspection message (no quote link, just "bring it in") ---
+      if (isInspection) {
+        if (method === 'sms' || method === 'both') {
+          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+          if (webhookUrl && enquiry.customer_phone) {
+            try {
+              const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, inspectionMessage)
+              await supabase.from('sms_logs').insert({
+                template_key: 'NEEDS_INSPECTION',
+                body_rendered: inspectionMessage,
+                status: smsResponse.ok ? 'SENT' : 'FAILED',
+                sent_at: smsResponse.ok ? now : null,
+              } as any)
+            } catch (e) { console.error('Inspection SMS failed:', e) }
+          }
+        }
+        if (method === 'email' || method === 'both') {
+          if (enquiry.customer_email) {
+            const emailSubject = `Your Repair Enquiry: ${deviceName || 'Your Device'} — We'd Like to Take a Look`
+            const emailHtml = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#FAF5E9;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FAF5E9;padding:24px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:600px;">
+<tr><td style="background:linear-gradient(135deg,#009B4D,#007a3d);padding:28px 30px;text-align:center;">
+<h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">New Forest Device Repairs</h1>
+</td></tr>
+<tr><td style="padding:32px 30px 20px;">
+<h2 style="color:#1a1a2e;margin:0 0 12px;font-size:18px;">Hi ${escapeHtml(enquiry.customer_name || '')},</h2>
+<p style="color:#555;font-size:15px;line-height:1.6;white-space:pre-wrap;margin:0 0 20px;">${escapeHtml(inspectionMessage)}</p>
+</td></tr>
+<tr><td style="background:#f8f9fa;padding:20px 30px;border-top:1px solid #eee;text-align:center;">
+<p style="color:#aaa;font-size:13px;margin:0;"><a href="https://nfdr.uk/h" style="color:#009B4D;text-decoration:none;">Opening hours</a> &nbsp;|&nbsp; <a href="https://nfdr.uk" style="color:#009B4D;text-decoration:none;">nfdr.uk</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`
+            try {
+              await sendEmail(enquiry.customer_email, emailSubject, emailHtml, inspectionMessage)
+              await supabase.from('email_logs').insert({ subject: emailSubject, body: inspectionMessage, status: 'SENT' } as any)
+            } catch (e) { console.error('Inspection email failed:', e) }
+          }
+        }
+        // Skip the quote-send block below for inspection messages
+        return NextResponse.json({ success: true, action, enquiry_ref: enquiry.enquiry_ref }, { headers })
+      }
+
+      // --- Quote SMS/email (instant or personalised with price) ---
       if (method === 'sms' || method === 'both') {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (!webhookUrl) {
@@ -277,14 +417,15 @@ export async function POST(request: NextRequest) {
           const addRepairsText = enquiry.additional_repairs && enquiry.additional_repairs.length > 0
             ? `\n\nAlso booked:\n${enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n')}\nTotal: £${(enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)}`
             : ''
+          const personalisedText = personalisedMessage ? `\n\n${personalisedMessage}` : ''
           const smsMessage = isInstant
-            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
+            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
             : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote within working hours.\n\nQuestions? Reply to this text.\n\nNew Forest Device Repairs`
           try {
             const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {
               await supabase.from('sms_logs').insert({
-                template_key: 'QUOTE_SENT',
+                template_key: personalisedMessage ? 'PERSONALISED_QUOTE' : 'QUOTE_SENT',
                 body_rendered: smsMessage,
                 status: smsResponse.ok ? 'SENT' : 'FAILED',
                 sent_at: smsResponse.ok ? now : null,
@@ -299,6 +440,10 @@ export async function POST(request: NextRequest) {
           const emailSubject = isInstant
             ? `Your Repair Quote: ${deviceName} ${repairName} — ${priceText}`
             : `Your Repair Enquiry: ${deviceName} — We'll be in touch`
+
+          const personalisedHtml = personalisedMessage
+            ? `<p style="color:#555;font-size:15px;line-height:1.6;white-space:pre-wrap;margin:0 0 20px;">${escapeHtml(personalisedMessage)}</p>`
+            : ''
 
           const emailHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -324,6 +469,8 @@ ${additionalRepairs ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${ad
 <p style="color:#009B4D;font-size:32px;font-weight:800;margin:8px 0 0;">${priceText}</p>
 </div>
 
+${personalisedHtml}
+
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;"><tr><td align="center">
 <a href="${quoteUrl}" style="display:inline-block;background:#009B4D;color:#fff;padding:14px 44px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Get This Repair Started</a>
 </td></tr></table>
@@ -347,9 +494,10 @@ ${additionalRepairs ? `<p style="color:#666;font-size:13px;margin:0 0 8px;">${ad
 </table>
 </body></html>`
 
+          const personalisedText = personalisedMessage ? `\n\n${personalisedMessage}` : ''
           const emailText = isInstant
-            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}\n\nTo proceed, click here:\n${quoteUrl}\n\nNew Forest Device Repairs\nnfdr.uk/h`
-            : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll be in touch with a personalised quote.\n\nNew Forest Device Repairs\nnfdr.uk/h`
+            ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nNew Forest Device Repairs\nnfdr.uk/h`
+            : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote.\n\nNew Forest Device Repairs\nnfdr.uk/h`
           try {
             await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
             try {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
@@ -76,6 +76,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   converted: { label: 'Booked In', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
   quote_viewed: { label: 'Viewed · No Action', color: 'border-yellow-500', bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
   quote_sent: { label: 'Quote Sent', color: 'border-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
+  personalised_quote: { label: 'Quote Needed', color: 'border-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-400' },
   follow_up: { label: 'Follow-up', color: 'border-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400' },
   accepted: { label: 'Accepted', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
   booked: { label: 'Booked In', color: 'border-green-600', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
@@ -114,6 +115,14 @@ function EnquiriesContent() {
   } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
+  // Personalised quote response panel state
+  const [showQuoteForm, setShowQuoteForm] = useState(false)
+  const [quotePrice, setQuotePrice] = useState('')
+  const [quotePersonalisedMsg, setQuotePersonalisedMsg] = useState('')
+  const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both'>('sms')
+  const [sendingQuote, setSendingQuote] = useState(false)
+  const [sendingInspection, setSendingInspection] = useState(false)
+  const [quoteResult, setQuoteResult] = useState<{ success: boolean; message: string } | null>(null)
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -169,6 +178,8 @@ function EnquiriesContent() {
         filtered = filtered.filter(e => isActionNeeded(e))
       } else if (statusFilter === 'follow_up') {
         filtered = filtered.filter(e => isFollowUp(e))
+      } else if (statusFilter === 'personalised_quote') {
+        filtered = filtered.filter(e => isPersonalisedQuoteNeeded(e))
       } else if (statusFilter === 'accepted') {
         filtered = filtered.filter(e => isAccepted(e))
       } else if (statusFilter === 'quote_viewed') {
@@ -250,12 +261,23 @@ function EnquiriesContent() {
   )
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && e.status !== 'rejected' && !isConverted(e) && !isAccepted(e) && Boolean(e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const hasQuoteBeenSent = (e: Enquiry) => Boolean(e.quote_sent_method && e.quote_sent_method !== 'none')
-  const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e)
+  // A personalised quote that needs staff to manually enter a price and send it.
+  // This is a repair_quote enquiry with no price, not yet accepted/converted,
+  // not dismissed, and not already sent (or sent but still no price).
+  const isPersonalisedQuoteNeeded = (e: Enquiry) =>
+    e.enquiry_type === 'repair_quote'
+    && !isConverted(e)
+    && !isAccepted(e)
+    && e.status !== 'rejected'
+    && !e.quoted_price
+    && !hasQuoteBeenSent(e)
+  const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e) || isPersonalisedQuoteNeeded(e)
 
   const getJourneyStage = (e: Enquiry): { key: string; label: string; detail: string } => {
     if (isConverted(e)) return { key: 'booked', label: 'Booked In', detail: 'Transferred to a repair job' }
     if (isAccepted(e)) return { key: 'accepted', label: 'Accepted', detail: 'Customer wants the repair — check stock' }
     if (isFollowUp(e)) return { key: 'follow_up', label: 'Follow-up', detail: 'Customer asked a question or shared a concern' }
+    if (isPersonalisedQuoteNeeded(e)) return { key: 'personalised_quote', label: 'Quote Needed', detail: 'Personalised quote — enter a price and send to customer' }
     if (e.status === 'rejected') return { key: 'dismissed', label: 'Dismissed', detail: 'Archived from the active enquiry lists' }
     if (e.enquiry_type !== 'repair_quote') {
       return { key: e.status, label: e.status === 'pending' ? 'New Enquiry' : (STATUS_CONFIG[e.status]?.label || 'Enquiry'), detail: 'Service enquiry' }
@@ -269,15 +291,17 @@ function EnquiriesContent() {
   const getPriority = (e: Enquiry) => {
     if (isAccepted(e)) return 0
     if (isFollowUp(e)) return 1
-    if (getJourneyStage(e).key === 'quote_sent') return 2
-    if (getJourneyStage(e).key === 'quote_viewed') return 3
-    if (e.status === 'pending') return 4
-    if (isConverted(e)) return 6
-    return 5
+    if (isPersonalisedQuoteNeeded(e)) return 2
+    if (getJourneyStage(e).key === 'quote_sent') return 3
+    if (getJourneyStage(e).key === 'quote_viewed') return 4
+    if (e.status === 'pending') return 5
+    if (isConverted(e)) return 7
+    return 6
   }
 
   const acceptedCount = enquiries.filter(e => isAccepted(e)).length
   const followUpCount = enquiries.filter(e => isFollowUp(e)).length
+  const personalisedQuoteCount = enquiries.filter(e => isPersonalisedQuoteNeeded(e)).length
   const actionNeededCount = enquiries.filter(e => isActionNeeded(e)).length
   const quoteViewedCount = enquiries.filter(e => getJourneyStage(e).key === 'quote_viewed').length
   const quoteSentCount = enquiries.filter(e => getJourneyStage(e).key === 'quote_sent').length
@@ -299,6 +323,7 @@ function EnquiriesContent() {
     if (e.repair_reserved || e.proceed_with_repair) return { text: 'RESERVED', color: 'bg-green-500' }
     if (e.part_reserved) return { text: 'PART HELD', color: 'bg-blue-500' }
     if (e.hesitation_reason) return { text: 'HESITATING', color: 'bg-orange-500' }
+    if (isPersonalisedQuoteNeeded(e)) return { text: 'QUOTE NEEDED', color: 'bg-purple-500' }
     return null
   }
 
@@ -387,12 +412,118 @@ function EnquiriesContent() {
     setSendingSms(false)
   }
 
+  const handleSendPersonalisedQuote = async () => {
+    if (!selectedEnquiry) return
+    const price = parseFloat(quotePrice)
+    if (!price || price <= 0) {
+      setQuoteResult({ success: false, message: 'Please enter a valid price.' })
+      return
+    }
+    setSendingQuote(true)
+    setQuoteResult(null)
+    try {
+      const res = await fetch('/api/enquiries/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiry_ref: selectedEnquiry.enquiry_ref,
+          action: 'send_personalised_quote',
+          data: {
+            quoted_price: price,
+            personalised_message: quotePersonalisedMsg.trim(),
+            method: quoteMethod,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setQuoteResult({ success: true, message: `Quote of £${price} sent to ${selectedEnquiry.customer_name} via ${quoteMethod}.` })
+        setQuotePrice('')
+        setQuotePersonalisedMsg('')
+        setShowQuoteForm(false)
+        setSelectedEnquiry({ ...selectedEnquiry, quoted_price: price, quote_type: 'personalised', quote_sent_method: quoteMethod })
+        loadEnquiries()
+      } else {
+        setQuoteResult({ success: false, message: data.error || 'Failed to send quote.' })
+      }
+    } catch (e) {
+      console.error('Failed to send personalised quote:', e)
+      setQuoteResult({ success: false, message: 'Failed to send quote. Please try again.' })
+    }
+    setSendingQuote(false)
+  }
+
+  const handleSendInspection = async (variant: 'diagnostics' | 'quick_look' | 'unable_to_quote') => {
+    if (!selectedEnquiry) return
+    setSendingInspection(true)
+    setQuoteResult(null)
+    try {
+      const res = await fetch('/api/enquiries/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiry_ref: selectedEnquiry.enquiry_ref,
+          action: 'send_needs_inspection',
+          data: { variant, method: quoteMethod },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        const labels: Record<string, string> = {
+          diagnostics: 'diagnostic request',
+          quick_look: 'quick look request',
+          unable_to_quote: 'inspection request',
+        }
+        setQuoteResult({ success: true, message: `${labels[variant] || 'Request'} sent to ${selectedEnquiry.customer_name}.` })
+        setShowQuoteForm(false)
+        setSelectedEnquiry({ ...selectedEnquiry, quote_sent_method: quoteMethod, status: 'more_info_requested' })
+        loadEnquiries()
+      } else {
+        setQuoteResult({ success: false, message: data.error || 'Failed to send.' })
+      }
+    } catch (e) {
+      console.error('Failed to send inspection request:', e)
+      setQuoteResult({ success: false, message: 'Failed to send. Please try again.' })
+    }
+    setSendingInspection(false)
+  }
+
   const openDetail = (enquiry: Enquiry) => {
     setSelectedEnquiry(enquiry)
     setResponseText(enquiry.staff_notes || '')
     setConvertResult(null)
     setShowMessageComposer(false)
+    setShowQuoteForm(false)
+    setQuoteResult(null)
+    setQuotePrice('')
+    setQuotePersonalisedMsg('')
     setShowDetail(true)
+  }
+
+  // Parse customer_notes which may be a plain string or a JSON array of
+  // { type, message, timestamp, classification } objects (from SMS replies).
+  const renderCustomerNotes = (notes: string | null): { type: string; message: string; timestamp?: string; classification?: string }[] | null => {
+    if (!notes) return null
+    try {
+      const parsed = typeof notes === 'string' ? JSON.parse(notes) : notes
+      if (Array.isArray(parsed)) return parsed
+      // It's a JSON object but not an array — treat as a single plain-text note
+      if (parsed && typeof parsed === 'object') return null
+      return null
+    } catch {
+      // Not JSON — it's a plain string note
+      return null
+    }
+  }
+
+  const isJsonNotes = (notes: string | null): boolean => {
+    if (!notes) return false
+    try {
+      const parsed = JSON.parse(notes)
+      return Array.isArray(parsed)
+    } catch {
+      return false
+    }
   }
 
   const fmtDate = (d: string) => {
@@ -442,6 +573,14 @@ function EnquiriesContent() {
                 className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'action_needed' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700'}`}
               >
                 Action Needed ({actionNeededCount})
+              </button>
+            )}
+            {personalisedQuoteCount > 0 && (
+              <button
+                onClick={() => setStatusFilter('personalised_quote')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${statusFilter === 'personalised_quote' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700'}`}
+              >
+                Quote Needed ({personalisedQuoteCount})
               </button>
             )}
             <button
@@ -524,7 +663,7 @@ function EnquiriesContent() {
                     <h2 className="font-black text-lg text-green-700 dark:text-green-400">
                       Action Needed ({filteredEnquiries.filter(e => isActionNeeded(e)).length})
                     </h2>
-                    <p className="text-xs text-green-600 dark:text-green-500">Accepted repairs, questions and budget follow-ups</p>
+                    <p className="text-xs text-green-600 dark:text-green-500">Accepted repairs, personalised quotes, questions and budget follow-ups</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -534,12 +673,14 @@ function EnquiriesContent() {
                     const summary = getTileSummary(enquiry)
                     const badge = getTileBadge(enquiry)
                     const TypeIcon = typeCfg.icon
+                    const isPQ = isPersonalisedQuoteNeeded(enquiry)
+                    const tileBg = isPQ ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-500' : 'bg-green-50 dark:bg-green-900/20 border-green-500'
 
                     return (
                       <button
                         key={enquiry.id}
                         onClick={() => openDetail(enquiry)}
-                        className="relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-green-50 dark:bg-green-900/20 border-2 border-green-500"
+                        className={`relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-2 ${tileBg}`}
                       >
                         <div className="p-3 h-full flex flex-col">
                           <div className="flex items-center justify-between mb-1">
@@ -560,8 +701,8 @@ function EnquiriesContent() {
                               <p className="text-lg font-black mt-1 text-green-700 dark:text-green-400">£{enquiry.quoted_price}</p>
                             )}
                           </div>
-                          <div className="flex items-center justify-between text-xs border-t border-green-200 dark:border-green-800 pt-1.5">
-                            <span className="font-bold text-green-700 dark:text-green-400">{statusLabel}</span>
+                          <div className={`flex items-center justify-between text-xs border-t pt-1.5 ${isPQ ? 'border-purple-200 dark:border-purple-800' : 'border-green-200 dark:border-green-800'}`}>
+                            <span className={`font-bold ${isPQ ? 'text-purple-700 dark:text-purple-400' : 'text-green-700 dark:text-green-400'}`}>{statusLabel}</span>
                             <span className="text-gray-400 dark:text-gray-500">{fmtDate(enquiry.created_at)}</span>
                           </div>
                         </div>
@@ -809,7 +950,22 @@ function EnquiriesContent() {
                 {selectedEnquiry.customer_notes && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3">
                     <p className="text-xs font-bold text-blue-900 dark:text-blue-300 mb-1">Customer Notes</p>
-                    <p className="text-sm text-blue-800 dark:text-blue-400 italic">"{selectedEnquiry.customer_notes}"</p>
+                    {isJsonNotes(selectedEnquiry.customer_notes) ? (
+                      <div className="space-y-2">
+                        {renderCustomerNotes(selectedEnquiry.customer_notes)!.map((note, i) => (
+                          <div key={i} className="text-sm text-blue-800 dark:text-blue-400 border-l-2 border-blue-300 dark:border-blue-700 pl-2">
+                            <p className="italic whitespace-pre-wrap">"{note.message}"</p>
+                            <p className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">
+                              {note.timestamp ? new Date(note.timestamp).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                              {note.classification ? ` · ${note.classification}` : ''}
+                              {note.type === 'customer_sms' ? ' · SMS reply' : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-blue-800 dark:text-blue-400 italic whitespace-pre-wrap">"{selectedEnquiry.customer_notes}"</p>
+                    )}
                   </div>
                 )}
 
@@ -818,6 +974,140 @@ function EnquiriesContent() {
                   <div>
                     <p className="text-xs font-bold text-gray-500 mb-1">Issue Description</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
+                  </div>
+                )}
+
+                {/* === PERSONALISED QUOTE RESPONSE PANEL === */}
+                {isPersonalisedQuoteNeeded(selectedEnquiry) && !showQuoteForm && !quoteResult && (
+                  <div className="space-y-3 pt-2">
+                    <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500">
+                      <p className="text-center text-sm font-bold text-purple-700 dark:text-purple-400">This needs a personalised quote</p>
+                      <p className="text-center text-xs text-purple-600 dark:text-purple-500 mt-0.5">Enter a price and send, or ask the customer to bring it in</p>
+                    </div>
+                    <button
+                      onClick={() => setShowQuoteForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors active:scale-95"
+                    >
+                      <PoundSterling className="h-5 w-5" />
+                      Send Quote
+                    </button>
+                    <div className="grid grid-cols-1 gap-2">
+                      <button
+                        onClick={() => handleSendInspection('diagnostics')}
+                        disabled={sendingInspection}
+                        className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                      >
+                        <Stethoscope className="h-4 w-4" />
+                        {sendingInspection ? 'Sending...' : 'Needs Diagnostics'}
+                      </button>
+                      <button
+                        onClick={() => handleSendInspection('quick_look')}
+                        disabled={sendingInspection}
+                        className="flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                      >
+                        <Eye className="h-4 w-4" />
+                        {sendingInspection ? 'Sending...' : 'I\'ll Need a Quick Look'}
+                      </button>
+                      <button
+                        onClick={() => handleSendInspection('unable_to_quote')}
+                        disabled={sendingInspection}
+                        className="flex items-center justify-center gap-2 py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                      >
+                        <Wrench className="h-4 w-4" />
+                        {sendingInspection ? 'Sending...' : 'Unable to Quote — Bring It In'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Personalised quote form */}
+                {isPersonalisedQuoteNeeded(selectedEnquiry) && showQuoteForm && !quoteResult && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Send Personalised Quote</h3>
+                      <button
+                        onClick={() => setShowQuoteForm(false)}
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    {/* Price input */}
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Quote Price (£)</p>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold">£</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          min="0"
+                          value={quotePrice}
+                          onChange={(e) => setQuotePrice(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-14 pl-8 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Personalised message */}
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Personalised Message</p>
+                      <p className="text-xs text-gray-500 mb-2">Included with the quote — explain repairability, conditions, what's needed, etc.</p>
+                      <textarea
+                        value={quotePersonalisedMsg}
+                        onChange={(e) => setQuotePersonalisedMsg(e.target.value)}
+                        placeholder="e.g. How repairable this is depends on the damage to the board. We'd also need a donor memory card to transfer the data onto..."
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        rows={5}
+                      />
+                    </div>
+
+                    {/* Send method */}
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Send via</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['sms', 'email', 'both'] as const).map((method) => (
+                          <button
+                            key={method}
+                            onClick={() => setQuoteMethod(method)}
+                            className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                              quoteMethod === method
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            {method === 'sms' ? 'Text' : method === 'email' ? 'Email' : 'Both'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleSendPersonalisedQuote}
+                      disabled={sendingQuote || !quotePrice}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4" />
+                      {sendingQuote ? 'Sending Quote...' : `Send £${quotePrice || '0'} Quote`}
+                    </button>
+                  </div>
+                )}
+
+                {/* Quote result */}
+                {quoteResult && (
+                  <div className={`rounded-xl p-4 text-center space-y-3 ${quoteResult.success ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-500' : 'bg-red-50 dark:bg-red-900/20 border-2 border-red-500'}`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${quoteResult.success ? 'bg-green-100 dark:bg-green-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
+                      {quoteResult.success ? <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" /> : <X className="h-6 w-6 text-red-600 dark:text-red-400" />}
+                    </div>
+                    <p className={`text-sm font-bold ${quoteResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{quoteResult.message}</p>
+                    <button
+                      onClick={() => { setQuoteResult(null); setShowQuoteForm(false) }}
+                      className="w-full py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      Done
+                    </button>
                   </div>
                 )}
 
@@ -848,15 +1138,17 @@ function EnquiriesContent() {
                   </div>
                 )}
 
-                {/* Message button */}
+                {/* Message button — hidden when quote form/result is open */}
+                {!showQuoteForm && !quoteResult && (
                 <button
                   onClick={() => setShowMessageComposer(true)}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
                 >
                   <MessageSquare className="h-4 w-4" /> Message Customer
                 </button>
+                )}
 
-                {!isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry) && (
+                {!isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry) && !showQuoteForm && !quoteResult && (
                   <button
                     onClick={() => handleDismissToggle(selectedEnquiry)}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
