@@ -1,11 +1,16 @@
 -- ============================================================
--- SETUP CRON: REPAIR-PLAN QUOTE REMINDERS (every 15 minutes)
+-- SETUP CRON: REPAIR QUOTE REMINDERS (every 15 minutes)
 -- ============================================================
 -- Apply AFTER supabase/add-quote-reminders.sql and AFTER the
--- /api/enquiries/send-plan-reminders endpoint is deployed.
+-- /api/enquiries/send-plan-reminders endpoint is deployed/tested.
+--
+-- Customers choose when they hope to get the repair done. The API stores
+-- reminder_at two days before that date; this cron simply sends reminders
+-- once they become due.
 --
 -- Replace REPLACE_WITH_CRON_SECRET_FROM_VAULT with the same
--- CRON_SECRET used by the existing scheduled app endpoints.
+-- CRON_SECRET used by the existing scheduled app endpoints at execution time.
+-- NEVER commit the real secret.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -42,10 +47,10 @@ BEGIN
         ''
     )::http_request);
 
-    RAISE NOTICE 'Quote-plan reminder cron executed. Response length: %', length(v_response);
+    RAISE NOTICE 'Quote reminder cron executed. Response length: %', length(v_response);
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Quote-plan reminder cron error: %', SQLERRM;
+        RAISE NOTICE 'Quote reminder cron error: %', SQLERRM;
 END;
 $$;
 
