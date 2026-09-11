@@ -58,11 +58,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`[sms/reply] From ${phone}: "${message.substring(0, 80)}"`)
 
-    // Normalise phone to +44XXXXXXXXX format for lookup.
-    // Enquiries are stored normalised, but inbound SMS from MacroDroid may
-    // arrive as 07XXXXXXXXX or +447XXXXXXXXX — try both forms to be safe.
+    // Normalise phone for lookup. Jobs/enquiries may be stored as 07... or
+    // +447... depending on how they were created. Build all possible variants
+    // so the lookup always finds the matching record.
     const normalisedPhone = normaliseUkPhoneForLookup(phone)
-    const lookupPhones = [normalisedPhone, phone.trim()].filter(Boolean)
+    const lookupSet = new Set<string>([normalisedPhone, phone.trim()])
+    // Also add the 07... form (strip +44 prefix)
+    if (normalisedPhone.startsWith('+447')) {
+      lookupSet.add('0' + normalisedPhone.slice(3))
+    }
+    // And the 447... form (no + prefix)
+    if (normalisedPhone.startsWith('+447')) {
+      lookupSet.add(normalisedPhone.slice(1))
+    }
+    const lookupPhones = Array.from(lookupSet).filter(Boolean)
 
     // -----------------------------------------------------------------------
     // 1. Check for an active repair_quote enquiry
