@@ -59,26 +59,37 @@ export async function GET(request: NextRequest) {
 
   // Enrich with customer names
   const phoneList = Object.keys(byPhone).filter((p) => p && p !== '(unknown)')
-  if (phoneList.length > 0) {
+  // Build alternate format variants for each phone
+  const allPhoneVariants = new Set<string>()
+  for (const p of phoneList) {
+    allPhoneVariants.add(p)
+    if (p.startsWith('+44')) allPhoneVariants.add('0' + p.slice(3))
+    if (p.startsWith('07') && p.length === 11) allPhoneVariants.add('+44' + p.slice(1))
+  }
+  const phoneQueryList = Array.from(allPhoneVariants)
+
+  if (phoneQueryList.length > 0) {
     const { data: jobs } = await supabase
       .from('jobs')
       .select('id, customer_name, customer_phone, job_ref')
-      .in('customer_phone', phoneList)
+      .in('customer_phone', phoneQueryList)
 
     const { data: enquiries } = await supabase
       .from('enquiries')
       .select('id, enquiry_ref, customer_name, customer_phone')
-      .in('customer_phone', phoneList)
+      .in('customer_phone', phoneQueryList)
 
     const nameByPhone: Record<string, any> = {}
     for (const j of jobs || []) {
-      if (!nameByPhone[j.customer_phone]) {
-        nameByPhone[j.customer_phone] = { name: j.customer_name, job_ref: j.job_ref, job_id: j.id }
+      const normalized = j.customer_phone?.startsWith('07') ? '+44' + j.customer_phone.slice(1) : j.customer_phone
+      if (!nameByPhone[normalized || j.customer_phone]) {
+        nameByPhone[normalized || j.customer_phone] = { name: j.customer_name, job_ref: j.job_ref, job_id: j.id }
       }
     }
     for (const e of enquiries || []) {
-      if (!nameByPhone[e.customer_phone]) {
-        nameByPhone[e.customer_phone] = { name: e.customer_name, enquiry_ref: e.enquiry_ref }
+      const normalized = e.customer_phone?.startsWith('07') ? '+44' + e.customer_phone.slice(1) : e.customer_phone
+      if (!nameByPhone[normalized || e.customer_phone]) {
+        nameByPhone[normalized || e.customer_phone] = { name: e.customer_name, enquiry_ref: e.enquiry_ref }
       }
     }
 
