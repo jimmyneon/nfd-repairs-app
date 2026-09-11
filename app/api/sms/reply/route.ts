@@ -379,15 +379,19 @@ export async function POST(request: NextRequest) {
       // Not a clear status query (includes turnaround, location, and anything
       // not understood) — send the generic welcome message with useful links
       // rather than the unhelpful "cannot find a repair job" reply.
-      // Rate-limited to 1 per 2 days per number to avoid flooding.
+      // Rate-limited to 1 welcome per 2 days per number to avoid flooding.
+      // Only counts previous welcome messages, not all SMS — so if staff
+      // had a conversation with the customer yesterday, the customer still
+      // gets a welcome if they text again after the conversation ended.
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-      const { count: recentSentCount } = await supabase
+      const { count: recentWelcomeCount } = await supabase
         .from('sms_logs')
         .select('id', { count: 'exact', head: true })
         .eq('recipient_phone', phone)
+        .eq('template_key', 'FIRST_TEXT_WELCOME')
         .gte('created_at', twoDaysAgo)
 
-      if ((recentSentCount || 0) === 0) {
+      if ((recentWelcomeCount || 0) === 0) {
         const hoursStatus = await computeHoursStatus(supabase)
         const welcomeBody = buildWelcomeMessage(hoursStatus)
         const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
@@ -1174,8 +1178,11 @@ function detectSmsIntent(message: string): SmsIntent | null {
   }
 
   // --- Update intent ("Update", "Any news?", "Status", "How's it going?") ---
+  // Note: bare "update" is NOT matched here because it's too ambiguous —
+  // customers often say "I need a software update" or "my phone needs an update"
+  // when describing their repair problem, not asking for a status update.
+  // Only match phrases that clearly ask for a repair status update.
   const updatePatterns: RegExp[] = [
-    /\bupdates?\b/i,
     /\bany\s+updates?\b/i,
     /\bcan\s+i\s+get\s+an?\s+update\b/i,
     /\blooking\s+for\s+an?\s+update\b/i,
@@ -1187,7 +1194,6 @@ function detectSmsIntent(message: string): SmsIntent | null {
     /\bany\s+news\b/i,
     /\bany\s+word\b/i,
     /\bany\s+luck\b/i,
-    /\bheard\b/i,
     /\bnot\s+heard\b/i,
     /\bprogress\b/i,
     /\bhow.?s\s+it\s+going\b/i,
