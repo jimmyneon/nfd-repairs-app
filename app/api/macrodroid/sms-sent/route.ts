@@ -152,6 +152,10 @@ export async function POST(request: NextRequest) {
           job_id: jobId,
           type: 'SMS_SENT',
           message: `Outbound SMS: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+          metadata: {
+            phone: normalisedPhone || null,
+            sender: 'staff',
+          },
         })
       } catch (e) {
         console.error('[sms-sent] Job event insert failed:', e)

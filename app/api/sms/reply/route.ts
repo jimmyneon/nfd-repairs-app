@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
         type: 'CUSTOMER_SMS',
         message: message.substring(0, 500),
         metadata: {
-          phone,
+          phone: normaliseUkPhoneForLookup(phone),
           timestamp: timestamp || new Date().toISOString(),
           thread_id: threadId || null,
         },
