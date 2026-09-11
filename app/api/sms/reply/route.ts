@@ -56,7 +56,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[sms/reply] From ${phone}: "${message.substring(0, 80)}"`)
+    console.log(`[sms/reply] === INBOUND SMS ===`)
+    console.log(`[sms/reply] Raw phone: "${phone}"`)
+    console.log(`[sms/reply] Message: "${message.substring(0, 120)}"`)
+    console.log(`[sms/reply] Timestamp: ${timestamp || 'none'}`)
+    console.log(`[sms/reply] ThreadId: ${threadId || 'none'}`)
 
     // Normalise phone for lookup. Jobs/enquiries may be stored as 07... or
     // +447... depending on how they were created. Build all possible variants
@@ -72,6 +76,9 @@ export async function POST(request: NextRequest) {
       lookupSet.add(normalisedPhone.slice(1))
     }
     const lookupPhones = Array.from(lookupSet).filter(Boolean)
+
+    console.log(`[sms/reply] Normalised: "${normalisedPhone}"`)
+    console.log(`[sms/reply] Lookup variants: ${JSON.stringify(lookupPhones)}`)
 
     // -----------------------------------------------------------------------
     // 1. Check for an active repair_quote enquiry
@@ -90,11 +97,15 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     const activeEnquiry = enquiries?.[0]
+    console.log(`[sms/reply] Enquiry lookup: ${activeEnquiry ? `found ${activeEnquiry.enquiry_ref} (${activeEnquiry.status})` : 'none'}`)
 
     // Check if this message looks like a status/update query (not a quote response)
-    const looksLikeStatusQuery = detectSmsIntent(message) !== null
+    const detectedIntent = detectSmsIntent(message)
+    const looksLikeStatusQuery = detectedIntent !== null
+    console.log(`[sms/reply] Intent: ${detectedIntent || 'null (unclear)'}`)
 
     if (activeEnquiry && !looksLikeStatusQuery) {
+      console.log(`[sms/reply] → Routing to enquiry handler (${activeEnquiry.enquiry_ref})`)
       return handleEnquiryReply({
         supabase,
         enquiry: activeEnquiry,
@@ -116,6 +127,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     const job = jobs?.[0]
+    console.log(`[sms/reply] Job lookup: ${job ? `found ${job.job_ref} (${job.status}) ${job.customer_name}` : 'none'}`)
 
     if (job) {
       // --- Suppress auto-replies when staff are actively in conversation ---
@@ -131,6 +143,7 @@ export async function POST(request: NextRequest) {
         .gte('created_at', thirtyMinAgo)
 
       const staffInConversation = (recentStaffSms || 0) > 0
+      console.log(`[sms/reply] Staff SMS in last 30min: ${recentStaffSms || 0} → suppress=${staffInConversation}`)
 
       if (staffInConversation) {
         console.log(`[sms/reply] Staff sent SMS to ${phone} in last 30min — suppressing auto-reply`)
@@ -408,7 +421,8 @@ export async function POST(request: NextRequest) {
     //    Otherwise, send generic welcome with hours/quote link.
     //    Staff are always notified. Welcome is rate-limited to 1/day.
     // -----------------------------------------------------------------------
-    console.log(`[sms/reply] No matching enquiry or job for ${phone}`)
+    console.log(`[sms/reply] → ORPHAN: No matching enquiry or job for ${phone}`)
+    console.log(`[sms/reply] Orphan intent: ${detectSmsIntent(message) || 'null (unclear)'}`)
 
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     let orphanSmsSent = false
