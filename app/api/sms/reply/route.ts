@@ -109,6 +109,24 @@ export async function POST(request: NextRequest) {
     const job = jobs?.[0]
 
     if (job) {
+      // --- Suppress auto-replies when staff are actively in conversation ---
+      // If staff sent an SMS to this customer in the last 30 minutes, don't
+      // send any auto-reply. The customer is talking to a human, not a bot.
+      // Still log the message and notify staff.
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+      const { count: recentStaffSms } = await supabase
+        .from('sms_logs')
+        .select('id', { count: 'exact', head: true })
+        .in('recipient_phone', lookupPhones)
+        .eq('status', 'SENT')
+        .gte('created_at', thirtyMinAgo)
+
+      const staffInConversation = (recentStaffSms || 0) > 0
+
+      if (staffInConversation) {
+        console.log(`[sms/reply] Staff sent SMS to ${phone} in last 30min — suppressing auto-reply`)
+      }
+
       // --- Rate limit auto-replies: 1 per 2 minutes per job ---
       // Prevents flooding from duplicate SMS delivery or rapid re-texting.
       // Customer messages are still logged and staff still notified,
@@ -283,6 +301,18 @@ export async function POST(request: NextRequest) {
 
       const autoReply = await detectAutoReply(message, job, statusSmsCount, supabase)
       if (autoReply) {
+        // Suppress if staff are in active conversation
+        if (staffInConversation) {
+          console.log(`[sms/reply] Auto-reply suppressed for job ${job.job_ref} — staff in conversation`)
+          return NextResponse.json({
+            success: true,
+            routed_to: 'staff_in_conversation',
+            job_ref: job.job_ref,
+            sms_sent: false,
+            reason: 'Staff sent SMS in last 30 min — message logged, no auto-reply',
+          })
+        }
+
         // Rate limit: skip sending if we just sent an auto-reply in the last 2 minutes
         if (autoReplyRateLimited) {
           console.log(`[sms/reply] Auto-reply rate limited for job ${job.job_ref} — sent one in last 2 min`)
@@ -322,8 +352,9 @@ export async function POST(request: NextRequest) {
       // couldn't understand their message, send a helpful generic reply with
       // their tracking link and hours, rather than leaving them with nothing.
       // Still rate-limited by the 2-minute check above.
+      // Suppressed when staff are in active conversation (last 30 min).
       const completedStatuses = ['COMPLETED', 'COLLECTED', 'READY_TO_COLLECT']
-      if (!completedStatuses.includes(job.status) && !autoReplyRateLimited) {
+      if (!completedStatuses.includes(job.status) && !autoReplyRateLimited && !staffInConversation) {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (webhookUrl) {
           const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
