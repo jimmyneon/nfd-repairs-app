@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import QuoteLookupModal from '@/components/QuoteLookupModal'
 import CustomerSearchModal from '@/components/CustomerSearchModal'
 import FormErrorToast from '@/components/FormErrorToast'
+import ConversationPreview from '@/components/ConversationPreview'
 import { getIssuesForDeviceType, saveCustomIssue, getCustomIssues } from '@/lib/device-issues'
 
 function CreateJobContent() {
@@ -781,6 +782,7 @@ function CreateJobContent() {
                       {validationErrors.customerPhone}
                     </p>
                   )}
+                  <ConversationPreview phone={customerPhone} />
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">

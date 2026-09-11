@@ -27,6 +27,7 @@ import CustomSmsComposer from '@/components/CustomSmsComposer'
 import RepairOutcomeSelector from '@/components/RepairOutcomeSelector'
 import PriceSetterModal from '@/components/PriceSetterModal'
 import QuickActionsModal from '@/components/QuickActionsModal'
+import ConversationThread from '@/components/ConversationThread'
 
 const isIncompleteIntakeValue = (value?: string | null) =>
   !value || ['unknown', 'to be added', 'to be assessed', 'repair needed'].includes(value.trim().toLowerCase())
@@ -72,7 +73,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [activePanel, setActivePanel] = useState<'device' | 'customer' | 'diagnostic' | 'history' | 'notes' | null>(null)
   const [showDiagnosticFollowUp, setShowDiagnosticFollowUp] = useState(false)
   const [showDiagnosticResponse, setShowDiagnosticResponse] = useState(false)
-  const [historyTab, setHistoryTab] = useState<'all' | 'status' | 'messages' | 'notes' | 'emails'>('all')
+  const [historyTab, setHistoryTab] = useState<'all' | 'status' | 'messages' | 'notes' | 'emails' | 'conversation'>('all')
   const [showSmsComposer, setShowSmsComposer] = useState(false)
   const [showPriceModal, setShowPriceModal] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
@@ -2485,6 +2486,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           actionLoading={actionLoading}
           activeTab={historyTab}
           onTabChange={setHistoryTab}
+          jobId={job?.id}
+          customerPhone={job?.customer_phone}
           onRetrySms={async () => {
             setActionLoading(true)
             try {

@@ -35,6 +35,7 @@ export default function JobsListPageV2() {
   const [activeFilter, setActiveFilter] = useState<string>('all')
   const [sendInCount, setSendInCount] = useState(0)
   const [enquiryCount, setEnquiryCount] = useState(0)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
@@ -50,6 +51,7 @@ export default function JobsListPageV2() {
     loadWarrantyTickets()
     loadSendInCount()
     loadEnquiryCount()
+    loadUnreadMessageCount()
 
     // Reload on bfcache restoration (back button) - show loading state during reload
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -61,6 +63,7 @@ export default function JobsListPageV2() {
       loadWarrantyTickets()
       loadSendInCount()
       loadEnquiryCount()
+      loadUnreadMessageCount()
     }
     window.addEventListener('pageshow', handlePageShow)
 
@@ -209,6 +212,18 @@ export default function JobsListPageV2() {
     setApprovedEnquiries(approved || [])
   }
 
+  const loadUnreadMessageCount = async () => {
+    try {
+      const res = await fetch('/api/conversations/inbox?unread_only=1&limit=1')
+      if (res.ok) {
+        const data = await res.json()
+        setUnreadMessageCount(data.total_unread || 0)
+      }
+    } catch (e) {
+      // Silent fail — badge is non-critical
+    }
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -342,7 +357,7 @@ export default function JobsListPageV2() {
               <Archive className="h-6 w-6" />
             </button>
             <div className="ml-auto">
-              <NavDropdown unreadCount={unreadCount} warrantyCount={warrantyCount} sendInCount={sendInCount} enquiryCount={enquiryCount} />
+              <NavDropdown unreadCount={unreadCount} warrantyCount={warrantyCount} sendInCount={sendInCount} enquiryCount={enquiryCount} unreadMessageCount={unreadMessageCount} />
             </div>
           </div>
           <div className="relative">

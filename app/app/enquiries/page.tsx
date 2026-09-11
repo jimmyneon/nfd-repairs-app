@@ -6,6 +6,7 @@ import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, Check
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
+import ConversationThread from '@/components/ConversationThread'
 
 export const dynamic = 'force-dynamic'
 
@@ -999,6 +1000,20 @@ function EnquiriesContent() {
                     ) : (
                       <p className="text-sm text-blue-800 dark:text-blue-400 italic whitespace-pre-wrap">"{selectedEnquiry.customer_notes}"</p>
                     )}
+                  </div>
+                )}
+
+                {/* Conversation thread — full SMS history with this customer */}
+                {selectedEnquiry.customer_phone && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 mb-2">Conversation</p>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 min-h-[200px]">
+                      <ConversationThread
+                        enquiryId={selectedEnquiry.id}
+                        phone={selectedEnquiry.customer_phone || undefined}
+                        refreshInterval={15000}
+                      />
+                    </div>
                   </div>
                 )}
 

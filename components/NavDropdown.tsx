@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, Home, Plus, Smartphone, Shield, Bell, Settings, Mail, Package, Clock, X, BarChart3, MessageSquareText } from 'lucide-react'
+import { Menu, Home, Plus, Smartphone, Shield, Bell, Settings, Mail, Package, Clock, X, BarChart3, MessageSquareText, MessageCircle } from 'lucide-react'
 
 interface NavLink {
   href: string
@@ -17,9 +17,10 @@ interface NavDropdownProps {
   warrantyCount?: number
   sendInCount?: number
   enquiryCount?: number
+  unreadMessageCount?: number
 }
 
-export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendInCount = 0, enquiryCount = 0 }: NavDropdownProps) {
+export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendInCount = 0, enquiryCount = 0, unreadMessageCount = 0 }: NavDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -39,6 +40,7 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
   ]
 
   const secondaryLinks: NavLink[] = [
+    { href: '/app/messages', label: 'Messages', icon: MessageCircle, badge: unreadMessageCount },
     { href: '/app/send-in-requests', label: 'Send-In Requests', icon: Package, badge: sendInCount },
     { href: '/app/enquiries', label: 'Enquiries', icon: Mail, badge: enquiryCount },
     { href: '/app/send-link', label: 'Send Customer Form', icon: MessageSquareText },
