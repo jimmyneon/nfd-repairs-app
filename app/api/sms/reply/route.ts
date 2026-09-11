@@ -317,9 +317,31 @@ export async function POST(request: NextRequest) {
         })
       }
 
+      // --- Fallback auto-reply for active jobs with unclear intent ---
+      // If the customer has an active (not completed/collected) job and we
+      // couldn't understand their message, send a helpful generic reply with
+      // their tracking link and hours, rather than leaving them with nothing.
+      // Still rate-limited by the 2-minute check above.
+      const completedStatuses = ['COMPLETED', 'COLLECTED', 'READY_TO_COLLECT']
+      if (!completedStatuses.includes(job.status) && !autoReplyRateLimited) {
+        const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+        if (webhookUrl) {
+          const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
+          const firstName = getFirstName(job.customer_name)
+          const fallbackBody = `Hi ${firstName} 👋\n\nThanks for your text — we've got your message and will get back to you.\n\nTrack your repair here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNFD Repairs`
+          const result = await sendViaMacroDroid(webhookUrl, phone, fallbackBody)
+          await logSms(supabase, 'AUTO_FALLBACK_REPLY', fallbackBody, result.ok, job.id)
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'SYSTEM',
+            message: 'Auto-reply sent: AUTO_FALLBACK_REPLY',
+          })
+          console.log(`[sms/reply] Fallback auto-reply sent for job ${job.job_ref}`)
+        }
+      }
+
       // Also route to warranty ticket flow if the job is completed/collected
       // (existing behaviour — post-repair support)
-      const completedStatuses = ['COMPLETED', 'COLLECTED', 'READY_TO_COLLECT']
       if (completedStatuses.includes(job.status)) {
         return handleWarrantyTicket({
           supabase,
@@ -379,17 +401,17 @@ export async function POST(request: NextRequest) {
       // Not a clear status query (includes turnaround, location, and anything
       // not understood) — send the generic welcome message with useful links
       // rather than the unhelpful "cannot find a repair job" reply.
-      // Rate-limited to 1 welcome per 2 days per number to avoid flooding.
+      // Rate-limited to 1 welcome per day per number to avoid flooding.
       // Only counts previous welcome messages, not all SMS — so if staff
-      // had a conversation with the customer yesterday, the customer still
-      // gets a welcome if they text again after the conversation ended.
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      // had a conversation with the customer earlier, the customer still
+      // gets a welcome if they text again later.
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const { count: recentWelcomeCount } = await supabase
         .from('sms_logs')
         .select('id', { count: 'exact', head: true })
         .eq('recipient_phone', phone)
         .eq('template_key', 'FIRST_TEXT_WELCOME')
-        .gte('created_at', twoDaysAgo)
+        .gte('created_at', oneDayAgo)
 
       if ((recentWelcomeCount || 0) === 0) {
         const hoursStatus = await computeHoursStatus(supabase)
@@ -399,7 +421,7 @@ export async function POST(request: NextRequest) {
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent first-text welcome to ${phone}`)
       } else {
-        console.log(`[sms/reply] Welcome rate-limited for ${phone} (sent SMS in last 2 days)`)
+        console.log(`[sms/reply] Welcome rate-limited for ${phone} (welcome sent in last 24h)`)
       }
     }
 
@@ -1104,8 +1126,18 @@ type SmsIntent = 'collection' | 'turnaround' | 'done_check' | 'update' | 'locati
 function detectSmsIntent(message: string): SmsIntent | null {
   const msg = message.toLowerCase().trim()
 
+  // --- Standalone commands (short messages that are clearly commands) ---
+  // "UPDATE", "update", "Updates" as the entire message = status request
+  // This is what the welcome message tells customers to type.
+  if (/^(update|updates|status)$/i.test(msg)) {
+    return 'update'
+  }
+
   // Words that exclude auto-reply (these are actions, not queries)
-  const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost|cracked|broken|drop\s+off|drop\s+my)\b/i
+  // Only exclude clear action words — not descriptions like "broken" or
+  // "cracked" which customers use when describing their problem alongside
+  // a question like "how long will it take?"
+  const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost)\b/i
   if (excludeRegex.test(msg)) return null
 
   // --- Location intent ("Where are you?", "What's your address?") ---
@@ -1177,18 +1209,18 @@ function detectSmsIntent(message: string): SmsIntent | null {
     return 'done_check'
   }
 
-  // --- Update intent ("Update", "Any news?", "Status", "How's it going?") ---
+  // --- Update intent ("Any news?", "Status", "How's it going?") ---
   // Note: bare "update" is NOT matched here because it's too ambiguous —
   // customers often say "I need a software update" or "my phone needs an update"
   // when describing their repair problem, not asking for a status update.
-  // Only match phrases that clearly ask for a repair status update.
+  // Standalone "UPDATE" is handled at the top of this function.
+  // "status" alone is matched, but "battery status" etc is unlikely in repair SMS.
   const updatePatterns: RegExp[] = [
     /\bany\s+updates?\b/i,
     /\bcan\s+i\s+get\s+an?\s+update\b/i,
     /\blooking\s+for\s+an?\s+update\b/i,
     /\bupdate\s+me\b/i,
     /\bupdate\s+on\b/i,
-    /\bstatus\b/i,
     /\bwhat.?s\s+(the\s+)?status\b/i,
     /\bmy\s+status\b/i,
     /\bany\s+news\b/i,
