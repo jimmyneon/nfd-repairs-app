@@ -157,10 +157,10 @@ export async function POST(request: NextRequest) {
         const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
         const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
         const priceText = enquiry.display_price
-          ? ` Your saved quote is ${enquiry.display_price}.`
-          : enquiry.quoted_price ? ` Your saved quote is £${enquiry.quoted_price}.` : ''
+          ? ` ${enquiry.display_price}.`
+          : enquiry.quoted_price ? ` £${enquiry.quoted_price}.` : ''
         const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
-        const smsBody = `Hi ${firstName}! 👋\n\n💾 Quote saved: ${device} ${repairLabel(enquiry.repair_type)}${optionText}${priceText}\n\n📅 We'll remind you on ${formatReminderDate(reminderAt || `${plannedRepairDate}T09:00:00Z`)}\n\n🔗 Your quote: ${quoteLink}\n\nNothing to pay now — tap the link when you're ready to go ahead.\n\nNFD Repairs`
+        const smsBody = `Hi ${firstName}! 👋\n\n💾 ${device} ${repairLabel(enquiry.repair_type)}${optionText}${priceText}\n\n📅 We'll remind you on ${formatReminderDate(reminderAt || `${plannedRepairDate}T09:00:00Z`)}\n\n🔗 ${quoteLink}\n\nNFD Repairs`
 
         try {
           const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)

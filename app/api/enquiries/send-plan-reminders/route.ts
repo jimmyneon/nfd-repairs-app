@@ -117,13 +117,13 @@ export async function GET(request: NextRequest) {
       const targetDate = formatDate(enquiry.planned_repair_date)
       const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
       const priceText = enquiry.display_price
-        ? ` Your saved quote is ${enquiry.display_price}.`
+        ? ` for ${enquiry.display_price}`
         : enquiry.quoted_price
-          ? ` Your saved quote is £${enquiry.quoted_price}.`
+          ? ` for £${enquiry.quoted_price}`
           : ''
       const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
 
-      const smsBody = `Hi ${firstName}! 👋\n\n📅 Reminder: you were hoping to get your ${device} ${repair}${optionText} done around ${targetDate}.${priceText}\n\n🔗 Ready to go ahead? Tap here:\n${quoteLink}\n\nOr just reply to this text. We'll check parts before you make a trip.\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}! 👋\n\nStill want your ${device} ${repair}${optionText} done on ${targetDate}${priceText}?\n\n🔗 ${quoteLink}\n\nOr just reply to this text.\n\nNFD Repairs`
 
       try {
         const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
