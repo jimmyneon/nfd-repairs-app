@@ -1232,6 +1232,7 @@ function detectSmsIntent(message: string): SmsIntent | null {
     /\bhow.?s\s+it\s+going\b/i,
     /\bhow\s+is\s+it\s+going\b/i,
     /\bhow.?s\s+(my|the)\s+\w+\s+(getting|going)\b/i,
+    /\bhow\s+is\s+(my|the)\s+\w+\s+(getting|going)\b/i,
     /\bwhat.?s\s+happening\b/i,
     /\bwhat.?s\s+going\s+on\b/i,
     /\bwhere.?s?\s+my\s+(phone|device|repair|mobile|tablet|laptop)\b/i,
