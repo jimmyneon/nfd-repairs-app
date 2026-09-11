@@ -1214,13 +1214,14 @@ function detectSmsIntent(message: string): SmsIntent | null {
   // customers often say "I need a software update" or "my phone needs an update"
   // when describing their repair problem, not asking for a status update.
   // Standalone "UPDATE" is handled at the top of this function.
-  // "status" alone is matched, but "battery status" etc is unlikely in repair SMS.
+  // "update on" is NOT matched because "software update on my phone" is a
+  // common false positive. Customers who want a status update say "any updates?"
+  // or "can I get an update?" or just "UPDATE".
   const updatePatterns: RegExp[] = [
     /\bany\s+updates?\b/i,
     /\bcan\s+i\s+get\s+an?\s+update\b/i,
     /\blooking\s+for\s+an?\s+update\b/i,
     /\bupdate\s+me\b/i,
-    /\bupdate\s+on\b/i,
     /\bwhat.?s\s+(the\s+)?status\b/i,
     /\bmy\s+status\b/i,
     /\bany\s+news\b/i,
@@ -1229,6 +1230,7 @@ function detectSmsIntent(message: string): SmsIntent | null {
     /\bnot\s+heard\b/i,
     /\bprogress\b/i,
     /\bhow.?s\s+it\s+going\b/i,
+    /\bhow\s+is\s+it\s+going\b/i,
     /\bhow.?s\s+(my|the)\s+\w+\s+(getting|going)\b/i,
     /\bwhat.?s\s+happening\b/i,
     /\bwhat.?s\s+going\s+on\b/i,
