@@ -198,7 +198,7 @@ function CreateJobContent() {
   const commonIssuePresets = [
     { label: 'Screen', icon: Smartphone, value: 'Screen Replacement', color: 'bg-red-600 hover:bg-red-700' },
     { label: 'Battery', icon: Battery, value: 'Battery Replacement', color: 'bg-green-600 hover:bg-green-700' },
-    { label: 'Charging Port', icon: Lightning, value: 'Charging Port Replacement', color: 'bg-yellow-600 hover:bg-yellow-700' },
+    { label: 'Charging Port', icon: Lightning, value: 'Charging Port Service', color: 'bg-yellow-600 hover:bg-yellow-700' },
     { label: 'Water Damage', icon: Droplet, value: 'Water Damage', color: 'bg-blue-600 hover:bg-blue-700' },
     { label: 'Not Charging', icon: Power, value: 'Not Charging', color: 'bg-orange-600 hover:bg-orange-700' },
     { label: 'Black Screen', icon: Circle, value: 'Black Screen', color: 'bg-gray-700 hover:bg-gray-800' },
@@ -522,7 +522,7 @@ function CreateJobContent() {
         'screen': 'Screen Replacement', 'cracked screen': 'Screen Replacement',
         'broken screen': 'Screen Replacement', 'screen repair': 'Screen Repair',
         'battery': 'Battery Replacement', 'battery replacement': 'Battery Replacement',
-        'charging': 'Not Charging', 'charging port': 'Charging Port Replacement',
+        'charging': 'Not Charging', 'charging port': 'Charging Port Service',
         'not charging': 'Not Charging', 'water': 'Water Damage',
         'no power': 'No Power', 'black screen': 'Black Screen',
         'diagnostic': 'Diagnostics', 'diagnostics': 'Diagnostics',

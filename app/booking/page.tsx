@@ -33,6 +33,7 @@ export default function CustomerBookingPage() {
     phone: [
       'Screen Replacement',
       'Battery Replacement',
+      'Charging Port Service',
       'Charging Port Replacement',
       'Not Charging',
       'Water Damage',
@@ -45,6 +46,7 @@ export default function CustomerBookingPage() {
     tablet: [
       'Screen Replacement',
       'Battery Replacement',
+      'Charging Port Service',
       'Charging Port Replacement',
       'Not Charging',
       'Water Damage',
