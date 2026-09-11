@@ -5,6 +5,7 @@ import { sendViaMacroDroid } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
+import { SHOP_INFO } from '@/lib/constants'
 
 /**
  * POST /api/sms/reply
@@ -61,6 +62,22 @@ export async function POST(request: NextRequest) {
     console.log(`[sms/reply] Message: "${message.substring(0, 120)}"`)
     console.log(`[sms/reply] Timestamp: ${timestamp || 'none'}`)
     console.log(`[sms/reply] ThreadId: ${threadId || 'none'}`)
+
+    // Guard: ignore SMS from the shop's own number. When the app sends a
+    // text to the shop phone (e.g. a test or a job booked under the shop
+    // number), the "Sms to ai" macro forwards it back here. Processing it
+    // would create ghost inbound messages and potential reply loops.
+    const normalisedForSelfCheck = normaliseUkPhoneForLookup(phone)
+    const shopNormalised = normaliseUkPhoneForLookup(SHOP_INFO.phone)
+    if (normalisedForSelfCheck === shopNormalised) {
+      console.log(`[sms/reply] Ignored self-text from shop's own number (${phone})`)
+      return NextResponse.json({
+        success: true,
+        ignored: true,
+        reason: 'SHOP_OWN_NUMBER',
+        message: 'Inbound SMS from shop\'s own number ignored (self-text loop prevention)',
+      })
+    }
 
     // Normalise phone for lookup. Jobs/enquiries may be stored as 07... or
     // +447... depending on how they were created. Build all possible variants

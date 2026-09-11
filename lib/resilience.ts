@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { SHOP_INFO } from './constants'
 
 /**
  * Create a Supabase service-role client with retry-friendly settings.
@@ -151,6 +152,14 @@ export function isSafeSmsDestination(rawPhone: string): {
 } {
   const normalized = normaliseUkSmsDestination(rawPhone)
 
+  // Never auto-text the shop's own number — it creates a loop where the
+  // "Sms to ai" macro forwards the self-sent SMS back to the app, which
+  // can trigger further auto-replies and flood the system.
+  const shopNormalized = normaliseUkSmsDestination(SHOP_INFO.phone)
+  if (normalized === shopNormalized) {
+    return { ok: false, normalized, reason: 'SHOP_OWN_NUMBER' }
+  }
+
   // Never auto-text international numbers, landlines, shortcodes, malformed
   // numbers, etc. The repair app's automated messaging is UK-mobile only.
   if (!/^07\d{9}$/.test(normalized)) {
@@ -186,6 +195,15 @@ export async function sendViaMacroDroid(
   message: string,
   timeoutMs = 15000
 ): Promise<{ ok: boolean; status: number; body: string }> {
+  // Guard: never send empty/null phone or message to MacroDroid.
+  // An empty payload causes MacroDroid's JSON Parse to produce 0 entries,
+  // and the Send SMS action tries to send to the literal string
+  // "{lv=parse[phone]}" — which fails with "Null PDU" and retries 5 times.
+  if (!phone || !phone.trim() || !message || !message.trim()) {
+    console.warn('[sms-safety] Blocked empty phone or message to MacroDroid')
+    return { ok: false, status: 422, body: 'BLOCKED_EMPTY_PHONE_OR_MESSAGE' }
+  }
+
   const destination = isSafeSmsDestination(phone)
   if (!destination.ok) {
     const body = `BLOCKED_CHARGEABLE_NUMBER:${destination.reason}`

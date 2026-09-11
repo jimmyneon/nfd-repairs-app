@@ -110,10 +110,14 @@ export async function POST(request: NextRequest) {
 
     if (!logEntry) {
       console.log('[delivery-confirmation] No matching sms_log found for', phone, `(${message.length} chars)`)
+      // Return 200, not 404 — the endpoint exists and the request was valid,
+      // we just couldn't match it to a log entry. A 404 makes MacroDroid log
+      // a misleading "HTTP response code: 404" that looks like the endpoint
+      // is broken.
       return NextResponse.json({
         success: false,
         message: 'No matching SMS log found (may be older than 10 minutes or text mismatch)',
-      }, { status: 404 })
+      }, { status: 200 })
     }
 
     // Update the log with delivery confirmation
