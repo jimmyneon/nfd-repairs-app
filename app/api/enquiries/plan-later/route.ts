@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           ? ` Your saved quote is ${enquiry.display_price}.`
           : enquiry.quoted_price ? ` Your saved quote is £${enquiry.quoted_price}.` : ''
         const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
-        const smsBody = `Hi ${firstName}, we've saved your ${device} ${repairLabel(enquiry.repair_type)}${optionText} quote for later.${priceText}\n\nYou said you're hoping to get it repaired around ${formatDate(plannedRepairDate)}. We'll give you a reminder on ${formatReminderDate(reminderAt || `${plannedRepairDate}T09:00:00Z`)}.\n\nYour quote: ${quoteLink}\n\nNothing is booked and there's nothing to pay now. When you're ready, use the quote link to go ahead. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
+        const smsBody = `Hi ${firstName}! 👋\n\n💾 Quote saved: ${device} ${repairLabel(enquiry.repair_type)}${optionText}${priceText}\n\n📅 We'll remind you on ${formatReminderDate(reminderAt || `${plannedRepairDate}T09:00:00Z`)}\n\n🔗 Your quote: ${quoteLink}\n\nNothing to pay now — tap the link when you're ready to go ahead.\n\nNFD Repairs`
 
         try {
           const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
