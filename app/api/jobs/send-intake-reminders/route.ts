@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
       const firstName = getFirstName(job.customer_name)
 
-      const smsBody = `Hi ${firstName}! 👋\n\nJust a friendly reminder — you started checking in your device with us but haven't finished yet.\n\nTap here to complete it (takes 2 minutes):\n${walkInUrl}\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}! 👋\n\nYou started checking in your device but didn'\''t finish.\n\nTap here to complete it:\n${walkInUrl}\n\nNFD Repairs`
 
       try {
         const result = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)

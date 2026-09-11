@@ -207,8 +207,8 @@ export default function WalkInSelfBookingPage() {
         // Pre-fill any missing fields from the existing job
         setFormData(prev => ({
           ...prev,
-          customer_name: prev.customerName || lookupData.job.customer_name || '',
-          customer_phone: prev.customerPhone || lookupData.job.customer_phone || '',
+          customerName: prev.customerName || lookupData.job.customer_name || '',
+          customerPhone: prev.customerPhone || lookupData.job.customer_phone || '',
           customerEmail: prev.customerEmail || lookupData.job.customer_email || '',
           deviceType: prev.deviceType !== 'phone' ? prev.deviceType : (lookupData.job.device_type || 'phone'),
           deviceMake: prev.deviceMake || (lookupData.job.device_make && lookupData.job.device_make !== 'To be added' ? lookupData.job.device_make : ''),
