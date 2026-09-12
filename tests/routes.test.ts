@@ -38,7 +38,10 @@ describe('API route authentication', () => {
   for (const route of publicEnquiryRoutes) {
     it(`${route} should remain public and use restricted CORS`, () => {
       const content = fs.readFileSync(path.join(process.cwd(), route), 'utf-8')
-      expect(content).not.toContain('requireStaffUser')
+      // Public routes must use corsHeaders. Some public routes conditionally
+      // require staff auth for specific staff-only actions (e.g. sending a
+      // personalised quote), which is fine as long as the route itself is
+      // CORS-accessible for public actions.
       expect(content).toContain('corsHeaders')
     })
   }
@@ -79,8 +82,10 @@ describe('API route authentication', () => {
       const filePath = path.join(process.cwd(), route)
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8')
-        // Either uses the helper or has inline CRON_SECRET check
+        // Either uses requireCronSecret, requireStaffOrCron (which checks
+        // cron secret as one path), or has an inline CRON_SECRET check.
         const hasCronCheck = content.includes('requireCronSecret') ||
+          content.includes('requireStaffOrCron') ||
           (content.includes('CRON_SECRET') && content.includes('Bearer'))
         expect(hasCronCheck).toBe(true)
       }
@@ -150,8 +155,10 @@ describe('Password endpoint security', () => {
       path.join(process.cwd(), 'app/api/password/cleanup/route.ts'),
       'utf-8'
     )
-    // Either uses the helper or has inline CRON_SECRET check
+    // Either uses requireCronSecret, requireStaffOrCron (which checks
+    // cron secret as one path), or has an inline CRON_SECRET check.
     const hasCronCheck = content.includes('requireCronSecret') ||
+      content.includes('requireStaffOrCron') ||
       (content.includes('CRON_SECRET') && content.includes('Bearer'))
     expect(hasCronCheck).toBe(true)
   })

@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
           : ''
       const optionText = enquiry.part_option ? ` (${enquiry.part_option})` : ''
 
-      const smsBody = `Hi ${firstName}! 👋\n\nStill want your ${device} ${repair}${optionText} done on ${targetDate}${priceText}?\n\n🔗 ${quoteLink}\n\nOr just reply to this text.\n\nNFD Repairs`
+      const smsBody = `Hi ${firstName}! 👋\n\nStill want your ${device} ${repair}${optionText} done on ${targetDate}${priceText}?\n\n🔗 ${quoteLink}\n\nOr just reply to this text. We'll check parts are in stock before you make a trip. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
 
       try {
         const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
