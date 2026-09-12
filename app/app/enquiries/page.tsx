@@ -943,89 +943,8 @@ function EnquiriesContent() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Repair details — compact */}
-                {selectedEnquiry.enquiry_type === 'repair_quote' && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1.5">
-                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                      <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
-                      <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
-                      {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
-                      {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
-                      {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
-                      {selectedEnquiry.commitment_type === 'remind_later' && (
-                        <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 space-y-1">
-                          <p className="font-semibold text-indigo-700 dark:text-indigo-400">Remind Me Later</p>
-                          {selectedEnquiry.planned_repair_date && (
-                            <p><span className="font-semibold">Target repair date:</span> {new Date(selectedEnquiry.planned_repair_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                          )}
-                          {selectedEnquiry.reminder_at && !selectedEnquiry.reminder_sent_at && (
-                            <p><span className="font-semibold">Reminder due:</span> {new Date(selectedEnquiry.reminder_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                          )}
-                          {selectedEnquiry.reminder_sent_at && (
-                            <p className="text-green-600 dark:text-green-400"><span className="font-semibold">Reminder sent:</span> {new Date(selectedEnquiry.reminder_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-                          )}
-                          <p className="text-xs text-gray-500 dark:text-gray-400">No booking, no deposit. Staff must check stock before booking in.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Customer info */}
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
-                  <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                    <p><span className="font-semibold">Name:</span> {selectedEnquiry.customer_name}</p>
-                    <p><span className="font-semibold">Phone:</span> {selectedEnquiry.customer_phone || '—'}</p>
-                    {selectedEnquiry.customer_email && <p><span className="font-semibold">Email:</span> {selectedEnquiry.customer_email}</p>}
-                  </div>
-                </div>
-
-                {/* Customer notes */}
-                {selectedEnquiry.customer_notes && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3">
-                    <p className="text-xs font-bold text-blue-900 dark:text-blue-300 mb-1">Customer Notes</p>
-                    {isJsonNotes(selectedEnquiry.customer_notes) ? (
-                      <div className="space-y-2">
-                        {renderCustomerNotes(selectedEnquiry.customer_notes)!.map((note, i) => (
-                          <div key={i} className="text-sm text-blue-800 dark:text-blue-400 border-l-2 border-blue-300 dark:border-blue-700 pl-2">
-                            <p className="italic whitespace-pre-wrap">"{note.message}"</p>
-                            <p className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">
-                              {note.timestamp ? new Date(note.timestamp).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
-                              {note.classification ? ` · ${note.classification}` : ''}
-                              {note.type === 'customer_sms' ? ' · SMS reply' : ''}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-blue-800 dark:text-blue-400 italic whitespace-pre-wrap">"{selectedEnquiry.customer_notes}"</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Conversation thread — full SMS history with this customer */}
-                {selectedEnquiry.customer_phone && (
-                  <div>
-                    <p className="text-xs font-bold text-gray-500 mb-2">Conversation</p>
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 min-h-[200px]">
-                      <ConversationThread
-                        enquiryId={selectedEnquiry.id}
-                        phone={selectedEnquiry.customer_phone || undefined}
-                        refreshInterval={15000}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Issue description */}
-                {selectedEnquiry.issue_description && (
-                  <div>
-                    <p className="text-xs font-bold text-gray-500 mb-1">Issue Description</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
-                  </div>
-                )}
-
                 {/* === PERSONALISED QUOTE RESPONSE PANEL === */}
+                {/* Shown at the top so Send Quote is immediately visible without scrolling past the conversation */}
                 {isPersonalisedQuoteNeeded(selectedEnquiry) && !showQuoteForm && !quoteResult && (
                   <div className="space-y-3 pt-2">
                     <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500">
@@ -1173,6 +1092,88 @@ function EnquiriesContent() {
                     >
                       Done
                     </button>
+                  </div>
+                )}
+
+                {/* Repair details — compact */}
+                {selectedEnquiry.enquiry_type === 'repair_quote' && (
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1.5">
+                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
+                      <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
+                      {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
+                      {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
+                      {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
+                      {selectedEnquiry.commitment_type === 'remind_later' && (
+                        <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 space-y-1">
+                          <p className="font-semibold text-indigo-700 dark:text-indigo-400">Remind Me Later</p>
+                          {selectedEnquiry.planned_repair_date && (
+                            <p><span className="font-semibold">Target repair date:</span> {new Date(selectedEnquiry.planned_repair_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                          )}
+                          {selectedEnquiry.reminder_at && !selectedEnquiry.reminder_sent_at && (
+                            <p><span className="font-semibold">Reminder due:</span> {new Date(selectedEnquiry.reminder_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                          )}
+                          {selectedEnquiry.reminder_sent_at && (
+                            <p className="text-green-600 dark:text-green-400"><span className="font-semibold">Reminder sent:</span> {new Date(selectedEnquiry.reminder_sent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                          )}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">No booking, no deposit. Staff must check stock before booking in.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Customer info */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
+                  <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                    <p><span className="font-semibold">Name:</span> {selectedEnquiry.customer_name}</p>
+                    <p><span className="font-semibold">Phone:</span> {selectedEnquiry.customer_phone || '—'}</p>
+                    {selectedEnquiry.customer_email && <p><span className="font-semibold">Email:</span> {selectedEnquiry.customer_email}</p>}
+                  </div>
+                </div>
+
+                {/* Customer notes */}
+                {selectedEnquiry.customer_notes && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3">
+                    <p className="text-xs font-bold text-blue-900 dark:text-blue-300 mb-1">Customer Notes</p>
+                    {isJsonNotes(selectedEnquiry.customer_notes) ? (
+                      <div className="space-y-2">
+                        {renderCustomerNotes(selectedEnquiry.customer_notes)!.map((note, i) => (
+                          <div key={i} className="text-sm text-blue-800 dark:text-blue-400 border-l-2 border-blue-300 dark:border-blue-700 pl-2">
+                            <p className="italic whitespace-pre-wrap">"{note.message}"</p>
+                            <p className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">
+                              {note.timestamp ? new Date(note.timestamp).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                              {note.classification ? ` · ${note.classification}` : ''}
+                              {note.type === 'customer_sms' ? ' · SMS reply' : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-blue-800 dark:text-blue-400 italic whitespace-pre-wrap">"{selectedEnquiry.customer_notes}"</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Conversation thread — full SMS history with this customer */}
+                {selectedEnquiry.customer_phone && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 mb-2">Conversation</p>
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 min-h-[200px]">
+                      <ConversationThread
+                        enquiryId={selectedEnquiry.id}
+                        phone={selectedEnquiry.customer_phone || undefined}
+                        refreshInterval={15000}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Issue description */}
+                {selectedEnquiry.issue_description && (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 mb-1">Issue Description</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
                   </div>
                 )}
 

@@ -37,6 +37,7 @@ export default function JobsListPageV2() {
   const [enquiryCount, setEnquiryCount] = useState(0)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
+  const [pendingQuoteEnquiries, setPendingQuoteEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; repair_type: string | null}[]>([])
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
   const supabase = createClient() as any
@@ -210,6 +211,17 @@ export default function JobsListPageV2() {
       .eq('status', 'approved')
       .order('updated_at', { ascending: false })
     setApprovedEnquiries(approved || [])
+
+    // Load personalised-quote enquiries (repair_quote with no price set yet,
+    // not dismissed or converted) — these need a staff response
+    const { data: pendingQuotes } = await supabase
+      .from('enquiries')
+      .select('enquiry_ref, customer_name, device_make, device_model, repair_type')
+      .eq('enquiry_type', 'repair_quote')
+      .is('quoted_price', null)
+      .not('status', 'in', '("rejected","converted")')
+      .order('created_at', { ascending: false })
+    setPendingQuoteEnquiries(pendingQuotes || [])
   }
 
   const loadUnreadMessageCount = async () => {
@@ -293,6 +305,50 @@ export default function JobsListPageV2() {
       
       {/* Customer Waiting Banner - Shows when customer has arrived */}
       <CustomerWaitingBanner jobs={jobs} />
+      
+      {/* Pending Quote Banner - Shows when customers are waiting for a personalised quote response */}
+      {pendingQuoteEnquiries.length > 0 && (
+        <div className="bg-purple-600 text-white px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <BellRing className="h-6 w-6 animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">
+                {pendingQuoteEnquiries.length === 1
+                  ? 'QUOTE NEEDED - Customer waiting for a response!'
+                  : `${pendingQuoteEnquiries.length} QUOTES NEEDED - Customers waiting for a response!`}
+              </p>
+              <div className="flex gap-2 mt-1 overflow-x-auto pb-1">
+                {pendingQuoteEnquiries.slice(0, 4).map((enq) => (
+                  <Link
+                    key={enq.enquiry_ref}
+                    href={`/app/enquiries?ref=${enq.enquiry_ref}`}
+                    className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <span className="text-xs font-bold">{enq.customer_name}</span>
+                    <span className="text-xs ml-2 opacity-90">
+                      {enq.device_make} {enq.device_model}
+                    </span>
+                  </Link>
+                ))}
+                {pendingQuoteEnquiries.length > 4 && (
+                  <Link
+                    href="/app/enquiries"
+                    className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <span className="text-xs font-bold">+{pendingQuoteEnquiries.length - 4} more...</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            <Link
+              href="/app/enquiries"
+              className="flex-shrink-0 bg-white text-purple-700 font-black text-xs px-4 py-2 rounded-xl hover:bg-purple-50 transition-colors active:scale-95"
+            >
+              View All
+            </Link>
+          </div>
+        </div>
+      )}
       
       {/* Approved Quote Banner - Shows when customers have approved quotes */}
       {approvedEnquiries.length > 0 && (
