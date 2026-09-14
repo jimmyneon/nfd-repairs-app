@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
       accessories,
       // Common
       additional_info,
+      // Remote Support fields
+      stripe_session_id,
     } = body
 
     // Validate required fields based on enquiry type
@@ -193,6 +195,48 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Stripe payment verification for remote support enquiries
+    // Verifies that the customer actually paid via Stripe before creating
+    // the enquiry. Rejects submissions without a valid paid session.
+    let stripePaymentVerified = false
+    let stripePaymentAmount = 0
+    if (enquiry_type === 'remote_support') {
+      if (!stripe_session_id) {
+        return NextResponse.json(
+          { error: 'Payment verification required: missing Stripe session ID. Please complete payment first.' },
+          { status: 402, headers }
+        )
+      }
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+      if (!stripeSecretKey) {
+        console.error('[Remote Support] STRIPE_SECRET_KEY not set — cannot verify payment')
+        return NextResponse.json(
+          { error: 'Payment verification not configured. Please call us on 07410 381247.' },
+          { status: 503, headers }
+        )
+      }
+      try {
+        const stripe = await import('stripe')
+        const stripeClient = new stripe.default(stripeSecretKey)
+        const session = await stripeClient.checkout.sessions.retrieve(stripe_session_id)
+        if (session.payment_status === 'paid') {
+          stripePaymentVerified = true
+          stripePaymentAmount = session.amount_total || 6000
+        } else {
+          return NextResponse.json(
+            { error: 'Payment not completed. Please complete your £60 payment first.' },
+            { status: 402, headers }
+          )
+        }
+      } catch (err: any) {
+        console.error('[Remote Support] Stripe verification failed:', err.message)
+        return NextResponse.json(
+          { error: 'Could not verify payment. Please call us on 07410 381247.' },
+          { status: 402, headers }
+        )
+      }
+    }
+
     // Server-side price verification for repair quotes
     // If a quote_key is provided, look up the real price from the catalogue
     // and override the client-sent price to prevent tampering
@@ -262,7 +306,9 @@ export async function POST(request: NextRequest) {
           payday_date: payday_date || null,
           accessories: accessories || null,
           // Common
-          additional_info: additional_info || null,
+          additional_info: enquiry_type === 'remote_support'
+            ? [additional_info, stripePaymentVerified ? `Stripe: PAID £${(stripePaymentAmount / 100).toFixed(0)} (session: ${stripe_session_id?.substring(0, 20)}...)` : 'Stripe: NOT VERIFIED'].filter(Boolean).join(' | ')
+            : additional_info || null,
           status: proceed_with_repair ? 'approved' : 'pending',
         })
         .select()
