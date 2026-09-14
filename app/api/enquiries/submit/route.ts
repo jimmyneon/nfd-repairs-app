@@ -417,22 +417,22 @@ export async function POST(request: NextRequest) {
       is_read: false,
     } as any)
 
-    // Trigger MacroDroid notification for high-intent enquiries
-    // (customer wants to proceed, reserve for payday, OR submitted a personalised
-    // quote request that needs a manual price from staff, OR remote support)
-    // Sends a plain-text URL to the MacroDroid webhook — same mechanism as
-    // quote approval, so the phone gets a notification with a link to the app.
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if ((isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) && webhookUrl) {
+    // Trigger MacroDroid staff notification for high-intent enquiries.
+    // Keep this separate from MACRODROID_WEBHOOK_URL, which is the customer SMS
+    // endpoint and expects JSON containing phone + message.
+    const notificationWebhookUrl =
+      process.env.MACRODROID_NOTIFICATION_WEBHOOK_URL ||
+      'https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request'
+    if (isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
-        await fetch(webhookUrl, {
+        await fetch(notificationWebhookUrl, {
           method: 'POST',
           body: enquiryUrl,
         })
       } catch (e) {
-        console.error('Failed to trigger MacroDroid notification:', e)
+        console.error('[MacroDroid] Failed to send staff notification:', e)
       }
     }
 
