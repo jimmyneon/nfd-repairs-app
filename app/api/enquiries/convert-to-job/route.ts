@@ -52,6 +52,19 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean).join('\n')
     const extraInfoBlock = extraInfo ? `\n\n${extraInfo}` : ''
 
+    // Helper: insert extra info before the trailing "NFD Repairs" signature
+    function withExtraInfo(templateBody: string): string {
+      if (!extraInfoBlock) return templateBody
+      // Strip trailing "NFD Repairs" (with optional whitespace/newlines before it)
+      const sig = 'NFD Repairs'
+      if (templateBody.trimEnd().endsWith(sig)) {
+        const trimmed = templateBody.trimEnd()
+        return trimmed.slice(0, trimmed.length - sig.length).trimEnd() + `${extraInfoBlock}\n\n${sig}`
+      }
+      // No signature found — just append
+      return templateBody + extraInfoBlock
+    }
+
     const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
     if (!validStatuses.includes(stock_status)) {
       return NextResponse.json(
@@ -245,7 +258,7 @@ export async function POST(request: NextRequest) {
 
       const deviceSummary = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
       smsBody = templates?.body
-        ? renderSmsTemplate(templates.body, {
+        ? withExtraInfo(renderSmsTemplate(templates.body, {
             first_name: getFirstName(enquiry.customer_name),
             customer_name: enquiry.customer_name || '',
             device_make: enquiry.device_make || '',
@@ -253,7 +266,7 @@ export async function POST(request: NextRequest) {
             device_summary: deviceSummary,
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
-          })
+          }))
         : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.${extraInfoBlock}\n\nNFD Repairs`
     } else if (depositAlreadyPaid) {
       // Parts needed + deposit paid
@@ -270,7 +283,7 @@ export async function POST(request: NextRequest) {
 
       const template = templates?.find((item: any) => item.key === 'DEPOSIT_REQUEST') || templates?.[0]
       smsBody = template?.body
-        ? renderSmsTemplate(template.body, {
+        ? withExtraInfo(renderSmsTemplate(template.body, {
             first_name: getFirstName(enquiry.customer_name),
             customer_name: enquiry.customer_name || '',
             device_make: enquiry.device_make || '',
@@ -280,7 +293,7 @@ export async function POST(request: NextRequest) {
             deposit_link: depositUrl,
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
-          })
+          }))
         : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.${extraInfoBlock}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
