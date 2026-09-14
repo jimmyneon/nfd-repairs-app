@@ -137,6 +137,9 @@ function EnquiriesContent() {
   const [sendingQuote, setSendingQuote] = useState(false)
   const [sendingInspection, setSendingInspection] = useState(false)
   const [quoteResult, setQuoteResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [remoteSessionTime, setRemoteSessionTime] = useState('')
+  const [schedulingRemote, setSchedulingRemote] = useState(false)
+  const [remoteResult, setRemoteResult] = useState<{ success: boolean; message: string } | null>(null)
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -518,6 +521,40 @@ function EnquiriesContent() {
     setSendingInspection(false)
   }
 
+  const handleScheduleRemoteSession = async () => {
+    if (!selectedEnquiry) return
+    if (!remoteSessionTime.trim()) {
+      setRemoteResult({ success: false, message: 'Please enter a time for the session.' })
+      return
+    }
+    setSchedulingRemote(true)
+    setRemoteResult(null)
+    try {
+      const res = await fetch('/api/enquiries/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiry_ref: selectedEnquiry.enquiry_ref,
+          action: 'schedule_remote_session',
+          data: { session_time: remoteSessionTime.trim() },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setRemoteResult({ success: true, message: `Session scheduled for ${remoteSessionTime.trim()}. SMS and email sent to ${selectedEnquiry.customer_name}.` })
+        setRemoteSessionTime('')
+        setSelectedEnquiry({ ...selectedEnquiry, status: 'more_info_requested', staff_notes: `Remote session scheduled: ${remoteSessionTime.trim()}` })
+        loadEnquiries()
+      } else {
+        setRemoteResult({ success: false, message: data.error || 'Failed to schedule session.' })
+      }
+    } catch (e) {
+      console.error('Failed to schedule remote session:', e)
+      setRemoteResult({ success: false, message: 'Failed to schedule. Please try again.' })
+    }
+    setSchedulingRemote(false)
+  }
+
   const openDetail = (enquiry: Enquiry) => {
     setSelectedEnquiry(enquiry)
     setResponseText(enquiry.staff_notes || '')
@@ -528,6 +565,8 @@ function EnquiriesContent() {
     setQuotePrice('')
     setQuotePriceHigh('')
     setQuotePersonalisedMsg('')
+    setRemoteResult(null)
+    setRemoteSessionTime('')
     setShowDetail(true)
   }
 
@@ -1153,6 +1192,37 @@ function EnquiriesContent() {
                       {selectedEnquiry.additional_info && <p><span className="font-semibold">RustDesk ID:</span> <span className="font-mono">{selectedEnquiry.additional_info.replace('RustDesk ID: ', '')}</span></p>}
                       <p className="text-green-600 dark:text-green-400 font-semibold">£60 PAID</p>
                     </div>
+                  </div>
+                )}
+
+                {/* Schedule remote session action */}
+                {selectedEnquiry.enquiry_type === 'remote_support' && selectedEnquiry.status === 'pending' && (
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-3">
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">Schedule Remote Session</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Enter a time for the session. The customer will receive an SMS and email with the time and instructions to keep their laptop on, awake, and unlocked.</p>
+                    <input
+                      type="text"
+                      value={remoteSessionTime}
+                      onChange={(e) => setRemoteSessionTime(e.target.value)}
+                      placeholder="e.g. Today 2pm, Tomorrow 10am, Mon 15th at 11am"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                    {remoteResult && (
+                      <p className={`text-sm ${remoteResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {remoteResult.message}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleScheduleRemoteSession}
+                      disabled={schedulingRemote || !remoteSessionTime.trim()}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-600 text-white font-bold rounded-xl hover:bg-cyan-700 transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {schedulingRemote ? (
+                        <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Sending...</>
+                      ) : (
+                        <><Send className="h-4 w-4" /> Schedule & Notify Customer</>
+                      )}
+                    </button>
                   </div>
                 )}
 
