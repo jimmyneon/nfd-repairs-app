@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
 import { corsHeaders, requireStaffUser } from '@/lib/api-auth'
-import { sendSms } from '@/lib/resilience'
+import { sendViaMacroDroid } from '@/lib/resilience'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 function escapeHtml(str: string): string {
@@ -365,7 +365,7 @@ export async function POST(request: NextRequest) {
           ? `Hi ${enquiry.customer_name}! 👋\n\nWe have got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request ✅\n\nWe will be in touch ASAP with next steps.\n\nNFD Repairs\nnfdr.uk/h`
           : `Hi ${enquiry.customer_name}! 👋\n\nWe will look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ✅\n\nWe will be in touch to confirm.\n\nNFD Repairs\nnfdr.uk/h`
         try {
-          const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
+          const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
           try {
             await supabase.from('sms_logs').insert({
               template_key: action === 'reserve_repair' ? 'REPAIR_RESERVED' : 'PART_RESERVED',
@@ -385,7 +385,7 @@ export async function POST(request: NextRequest) {
       const smsMessage = `Hi ${enquiry.customer_name}! 👋\n\nYour remote support session is booked for ${sessionTime}.\n\nPlease make sure your laptop is:\n• Turned on and awake (not sleeping)\n• Unlocked and logged in\n• Connected to the internet\n• Running the RustDesk app we sent you\n\nWe'll text you 5 minutes before we connect. Go make a cup of tea while we work. ☕\n\nNFD Repairs\nnfdr.uk/h`
       if (webhookUrl) {
         try {
-          const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
+          const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
           try {
             await supabase.from('sms_logs').insert({
               template_key: 'REMOTE_SESSION_SCHEDULED',
@@ -437,7 +437,7 @@ export async function POST(request: NextRequest) {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl && enquiry.customer_phone) {
             try {
-              const smsResponse = await sendSms(enquiry.customer_phone, inspectionMessage)
+              const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, inspectionMessage)
               await supabase.from('sms_logs').insert({
                 template_key: 'NEEDS_INSPECTION',
                 body_rendered: inspectionMessage,
@@ -492,7 +492,7 @@ export async function POST(request: NextRequest) {
             ? `Hi ${enquiry.customer_name}! 👋\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
             : `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
-            const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
+            const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
             try {
               await supabase.from('sms_logs').insert({
                 template_key: personalisedMessage ? 'PERSONALISED_QUOTE' : 'QUOTE_SENT',
