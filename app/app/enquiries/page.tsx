@@ -66,6 +66,7 @@ interface Enquiry {
   quote_valid_until?: string | null
   staff_notes?: string | null
   staff_response?: string | null
+  additional_repairs?: Array<{ repair: string; display_name: string; price: number }> | null
   responded_at?: string | null
   updated_at?: string | null
   commitment_type?: string | null
@@ -1112,6 +1113,15 @@ function EnquiriesContent() {
                       <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
                       {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
                       {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
+                      {selectedEnquiry.additional_repairs && selectedEnquiry.additional_repairs.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                          <p className="font-semibold">Also included:</p>
+                          {selectedEnquiry.additional_repairs.map((r, i) => (
+                            <p key={i} className="pl-2">{r.display_name || r.repair} — £{r.price}</p>
+                          ))}
+                          <p className="font-semibold mt-1">Total: £{(selectedEnquiry.quoted_price || 0) + selectedEnquiry.additional_repairs.reduce((s, r) => s + r.price, 0)}</p>
+                        </div>
+                      )}
                       {selectedEnquiry.quote_type && <p><span className="font-semibold">Type:</span> {selectedEnquiry.quote_type}</p>}
                       {selectedEnquiry.commitment_type === 'remind_later' && (
                         <div className="mt-2 pt-2 border-t border-indigo-200 dark:border-indigo-800 space-y-1">

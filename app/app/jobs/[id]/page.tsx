@@ -2225,11 +2225,18 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           {/* Additional Issues */}
           {job.additional_issues && job.additional_issues.length > 0 && (
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Additional Issues</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">Additional Repairs</p>
               <div className="space-y-2">
                 {job.additional_issues.map((additionalIssue, index) => (
                   <div key={index} className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">{additionalIssue.issue}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">
+                        {additionalIssue.display_name || additionalIssue.repair || additionalIssue.issue || 'Unknown repair'}
+                      </p>
+                      {additionalIssue.price != null && (
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">£{additionalIssue.price}</p>
+                      )}
+                    </div>
                     {additionalIssue.description && (
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{additionalIssue.description}</p>
                     )}

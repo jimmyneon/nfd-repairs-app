@@ -23,6 +23,11 @@ export type JobType = 'repair' | 'sell'
 export interface AdditionalIssue {
   issue: string
   description?: string
+  // Fields used when additional issues come from enquiry conversion
+  // (additional_repairs stored as { repair, display_name, price })
+  repair?: string
+  display_name?: string
+  price?: number
 }
 
 export interface Job {
