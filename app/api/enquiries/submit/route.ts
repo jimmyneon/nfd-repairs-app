@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
       if (!stripeSecretKey) {
         console.error('[Remote Support] STRIPE_SECRET_KEY not set — cannot verify payment')
         return NextResponse.json(
-          { error: 'Payment verification not configured. Please call us on 07410 381247.' },
+          { error: 'Payment verification not configured. Please try again later.' },
           { status: 503, headers }
         )
       }
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       } catch (err: any) {
         console.error('[Remote Support] Stripe verification failed:', err.message)
         return NextResponse.json(
-          { error: 'Could not verify payment. Please call us on 07410 381247.' },
+          { error: 'Could not verify payment. Please try again.' },
           { status: 402, headers }
         )
       }

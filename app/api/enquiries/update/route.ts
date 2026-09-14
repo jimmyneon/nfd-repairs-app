@@ -414,10 +414,10 @@ export async function POST(request: NextRequest) {
                 <li>Keep the RustDesk app running</li>
               </ul>
               <p>We'll text you 5 minutes before we connect.</p>
-              <p>If you need to reschedule, reply to this email or call us on 07410 381247.</p>
+              <p>If you need to reschedule, just reply to this email.</p>
               <p>New Forest Device Repairs<br>5a New Street, Lymington, SO41 9BH<br>07410 381247</p>
             </div>`,
-            `Hi ${enquiry.customer_name},\n\nYour remote support session is booked for ${sessionTime}.\n\nBefore your session:\n• Keep your laptop turned on and awake (not sleeping)\n• Make sure it's unlocked and logged in\n• Make sure it's connected to the internet\n• Keep the RustDesk app running\n\nWe'll text you 5 minutes before we connect.\n\nIf you need to reschedule, reply to this email or call us on 07410 381247.\n\nNew Forest Device Repairs\n5a New Street, Lymington, SO41 9BH\n07410 381247`
+            `Hi ${enquiry.customer_name},\n\nYour remote support session is booked for ${sessionTime}.\n\nBefore your session:\n• Keep your laptop turned on and awake (not sleeping)\n• Make sure it's unlocked and logged in\n• Make sure it's connected to the internet\n• Keep the RustDesk app running\n\nWe'll text you 5 minutes before we connect.\n\nIf you need to reschedule, just reply to this email.\n\nNew Forest Device Repairs\n5a New Street, Lymington, SO41 9BH`
           )
         } catch (e) { console.error('Remote session email failed:', e) }
       }
