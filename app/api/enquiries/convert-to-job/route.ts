@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendSms } from '@/lib/resilience'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -299,7 +299,7 @@ export async function POST(request: NextRequest) {
     let smsError: string | null = null
     if (smsBody && customerPhone && webhookUrl) {
       try {
-        const smsResponse = await sendSms(customerPhone, smsBody)
+        const smsResponse = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
 
         const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
         smsSent = smsResponse.ok
