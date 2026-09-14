@@ -122,6 +122,10 @@ function EnquiriesContent() {
   } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
+  // Convert-to-job form state (In Stock / Need Parts / Device Dropped Off)
+  const [convertFormOpen, setConvertFormOpen] = useState<'in_stock' | 'parts_needed' | 'device_in_shop' | null>(null)
+  const [convertEarliestDate, setConvertEarliestDate] = useState('')
+  const [convertNotes, setConvertNotes] = useState('')
   // Personalised quote response panel state
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quotePrice, setQuotePrice] = useState('')
@@ -361,6 +365,8 @@ function EnquiriesContent() {
         body: JSON.stringify({
           enquiry_id: selectedEnquiry.id,
           stock_status: stockStatus,
+          earliest_date: convertEarliestDate || null,
+          staff_notes: convertNotes.trim() || null,
         }),
       })
       const data = await res.json()
@@ -373,6 +379,9 @@ function EnquiriesContent() {
           sms_sent: data.sms_sent === true,
           sms_error: data.sms_error || null,
         })
+        setConvertFormOpen(null)
+        setConvertEarliestDate('')
+        setConvertNotes('')
         loadEnquiries()
       } else {
         alert(data.error || 'Failed to convert enquiry')
@@ -1181,37 +1190,125 @@ function EnquiriesContent() {
                 {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
                   <div className="space-y-3 pt-2">
                     <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Convert to job — what's the situation?</p>
-                    <div className="grid grid-cols-1 gap-3">
-                      <button
-                        onClick={() => handleConvertToJob('device_in_shop')}
-                        disabled={converting}
-                        className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 disabled:opacity-50"
-                      >
-                        <Store className="h-5 w-5" />
-                        <span className="text-sm">Device Dropped Off</span>
-                        <span className="text-xs opacity-80">— Book in & send received message</span>
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => handleConvertToJob('in_stock')}
-                        disabled={converting}
-                        className="flex flex-col items-center justify-center gap-2 py-6 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
-                      >
-                        <CheckCircle className="h-7 w-7" />
-                        <span className="text-sm">In Stock</span>
-                        <span className="text-xs opacity-80">Book in & message →</span>
-                      </button>
-                      <button
-                        onClick={() => handleConvertToJob('parts_needed')}
-                        disabled={converting}
-                        className="flex flex-col items-center justify-center gap-2 py-6 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
-                      >
-                        <Clock className="h-7 w-7" />
-                        <span className="text-sm">Need Parts</span>
-                        <span className="text-xs opacity-80">Send deposit request →</span>
-                      </button>
-                    </div>
+
+                    {/* When no form is open, show the three choice buttons */}
+                    {!convertFormOpen && (
+                      <>
+                        <div className="grid grid-cols-1 gap-3">
+                          <button
+                            onClick={() => setConvertFormOpen('device_in_shop')}
+                            disabled={converting}
+                            className="flex items-center justify-center gap-3 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            <Store className="h-5 w-5" />
+                            <span className="text-sm">Device Dropped Off</span>
+                            <span className="text-xs opacity-80">— Book in & send received message</span>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => setConvertFormOpen('in_stock')}
+                            disabled={converting}
+                            className="flex flex-col items-center justify-center gap-2 py-6 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            <CheckCircle className="h-7 w-7" />
+                            <span className="text-sm">In Stock</span>
+                            <span className="text-xs opacity-80">Book in & message →</span>
+                          </button>
+                          <button
+                            onClick={() => setConvertFormOpen('parts_needed')}
+                            disabled={converting}
+                            className="flex flex-col items-center justify-center gap-2 py-6 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            <Clock className="h-7 w-7" />
+                            <span className="text-sm">Need Parts</span>
+                            <span className="text-xs opacity-80">Send deposit request →</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Convert form — shown when a choice is made */}
+                    {convertFormOpen && (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-4 border-2 border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                            {convertFormOpen === 'in_stock' && '✅ In Stock — Book in & message'}
+                            {convertFormOpen === 'parts_needed' && '⏳ Need Parts — Send deposit request'}
+                            {convertFormOpen === 'device_in_shop' && '🏪 Device Dropped Off — Book in'}
+                          </p>
+                          <button
+                            onClick={() => { setConvertFormOpen(null); setConvertEarliestDate(''); setConvertNotes('') }}
+                            disabled={converting}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+
+                        {/* Earliest date — most useful for Need Parts, but available for all */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">
+                            Earliest we can do it <span className="font-normal opacity-60">(optional)</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={convertEarliestDate}
+                            onChange={(e) => setConvertEarliestDate(e.target.value)}
+                            disabled={converting}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {convertFormOpen === 'parts_needed'
+                              ? 'When the part should arrive. We\'ll tell the customer.'
+                              : 'When we can start the repair. We\'ll tell the customer.'}
+                          </p>
+                        </div>
+
+                        {/* Additional notes */}
+                        <div>
+                          <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">
+                            Additional info <span className="font-normal opacity-60">(optional — added to SMS)</span>
+                          </label>
+                          <textarea
+                            value={convertNotes}
+                            onChange={(e) => setConvertNotes(e.target.value)}
+                            disabled={converting}
+                            rows={3}
+                            placeholder="e.g. We're waiting on a delivery, or pop in anytime between 10 and 4"
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleConvertToJob(convertFormOpen)}
+                            disabled={converting}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            {converting ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                                Converting...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4" />
+                                Confirm & Send
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => { setConvertFormOpen(null); setConvertEarliestDate(''); setConvertNotes('') }}
+                            disabled={converting}
+                            className="px-4 py-3 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

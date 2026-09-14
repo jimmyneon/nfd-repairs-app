@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { enquiry_id, stock_status } = await request.json()
+    const { enquiry_id, stock_status, earliest_date, staff_notes } = await request.json()
 
     if (!enquiry_id || !stock_status) {
       return NextResponse.json(
@@ -35,6 +35,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Format earliest date for SMS (e.g. "Wed 17 Sep") if provided
+    const earliestDateStr = earliest_date
+      ? new Date(earliest_date + 'T00:00:00').toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        })
+      : null
+    const staffNotes = (staff_notes || '').trim()
+    // Build optional suffix appended to SMS body
+    const extraInfo = [
+      earliestDateStr ? `Earliest we can do it: ${earliestDateStr}` : null,
+      staffNotes || null,
+    ].filter(Boolean).join('\n')
+    const extraInfoBlock = extraInfo ? `\n\n${extraInfo}` : ''
 
     const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
     if (!validStatuses.includes(stock_status)) {
@@ -238,10 +254,10 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           })
-        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.${extraInfoBlock}\n\nNFD Repairs`
     } else if (depositAlreadyPaid) {
       // Parts needed + deposit paid
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}${extraInfoBlock}\n\nNFD Repairs`
     } else if (requiresParts) {
       // Parts needed — request the deposit before ordering
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
@@ -265,7 +281,7 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           })
-        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.${extraInfoBlock}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
@@ -276,14 +292,14 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust bring your device in whenever suits you during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${extraInfoBlock}\n\nNFD Repairs`
     }
 
     let smsSent = false
     let smsError: string | null = null
     if (smsBody && customerPhone && webhookUrl) {
       try {
-        const smsResponse = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
+        const smsResponse = await sendSms(customerPhone, smsBody)
 
         const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
         smsSent = smsResponse.ok
