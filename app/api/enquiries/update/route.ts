@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { shortQuoteApprovalLink } from '@/lib/utils'
 import { corsHeaders, requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms } from '@/lib/resilience'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 function escapeHtml(str: string): string {
@@ -287,6 +287,19 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'schedule_remote_session': {
+        const sessionTime = data?.session_time || ''
+        if (!sessionTime) {
+          return NextResponse.json({ error: 'session_time is required' }, { status: 400, headers })
+        }
+        updateFields.status = 'more_info_requested'
+        updateFields.staff_notes = `Remote session scheduled: ${sessionTime}`
+        notificationTitle = `🖥️ Remote Session Scheduled: ${enquiry.customer_name}`
+        notificationBody = `Time: ${sessionTime}`
+        // SMS will be sent below after the update
+        break
+      }
+
       default: {
         return NextResponse.json({ error: 'Unknown action: ' + action }, { status: 400, headers })
       }
@@ -352,7 +365,7 @@ export async function POST(request: NextRequest) {
           ? `Hi ${enquiry.customer_name}! 👋\n\nWe have got your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair request ✅\n\nWe will be in touch ASAP with next steps.\n\nNFD Repairs\nnfdr.uk/h`
           : `Hi ${enquiry.customer_name}! 👋\n\nWe will look into getting a part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ✅\n\nWe will be in touch to confirm.\n\nNFD Repairs\nnfdr.uk/h`
         try {
-          const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
+          const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
           try {
             await supabase.from('sms_logs').insert({
               template_key: action === 'reserve_repair' ? 'REPAIR_RESERVED' : 'PART_RESERVED',
@@ -362,6 +375,51 @@ export async function POST(request: NextRequest) {
             } as any)
           } catch (e) { console.error('SMS log failed:', e) }
         } catch (e) { console.error('Confirmation SMS failed:', e) }
+      }
+    }
+
+    // Send SMS + email for remote session scheduling
+    if (action === 'schedule_remote_session' && enquiry.customer_phone) {
+      const sessionTime = data?.session_time || ''
+      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+      const smsMessage = `Hi ${enquiry.customer_name}! 👋\n\nYour remote support session is booked for ${sessionTime}.\n\nPlease make sure your laptop is:\n• Turned on and awake (not sleeping)\n• Unlocked and logged in\n• Connected to the internet\n• Running the RustDesk app we sent you\n\nWe'll text you 5 minutes before we connect. Go make a cup of tea while we work. ☕\n\nNFD Repairs\nnfdr.uk/h`
+      if (webhookUrl) {
+        try {
+          const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
+          try {
+            await supabase.from('sms_logs').insert({
+              template_key: 'REMOTE_SESSION_SCHEDULED',
+              body_rendered: smsMessage,
+              status: smsResponse.ok ? 'SENT' : 'FAILED',
+              sent_at: smsResponse.ok ? now : null,
+            } as any)
+          } catch (e) { console.error('SMS log failed:', e) }
+        } catch (e) { console.error('Remote session SMS failed:', e) }
+      }
+      // Also send email if available
+      if (enquiry.customer_email) {
+        try {
+          await sendEmail(
+            enquiry.customer_email,
+            'Your Remote Support Session is Booked — NFD Repairs',
+            `<div style="font-family:Poppins,Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <h2>Your remote support session is booked</h2>
+              <p>Hi ${enquiry.customer_name},</p>
+              <p>Your remote support session is booked for <strong>${sessionTime}</strong>.</p>
+              <h3>Before your session:</h3>
+              <ul>
+                <li>Keep your laptop turned on and awake (not sleeping)</li>
+                <li>Make sure it's unlocked and logged in</li>
+                <li>Make sure it's connected to the internet</li>
+                <li>Keep the RustDesk app running</li>
+              </ul>
+              <p>We'll text you 5 minutes before we connect.</p>
+              <p>If you need to reschedule, reply to this email or call us on 07410 381247.</p>
+              <p>New Forest Device Repairs<br>5a New Street, Lymington, SO41 9BH<br>07410 381247</p>
+            </div>`,
+            `Hi ${enquiry.customer_name},\n\nYour remote support session is booked for ${sessionTime}.\n\nBefore your session:\n• Keep your laptop turned on and awake (not sleeping)\n• Make sure it's unlocked and logged in\n• Make sure it's connected to the internet\n• Keep the RustDesk app running\n\nWe'll text you 5 minutes before we connect.\n\nIf you need to reschedule, reply to this email or call us on 07410 381247.\n\nNew Forest Device Repairs\n5a New Street, Lymington, SO41 9BH\n07410 381247`
+          )
+        } catch (e) { console.error('Remote session email failed:', e) }
       }
     }
 
@@ -379,7 +437,7 @@ export async function POST(request: NextRequest) {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (webhookUrl && enquiry.customer_phone) {
             try {
-              const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, inspectionMessage)
+              const smsResponse = await sendSms(enquiry.customer_phone, inspectionMessage)
               await supabase.from('sms_logs').insert({
                 template_key: 'NEEDS_INSPECTION',
                 body_rendered: inspectionMessage,
@@ -434,7 +492,7 @@ export async function POST(request: NextRequest) {
             ? `Hi ${enquiry.customer_name}! 👋\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${addRepairsText}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
             : `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
-            const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
+            const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
             try {
               await supabase.from('sms_logs').insert({
                 template_key: personalisedMessage ? 'PERSONALISED_QUOTE' : 'QUOTE_SENT',

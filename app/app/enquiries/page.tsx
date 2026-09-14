@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 interface Enquiry {
   id: string
   enquiry_ref: string
-  enquiry_type: 'web_services' | 'home_services' | 'business' | 'repair_quote'
+  enquiry_type: 'web_services' | 'home_services' | 'business' | 'repair_quote' | 'remote_support'
   customer_name: string
   customer_email: string
   customer_phone: string | null
@@ -95,6 +95,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Wrench; color: s
   business: { label: 'Business', icon: Briefcase, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
   web_services: { label: 'Web', icon: Code, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
   home_services: { label: 'Home', icon: Home, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20' },
+  remote_support: { label: 'Remote', icon: Monitor, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/20' },
 }
 
 function EnquiriesContent() {
@@ -324,6 +325,7 @@ function EnquiriesContent() {
 
   const getTileSummary = (e: Enquiry): string => {
     if (e.enquiry_type === 'repair_quote') return `${e.device_make || ''} ${e.device_model || ''}`.trim() || 'Repair quote'
+    if (e.enquiry_type === 'remote_support') return e.device_make || 'Remote support'
     if (e.enquiry_type === 'business') return e.help_type || e.company || 'Business enquiry'
     if (e.enquiry_type === 'web_services') return e.project_type || 'Web project'
     return e.service_type || 'Home service'
@@ -1138,6 +1140,18 @@ function EnquiriesContent() {
                           <p className="text-xs text-gray-500 dark:text-gray-400">No booking, no deposit. Staff must check stock before booking in.</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Remote support details */}
+                {selectedEnquiry.enquiry_type === 'remote_support' && (
+                  <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-xl p-4 space-y-1.5">
+                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <p className="text-base font-bold text-gray-900 dark:text-white"><i className="fas fa-desktop mr-1"></i> {selectedEnquiry.device_make || 'Remote support'}</p>
+                      <p><span className="font-semibold">Problem:</span> {selectedEnquiry.issue_description || 'Not described'}</p>
+                      {selectedEnquiry.additional_info && <p><span className="font-semibold">RustDesk ID:</span> <span className="font-mono">{selectedEnquiry.additional_info.replace('RustDesk ID: ', '')}</span></p>}
+                      <p className="text-green-600 dark:text-green-400 font-semibold">£60 PAID</p>
                     </div>
                   </div>
                 )}

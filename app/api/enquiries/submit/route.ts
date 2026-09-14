@@ -161,16 +161,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Email required for web/home services, optional for repair_quote and business
-    if (enquiry_type !== 'repair_quote' && !sanitizedEmail) {
+    // Email required for web/home services and remote support, optional for repair_quote and business
+    if (enquiry_type !== 'repair_quote' && enquiry_type !== 'business' && !sanitizedEmail) {
       return NextResponse.json(
         { error: 'Missing required field: customer_email' },
         { status: 400, headers }
       )
     }
 
-    // Phone required for repair_quote (unless email is provided — customer can choose email-only)
-    if (enquiry_type === 'repair_quote' && !sanitizedPhone && !sanitizedEmail) {
+    // Phone required for repair_quote and remote_support (unless email is provided)
+    if ((enquiry_type === 'repair_quote' || enquiry_type === 'remote_support') && !sanitizedPhone && !sanitizedEmail) {
       return NextResponse.json(
         { error: 'Missing required field: customer_phone or customer_email' },
         { status: 400, headers }
@@ -338,11 +338,14 @@ export async function POST(request: NextRequest) {
     const isTimingLossRisk = quote_source === 'timing_loss_risk'
     const isPriceOptionReview = quote_source === 'price_option_review'
     const isRecoveryReview = isTimingLossRisk || isPriceOptionReview
+    const isRemoteSupport = enquiry_type === 'remote_support'
     const isPersonalisedQuoteNeeded = enquiry_type === 'repair_quote'
       && !verifiedQuotedPrice
       && !isProceed
       && !isPayday
-    const notifTitle = enquiry_type === 'repair_quote'
+    const notifTitle = isRemoteSupport
+      ? `🖥️ REMOTE SUPPORT: ${device_make || ''} ${device_model || ''}`
+      : enquiry_type === 'repair_quote'
       ? isTimingLossRisk
         ? `⏱️ TIMING LOSS RISK: ${device_make || ''} ${device_model || ''}`
         : isPriceOptionReview
@@ -355,12 +358,14 @@ export async function POST(request: NextRequest) {
             ? `📝 PERSONALISED QUOTE NEEDED: ${device_make || ''} ${device_model || ''}`
             : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
       : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
-    const notifBody = enquiry_type === 'repair_quote'
+    const notifBody = isRemoteSupport
+      ? `${customer_name} - ${issue_description || 'Remote support request'} - £60 PAID${additional_info ? ' - ' + additional_info : ''}`
+      : enquiry_type === 'repair_quote'
       ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isTimingLossRisk ? ' - TIMING BLOCKED: review only; do not promise late opening' : isPriceOptionReview ? ' - REVIEW CURRENT SUITABLE OPTIONS; no price haggling' : isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : isPersonalisedQuoteNeeded ? ' - SEND QUOTE FROM APP' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
       : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
 
     await supabase.from('notifications').insert({
-      type: isRecoveryReview ? 'NEW_ENQUIRY' : isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
+      type: isRemoteSupport ? 'REMOTE_SUPPORT' : isRecoveryReview ? 'NEW_ENQUIRY' : isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
       is_read: false,
@@ -368,11 +373,11 @@ export async function POST(request: NextRequest) {
 
     // Trigger MacroDroid notification for high-intent enquiries
     // (customer wants to proceed, reserve for payday, OR submitted a personalised
-    // quote request that needs a manual price from staff)
+    // quote request that needs a manual price from staff, OR remote support)
     // Sends a plain-text URL to the MacroDroid webhook — same mechanism as
     // quote approval, so the phone gets a notification with a link to the app.
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if ((isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview) && webhookUrl) {
+    if ((isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) && webhookUrl) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
@@ -385,9 +390,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send NF Hub push notification for personalised quotes (so a banner appears
-    // even if the staff member misses the MacroDroid SMS)
-    if (isPersonalisedQuoteNeeded || isRecoveryReview) {
+    // Send NF Hub push notification for personalised quotes and remote support
+    // (so a banner appears even if the staff member misses the MacroDroid SMS)
+    if (isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
