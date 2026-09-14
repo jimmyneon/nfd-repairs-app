@@ -219,9 +219,42 @@ export async function POST(request: NextRequest) {
         const stripe = await import('stripe')
         const stripeClient = new stripe.default(stripeSecretKey)
         const session = await stripeClient.checkout.sessions.retrieve(stripe_session_id)
+
+        // Verify the session belongs to this product (not a different Stripe product)
+        if (session.metadata?.product !== 'remote_support_session') {
+          console.warn('[Remote Support] Session metadata mismatch:', session.metadata?.product)
+          return NextResponse.json(
+            { error: 'Could not verify payment. Please try again.' },
+            { status: 402, headers }
+          )
+        }
+
+        // Verify the amount is correct (£60 = 6000p)
+        if (session.amount_total !== 6000) {
+          console.warn('[Remote Support] Amount mismatch:', session.amount_total)
+          return NextResponse.json(
+            { error: 'Could not verify payment. Please try again.' },
+            { status: 402, headers }
+          )
+        }
+
         if (session.payment_status === 'paid') {
+          // Check if this session has already been used for an enquiry (replay protection)
+          const { data: existing } = await supabase
+            .from('enquiries')
+            .select('id')
+            .eq('additional_info', `ilike%${stripe_session_id}%`)
+            .eq('enquiry_type', 'remote_support')
+            .limit(1)
+          if (existing && existing.length > 0) {
+            console.warn('[Remote Support] Replay attempt for session:', stripe_session_id)
+            return NextResponse.json(
+              { error: 'This payment has already been used. Please book a new session if you need another.' },
+              { status: 409, headers }
+            )
+          }
           stripePaymentVerified = true
-          stripePaymentAmount = session.amount_total || 6000
+          stripePaymentAmount = session.amount_total
         } else {
           return NextResponse.json(
             { error: 'Payment not completed. Please complete your £60 payment first.' },
