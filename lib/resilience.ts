@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { SHOP_INFO } from './constants'
+import { SHOP_INFO } from './constants' // eslint-disable-line no-unused-vars
 
 /**
  * Create a Supabase service-role client with retry-friendly settings.
@@ -151,14 +151,6 @@ export function isSafeSmsDestination(rawPhone: string): {
   reason?: string
 } {
   const normalized = normaliseUkSmsDestination(rawPhone)
-
-  // Never auto-text the shop's own number — it creates a loop where the
-  // "Sms to ai" macro forwards the self-sent SMS back to the app, which
-  // can trigger further auto-replies and flood the system.
-  const shopNormalized = normaliseUkSmsDestination(SHOP_INFO.phone)
-  if (normalized === shopNormalized) {
-    return { ok: false, normalized, reason: 'SHOP_OWN_NUMBER' }
-  }
 
   // Never auto-text international numbers, landlines, shortcodes, malformed
   // numbers, etc. The repair app's automated messaging is UK-mobile only.
