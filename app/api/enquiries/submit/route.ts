@@ -335,25 +335,32 @@ export async function POST(request: NextRequest) {
     // Create notification for staff
     const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
     const isPayday = quote_source === 'reserve_for_payday' && proceed_with_repair
+    const isTimingLossRisk = quote_source === 'timing_loss_risk'
+    const isPriceOptionReview = quote_source === 'price_option_review'
+    const isRecoveryReview = isTimingLossRisk || isPriceOptionReview
     const isPersonalisedQuoteNeeded = enquiry_type === 'repair_quote'
       && !verifiedQuotedPrice
       && !isProceed
       && !isPayday
     const notifTitle = enquiry_type === 'repair_quote'
-      ? isPayday
-        ? `💰 RESERVE FOR PAYDAY: ${device_make || ''} ${device_model || ''}`
-        : isProceed
+      ? isTimingLossRisk
+        ? `⏱️ TIMING LOSS RISK: ${device_make || ''} ${device_model || ''}`
+        : isPriceOptionReview
+          ? `🔎 PRICE / OPTION REVIEW: ${device_make || ''} ${device_model || ''}`
+          : isPayday
+            ? `💰 RESERVE FOR PAYDAY: ${device_make || ''} ${device_model || ''}`
+            : isProceed
           ? `🔥 CUSTOMER WANTS TO PROCEED: ${device_make || ''} ${device_model || ''}`
           : isPersonalisedQuoteNeeded
             ? `📝 PERSONALISED QUOTE NEEDED: ${device_make || ''} ${device_model || ''}`
             : `New Repair Quote: ${device_make || ''} ${device_model || ''}`
       : `New ${enquiry_type === 'web_services' ? 'Web Services' : enquiry_type === 'business' ? 'Business' : 'Home Services'} Enquiry`
     const notifBody = enquiry_type === 'repair_quote'
-      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : isPersonalisedQuoteNeeded ? ' - SEND QUOTE FROM APP' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
+      ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isTimingLossRisk ? ' - TIMING BLOCKED: review only; do not promise late opening' : isPriceOptionReview ? ' - REVIEW CURRENT SUITABLE OPTIONS; no price haggling' : isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : isPersonalisedQuoteNeeded ? ' - SEND QUOTE FROM APP' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
       : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
 
     await supabase.from('notifications').insert({
-      type: isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
+      type: isRecoveryReview ? 'NEW_ENQUIRY' : isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
       is_read: false,
@@ -365,7 +372,7 @@ export async function POST(request: NextRequest) {
     // Sends a plain-text URL to the MacroDroid webhook — same mechanism as
     // quote approval, so the phone gets a notification with a link to the app.
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if ((isProceed || isPayday || isPersonalisedQuoteNeeded) && webhookUrl) {
+    if ((isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview) && webhookUrl) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
@@ -380,7 +387,7 @@ export async function POST(request: NextRequest) {
 
     // Send NF Hub push notification for personalised quotes (so a banner appears
     // even if the staff member misses the MacroDroid SMS)
-    if (isPersonalisedQuoteNeeded) {
+    if (isPersonalisedQuoteNeeded || isRecoveryReview) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
