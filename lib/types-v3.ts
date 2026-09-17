@@ -7,6 +7,7 @@ export type JobStatus =
   | 'DROPPED_OFF'
   | 'RECEIVED'
   | 'DIAGNOSTIC'
+  | 'AWAITING_CUSTOMER'
   | 'AWAITING_DEPOSIT'
   | 'PARTS_ORDERED'
   | 'PARTS_ARRIVED'
