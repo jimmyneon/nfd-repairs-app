@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor, Pencil, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
@@ -140,6 +140,19 @@ function EnquiriesContent() {
   const [remoteSessionTime, setRemoteSessionTime] = useState('')
   const [schedulingRemote, setSchedulingRemote] = useState(false)
   const [remoteResult, setRemoteResult] = useState<{ success: boolean; message: string } | null>(null)
+  // Long-press tile menu + edit/delete state
+  const [menuEnquiry, setMenuEnquiry] = useState<Enquiry | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [editingEnquiry, setEditingEnquiry] = useState<Enquiry | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editStatus, setEditStatus] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didLongPress = useRef(false)
   const supabase = createClient() as any
 
   useEffect(() => {
@@ -288,6 +301,7 @@ function EnquiriesContent() {
     && !isConverted(e)
     && !isAccepted(e)
     && e.status !== 'rejected'
+    && e.status !== 'more_info_requested'
     && !e.quoted_price
   const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e) || isPersonalisedQuoteNeeded(e)
 
@@ -299,6 +313,9 @@ function EnquiriesContent() {
     if (e.status === 'rejected') return { key: 'dismissed', label: 'Dismissed', detail: 'Archived from the active enquiry lists' }
     if (e.enquiry_type !== 'repair_quote') {
       return { key: e.status, label: e.status === 'pending' ? 'New Enquiry' : (STATUS_CONFIG[e.status]?.label || 'Enquiry'), detail: 'Service enquiry' }
+    }
+    if (e.status === 'more_info_requested') {
+      return { key: 'more_info_requested', label: 'Info Sent', detail: 'Staff replied — waiting on the customer' }
     }
     if (hasQuoteBeenSent(e)) {
       const method = e.quote_sent_method === 'both' ? 'text and email' : e.quote_sent_method
@@ -428,6 +445,16 @@ function EnquiriesContent() {
           })
         }
       }
+      // Mark the enquiry as responded so it leaves the "needs action" lists.
+      // Don't downgrade approved/converted enquiries that staff just messaged.
+      if (selectedEnquiry.status === 'pending') {
+        const now = new Date().toISOString()
+        await supabase
+          .from('enquiries')
+          .update({ status: 'more_info_requested', responded_at: now, updated_at: now })
+          .eq('id', selectedEnquiry.id)
+        setSelectedEnquiry({ ...selectedEnquiry, status: 'more_info_requested', responded_at: now })
+      }
       setSmsMessage('')
       setShowMessageComposer(false)
       loadEnquiries()
@@ -553,6 +580,101 @@ function EnquiriesContent() {
       setRemoteResult({ success: false, message: 'Failed to schedule. Please try again.' })
     }
     setSchedulingRemote(false)
+  }
+
+  // Long-press (or right-click) on a tile opens an action menu instead of the detail view
+  const openTileMenu = (enquiry: Enquiry) => {
+    didLongPress.current = true
+    setConfirmingDelete(false)
+    setMenuEnquiry(enquiry)
+  }
+
+  const tileHandlers = (enquiry: Enquiry) => ({
+    onPointerDown: () => {
+      didLongPress.current = false
+      longPressTimer.current = setTimeout(() => openTileMenu(enquiry), 500)
+    },
+    onPointerUp: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
+    onPointerLeave: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
+    onPointerMove: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
+    onPointerCancel: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
+    onContextMenu: (e: { preventDefault: () => void }) => { e.preventDefault(); openTileMenu(enquiry) },
+  })
+
+  const handleTileClick = (enquiry: Enquiry) => {
+    if (didLongPress.current) { didLongPress.current = false; return }
+    openDetail(enquiry)
+  }
+
+  const handleMarkDealtWith = async (enquiry: Enquiry) => {
+    const now = new Date().toISOString()
+    const { error } = await supabase
+      .from('enquiries')
+      .update({ status: 'more_info_requested', responded_at: enquiry.responded_at || now, updated_at: now })
+      .eq('id', enquiry.id)
+    if (error) {
+      alert('Could not update this enquiry. Please try again.')
+      return
+    }
+    setMenuEnquiry(null)
+    loadEnquiries()
+  }
+
+  const openEdit = (enquiry: Enquiry) => {
+    setEditName(enquiry.customer_name || '')
+    setEditPhone(enquiry.customer_phone || '')
+    setEditEmail(enquiry.customer_email || '')
+    setEditStatus(enquiry.status)
+    setEditNotes(enquiry.staff_notes || '')
+    setMenuEnquiry(null)
+    setEditingEnquiry(enquiry)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingEnquiry) return
+    setSavingEdit(true)
+    const { error } = await supabase
+      .from('enquiries')
+      .update({
+        customer_name: editName.trim() || editingEnquiry.customer_name,
+        customer_phone: editPhone.trim() || null,
+        customer_email: editEmail.trim() || null,
+        status: editStatus || editingEnquiry.status,
+        staff_notes: editNotes.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', editingEnquiry.id)
+    setSavingEdit(false)
+    if (error) {
+      alert('Could not save changes. Please try again.')
+      return
+    }
+    setEditingEnquiry(null)
+    loadEnquiries()
+  }
+
+  const handleDeleteEnquiry = async () => {
+    if (!menuEnquiry) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/enquiries/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enquiry_id: menuEnquiry.id }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setMenuEnquiry(null)
+        setConfirmingDelete(false)
+        loadEnquiries()
+      } else {
+        alert(data.error || 'Failed to delete enquiry')
+      }
+    } catch (e) {
+      console.error('Failed to delete enquiry:', e)
+      alert('Failed to delete enquiry')
+    }
+    setDeleting(false)
   }
 
   const openDetail = (enquiry: Enquiry) => {
@@ -749,7 +871,9 @@ function EnquiriesContent() {
                     return (
                       <button
                         key={enquiry.id}
-                        onClick={() => openDetail(enquiry)}
+                        {...tileHandlers(enquiry)}
+                        onClick={() => handleTileClick(enquiry)}
+                        style={{ WebkitTouchCallout: 'none' } as any}
                         className={`relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-2 ${tileBg}`}
                       >
                         <div className="p-3 h-full flex flex-col">
@@ -805,7 +929,9 @@ function EnquiriesContent() {
                     return (
                       <button
                         key={enquiry.id}
-                        onClick={() => openDetail(enquiry)}
+                        {...tileHandlers(enquiry)}
+                        onClick={() => handleTileClick(enquiry)}
+                        style={{ WebkitTouchCallout: 'none' } as any}
                         className="relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-gray-300"
                       >
                         <div className="p-3 h-full flex flex-col">
@@ -841,6 +967,152 @@ function EnquiriesContent() {
           </>
         )}
       </main>
+
+      {/* Long-press action menu */}
+      {menuEnquiry && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          onClick={() => { setMenuEnquiry(null); setConfirmingDelete(false) }}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <p className="font-bold text-gray-900 dark:text-white truncate">{menuEnquiry.customer_name}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{menuEnquiry.enquiry_ref}</p>
+            </div>
+            <div className="p-2">
+              <button
+                onClick={() => { const e = menuEnquiry; setMenuEnquiry(null); openDetail(e) }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Mail className="h-5 w-5 text-primary" /> Open
+              </button>
+              {!isConverted(menuEnquiry) && menuEnquiry.status !== 'more_info_requested' && (
+                <button
+                  onClick={() => handleMarkDealtWith(menuEnquiry)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <CheckCircle className="h-5 w-5 text-green-600" /> Mark as Dealt With
+                </button>
+              )}
+              <button
+                onClick={() => openEdit(menuEnquiry)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <Pencil className="h-5 w-5 text-blue-600" /> Edit Details
+              </button>
+              {!confirmingDelete ? (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="h-5 w-5" /> Delete Enquiry
+                </button>
+              ) : (
+                <button
+                  onClick={handleDeleteEnquiry}
+                  disabled={deleting}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                >
+                  <Trash2 className="h-5 w-5" /> {deleting ? 'Deleting...' : 'Tap again to delete permanently'}
+                </button>
+              )}
+            </div>
+            <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => { setMenuEnquiry(null); setConfirmingDelete(false) }}
+                className="w-full py-2.5 rounded-xl font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit enquiry modal */}
+      {editingEnquiry && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          onClick={() => setEditingEnquiry(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white">Edit Enquiry</h3>
+              <button
+                onClick={() => setEditingEnquiry(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{editingEnquiry.enquiry_ref}</p>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Customer name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Email</label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Status</label>
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="more_info_requested">Info Sent</option>
+                <option value="converted">Booked In</option>
+                <option value="rejected">Dismissed</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Staff notes</label>
+              <textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              />
+            </div>
+            <button
+              onClick={handleSaveEdit}
+              disabled={savingEdit || !editName.trim()}
+              className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 disabled:opacity-50"
+            >
+              {savingEdit ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Detail Slide-Up Panel */}
       <SlideUpPanel
