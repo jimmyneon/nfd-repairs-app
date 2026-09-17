@@ -8,6 +8,7 @@ export type BlockerType =
   | 'DEPOSIT' 
   | 'PARTS_ORDERED' 
   | 'AWAITING_DROPOFF' 
+  | 'AWAITING_CUSTOMER'
   | 'DELAYED' 
   | 'NEEDS_DEPOSIT'
   | null
@@ -101,9 +102,10 @@ export function getActionGroup(job: Job): ActionGroup {
   if (job.status === 'RECEIVED' && !job.parts_required && job.device_in_shop) return 'READY_TO_WORK'
   
   // WAITING: Blocked by something
+  if (job.status === 'AWAITING_CUSTOMER') return 'WAITING'
   if (job.status === 'AWAITING_DEPOSIT') return 'WAITING'
   if (job.status === 'PARTS_ORDERED') return 'WAITING'
-  if (job.status === 'QUOTE_APPROVED') return 'WAITING'
+  if (job.status === 'AWAITING_DEVICE' || job.status === 'QUOTE_APPROVED') return 'WAITING'
   if (job.status === 'RECEIVED' && job.parts_required) return 'WAITING'
   
   // READY_TO_COLLECT: Waiting for customer
@@ -122,9 +124,10 @@ export function getActionGroup(job: Job): ActionGroup {
  * Determine blocker type for a job
  */
 export function getBlockerType(job: Job): BlockerType {
+  if (job.status === 'AWAITING_CUSTOMER') return 'AWAITING_CUSTOMER'
   if (job.status === 'AWAITING_DEPOSIT') return 'DEPOSIT'
   if (job.status === 'PARTS_ORDERED') return 'PARTS_ORDERED'
-  if (job.status === 'QUOTE_APPROVED') return 'AWAITING_DROPOFF'
+  if (job.status === 'AWAITING_DEVICE' || job.status === 'QUOTE_APPROVED') return 'AWAITING_DROPOFF'
   if (job.status === 'DELAYED') return 'DELAYED'
   if (job.status === 'RECEIVED' && job.parts_required) return 'NEEDS_DEPOSIT'
   return null
@@ -154,6 +157,8 @@ export function getBlockerText(blockerType: BlockerType, job: Job): string | nul
       return '📦 Parts ordered'
     case 'AWAITING_DROPOFF':
       return '📍 Awaiting drop-off'
+    case 'AWAITING_CUSTOMER':
+      return '💬 Awaiting customer'
     case 'DELAYED':
       return `⏰ ${job.delay_reason || 'Delayed'}`
     case 'NEEDS_DEPOSIT':
