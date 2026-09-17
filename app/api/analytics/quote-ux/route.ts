@@ -17,6 +17,7 @@ type EventRow = {
 type Visit = { sessionId: string; events: EventRow[] }
 
 const granularTypes = new Set([
+  'quote_instrumentation_ready',
   'quote_category_selected',
   'quote_brand_selected',
   'quote_model_help_opened',
@@ -109,13 +110,16 @@ export async function GET(request: NextRequest) {
     }
 
     const instrumentationStart = Date.parse(firstGranular.created_at)
-    const relevantEvents = events.filter(event => Date.parse(event.created_at) >= instrumentationStart)
+    // Include a short lead-in so the step-1 event fired just before DOMContentLoaded
+    // stays attached to the first instrumented visit.
+    const relevantEvents = events.filter(event => Date.parse(event.created_at) >= instrumentationStart - 60_000)
     const visits = splitVisits(relevantEvents)
 
     const has = (visit: Visit, type: string) => visit.events.some(event => event.event_type === type)
     const hasStep = (visit: Visit, step: number) => visit.events.some(event => event.event_type === 'quote_step_enter' && Number(event.event_data?.step) === step)
 
-    const started = visits.filter(visit => hasStep(visit, 1))
+    const instrumentedVisits = visits.filter(visit => has(visit, 'quote_instrumentation_ready'))
+    const started = instrumentedVisits.filter(visit => hasStep(visit, 1))
     const categorySelected = started.filter(visit => has(visit, 'quote_category_selected'))
     const brandSelected = started.filter(visit => has(visit, 'quote_brand_selected'))
     const modelSelected = started.filter(visit => has(visit, 'quote_model_selected'))
@@ -138,9 +142,9 @@ export async function GET(request: NextRequest) {
       .map(event => Number(event.event_data?.decoded_body_size))
       .filter(value => Number.isFinite(value) && value >= 0)
 
-    const modelHelpVisits = visits.filter(visit => has(visit, 'quote_model_help_opened')).length
-    const modelUnlistedVisits = visits.filter(visit => has(visit, 'quote_model_unlisted')).length
-    const repairHelpVisits = visits.filter(visit => has(visit, 'quote_repair_help_used')).length
+    const modelHelpVisits = instrumentedVisits.filter(visit => has(visit, 'quote_model_help_opened')).length
+    const modelUnlistedVisits = instrumentedVisits.filter(visit => has(visit, 'quote_model_unlisted')).length
+    const repairHelpVisits = instrumentedVisits.filter(visit => has(visit, 'quote_repair_help_used')).length
 
     return NextResponse.json({
       success: true,
