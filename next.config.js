@@ -6,8 +6,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // ESLint is a dev dependency and is not present in every production build
+  // environment. Keep type-checking strict here; lint can still be run with
+  // `npm run lint` in a development/CI install.
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   webpack: (config) => {
     config.resolve.alias = {
