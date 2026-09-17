@@ -24,6 +24,17 @@ ALTER TABLE jobs ADD CONSTRAINT valid_status CHECK (
   )
 );
 
+-- Update the notification_config status-key constraint to allow the new status.
+ALTER TABLE notification_config DROP CONSTRAINT IF EXISTS valid_status_key;
+ALTER TABLE notification_config ADD CONSTRAINT valid_status_key CHECK (
+  status_key IN (
+    'QUOTE_REQUESTED', 'QUOTE_APPROVED', 'AWAITING_DEVICE', 'DROPPED_OFF',
+    'RECEIVED', 'DIAGNOSTIC', 'AWAITING_CUSTOMER', 'AWAITING_DEPOSIT',
+    'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'DELAYED',
+    'READY_TO_COLLECT', 'IN_STORAGE', 'COLLECTED', 'COMPLETED', 'CANCELLED'
+  )
+);
+
 -- Make the status visible to the notification settings UI, but deliberately
 -- leave automatic customer notifications disabled. Staff can send the actual
 -- question/repair options first, then move the job into this status.
