@@ -1,6 +1,6 @@
 'use client'
 
-import { X, Trash2, CheckCircle, Package, Clock, Wrench, AlertTriangle, Bell, UserCheck, Archive, Ban, FileText } from 'lucide-react'
+import { X, Trash2, CheckCircle, Package, Clock, Wrench, AlertTriangle, Bell, UserCheck, Archive, Ban, FileText, MessageSquare } from 'lucide-react'
 import { JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS } from '@/lib/constants'
 import { useState } from 'react'
@@ -29,6 +29,7 @@ export default function QuickActionsModal({
     'AWAITING_DEVICE',
     'RECEIVED',
     'DIAGNOSTIC',
+    'AWAITING_CUSTOMER',
     'AWAITING_DEPOSIT',
     'PARTS_ORDERED',
     'PARTS_ARRIVED',
@@ -47,6 +48,7 @@ export default function QuickActionsModal({
       AWAITING_DEVICE: 'bg-teal-600 hover:bg-teal-700',
       RECEIVED: 'bg-blue-700 hover:bg-blue-800',
       DIAGNOSTIC: 'bg-indigo-600 hover:bg-indigo-700',
+      AWAITING_CUSTOMER: 'bg-amber-600 hover:bg-amber-700',
       AWAITING_DEPOSIT: 'bg-yellow-500 hover:bg-yellow-600',
       PARTS_ORDERED: 'bg-purple-600 hover:bg-purple-700',
       PARTS_ARRIVED: 'bg-purple-700 hover:bg-purple-800',
@@ -69,6 +71,7 @@ export default function QuickActionsModal({
       AWAITING_DEVICE: Package,
       RECEIVED: Package,
       DIAGNOSTIC: FileText,
+      AWAITING_CUSTOMER: MessageSquare,
       AWAITING_DEPOSIT: Clock,
       PARTS_ORDERED: Package,
       PARTS_ARRIVED: CheckCircle,
@@ -91,6 +94,7 @@ export default function QuickActionsModal({
       AWAITING_DEVICE: 'Wait Dev',
       RECEIVED: 'Received',
       DIAGNOSTIC: 'Diag',
+      AWAITING_CUSTOMER: 'Wait Cust',
       AWAITING_DEPOSIT: 'Deposit',
       PARTS_ORDERED: 'Parts',
       PARTS_ARRIVED: 'Arrived',
