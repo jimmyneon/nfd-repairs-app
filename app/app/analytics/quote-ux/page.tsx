@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Clock3, HelpCircle, LoaderCircle, RefreshCw, Target } from 'lucide-react'
+import { ArrowLeft, Clock3, HelpCircle, RefreshCw, Target } from 'lucide-react'
 
 type Data = {
   success: boolean
@@ -105,7 +105,7 @@ export default function QuoteUxPage() {
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">{error}</div>}
 
-        {loading && !data && <div className="py-20 flex justify-center"><LoaderCircle className="w-6 h-6 animate-spin text-green-700" /></div>}
+        {loading && !data && <div className="py-20 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-green-700" /></div>}
 
         {data && !data.instrumentation_active && !loading && (
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6">
