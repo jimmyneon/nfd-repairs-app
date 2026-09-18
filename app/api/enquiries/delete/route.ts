@@ -27,9 +27,12 @@ export async function POST(request: NextRequest) {
     const { response: authResponse } = await requireStaffUser(request)
     if (authResponse) return authResponse
 
-    const { enquiry_id } = await request.json()
-    if (!enquiry_id) {
-      return NextResponse.json({ error: 'Missing enquiry_id' }, { status: 400, headers })
+    const body = await request.json()
+    const ids: string[] = Array.isArray(body.enquiry_ids)
+      ? body.enquiry_ids.filter((x: unknown) => typeof x === 'string')
+      : (body.enquiry_id ? [body.enquiry_id] : [])
+    if (!ids.length || ids.length > 100) {
+      return NextResponse.json({ error: 'Provide 1-100 enquiry_ids' }, { status: 400, headers })
     }
 
     const supabase = createClient(
@@ -41,14 +44,14 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase
       .from('enquiries')
       .delete()
-      .eq('id', enquiry_id)
+      .in('id', ids)
 
     if (error) {
       console.error('Failed to delete enquiry:', error)
       return NextResponse.json({ error: 'Failed to delete enquiry' }, { status: 500, headers })
     }
 
-    return NextResponse.json({ success: true }, { headers })
+    return NextResponse.json({ success: true, deleted: ids.length }, { headers })
   } catch (e) {
     console.error('Delete enquiry error:', e)
     return NextResponse.json({ error: 'Failed to delete enquiry' }, { status: 500, headers })
