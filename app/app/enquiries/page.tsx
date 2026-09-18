@@ -140,10 +140,11 @@ function EnquiriesContent() {
   const [remoteSessionTime, setRemoteSessionTime] = useState('')
   const [schedulingRemote, setSchedulingRemote] = useState(false)
   const [remoteResult, setRemoteResult] = useState<{ success: boolean; message: string } | null>(null)
-  // Long-press tile menu + edit/delete state
-  const [menuEnquiry, setMenuEnquiry] = useState<Enquiry | null>(null)
+  // Long-press multi-select mode + edit/delete state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [bulkUpdating, setBulkUpdating] = useState(false)
   const [editingEnquiry, setEditingEnquiry] = useState<Enquiry | null>(null)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
@@ -582,41 +583,56 @@ function EnquiriesContent() {
     setSchedulingRemote(false)
   }
 
-  // Long-press (or right-click) on a tile opens an action menu instead of the detail view
-  const openTileMenu = (enquiry: Enquiry) => {
+  // Long-press (or right-click) enters multi-select mode with that tile selected
+  const enterSelection = (enquiry: Enquiry) => {
     didLongPress.current = true
     setConfirmingDelete(false)
-    setMenuEnquiry(enquiry)
+    setSelectedIds(new Set([enquiry.id]))
   }
 
   const tileHandlers = (enquiry: Enquiry) => ({
     onPointerDown: () => {
       didLongPress.current = false
-      longPressTimer.current = setTimeout(() => openTileMenu(enquiry), 500)
+      longPressTimer.current = setTimeout(() => enterSelection(enquiry), 500)
     },
     onPointerUp: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
     onPointerLeave: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
     onPointerMove: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
     onPointerCancel: () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) },
-    onContextMenu: (e: { preventDefault: () => void }) => { e.preventDefault(); openTileMenu(enquiry) },
+    onContextMenu: (e: { preventDefault: () => void }) => { e.preventDefault(); enterSelection(enquiry) },
   })
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      if (next.size === 0) setConfirmingDelete(false)
+      return next
+    })
+  }
 
   const handleTileClick = (enquiry: Enquiry) => {
     if (didLongPress.current) { didLongPress.current = false; return }
+    if (selectedIds.size > 0) { toggleSelected(enquiry.id); return }
     openDetail(enquiry)
   }
 
-  const handleMarkDealtWith = async (enquiry: Enquiry) => {
+  const handleMarkDealtWith = async (enquiriesToMark: Enquiry[]) => {
+    const eligible = enquiriesToMark.filter(e => !isConverted(e) && e.status !== 'more_info_requested')
+    if (!eligible.length) { setSelectedIds(new Set()); return }
+    setBulkUpdating(true)
     const now = new Date().toISOString()
     const { error } = await supabase
       .from('enquiries')
-      .update({ status: 'more_info_requested', responded_at: enquiry.responded_at || now, updated_at: now })
-      .eq('id', enquiry.id)
+      .update({ status: 'more_info_requested', updated_at: now })
+      .in('id', eligible.map(e => e.id))
+    setBulkUpdating(false)
     if (error) {
-      alert('Could not update this enquiry. Please try again.')
+      alert('Could not update some enquiries. Please try again.')
       return
     }
-    setMenuEnquiry(null)
+    setSelectedIds(new Set())
     loadEnquiries()
   }
 
@@ -626,7 +642,6 @@ function EnquiriesContent() {
     setEditEmail(enquiry.customer_email || '')
     setEditStatus(enquiry.status)
     setEditNotes(enquiry.staff_notes || '')
-    setMenuEnquiry(null)
     setEditingEnquiry(enquiry)
   }
 
@@ -653,26 +668,26 @@ function EnquiriesContent() {
     loadEnquiries()
   }
 
-  const handleDeleteEnquiry = async () => {
-    if (!menuEnquiry) return
+  const handleDeleteEnquiries = async () => {
+    if (selectedIds.size === 0) return
     setDeleting(true)
     try {
       const res = await fetch('/api/enquiries/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enquiry_id: menuEnquiry.id }),
+        body: JSON.stringify({ enquiry_ids: Array.from(selectedIds) }),
       })
       const data = await res.json()
       if (data.success) {
-        setMenuEnquiry(null)
+        setSelectedIds(new Set())
         setConfirmingDelete(false)
         loadEnquiries()
       } else {
-        alert(data.error || 'Failed to delete enquiry')
+        alert(data.error || 'Failed to delete enquiries')
       }
     } catch (e) {
-      console.error('Failed to delete enquiry:', e)
-      alert('Failed to delete enquiry')
+      console.error('Failed to delete enquiries:', e)
+      alert('Failed to delete enquiries')
     }
     setDeleting(false)
   }
@@ -874,8 +889,13 @@ function EnquiriesContent() {
                         {...tileHandlers(enquiry)}
                         onClick={() => handleTileClick(enquiry)}
                         style={{ WebkitTouchCallout: 'none' } as any}
-                        className={`relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-2 ${tileBg}`}
+                        className={`relative block rounded-xl shadow-md overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square border-2 ${tileBg} ${selectedIds.has(enquiry.id) ? 'ring-4 ring-primary' : ''}`}
                       >
+                        {selectedIds.size > 0 && (
+                          <span className={`absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedIds.has(enquiry.id) ? 'bg-primary border-primary' : 'border-gray-400 bg-white/80 dark:bg-gray-800/80'}`}>
+                            {selectedIds.has(enquiry.id) && <CheckCircle className="h-4 w-4 text-white" />}
+                          </span>
+                        )}
                         <div className="p-3 h-full flex flex-col">
                           <div className="flex items-center justify-between mb-1">
                             <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
@@ -932,8 +952,13 @@ function EnquiriesContent() {
                         {...tileHandlers(enquiry)}
                         onClick={() => handleTileClick(enquiry)}
                         style={{ WebkitTouchCallout: 'none' } as any}
-                        className="relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-gray-300"
+                        className={`relative block rounded-xl shadow-sm overflow-hidden active:scale-95 transition-all cursor-pointer select-none aspect-square bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-l-4 border-l-gray-300 ${selectedIds.has(enquiry.id) ? 'ring-4 ring-primary' : ''}`}
                       >
+                        {selectedIds.size > 0 && (
+                          <span className={`absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedIds.has(enquiry.id) ? 'bg-primary border-primary' : 'border-gray-400 bg-white/80 dark:bg-gray-800/80'}`}>
+                            {selectedIds.has(enquiry.id) && <CheckCircle className="h-4 w-4 text-white" />}
+                          </span>
+                        )}
                         <div className="p-3 h-full flex flex-col">
                           <div className="flex items-center justify-between mb-1">
                             <div className={`flex items-center gap-1.5 ${typeCfg.color}`}>
@@ -968,65 +993,59 @@ function EnquiriesContent() {
         )}
       </main>
 
-      {/* Long-press action menu */}
-      {menuEnquiry && (
-        <div
-          className="fixed inset-0 z-40 flex items-end sm:items-center justify-center bg-black/50 p-4"
-          onClick={() => { setMenuEnquiry(null); setConfirmingDelete(false) }}
-        >
-          <div
-            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <p className="font-bold text-gray-900 dark:text-white truncate">{menuEnquiry.customer_name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{menuEnquiry.enquiry_ref}</p>
-            </div>
-            <div className="p-2">
-              <button
-                onClick={() => { const e = menuEnquiry; setMenuEnquiry(null); openDetail(e) }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <Mail className="h-5 w-5 text-primary" /> Open
-              </button>
-              {!isConverted(menuEnquiry) && menuEnquiry.status !== 'more_info_requested' && (
+      {/* Multi-select action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+          <div className="max-w-lg mx-auto p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{selectedIds.size} selected</p>
+              <div className="flex gap-3">
                 <button
-                  onClick={() => handleMarkDealtWith(menuEnquiry)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => setSelectedIds(new Set(filteredEnquiries.map(e => e.id)))}
+                  className="text-sm font-bold text-primary"
                 >
-                  <CheckCircle className="h-5 w-5 text-green-600" /> Mark as Dealt With
+                  Select all
+                </button>
+                <button
+                  onClick={() => { setSelectedIds(new Set()); setConfirmingDelete(false) }}
+                  className="text-sm font-bold text-gray-500 dark:text-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <div className={`grid gap-2 ${selectedIds.size === 1 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              <button
+                onClick={() => handleMarkDealtWith(enquiries.filter(e => selectedIds.has(e.id)))}
+                disabled={bulkUpdating}
+                className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+              >
+                <CheckCircle className="h-4 w-4" /> {bulkUpdating ? 'Updating...' : 'Dealt With'}
+              </button>
+              {selectedIds.size === 1 && (
+                <button
+                  onClick={() => { const e = enquiries.find(x => selectedIds.has(x.id)); if (e) openEdit(e) }}
+                  className="flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors active:scale-95 text-sm"
+                >
+                  <Pencil className="h-4 w-4" /> Edit
                 </button>
               )}
-              <button
-                onClick={() => openEdit(menuEnquiry)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <Pencil className="h-5 w-5 text-blue-600" /> Edit Details
-              </button>
               {!confirmingDelete ? (
                 <button
                   onClick={() => setConfirmingDelete(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  className="flex items-center justify-center gap-2 py-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-bold rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors active:scale-95 text-sm"
                 >
-                  <Trash2 className="h-5 w-5" /> Delete Enquiry
+                  <Trash2 className="h-4 w-4" /> Delete
                 </button>
               ) : (
                 <button
-                  onClick={handleDeleteEnquiry}
+                  onClick={handleDeleteEnquiries}
                   disabled={deleting}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
                 >
-                  <Trash2 className="h-5 w-5" /> {deleting ? 'Deleting...' : 'Tap again to delete permanently'}
+                  <Trash2 className="h-4 w-4" /> {deleting ? 'Deleting...' : `Confirm delete ${selectedIds.size}`}
                 </button>
               )}
-            </div>
-            <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => { setMenuEnquiry(null); setConfirmingDelete(false) }}
-                className="w-full py-2.5 rounded-xl font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
             </div>
           </div>
         </div>
