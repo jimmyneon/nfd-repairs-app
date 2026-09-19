@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     let turnaroundInfoBlock = ''
 
     function getInfoBlock(): string {
-      return `${turnaroundInfoBlock}${getInfoBlock()}`
+      return `${turnaroundInfoBlock}${extraInfoBlock}`
     }
 
     // Helper: insert timing/staff info before the trailing "NFD Repairs" signature
