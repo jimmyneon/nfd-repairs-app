@@ -905,6 +905,11 @@ export function getReassuranceMessage(
     return "Parts have arrived! Bring your device in during opening hours and we'll get started straight away."
   }
 
+  // AWAITING_CUSTOMER — repair is paused until the customer replies
+  if (status === 'AWAITING_CUSTOMER') {
+    return "We've sent you a message about your repair and just need your reply before we can continue. Please check your messages and get back to us when you can."
+  }
+
   // AWAITING_DEPOSIT
   if (status === 'AWAITING_DEPOSIT') {
     if (tier === 'first') {
