@@ -110,20 +110,19 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
         }
         setStatusTimestamps(timestamps)
 
-        if (jobData.status === 'DELAYED' && events.length > 1) {
+        if (['DELAYED', 'AWAITING_CUSTOMER'].includes(jobData.status) && events.length > 1) {
+          const transientStatuses = new Set(['DELAYED', 'AWAITING_CUSTOMER'])
           for (let i = 0; i < events.length; i++) {
             const message = events[i].message
-            if (message && !message.includes('Delayed')) {
-              const statusMatch = message.match(/Status changed to (.+?)(?:\s*-|$)/)
-              if (statusMatch) {
-                const statusLabel = statusMatch[1].trim()
-                const statusKey = Object.entries(JOB_STATUS_LABELS).find(
-                  ([key, label]) => label === statusLabel
-                )?.[0]
-                if (statusKey && statusKey !== 'DELAYED') {
-                  setPreviousStatus(statusKey)
-                  break
-                }
+            const statusMatch = message?.match(/Status changed to (.+?)(?:\s*-|$)/)
+            if (statusMatch) {
+              const statusLabel = statusMatch[1].trim()
+              const statusKey = Object.entries(JOB_STATUS_LABELS).find(
+                ([key, label]) => label === statusLabel
+              )?.[0]
+              if (statusKey && !transientStatuses.has(statusKey)) {
+                setPreviousStatus(statusKey)
+                break
               }
             }
           }
@@ -327,19 +326,22 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   // Build status steps
   const buildStatusSteps = () => {
     const steps: string[] = []
+    const journeyBaseStatus =
+      (job.status === 'AWAITING_CUSTOMER' || job.status === 'DELAYED') && previousStatus
+        ? previousStatus
+        : job.status
+
     if (job.source !== 'staff_manual') {
-      // Use AWAITING_DEVICE if that's the current status, otherwise QUOTE_APPROVED for legacy
-      steps.push(job.status === 'AWAITING_DEVICE' ? 'AWAITING_DEVICE' : 'QUOTE_APPROVED')
+      // Use the last real journey status while a job is temporarily paused.
+      steps.push(journeyBaseStatus === 'AWAITING_DEVICE' ? 'AWAITING_DEVICE' : 'QUOTE_APPROVED')
     }
     steps.push('RECEIVED')
-    // Show DIAGNOSTIC step if the job has been through it or is currently in it
-    if (job.status === 'DIAGNOSTIC' || job.diagnosis_notes || job.diagnostic_report) {
+    // Show DIAGNOSTIC step if the job has been through it or is currently/temporarily paused there.
+    if (journeyBaseStatus === 'DIAGNOSTIC' || job.diagnosis_notes || job.diagnostic_report) {
       steps.push('DIAGNOSTIC')
     }
-    const needsDepositStep = job.deposit_required || ['AWAITING_DEPOSIT'].includes(job.status) ||
-      (job.status === 'DELAYED' && previousStatus && ['AWAITING_DEPOSIT'].includes(previousStatus))
-    const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(job.status) ||
-      (job.status === 'DELAYED' && previousStatus && ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(previousStatus))
+    const needsDepositStep = job.deposit_required || journeyBaseStatus === 'AWAITING_DEPOSIT'
+    const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(journeyBaseStatus)
     if (needsDepositStep) steps.push('AWAITING_DEPOSIT')
     if (needsPartsSteps) { steps.push('PARTS_ORDERED'); steps.push('PARTS_ARRIVED') }
     steps.push('IN_REPAIR')
@@ -349,14 +351,22 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
   }
 
   const statusSteps = buildStatusSteps()
-  const getActualStepForDelayed = (): string => {
+  const getActualStepForPausedStatus = (): string => {
     if (previousStatus && statusSteps.includes(previousStatus)) return previousStatus
-    if (job.parts_required || job.deposit_required) return 'PARTS_ORDERED'
-    return 'IN_REPAIR'
+
+    // Preserve the old delayed fallback behaviour.
+    if (job.status === 'DELAYED') {
+      if (job.parts_required || job.deposit_required) return 'PARTS_ORDERED'
+      return 'IN_REPAIR'
+    }
+
+    // AWAITING_CUSTOMER is a temporary blocker, not a journey stage.
+    return 'RECEIVED'
   }
-  // When repair is agreed, DIAGNOSTIC is done — but we haven't started IN_REPAIR yet
-  // Show DIAGNOSTIC as completed, IN_REPAIR as upcoming (not current, no fake timestamp)
-  const displayStatus = job.status === 'DELAYED' ? getActualStepForDelayed()
+  // When repair is agreed, DIAGNOSTIC is done — but we haven't started IN_REPAIR yet.
+  // DELAYED and AWAITING_CUSTOMER stay anchored to the last real journey stage.
+  const displayStatus = (job.status === 'DELAYED' || job.status === 'AWAITING_CUSTOMER')
+    ? getActualStepForPausedStatus()
     : (job.status === 'DIAGNOSTIC' && repairAgreed) ? '__AGREED_WAITING__'
     : job.status
   const currentStepIndex = job.status === 'DIAGNOSTIC' && repairAgreed
@@ -410,7 +420,9 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
               } shadow-md`}>
                 {job.status === 'DIAGNOSTIC' && repairAgreed
                   ? 'Starting Soon'
-                  : JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
+                  : job.status === 'AWAITING_CUSTOMER'
+                    ? 'Waiting for your reply'
+                    : JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
               </div>
             </div>
 
@@ -560,6 +572,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                   : (currentStepIndex >= 0 ? index < currentStepIndex : false)
                 const isUpNext = isAgreedWaiting && step === 'IN_REPAIR'
                 const isDelayed = job.status === 'DELAYED' && step === displayStatus
+                const isAwaitingCustomerPause = job.status === 'AWAITING_CUSTOMER' && isCurrent
                 const stageTimestamp = statusTimestamps[step]
                 const isLast = index === statusSteps.length - 1
 
@@ -573,11 +586,11 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                     {/* Dot */}
                     <div className={`flex-shrink-0 w-3.5 h-3.5 rounded-full mt-1.5 relative z-10 ${
                       isCompleted ? 'bg-green-500' :
-                      isCurrent ? (isDelayed ? 'bg-red-500' : 'bg-primary') :
+                      isCurrent ? (isDelayed ? 'bg-red-500' : isAwaitingCustomerPause ? 'bg-amber-500' : 'bg-primary') :
                       isUpNext ? 'bg-orange-400' :
                       'bg-gray-300 dark:bg-gray-600'
                     }`}>
-                      {isCurrent && !isDelayed && (
+                      {isCurrent && !isDelayed && !isAwaitingCustomerPause && (
                         <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
                       )}
                     </div>
@@ -585,7 +598,7 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                     {/* Text */}
                     <div className="flex-1 -mt-0.5">
                       <p className={`text-sm font-semibold ${
-                        isCurrent ? (isDelayed ? 'text-red-600' : 'text-primary') :
+                        isCurrent ? (isDelayed ? 'text-red-600' : isAwaitingCustomerPause ? 'text-amber-600 dark:text-amber-400' : 'text-primary') :
                         isCompleted ? 'text-gray-900 dark:text-white' :
                         isUpNext ? 'text-orange-600 dark:text-orange-400' :
                         'text-gray-400 dark:text-gray-500'
@@ -593,8 +606,8 @@ export default function TrackingPage({ params }: { params: { token: string } }) 
                         {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
                       </p>
                       {isCurrent && (
-                        <p className="text-xs text-primary mt-0.5">
-                          {formatTimeSince(statusChangedAt)}
+                        <p className={`text-xs mt-0.5 ${isAwaitingCustomerPause ? 'text-amber-600 dark:text-amber-400' : 'text-primary'}`}>
+                          {isAwaitingCustomerPause ? 'Paused here — waiting for your reply' : formatTimeSince(statusChangedAt)}
                         </p>
                       )}
                       {isCompleted && stageTimestamp && (
