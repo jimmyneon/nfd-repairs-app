@@ -1634,7 +1634,7 @@ function EnquiriesContent() {
                         {/* Earliest date — most useful for Need Parts, but available for all */}
                         <div>
                           <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">
-                            Earliest we can do it <span className="font-normal opacity-60">(optional)</span>
+                            Expected availability <span className="font-normal opacity-60">(optional)</span>
                           </label>
                           <input
                             type="date"
@@ -1646,8 +1646,8 @@ function EnquiriesContent() {
                           />
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {convertFormOpen === 'parts_needed'
-                              ? 'When the part should arrive. We\'ll tell the customer.'
-                              : 'When we can start the repair. We\'ll tell the customer.'}
+                              ? 'Expected part arrival date — not a completion date.'
+                              : 'Earliest repair start date — not a completion date.'}
                           </p>
                         </div>
 
