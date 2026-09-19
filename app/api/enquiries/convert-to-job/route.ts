@@ -45,24 +45,34 @@ export async function POST(request: NextRequest) {
         })
       : null
     const staffNotes = (staff_notes || '').trim()
-    // Build optional suffix appended to SMS body
+    const earliestDateLabel = (stock_status === 'parts_needed' || stock_status === 'parts_deposit_paid')
+      ? 'Expected part availability'
+      : 'Earliest repair start'
+    // Build optional staff-entered suffix appended to SMS body.
+    // An exact date is a start/availability date, not a completion promise.
     const extraInfo = [
-      earliestDateStr ? `Earliest we can do it: ${earliestDateStr}` : null,
+      earliestDateStr ? `${earliestDateLabel}: ${earliestDateStr}` : null,
       staffNotes || null,
     ].filter(Boolean).join('\n')
     const extraInfoBlock = extraInfo ? `\n\n${extraInfo}` : ''
+    let turnaroundInfoBlock = ''
 
-    // Helper: insert extra info before the trailing "NFD Repairs" signature
+    function getInfoBlock(): string {
+      return `${turnaroundInfoBlock}${getInfoBlock()}`
+    }
+
+    // Helper: insert timing/staff info before the trailing "NFD Repairs" signature
     function withExtraInfo(templateBody: string): string {
-      if (!extraInfoBlock) return templateBody
+      const infoBlock = getInfoBlock()
+      if (!infoBlock) return templateBody
       // Strip trailing "NFD Repairs" (with optional whitespace/newlines before it)
       const sig = 'NFD Repairs'
       if (templateBody.trimEnd().endsWith(sig)) {
         const trimmed = templateBody.trimEnd()
-        return trimmed.slice(0, trimmed.length - sig.length).trimEnd() + `${extraInfoBlock}\n\n${sig}`
+        return trimmed.slice(0, trimmed.length - sig.length).trimEnd() + `${infoBlock}\n\n${sig}`
       }
       // No signature found — just append
-      return templateBody + extraInfoBlock
+      return templateBody + infoBlock
     }
 
     const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
@@ -82,6 +92,13 @@ export async function POST(request: NextRequest) {
 
     if (fetchError || !enquiry) {
       return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
+    }
+
+    // Carry the repair-specific estimate from the quote catalogue into the customer message.
+    // "Varies" is omitted because it does not set a useful expectation.
+    const estimatedTime = String(enquiry.estimated_time || '').trim()
+    if (estimatedTime && !/^varies$/i.test(estimatedTime)) {
+      turnaroundInfoBlock = `\n\nTypical turnaround after drop-off: ${estimatedTime}`
     }
 
     // Check if already converted
@@ -267,10 +284,10 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           }))
-        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.${extraInfoBlock}\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.${getInfoBlock()}\n\nNFD Repairs`
     } else if (depositAlreadyPaid) {
       // Parts needed + deposit paid
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}${extraInfoBlock}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
     } else if (requiresParts) {
       // Parts needed — request the deposit before ordering
       const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
@@ -294,7 +311,7 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           }))
-        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.${extraInfoBlock}\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.${getInfoBlock()}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
@@ -305,7 +322,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${extraInfoBlock}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
     }
 
     let smsSent = false
