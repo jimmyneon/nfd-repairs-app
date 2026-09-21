@@ -34,9 +34,6 @@ export async function POST(request: NextRequest) {
       .eq('id', jobId)
       .single()
 
-    // Also check if email already sent
-    const emailAlreadySent = job?.post_collection_email_sent_at && !manual
-
     if (jobError || !job) {
       return NextResponse.json(
         { error: 'Job not found' },
@@ -44,8 +41,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if already sent (unless manual override)
-    if (job.post_collection_sms_sent_at && emailAlreadySent) {
+    // Retry each channel independently. A failed SMS must never resend an
+    // email that already succeeded (and vice versa). Staff can still resend
+    // deliberately using the existing manual override.
+    const shouldSendSms = manual === true || !job.post_collection_sms_sent_at
+    const shouldSendEmail = Boolean(job.customer_email) &&
+      (manual === true || !job.post_collection_email_sent_at)
+
+    if (!shouldSendSms && !shouldSendEmail) {
       return NextResponse.json({
         success: false,
         message: 'Post-collection notifications already sent',
@@ -113,74 +116,75 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get first name from customer name, with a safe fallback
-    const firstName = getFirstName(job.customer_name)
+    const events: any[] = []
+    let smsDeliveryStatus = job.post_collection_sms_delivery_status || 'SKIPPED'
+    let emailDeliveryStatus = job.post_collection_email_delivery_status || 'SKIPPED'
 
-    // Fetch the review SMS template (single template now, links to review landing page)
-    const { data: reviewTemplate } = await supabase
-      .from('sms_templates')
-      .select('*')
-      .eq('key', 'POST_COLLECTION_REVIEW')
-      .eq('is_active', true)
-      .single()
+    // Persist each channel immediately, before trying the other one. Surface
+    // database errors instead of reporting a successful send with no record.
+    const recordDelivery = async (updates: Record<string, unknown>) => {
+      const result: any = await supabaseRetry(() =>
+        supabase.from('jobs').update(updates).eq('id', jobId)
+      )
+      if (result.error) throw result.error
+    }
 
-    // Build SMS message from template, or fall back to hardcoded default
-    let smsBody: string
-    if (reviewTemplate && reviewTemplate.body) {
-      smsBody = renderSmsTemplate(reviewTemplate.body, {
-        first_name: firstName,
-        customer_name: job.customer_name,
-        device_make: job.device_make || '',
-        device_model: safeDeviceLabel(job.device_make, job.device_model),
-        device_summary: safeDeviceLabel(job.device_make, job.device_model),
-        review_link: reviewLink,
-        tracking_link: shortTrackingLink(job.short_token || job.tracking_token),
-        job_ref: job.job_ref,
+    if (shouldSendSms) {
+      // Get first name from customer name, with a safe fallback
+      const firstName = getFirstName(job.customer_name)
+
+      // Fetch the review SMS template (single template now, links to review landing page)
+      const { data: reviewTemplate } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('key', 'POST_COLLECTION_REVIEW')
+        .eq('is_active', true)
+        .single()
+
+      // Build SMS message from template, or fall back to hardcoded default
+      let smsBody: string
+      if (reviewTemplate && reviewTemplate.body) {
+        smsBody = renderSmsTemplate(reviewTemplate.body, {
+          first_name: firstName,
+          customer_name: job.customer_name,
+          device_make: job.device_make || '',
+          device_model: safeDeviceLabel(job.device_make, job.device_model),
+          device_summary: safeDeviceLabel(job.device_make, job.device_model),
+          review_link: reviewLink,
+          tracking_link: shortTrackingLink(job.short_token || job.tracking_token),
+          job_ref: job.job_ref,
+        })
+      } else {
+        // Fallback if template not in database
+        smsBody = `Hi ${firstName}!\n\nHope you are happy with your ${job.device_model || 'device'} repair!\n\nIf so, a 5-star Google review would mean the world to our small business:\n\nIt takes 60 seconds — just tap here:\n${reviewLink}\n\nIf anything is not right, please text us — we will sort it.\n\nNFD Repairs`
+      }
+
+      // SMS configuration/template failures must not block an email-only retry.
+      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+      const smsResult = webhookUrl && smsBody?.trim()
+        ? await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+        : { ok: false }
+      smsDeliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
+
+      await recordDelivery({
+        ...(smsResult.ok ? { post_collection_sms_sent_at: new Date().toISOString() } : {}),
+        post_collection_sms_delivery_status: smsDeliveryStatus,
+        post_collection_sms_body: smsBody,
+        last_review_platform_requested: selectedPlatform,
       })
-    } else {
-      // Fallback if template not in database
-      smsBody = `Hi ${firstName}!\n\nHope you are happy with your ${job.device_model || 'device'} repair!\n\nIf so, a 5-star Google review would mean the world to our small business:\n\nIt takes 60 seconds — just tap here:\n${reviewLink}\n\nIf anything is not right, please text us — we will sort it.\n\nNFD Repairs`
+      events.push({
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: ${selectedPlatform} review request`,
+      })
     }
-
-    // Guard: don't send empty SMS to MacroDroid (causes MacroDroid failures)
-    if (!smsBody || !smsBody.trim()) {
-      console.error(`Post-collection SMS body is empty for job ${job.job_ref} - not sending to MacroDroid`)
-      return NextResponse.json(
-        { error: 'SMS body is empty - template may be missing or malformed' },
-        { status: 500 }
-      )
-    }
-
-    // Send SMS via MacroDroid
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (!webhookUrl) {
-      console.error('MACRODROID_WEBHOOK_URL not configured')
-      return NextResponse.json(
-        { error: 'SMS webhook not configured' },
-        { status: 500 }
-      )
-    }
-
-    console.log('Sending post-collection SMS to:', job.customer_phone)
-
-    const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
-
-    const smsDeliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
 
     // Send email with dynamic cross-sell content
-    console.log('Sending post-collection email to:', job.customer_email)
-    let emailDeliveryStatus = 'SKIPPED'
-    let emailSubject = ''
-    let emailBody = ''
-
-    if (job.customer_email) {
+    if (shouldSendEmail) {
       const emailTemplate = generatePostCollectionEmail({
         job,
         googleReviewLink: reviewLink
       })
-
-      emailSubject = emailTemplate.subject
-      emailBody = emailTemplate.html
 
       const emailResult = await sendEmail(
         job.customer_email,
@@ -190,53 +194,28 @@ export async function POST(request: NextRequest) {
       )
 
       emailDeliveryStatus = emailResult.success ? 'SENT' : 'FAILED'
-      console.log(`Post-collection email ${emailDeliveryStatus} for job ${job.job_ref}`)
-    } else {
-      console.log(`No email address for job ${job.job_ref}, skipping email`)
+      await recordDelivery({
+        ...(emailResult.success ? { post_collection_email_sent_at: new Date().toISOString() } : {}),
+        post_collection_email_delivery_status: emailDeliveryStatus,
+        post_collection_email_subject: emailTemplate.subject,
+        post_collection_email_body: emailTemplate.html,
+      })
+      events.push({
+        job_id: jobId,
+        type: 'SYSTEM',
+        message: `Post-collection email ${emailDeliveryStatus.toLowerCase()}: Review request with cross-sell content`,
+      })
     }
 
-    // Update job with sent status for both SMS and email.
-    // CRITICAL: only write *_sent_at when delivery actually succeeded.
-    // Writing sent_at on failure blocks the cron from ever retrying.
-    const now = new Date().toISOString()
-    await supabaseRetry(() =>
-      supabase
-        .from('jobs')
-        .update({
-          ...(smsResult.ok ? { post_collection_sms_sent_at: now } : {}),
-          post_collection_sms_delivery_status: smsDeliveryStatus,
-          post_collection_sms_body: smsBody,
-          last_review_platform_requested: selectedPlatform,
-          ...(emailDeliveryStatus === 'SENT' ? { post_collection_email_sent_at: now } : {}),
-          post_collection_email_delivery_status: emailDeliveryStatus,
-          post_collection_email_subject: emailSubject,
-          post_collection_email_body: emailBody
-        })
-        .eq('id', jobId)
-    )
-
-    // Log events
-    const events: any[] = [
-      {
-        job_id: jobId,
-        type: 'SYSTEM',
-        message: `Post-collection SMS ${smsDeliveryStatus.toLowerCase()}: ${selectedPlatform} review request sent`
-      },
-      job.customer_email ? {
-        job_id: jobId,
-        type: 'SYSTEM',
-        message: `Post-collection email ${emailDeliveryStatus.toLowerCase()}: Review request with cross-sell content`
-      } : null
-    ].filter(Boolean)
-
-    await supabase
-      .from('job_events')
-      .insert(events)
+    // Only log attempts made by this call; retain previous channel metadata.
+    if (events.length > 0) {
+      await supabase.from('job_events').insert(events)
+    }
 
     console.log(`Post-collection notifications sent for job ${job.job_ref}: SMS=${smsDeliveryStatus}, Email=${emailDeliveryStatus}`)
 
     return NextResponse.json({
-      success: smsResult.ok || (job.customer_email && emailDeliveryStatus === 'SENT'),
+      success: smsDeliveryStatus === 'SENT' || emailDeliveryStatus === 'SENT',
       smsDeliveryStatus,
       emailDeliveryStatus,
       message: `Post-collection notifications sent: SMS ${smsDeliveryStatus}, Email ${emailDeliveryStatus}`
@@ -313,12 +292,13 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get all jobs with scheduled review SMS that haven't been sent yet
+    // Retry pending SMS or an explicitly failed email. Do not backfill old
+    // jobs that never had an email attempt, or retry deliberately skipped jobs.
     const { data: jobs, error } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_phone, customer_name')
+      .select('id, job_ref, customer_phone, customer_name, post_collection_sms_sent_at')
       .not('post_collection_sms_scheduled_at', 'is', null)
-      .is('post_collection_sms_sent_at', null)
+      .or('post_collection_sms_sent_at.is.null,and(post_collection_sms_delivery_status.eq.SENT,post_collection_email_sent_at.is.null,post_collection_email_delivery_status.eq.FAILED,customer_email.not.is.null,customer_email.neq."")')
       .lte('post_collection_sms_scheduled_at', new Date().toISOString())
       .order('post_collection_sms_scheduled_at', { ascending: true })
 
@@ -375,6 +355,8 @@ export async function GET(request: NextRequest) {
     // Deduplicate review SMS by phone number
     const seenPhones = new Set<string>()
     const uniqueJobs = (jobs || []).filter(job => {
+      // Email-only retries must not consume or be removed by SMS deduplication.
+      if (job.post_collection_sms_sent_at) return true
       if (seenPhones.has(job.customer_phone)) {
         console.log(`Skipping duplicate for ${job.job_ref} - already sending to ${job.customer_phone}`)
         return false
