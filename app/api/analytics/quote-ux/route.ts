@@ -117,6 +117,11 @@ export async function GET(request: NextRequest) {
 
     const has = (visit: Visit, type: string) => visit.events.some(event => event.event_type === type)
     const hasStep = (visit: Visit, step: number) => visit.events.some(event => event.event_type === 'quote_step_enter' && Number(event.event_data?.step) === step)
+    const routeMode = (visit: Visit) => {
+      if (has(visit, 'quote_search_result_selected')) return 'search'
+      const explicit = [...visit.events].reverse().find(event => typeof event.event_data?.journey_mode === 'string')?.event_data?.journey_mode
+      return ['guided', 'search', 'deep_link', 'restored'].includes(explicit) ? explicit : 'unknown'
+    }
 
     const instrumentedVisits = visits.filter(visit => has(visit, 'quote_instrumentation_ready'))
     const started = instrumentedVisits.filter(visit => hasStep(visit, 1))
@@ -126,6 +131,22 @@ export async function GET(request: NextRequest) {
     const repairSelected = started.filter(visit => has(visit, 'quote_repair_selected'))
     const quoteReached = started.filter(visit => has(visit, 'quote_reveal'))
     const submitted = started.filter(visit => has(visit, 'quote_form_submit'))
+    const repairStartClicked = started.filter(visit => has(visit, 'repair_start_clicked'))
+    const repairRequestOpened = started.filter(visit => has(visit, 'repair_request_opened'))
+    const repairRequestSubmitted = started.filter(visit => has(visit, 'repair_request_submitted'))
+    const notReadyOpened = started.filter(visit => has(visit, 'not_ready_opened'))
+
+    const routeNames = ['guided', 'search', 'deep_link', 'restored', 'unknown'] as const
+    const routes = routeNames.map(mode => {
+      const routeVisits = started.filter(visit => routeMode(visit) === mode)
+      return {
+        mode,
+        visits: routeVisits.length,
+        quote_reached: routeVisits.filter(visit => has(visit, 'quote_reveal')).length,
+        repair_start_clicked: routeVisits.filter(visit => has(visit, 'repair_start_clicked')).length,
+        repair_request_submitted: routeVisits.filter(visit => has(visit, 'repair_request_submitted')).length,
+      }
+    }).filter(route => route.visits > 0)
 
     const beforeReadyVisits = started.filter(visit => visit.events.some(event =>
       event.event_type === 'quote_category_selected' && event.event_data?.catalogue_ready === false))
@@ -162,6 +183,14 @@ export async function GET(request: NextRequest) {
         submitted: submitted.length,
         category_selected_while_loading: beforeReadyVisits.length,
         category_loading_then_progressed: beforeReadyProgressed.length,
+      },
+      conversion: {
+        quote_reached: quoteReached.length,
+        repair_start_clicked: repairStartClicked.length,
+        repair_request_opened: repairRequestOpened.length,
+        repair_request_submitted: repairRequestSubmitted.length,
+        not_ready_opened: notReadyOpened.length,
+        routes,
       },
       catalogue: {
         ready_events: readyEvents.length,
