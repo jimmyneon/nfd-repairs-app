@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reportRange, visitorOverview, readAllPages, QuoteEvent } from '../lib/quote-analytics'
+import { reportRange, visitorOverview, readAllPages, quoteJobHasDeviceArrived, quoteJobIsCompleted, QuoteEvent } from '../lib/quote-analytics'
 
 const now = new Date('2026-09-08T12:00:00Z')
 const range = reportRange(new URLSearchParams('start=2026-09-07&end=2026-09-08'), now)
@@ -71,5 +71,26 @@ describe('analytics pagination', () => {
   })
   it('does not hide a failed later page as zero or partial data', async () => {
     await expect(readAllPages(async from => from === 0 ? { data: Array(1000).fill({}), error: null } : { data: null, error: { message: 'Database unavailable' } })).rejects.toThrow('Database unavailable')
+  })
+})
+
+
+describe('quote-to-workshop outcomes', () => {
+  it('counts current workshop and post-collection statuses as having arrived', () => {
+    for (const status of ['RECEIVED', 'DIAGNOSTIC', 'AWAITING_CUSTOMER', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'IN_STORAGE', 'COLLECTED', 'COMPLETED']) {
+      expect(quoteJobHasDeviceArrived({ status, device_in_shop: false })).toBe(true)
+    }
+  })
+
+  it('uses device possession for parts/deposit states and does not count pre-dropoff jobs', () => {
+    expect(quoteJobHasDeviceArrived({ status: 'AWAITING_DEVICE', device_in_shop: false })).toBe(false)
+    expect(quoteJobHasDeviceArrived({ status: 'PARTS_ORDERED', device_in_shop: false })).toBe(false)
+    expect(quoteJobHasDeviceArrived({ status: 'PARTS_ORDERED', device_in_shop: true })).toBe(true)
+  })
+
+  it('only treats collected or completed jobs as completed outcomes', () => {
+    expect(quoteJobIsCompleted({ status: 'COLLECTED' })).toBe(true)
+    expect(quoteJobIsCompleted({ status: 'COMPLETED' })).toBe(true)
+    expect(quoteJobIsCompleted({ status: 'READY_TO_COLLECT' })).toBe(false)
   })
 })
