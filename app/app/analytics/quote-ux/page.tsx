@@ -21,6 +21,20 @@ type Data = {
     category_selected_while_loading: number
     category_loading_then_progressed: number
   }
+  conversion?: null | {
+    quote_reached: number
+    repair_start_clicked: number
+    repair_request_opened: number
+    repair_request_submitted: number
+    not_ready_opened: number
+    routes: Array<{
+      mode: 'guided' | 'search' | 'deep_link' | 'restored' | 'unknown'
+      visits: number
+      quote_reached: number
+      repair_start_clicked: number
+      repair_request_submitted: number
+    }>
+  }
   catalogue: null | {
     ready_events: number
     timeout_events: number
@@ -123,9 +137,48 @@ export default function QuoteUxPage() {
               <Metric title="Model help used" value={data.help.model_help_opened} sub={`${data.help.model_unlisted} used model not listed`} icon={<HelpCircle className="w-4 h-4" />} />
             </section>
 
+            {data.conversion && (
+              <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+                <h2 className="font-semibold mb-1">Commercial funnel</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">The part that matters commercially: people who saw a quote, chose to start the repair, opened the request and submitted it. Search and deep-link visitors can skip the earlier selection steps.</p>
+                <div className="space-y-3">
+                  <Stage label="Quote reached" count={data.conversion.quote_reached} base={data.conversion.quote_reached} />
+                  <Stage label="Get repair started" count={data.conversion.repair_start_clicked} base={data.conversion.quote_reached} />
+                  <Stage label="Request opened" count={data.conversion.repair_request_opened} base={data.conversion.quote_reached} />
+                  <Stage label="Repair request submitted" count={data.conversion.repair_request_submitted} base={data.conversion.quote_reached} />
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Opened “Not ready yet?”</span>
+                  <span className="font-semibold">{data.conversion.not_ready_opened} · {pct(data.conversion.not_ready_opened, data.conversion.quote_reached)}</span>
+                </div>
+              </section>
+            )}
+
+            {data.conversion && data.conversion.routes.length > 0 && (
+              <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+                <h2 className="font-semibold mb-1">Journey routes</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Search, guided selection and direct/deep links are measured separately so shortcuts no longer make the funnel look backwards.</p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {data.conversion.routes.map(route => (
+                    <div key={route.mode} className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-4">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <span className="font-semibold capitalize">{route.mode.replace('_', ' ')}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{route.visits} visits</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <RouteStat label="Quotes" value={route.quote_reached} />
+                        <RouteStat label="Started" value={route.repair_start_clicked} />
+                        <RouteStat label="Submitted" value={route.repair_request_submitted} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-              <h2 className="font-semibold mb-1">Actual progression</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Visit counts from the new explicit selection events, rather than assuming a person got stuck because a screen was displayed.</p>
+              <h2 className="font-semibold mb-1">Selection behaviour</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">These counts describe how people navigate the selector. They are not a strict funnel because search and direct links can skip steps.</p>
               <div className="space-y-3">
                 <Stage label="Started" count={data.visits.started} base={started} />
                 <Stage label="Category selected" count={data.visits.category_selected} base={started} />
@@ -180,4 +233,8 @@ function Stage({ label, count, base }: { label: string; count: number; base: num
 
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3"><dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt><dd className="font-semibold mt-1">{value}</dd></div>
+}
+
+function RouteStat({ label, value }: { label: string; value: number }) {
+  return <div><div className="text-gray-500 dark:text-gray-400">{label}</div><div className="font-semibold text-sm mt-0.5">{value}</div></div>
 }
