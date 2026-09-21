@@ -59,6 +59,8 @@ interface AnalyticsData {
     follow_up: number
     accepted: number
     booked: number
+    device_received: number
+    completed: number
     dismissed: number
     no_next_action: number
   }
@@ -695,12 +697,17 @@ function QuoteJourneySheet({ data }: { data: AnalyticsData }) {
         <DetailBar label="Question, budget or other follow-up" count={journey.follow_up} max={max} color="orange" />
         <DetailBar label="Accepted repair" count={journey.accepted} max={max} color="green" />
         <DetailBar label="Converted to job" count={journey.booked} max={max} color="green" />
+        <DetailBar label="Device actually arrived" count={journey.device_received} max={max} color="green" />
+        <DetailBar label="Collected / completed" count={journey.completed} max={max} color="green" />
         <DetailBar label="Dismissed" count={journey.dismissed} max={max} color="blue" />
         <DetailBar label="No next action selected" count={journey.no_next_action} max={max} color="red" />
       </div>
       <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3 text-sm text-gray-600 dark:text-gray-300">
         <span className="font-bold text-gray-900 dark:text-white">Accepted-to-job:</span>{' '}
         {journey.accepted > 0 ? pct(journey.booked, journey.accepted) : '0%'}
+        <br />
+        <span className="font-bold text-gray-900 dark:text-white">Job-to-device-arrival:</span>{' '}
+        {journey.booked > 0 ? pct(journey.device_received, journey.booked) : '0%'}
       </div>
     </div>
   )
