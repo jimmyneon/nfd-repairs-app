@@ -1,0 +1,32 @@
+name: Quote analytics validation
+
+on:
+  pull_request:
+    paths:
+      - 'app/api/analytics/**'
+      - 'app/app/analytics/**'
+      - 'lib/quote-analytics.ts'
+      - 'tests/quote-analytics*.test.ts'
+      - '.github/workflows/quote-analytics-check.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quote analytics tests
+        run: npx vitest run tests/quote-analytics.test.ts tests/quote-analytics-route.test.ts
+
+      - name: Type-check analytics changes
+        run: npx tsc --noEmit
