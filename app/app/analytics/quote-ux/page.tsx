@@ -26,6 +26,7 @@ type Data = {
     repair_start_clicked: number
     repair_request_opened: number
     repair_request_submitted: number
+    device_received: number
     not_ready_opened: number
     routes: Array<{
       mode: 'guided' | 'search' | 'deep_link' | 'restored' | 'unknown'
@@ -33,6 +34,7 @@ type Data = {
       quote_reached: number
       repair_start_clicked: number
       repair_request_submitted: number
+      device_received: number
     }>
   }
   catalogue: null | {
@@ -146,6 +148,7 @@ export default function QuoteUxPage() {
                   <Stage label="Get repair started" count={data.conversion.repair_start_clicked} base={data.conversion.quote_reached} />
                   <Stage label="Request opened" count={data.conversion.repair_request_opened} base={data.conversion.quote_reached} />
                   <Stage label="Repair request submitted" count={data.conversion.repair_request_submitted} base={data.conversion.quote_reached} />
+                  <Stage label="Device actually arrived" count={data.conversion.device_received} base={data.conversion.quote_reached} />
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-sm">
                   <span className="text-gray-500 dark:text-gray-400">Opened “Not ready yet?”</span>
@@ -165,10 +168,11 @@ export default function QuoteUxPage() {
                         <span className="font-semibold capitalize">{route.mode.replace('_', ' ')}</span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">{route.visits} visits</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="grid grid-cols-4 gap-2 text-xs">
                         <RouteStat label="Quotes" value={route.quote_reached} />
                         <RouteStat label="Started" value={route.repair_start_clicked} />
                         <RouteStat label="Submitted" value={route.repair_request_submitted} />
+                        <RouteStat label="Arrived" value={route.device_received} />
                       </div>
                     </div>
                   ))}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { reportRange, visitorOverview, readAllPages, QuoteEvent } from '@/lib/quote-analytics'
+import { reportRange, visitorOverview, readAllPages, QuoteEvent, quoteJobHasDeviceArrived, quoteJobIsCompleted } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -45,6 +45,29 @@ export async function GET(request: NextRequest) {
         .eq('enquiry_type', 'repair_quote').gte('created_at', range.startISO).lt('created_at', range.endISO)
         .order('created_at').order('id').range(from, to)),
     ])
+
+    // The quote journey is a cohort report: enquiries are selected by their
+    // creation date above, then we look up their linked jobs regardless of
+    // when the customer eventually brings the device in. This lets the
+    // dashboard answer the commercial question "did the device actually arrive?"
+    const enquiryIds = enquiryJourneyData.map((enquiry: any) => enquiry.id).filter(Boolean)
+    const quoteJobs: any[] = []
+    for (let offset = 0; offset < enquiryIds.length; offset += 100) {
+      const ids = enquiryIds.slice(offset, offset + 100)
+      const rows = await readAllPages<any>((from, to) => supabase
+        .from('jobs')
+        .select('id, quote_request_id, status, device_in_shop, created_at')
+        .in('quote_request_id', ids)
+        .order('created_at')
+        .order('id')
+        .range(from, to))
+      quoteJobs.push(...rows)
+    }
+    const jobsByEnquiry = new Map<string, any>()
+    for (const job of quoteJobs) {
+      if (job.quote_request_id) jobsByEnquiry.set(job.quote_request_id, job)
+    }
+
     const overview = visitorOverview(allEvents, range)
     const funnelData = allEvents.filter(e => Date.parse(e.created_at) >= Date.parse(range.startISO))
     const byType = (...types: string[]) => funnelData.filter(e => types.includes(e.event_type))
@@ -310,11 +333,16 @@ export async function GET(request: NextRequest) {
       follow_up: 0,
       accepted: 0,
       booked: 0,
+      device_received: 0,
+      completed: 0,
       dismissed: 0,
       no_next_action: 0,
     }
     for (const enquiry of enquiryJourneyData) {
       const booked = Boolean(enquiry.converted_job_id || enquiry.converted_to_job)
+      const linkedJob = jobsByEnquiry.get(enquiry.id)
+      const deviceReceived = booked && quoteJobHasDeviceArrived(linkedJob)
+      const completed = booked && quoteJobIsCompleted(linkedJob)
       const accepted = booked || enquiry.status === 'approved' || enquiry.status === 'converted' || Boolean(enquiry.repair_reserved || enquiry.proceed_with_repair)
       const dismissed = !accepted && enquiry.status === 'rejected'
       const followUp = !accepted && !dismissed && Boolean(enquiry.hesitation_reason || enquiry.customer_budget != null || enquiry.part_reserved)
@@ -324,6 +352,8 @@ export async function GET(request: NextRequest) {
       if (followUp) quoteJourney.follow_up++
       if (accepted) quoteJourney.accepted++
       if (booked) quoteJourney.booked++
+      if (deviceReceived) quoteJourney.device_received++
+      if (completed) quoteJourney.completed++
       if (dismissed) quoteJourney.dismissed++
       if (!sent && !followUp && !accepted && !dismissed) quoteJourney.no_next_action++
     }

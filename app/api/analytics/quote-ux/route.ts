@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { reportRange, readAllPages, VISIT_GAP_MS } from '@/lib/quote-analytics'
+import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -10,6 +10,7 @@ type EventRow = {
   id: string
   session_id: string
   event_type: string
+  enquiry_ref: string | null
   event_data: Record<string, any> | null
   created_at: string
 }
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     const lookback = new Date(Date.parse(range.startISO) - VISIT_GAP_MS).toISOString()
     const events = await readAllPages<EventRow>((from, to) => supabase
       .from('quote_analytics_events')
-      .select('id, session_id, event_type, event_data, created_at')
+      .select('id, session_id, enquiry_ref, event_type, event_data, created_at')
       .gte('created_at', lookback)
       .lt('created_at', range.endISO)
       .order('created_at')
@@ -136,6 +137,57 @@ export async function GET(request: NextRequest) {
     const repairRequestSubmitted = started.filter(visit => has(visit, 'repair_request_submitted'))
     const notReadyOpened = started.filter(visit => has(visit, 'not_ready_opened'))
 
+    // Join submitted website requests to their eventual jobs so the commercial
+    // funnel ends at the outcome that matters: the device reaching the workshop.
+    const submittedRefs = [...new Set(
+      relevantEvents
+        .filter(event => event.event_type === 'repair_request_submitted' && event.enquiry_ref)
+        .map(event => event.enquiry_ref as string)
+    )]
+    const submittedEnquiries: any[] = []
+    for (let offset = 0; offset < submittedRefs.length; offset += 100) {
+      const refs = submittedRefs.slice(offset, offset + 100)
+      const rows = await readAllPages<any>((from, to) => supabase
+        .from('enquiries')
+        .select('id, enquiry_ref, converted_job_id, converted_to_job')
+        .in('enquiry_ref', refs)
+        .order('created_at')
+        .order('id')
+        .range(from, to))
+      submittedEnquiries.push(...rows)
+    }
+    const enquiryByRef = new Map<string, any>()
+    for (const enquiry of submittedEnquiries) {
+      if (enquiry.enquiry_ref) enquiryByRef.set(enquiry.enquiry_ref, enquiry)
+    }
+
+    const enquiryIds = submittedEnquiries.map(enquiry => enquiry.id).filter(Boolean)
+    const linkedJobs: any[] = []
+    for (let offset = 0; offset < enquiryIds.length; offset += 100) {
+      const ids = enquiryIds.slice(offset, offset + 100)
+      const rows = await readAllPages<any>((from, to) => supabase
+        .from('jobs')
+        .select('id, quote_request_id, status, device_in_shop')
+        .in('quote_request_id', ids)
+        .order('created_at')
+        .order('id')
+        .range(from, to))
+      linkedJobs.push(...rows)
+    }
+    const jobByEnquiry = new Map<string, any>()
+    for (const job of linkedJobs) {
+      if (job.quote_request_id) jobByEnquiry.set(job.quote_request_id, job)
+    }
+    const visitEnquiryRef = (visit: Visit) =>
+      [...visit.events].reverse().find(event => event.enquiry_ref)?.enquiry_ref || null
+    const visitHasDeviceArrived = (visit: Visit) => {
+      const ref = visitEnquiryRef(visit)
+      if (!ref) return false
+      const enquiry = enquiryByRef.get(ref)
+      return Boolean(enquiry && quoteJobHasDeviceArrived(jobByEnquiry.get(enquiry.id)))
+    }
+    const deviceReceived = started.filter(visit => visitHasDeviceArrived(visit))
+
     const routeNames = ['guided', 'search', 'deep_link', 'restored', 'unknown'] as const
     const routes = routeNames.map(mode => {
       const routeVisits = started.filter(visit => routeMode(visit) === mode)
@@ -145,6 +197,7 @@ export async function GET(request: NextRequest) {
         quote_reached: routeVisits.filter(visit => has(visit, 'quote_reveal')).length,
         repair_start_clicked: routeVisits.filter(visit => has(visit, 'repair_start_clicked')).length,
         repair_request_submitted: routeVisits.filter(visit => has(visit, 'repair_request_submitted')).length,
+        device_received: routeVisits.filter(visit => visitHasDeviceArrived(visit)).length,
       }
     }).filter(route => route.visits > 0)
 
@@ -189,6 +242,7 @@ export async function GET(request: NextRequest) {
         repair_start_clicked: repairStartClicked.length,
         repair_request_opened: repairRequestOpened.length,
         repair_request_submitted: repairRequestSubmitted.length,
+        device_received: deviceReceived.length,
         not_ready_opened: notReadyOpened.length,
         routes,
       },

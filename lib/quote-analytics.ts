@@ -110,6 +110,29 @@ export function visitorOverview(events: QuoteEvent[], range: ReturnType<typeof r
 }
 export type VisitorOverview = ReturnType<typeof visitorOverview>
 
+
+const DEVICE_ARRIVED_STATUSES = new Set([
+  'RECEIVED',
+  'DIAGNOSTIC',
+  'AWAITING_CUSTOMER',
+  'IN_REPAIR',
+  'DELAYED',
+  'READY_TO_COLLECT',
+  'IN_STORAGE',
+  'COLLECTED',
+  'COMPLETED',
+])
+
+export function quoteJobHasDeviceArrived(job: { status?: string | null; device_in_shop?: boolean | null } | null | undefined): boolean {
+  if (!job) return false
+  return Boolean(job.device_in_shop) || DEVICE_ARRIVED_STATUSES.has(String(job.status || ''))
+}
+
+export function quoteJobIsCompleted(job: { status?: string | null } | null | undefined): boolean {
+  if (!job) return false
+  return job.status === 'COLLECTED' || job.status === 'COMPLETED'
+}
+
 /** Read every page; Supabase otherwise silently limits analytics totals. */
 export async function readAllPages<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const all: T[] = []
