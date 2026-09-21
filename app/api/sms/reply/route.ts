@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
     // And the 447... form (no + prefix)
     if (normalisedPhone.startsWith('+447')) {
       lookupSet.add(normalisedPhone.slice(1))
+      lookupSet.add('00' + normalisedPhone.slice(1))
     }
     const lookupPhones = Array.from(lookupSet).filter(Boolean)
 
@@ -472,18 +473,32 @@ export async function POST(request: NextRequest) {
       // not understood) — send the generic welcome message with useful links
       // rather than the unhelpful "cannot find a repair job" reply.
       // Rate-limited to 1 welcome per day per number to avoid flooding.
-      // Only counts previous welcome messages, not all SMS — so if staff
-      // had a conversation with the customer earlier, the customer still
-      // gets a welcome if they text again later.
+      // A missed-call reply already provides the same introduction. Count it
+      // too, including existing missed_call_log rows: older MISSED_CALL SMS
+      // logs did not store recipient_phone. Unrelated staff SMS do not count.
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      const { count: recentWelcomeCount } = await supabase
-        .from('sms_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('recipient_phone', phone)
-        .eq('template_key', 'FIRST_TEXT_WELCOME')
-        .gte('created_at', oneDayAgo)
+      const [recentIntroSms, recentMissedCallSms] = await Promise.all([
+        supabase
+          .from('sms_logs')
+          .select('id', { count: 'exact', head: true })
+          .in('recipient_phone', lookupPhones)
+          .in('template_key', ['FIRST_TEXT_WELCOME', 'MISSED_CALL', 'MISSED_CALL_REPEAT'])
+          .eq('status', 'SENT')
+          .gte('created_at', oneDayAgo),
+        supabase
+          .from('missed_call_log')
+          .select('id', { count: 'exact', head: true })
+          .in('phone', lookupPhones)
+          .eq('sms_sent', true)
+          .gte('called_at', oneDayAgo),
+      ])
 
-      if ((recentWelcomeCount || 0) === 0) {
+      if (recentIntroSms.error || recentMissedCallSms.error) {
+        // If history cannot be checked, avoid a possible duplicate intro.
+        // Continue below so the customer's message still reaches staff.
+        console.error('[sms/reply] Could not check introduction history; skipping welcome',
+          recentIntroSms.error || recentMissedCallSms.error)
+      } else if ((recentIntroSms.count || 0) === 0 && (recentMissedCallSms.count || 0) === 0) {
         const hoursStatus = await computeHoursStatus(supabase)
         const welcomeBody = buildWelcomeMessage(hoursStatus)
         const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
@@ -491,7 +506,7 @@ export async function POST(request: NextRequest) {
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent first-text welcome to ${phone}`)
       } else {
-        console.log(`[sms/reply] Welcome rate-limited for ${phone} (welcome sent in last 24h)`)
+        console.log(`[sms/reply] Welcome suppressed for ${phone} (welcome or missed-call reply sent in last 24h)`)
       }
     }
 
