@@ -212,16 +212,20 @@ export default function JobsListPageV2() {
       .order('updated_at', { ascending: false })
     setApprovedEnquiries(approved || [])
 
-    // Load personalised-quote enquiries (repair_quote with no price set yet,
-    // not dismissed or converted) — these need a staff response
+    // Load personalised-quote enquiries still awaiting a staff response:
+    // repair_quote, no price set yet, still 'pending' (excludes dismissed,
+    // converted, approved, and info/inspection-requested), and not already
+    // accepted/reserved/converted via flags — same rules as the enquiries page
     const { data: pendingQuotes } = await supabase
       .from('enquiries')
-      .select('enquiry_ref, customer_name, device_make, device_model, repair_type')
+      .select('enquiry_ref, customer_name, device_make, device_model, repair_type, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
       .eq('enquiry_type', 'repair_quote')
       .is('quoted_price', null)
-      .not('status', 'in', '("rejected","converted")')
+      .eq('status', 'pending')
       .order('created_at', { ascending: false })
-    setPendingQuoteEnquiries(pendingQuotes || [])
+    setPendingQuoteEnquiries((pendingQuotes || []).filter((e: any) =>
+      !e.repair_reserved && !e.proceed_with_repair && !e.converted_to_job && !e.converted_job_id
+    ))
   }
 
   const loadUnreadMessageCount = async () => {

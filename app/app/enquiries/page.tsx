@@ -292,18 +292,24 @@ function EnquiriesContent() {
   )
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && e.status !== 'rejected' && !isConverted(e) && !isAccepted(e) && Boolean(e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const hasQuoteBeenSent = (e: Enquiry) => Boolean(e.quote_sent_method && e.quote_sent_method !== 'none')
-  // A personalised quote that needs staff to manually enter a price and send it.
-  // This is a repair_quote enquiry with no price set yet, not yet
-  // accepted/converted, and not dismissed. The quote_sent_method being set
-  // just means the customer asked to receive a quote — it does NOT mean staff
-  // have sent one. So we don't check hasQuoteBeenSent here.
-  const isPersonalisedQuoteNeeded = (e: Enquiry) =>
+  // Whether staff can still send a personalised quote for this enquiry —
+  // a repair_quote with no price set yet, not yet accepted/converted, and not
+  // dismissed. The quote_sent_method being set just means the customer asked
+  // to receive a quote — it does NOT mean staff have sent one. Includes
+  // more_info_requested so a price can still be sent after an inspection or
+  // info request has gone out.
+  const canSendQuote = (e: Enquiry) =>
     e.enquiry_type === 'repair_quote'
     && !isConverted(e)
     && !isAccepted(e)
     && e.status !== 'rejected'
     && e.status !== 'more_info_requested'
     && !e.quoted_price
+  // A personalised quote that still needs staff action. Once staff respond
+  // (status leaves 'pending' — e.g. inspection request sent, info requested)
+  // it stops counting as "Quote Needed" even though no price was sent.
+  const isPersonalisedQuoteNeeded = (e: Enquiry) =>
+    canSendQuote(e) && e.status === 'pending'
   const isActionNeeded = (e: Enquiry) => isAccepted(e) || isFollowUp(e) || isPersonalisedQuoteNeeded(e)
 
   const getJourneyStage = (e: Enquiry): { key: string; label: string; detail: string } => {
@@ -312,6 +318,7 @@ function EnquiriesContent() {
     if (isFollowUp(e)) return { key: 'follow_up', label: 'Follow-up', detail: 'Customer asked a question or shared a concern' }
     if (isPersonalisedQuoteNeeded(e)) return { key: 'personalised_quote', label: 'Quote Needed', detail: 'Personalised quote — enter a price and send to customer' }
     if (e.status === 'rejected') return { key: 'dismissed', label: 'Dismissed', detail: 'Archived from the active enquiry lists' }
+    if (e.status === 'more_info_requested') return { key: 'more_info_requested', label: 'Info Sent', detail: 'Staff responded — awaiting the customer' }
     if (e.enquiry_type !== 'repair_quote') {
       return { key: e.status, label: e.status === 'pending' ? 'New Enquiry' : (STATUS_CONFIG[e.status]?.label || 'Enquiry'), detail: 'Service enquiry' }
     }
@@ -1287,7 +1294,7 @@ function EnquiriesContent() {
               <div className="space-y-4">
                 {/* === PERSONALISED QUOTE RESPONSE PANEL === */}
                 {/* Shown at the top so Send Quote is immediately visible without scrolling past the conversation */}
-                {isPersonalisedQuoteNeeded(selectedEnquiry) && !showQuoteForm && !quoteResult && (
+                {canSendQuote(selectedEnquiry) && !showQuoteForm && !quoteResult && (
                   <div className="space-y-3 pt-2">
                     <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500">
                       <p className="text-center text-sm font-bold text-purple-700 dark:text-purple-400">This needs a personalised quote</p>
@@ -1330,7 +1337,7 @@ function EnquiriesContent() {
                 )}
 
                 {/* Personalised quote form */}
-                {isPersonalisedQuoteNeeded(selectedEnquiry) && showQuoteForm && !quoteResult && (
+                {canSendQuote(selectedEnquiry) && showQuoteForm && !quoteResult && (
                   <div className="space-y-4 pt-2">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">Send Personalised Quote</h3>

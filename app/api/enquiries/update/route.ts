@@ -5,6 +5,35 @@ import { shortQuoteApprovalLink } from '@/lib/utils'
 import { corsHeaders, requireStaffUser } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { generateQuoteActionToken, quoteActionTokenExpiry, isQuoteActionTokenValid } from '@/lib/job-utils'
+
+/**
+ * Ensure the enquiry has a valid quote-action token. If missing/expired,
+ * stage the new token + expiry into updateFields (applied with the main
+ * update below) and mutate the in-memory enquiry so the link uses it.
+ * Returns the token to embed in the customer link.
+ */
+function ensureQuoteActionToken(
+  enquiry: any,
+  updateFields: Record<string, any>
+): string {
+  const valid = isQuoteActionTokenValid(
+    enquiry.quote_action_token,
+    enquiry.quote_action_token_expires_at,
+    enquiry.quote_action_token_revoked_at
+  )
+  if (valid && enquiry.quote_action_token) {
+    return enquiry.quote_action_token
+  }
+  const token = generateQuoteActionToken()
+  enquiry.quote_action_token = token
+  enquiry.quote_action_token_expires_at = quoteActionTokenExpiry()
+  enquiry.quote_action_token_revoked_at = null
+  updateFields.quote_action_token = token
+  updateFields.quote_action_token_expires_at = enquiry.quote_action_token_expires_at
+  updateFields.quote_action_token_revoked_at = null
+  return token
+}
 
 function escapeHtml(str: string): string {
   return String(str || '')
@@ -151,7 +180,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Store quote send info — SMS/email sent AFTER DB update to ensure data is committed
-        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
+        const quoteActionToken = ensureQuoteActionToken(enquiry, updateFields)
+        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref, quoteActionToken)
         const isInstant = enquiry.quoted_price && enquiry.quote_type === 'instant'
         const priceText = isInstant ? `£${enquiry.quoted_price}` : 'Personalised quote'
         const deviceName = escapeHtml(`${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim())
@@ -234,7 +264,8 @@ export async function POST(request: NextRequest) {
         notificationBody = `${enquiry.customer_name} sent a personalised quote of ${priceText} via ${method}.`
 
         // Build the quote send payload (sent after DB update)
-        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref)
+        const quoteActionToken2 = ensureQuoteActionToken(enquiry, updateFields)
+        const quoteUrl = shortQuoteApprovalLink(enquiry.enquiry_ref, quoteActionToken2)
         const deviceName = escapeHtml(`${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim())
         const repairName = escapeHtml(enquiry.repair_type || 'repair')
         const customerName = escapeHtml(enquiry.customer_name || '')
@@ -315,8 +346,10 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update enquiry:', updateError)
     }
 
-    // Create notification for staff (for significant actions)
-    if (notificationTitle) {
+    // Create notification for staff (for significant actions).
+    // Staff-initiated actions don't need an alert — the staff member just
+    // performed the action, and every insert triggers a push to their device.
+    if (notificationTitle && !staffOnlyActions.includes(action) && action !== 'schedule_remote_session') {
       try {
         await supabase.from('notifications').insert({
           type: 'QUOTE_ACTION',
