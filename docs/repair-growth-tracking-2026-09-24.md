@@ -9,6 +9,8 @@
 - Arrivals include DROPPED_OFF. Completed counts mean COLLECTED or COMPLETED. Completed-and-marked-paid additionally requires the existing full-payment flag.
 - Requests with missing enquiry records are displayed as unmatched; database failures return an error instead of zero outcomes.
 - The report selects requests by submission date and shows their jobs' current outcomes, so later arrivals/completions improve the original cohort.
+- Website analytics now follows anonymous browser visits from landing page → model selected → price viewed → continue → enquiry submitted → accepted → booked job.
+- Landing-page reporting shows visits, price views, continues, enquiries and booked jobs so traffic quality can be judged page by page.
 
 ## Validation
 
@@ -24,23 +26,24 @@ Source: supplied Performance-on-Search-2026-09-24.xlsx. Although Filters says 'L
 
 All 37 clicks are UK; UK impressions are 2,101 (1.76% CTR). US impressions are 1,694 with no clicks. Mobile contributes 25 of 37 clicks. Judge local progress with a UK filter rather than the blended all-country CTR.
 
-Candidates for the next page review (all-country page totals; the export cannot join country to page):
+The first priority-page pass is now complete:
 
-| Page | Clicks | Impressions | Average position |
-| --- | ---: | ---: | ---: |
-| /phone-repair-cost/ | 0 | 507 | 11.97 |
-| /samsung-charging-port-repair/ | 0 | 354 | 4.71 |
-| /areas/lymington/ | 0 | 282 | 5.18 |
-| /phone-repair-brockenhurst/ | 0 | 241 | 7.47 |
-| /phone-repair-near-me/ | 1 | 239 | 6.93 |
+| Page | Previous signal | Work completed |
+| --- | --- | --- |
+| /phone-repair-cost/ | 0 clicks / 507 impressions / position 11.97 | Reworked around current catalogue pricing and added live iPhone, Samsung Galaxy and Pixel price finders. |
+| /samsung-charging-port-repair/ | 0 / 354 / 4.71 | Kept the live price finder, removed broad price/time/warranty promises, corrected charging-fault wording and fixed catalogue brand routing. |
+| /areas/lymington/ | 0 / 282 / 5.18 | Clarified workshop/local intent and removed stale static review-count/rating markup. |
+| /phone-repair-brockenhurst/ | 0 / 241 / 7.47 | Clarified that the workshop is in Lymington, removed stale same-day/from-price claims and preselected the phone quote route. |
+| /phone-repair-near-me/ | 1 / 239 / 6.93 | Cleaned stale pricing/warranty/nearest claims and corrected brand-specific quote links. |
 
-Review local intent, truthful titles/descriptions, clear Lymington workshop location and relevant quote links before adding more similar pages. The small sample is a prioritisation signal, not proof that any title is the cause.
+Quote-link CI now validates category-only and category+brand routes as well as model/repair links, and separately validates every live price-finder category/brand target. This caught and corrected the Samsung finder brand mismatch.
+
+Do not make more large SEO changes immediately. Let the 24 September changes collect enough fresh UK traffic to compare impressions, CTR, price views, enquiries and booked jobs against this baseline.
 
 ## Still outstanding from the growth plan
 
 - Confirm delivery of an actual email/mobile repair request with an authorised test contact; simulated UI checks do not prove message delivery.
 - Audit/correct outdated business listings using the relevant owner accounts.
-- Finish priority service-page/local-search review, coordinating with any other active website changes.
 - Establish two useful repair posts per week using real repair examples.
 - Prepare the referral pilot and eligible-customer follow-up for approval before sending messages.
 - Review UK search clicks, unique requests, arrivals and completed jobs after sufficient new traffic accumulates; do not claim success from this older export.
