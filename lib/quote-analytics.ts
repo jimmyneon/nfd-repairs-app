@@ -237,7 +237,10 @@ export function websiteConversionOverview(
     const hasPrice = has('web_price_finder_price_viewed')
     const hasPriceContinue = has('web_price_finder_continue')
     const hasQuoteCta = has('web_quote_cta_click')
-    const hasContinue = hasPriceContinue || hasQuoteCta
+    // "Continue" is specifically the action after seeing an on-page price.
+    // Generic quote CTAs are reported separately so price conversion cannot
+    // exceed 100% on pages without a price finder.
+    const hasContinue = hasPriceContinue
     const submitEvents = visit.events.filter(e => e.event_type === 'quote_form_submit')
     const hasSubmit = submitEvents.length > 0
 
