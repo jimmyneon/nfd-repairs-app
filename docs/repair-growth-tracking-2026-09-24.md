@@ -12,7 +12,7 @@
 
 ## Validation
 
-23 analytics regression tests passed, including direct links, resumed requests, repeated references, multiple jobs, forward-only links, stale references, missing records, paid versus unpaid completions, staff authentication and query errors. TypeScript checking passed in an isolated checkout using existing installed dependencies, with the current analytics sources overlaid. No live customer enquiry or notification was created by testing.
+23 analytics regression tests passed, including direct links, resumed requests, repeated references, multiple jobs, forward-only links, stale references, missing records, paid versus unpaid completions, staff authentication and query errors. TypeScript checking passed against the complete current application sources plus the deployment repairs below, using existing installed dependencies. No live customer enquiry or notification was created by testing.
 
 ## Measurement limits
 
@@ -34,7 +34,7 @@ Candidates for the next page review (all-country page totals; the export cannot 
 | /phone-repair-brockenhurst/ | 0 | 241 | 7.47 |
 | /phone-repair-near-me/ | 1 | 239 | 6.93 |
 
-Review local intent, truthful titles/descriptions, clear New Milton workshop location and relevant quote links before adding more similar pages. The small sample is a prioritisation signal, not proof that any title is the cause.
+Review local intent, truthful titles/descriptions, clear Lymington workshop location and relevant quote links before adding more similar pages. The small sample is a prioritisation signal, not proof that any title is the cause.
 
 ## Still outstanding from the growth plan
 
@@ -44,3 +44,13 @@ Review local intent, truthful titles/descriptions, clear New Milton workshop loc
 - Establish two useful repair posts per week using real repair examples.
 - Prepare the referral pilot and eligible-customer follow-up for approval before sending messages.
 - Review UK search clicks, unique requests, arrivals and completed jobs after sufficient new traffic accumulates; do not claim success from this older export.
+
+## Listing correction prepared
+
+The Yell listing at https://www.yell.com/biz/new-forest-device-repairs-lymington-9852921/ still presents 8 Priestlands Place, SO41 9GA, and advertises free diagnosis/no-fix-no-fee. The official contact page https://newforestdevicerepairs.co.uk/contact-us/ instead gives **5a New Street, Lymington, SO41 9BH**, access via 5 New Street at the front. Telephone remains **07410 381247**.
+
+The owner-account update should replace the address, remove the unqualified diagnosis/no-fix-no-fee promises, check current hours against the owner's live Google listing, and point visitors to https://www.newforestdevicerepairs.co.uk/quote/. Suggested description: “Independent phone, tablet, laptop and games-console repairs in Lymington. See available repair prices online, or contact us for help identifying the fault. We explain the repair options, likely timing and applicable warranty before work goes ahead.” No Yell account change or message has been made.
+
+## Deployment recovery
+
+Vercel also reported failure on the preceding main commit, `2ddb806`. Checking its complete sources found missing quote-action-token helper imports, calls to a nonexistent two-argument link builder, and a duplicate narrowed status comparison. Restore the existing quote-link generation for the two send paths; preserve all staff authentication/rate-limit checks and the prior notification suppression change. The incomplete token fragment had no corresponding helper, link consumer or database migration in main. A full token rollout must be coordinated separately, rather than invented merely to make the build compile. Remove the unreachable duplicate status branch.
