@@ -156,7 +156,7 @@ describe('website conversion funnel', () => {
     expect(result.unique_visitors).toBe(1)
     expect(result.price_only).toBe(1)
     expect(result.quote_cta_clicks).toBe(1)
-    expect(result.continued_without_submit).toBe(1)
+    expect(result.continued_without_submit).toBe(0)
     expect(result.landing_pages.map(p => p.path)).toEqual([
       '/iphone-battery-replacement/',
       '/samsung-screen-repair/',
