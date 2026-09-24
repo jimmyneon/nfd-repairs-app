@@ -11,6 +11,7 @@ type Data = {
   instrumentation_started_at: string | null
   visits: null | {
     started: number
+    category_entrants: number
     category_selected: number
     no_category_selection: number
     brand_selected: number
@@ -20,6 +21,15 @@ type Data = {
     submitted: number
     category_selected_while_loading: number
     category_loading_then_progressed: number
+  }
+  outcomes?: {
+    requests: number
+    matched_requests: number
+    unmatched_requests: number
+    linked_jobs: number
+    device_received: number
+    completed: number
+    completed_marked_paid: number
   }
   conversion?: null | {
     quote_reached: number
@@ -83,6 +93,7 @@ export default function QuoteUxPage() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       setData(await response.json())
     } catch (err) {
+      setData(null)
       setError(err instanceof Error ? err.message : 'Could not load data')
     } finally {
       setLoading(false)
@@ -134,26 +145,43 @@ export default function QuoteUxPage() {
           <>
             <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Metric title="Quote visits" value={data.visits.started} sub="New tracked visits" icon={<Target className="w-4 h-4" />} />
-              <Metric title="No category click" value={data.visits.no_category_selection} sub={pct(data.visits.no_category_selection, started)} icon={<Target className="w-4 h-4" />} />
+              <Metric title="No category click" value={data.visits.no_category_selection} sub={`${pct(data.visits.no_category_selection, data.visits.category_entrants)} of category-step visits`} icon={<Target className="w-4 h-4" />} />
               <Metric title="Selected while loading" value={data.visits.category_selected_while_loading} sub={`${data.visits.category_loading_then_progressed} then reached brand`} icon={<Clock3 className="w-4 h-4" />} />
               <Metric title="Model help used" value={data.help.model_help_opened} sub={`${data.help.model_unlisted} used model not listed`} icon={<HelpCircle className="w-4 h-4" />} />
             </section>
 
             {data.conversion && (
               <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-                <h2 className="font-semibold mb-1">Commercial funnel</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">The part that matters commercially: people who saw a quote, chose to start the repair, opened the request and submitted it. Search and deep-link visitors can skip the earlier selection steps.</p>
+                <h2 className="font-semibold mb-1">Visit actions</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Anonymous visits with each action, not unique customers or jobs. A repeat visit can count again. Search and direct links can skip steps; the counts are not a strict funnel.</p>
                 <div className="space-y-3">
                   <Stage label="Quote reached" count={data.conversion.quote_reached} base={data.conversion.quote_reached} />
                   <Stage label="Get repair started" count={data.conversion.repair_start_clicked} base={data.conversion.quote_reached} />
                   <Stage label="Request opened" count={data.conversion.repair_request_opened} base={data.conversion.quote_reached} />
                   <Stage label="Repair request submitted" count={data.conversion.repair_request_submitted} base={data.conversion.quote_reached} />
-                  <Stage label="Device actually arrived" count={data.conversion.device_received} base={data.conversion.quote_reached} />
+                  <Stage label="Visits linked to an arrived device" count={data.conversion.device_received} base={data.conversion.quote_reached} />
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-sm">
                   <span className="text-gray-500 dark:text-gray-400">Opened “Not ready yet?”</span>
                   <span className="font-semibold">{data.conversion.not_ready_opened} · {pct(data.conversion.not_ready_opened, data.conversion.quote_reached)}</span>
                 </div>
+              </section>
+            )}
+
+            {data.outcomes && (
+              <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+                <h2 className="font-semibold mb-1">Repair requests to workshop outcomes</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Distinct requests successfully submitted on the website in the selected period, with their linked jobs’ current status. Repeat visits do not add jobs. One request can produce more than one job. Later arrivals and completions update this report.</p>
+                <dl className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <Stat label="Distinct requests" value={String(data.outcomes.requests)} />
+                  <Stat label="Linked jobs" value={String(data.outcomes.linked_jobs)} />
+                  <Stat label="Jobs with device arrived" value={String(data.outcomes.device_received)} />
+                  <Stat label="Collected / completed jobs" value={String(data.outcomes.completed)} />
+                  <Stat label="Completed and marked paid" value={String(data.outcomes.completed_marked_paid)} />
+                  <Stat label="Requests matched to records" value={`${data.outcomes.matched_requests} / ${data.outcomes.requests}`} />
+                </dl>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">Paid uses the app’s full-payment flag; it is not a bank reconciliation. Historical jobs may have been marked paid automatically. Collected or completed does not confirm a successful repair. Requests blocked from analytics are not included.</p>
+                {data.outcomes.unmatched_requests > 0 && <p className="text-sm text-amber-700 dark:text-amber-400 mt-3">{data.outcomes.unmatched_requests} request references could not be matched to enquiry records, so their outcomes are unknown.</p>}
               </section>
             )}
 
@@ -242,3 +270,4 @@ function Stat({ label, value }: { label: string; value: string }) {
 function RouteStat({ label, value }: { label: string; value: number }) {
   return <div><div className="text-gray-500 dark:text-gray-400">{label}</div><div className="font-semibold text-sm mt-0.5">{value}</div></div>
 }
+

@@ -97,6 +97,8 @@ export async function GET(request: NextRequest) {
     for (const row of funnelData) {
       if (row.event_type === 'quote_step_enter') {
         stepSessions['quote_step_enter'].add(row.session_id)
+      } else if (row.event_type === 'repair_request_submitted') {
+        stepSessions['quote_form_submit'].add(row.session_id)
       } else if (stepSessions[row.event_type]) {
         stepSessions[row.event_type].add(row.session_id)
       }
@@ -438,3 +440,4 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+

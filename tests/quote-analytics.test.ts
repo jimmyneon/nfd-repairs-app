@@ -77,7 +77,7 @@ describe('analytics pagination', () => {
 
 describe('quote-to-workshop outcomes', () => {
   it('counts current workshop and post-collection statuses as having arrived', () => {
-    for (const status of ['RECEIVED', 'DIAGNOSTIC', 'AWAITING_CUSTOMER', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'IN_STORAGE', 'COLLECTED', 'COMPLETED']) {
+    for (const status of ['DROPPED_OFF', 'RECEIVED', 'DIAGNOSTIC', 'AWAITING_CUSTOMER', 'IN_REPAIR', 'DELAYED', 'READY_TO_COLLECT', 'IN_STORAGE', 'COLLECTED', 'COMPLETED']) {
       expect(quoteJobHasDeviceArrived({ status, device_in_shop: false })).toBe(true)
     }
   })
@@ -92,5 +92,19 @@ describe('quote-to-workshop outcomes', () => {
     expect(quoteJobIsCompleted({ status: 'COLLECTED' })).toBe(true)
     expect(quoteJobIsCompleted({ status: 'COMPLETED' })).toBe(true)
     expect(quoteJobIsCompleted({ status: 'READY_TO_COLLECT' })).toBe(false)
+  })
+})
+
+
+describe('current website request events', () => {
+  it('counts successful repair requests once even with both legacy and new events', () => {
+    const result = visitorOverview([
+      event('a', '2026-09-07T09:00:00Z', 'quote_reveal'),
+      event('a', '2026-09-07T09:01:00Z', 'repair_request_submitted'),
+      event('a', '2026-09-07T09:02:00Z', 'quote_form_submit'),
+      event('b', '2026-09-07T09:00:00Z', 'repair_request_submitted'),
+    ], range, now)
+    expect(result.submitted_visits).toBe(2)
+    expect(result.viewed_without_submitting).toBe(0)
   })
 })
