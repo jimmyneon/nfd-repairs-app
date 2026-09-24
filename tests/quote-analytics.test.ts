@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reportRange, visitorOverview, readAllPages, quoteJobHasDeviceArrived, quoteJobIsCompleted, QuoteEvent } from '../lib/quote-analytics'
+import { reportRange, visitorOverview, websiteConversionOverview, readAllPages, quoteJobHasDeviceArrived, quoteJobIsCompleted, QuoteEvent } from '../lib/quote-analytics'
 
 const now = new Date('2026-09-08T12:00:00Z')
 const range = reportRange(new URLSearchParams('start=2026-09-07&end=2026-09-08'), now)
@@ -92,5 +92,74 @@ describe('quote-to-workshop outcomes', () => {
     expect(quoteJobIsCompleted({ status: 'COLLECTED' })).toBe(true)
     expect(quoteJobIsCompleted({ status: 'COMPLETED' })).toBe(true)
     expect(quoteJobIsCompleted({ status: 'READY_TO_COLLECT' })).toBe(false)
+  })
+})
+
+
+describe('website conversion funnel', () => {
+  const webEvent = (id: string, time: string, type: string, page = '/iphone-screen-repair/', extra: Record<string, any> = {}): QuoteEvent => ({
+    session_id: id,
+    created_at: time,
+    event_type: type,
+    page_path: page,
+    event_data: extra,
+  })
+
+  it('follows one anonymous visit from landing page to price, enquiry and booked job', () => {
+    const result = websiteConversionOverview([
+      webEvent('a', '2026-09-08T09:00:00Z', 'web_page_view', '/iphone-screen-repair/', { page_title: 'iPhone Screen Repair' }),
+      webEvent('a', '2026-09-08T09:00:05Z', 'web_price_finder_view'),
+      webEvent('a', '2026-09-08T09:00:10Z', 'web_price_finder_model_selected'),
+      webEvent('a', '2026-09-08T09:00:15Z', 'web_price_finder_price_viewed'),
+      webEvent('a', '2026-09-08T09:00:20Z', 'web_price_finder_continue'),
+      { ...webEvent('a', '2026-09-08T09:01:00Z', 'quote_form_submit', '/quote/', { enquiry_ref: 'Q-1' }), enquiry_ref: 'Q-1' },
+    ], range, { 'Q-1': { accepted: true, booked: true } })
+
+    expect(result).toMatchObject({
+      unique_visitors: 1,
+      visits: 1,
+      price_checker_loaded: 1,
+      model_selected: 1,
+      price_viewed: 1,
+      price_only: 0,
+      continued: 1,
+      submitted: 1,
+      accepted: 1,
+      booked: 1,
+    })
+    expect(result.rates).toMatchObject({
+      visit_to_price: 100,
+      price_to_continue: 100,
+      continue_to_submit: 100,
+      visit_to_submit: 100,
+      submit_to_booked: 100,
+    })
+    expect(result.landing_pages[0]).toMatchObject({
+      path: '/iphone-screen-repair/',
+      visits: 1,
+      price_views: 1,
+      continues: 1,
+      submissions: 1,
+      booked: 1,
+    })
+  })
+
+  it('separates price-only visitors and repeat visits after 30 minutes', () => {
+    const result = websiteConversionOverview([
+      webEvent('a', '2026-09-08T08:00:00Z', 'web_page_view', '/iphone-battery-replacement/'),
+      webEvent('a', '2026-09-08T08:00:10Z', 'web_price_finder_price_viewed', '/iphone-battery-replacement/'),
+      webEvent('a', '2026-09-08T09:00:00Z', 'web_page_view', '/samsung-screen-repair/'),
+      webEvent('a', '2026-09-08T09:00:10Z', 'web_quote_cta_click', '/samsung-screen-repair/'),
+    ], range)
+
+    expect(result.visits).toBe(2)
+    expect(result.unique_visitors).toBe(1)
+    expect(result.price_only).toBe(1)
+    expect(result.quote_cta_clicks).toBe(1)
+    expect(result.continued_without_submit).toBe(1)
+    expect(result.landing_pages.map(p => p.path)).toEqual([
+      '/iphone-battery-replacement/',
+      '/samsung-screen-repair/',
+    ])
   })
 })
