@@ -322,9 +322,6 @@ function EnquiriesContent() {
     if (e.enquiry_type !== 'repair_quote') {
       return { key: e.status, label: e.status === 'pending' ? 'New Enquiry' : (STATUS_CONFIG[e.status]?.label || 'Enquiry'), detail: 'Service enquiry' }
     }
-    if (e.status === 'more_info_requested') {
-      return { key: 'more_info_requested', label: 'Info Sent', detail: 'Staff replied — waiting on the customer' }
-    }
     if (hasQuoteBeenSent(e)) {
       const method = e.quote_sent_method === 'both' ? 'text and email' : e.quote_sent_method
       return { key: 'quote_sent', label: 'Quote Sent', detail: `Customer requested the quote by ${method}` }
