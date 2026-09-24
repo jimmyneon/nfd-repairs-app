@@ -54,7 +54,8 @@ export function visitorOverview(events: QuoteEvent[], range: ReturnType<typeof r
   const start = Date.parse(range.startISO), end = Date.parse(range.endISO)
   const groups = new Map<string, QuoteEvent[]>()
   for (const event of events) {
-    if (!event.session_id || !event.event_type.startsWith('quote_') || event.event_type.startsWith('quote_accept_')) continue
+    const quoteActivity = event.event_type.startsWith('quote_') || ['repair_start_clicked', 'repair_request_opened', 'repair_request_submitted', 'not_ready_opened'].includes(event.event_type)
+    if (!event.session_id || !quoteActivity || event.event_type.startsWith('quote_accept_')) continue
     if (!Number.isFinite(Date.parse(event.created_at)) || Date.parse(event.created_at) >= end) continue
     const group = groups.get(event.session_id) || []
     group.push(event)
@@ -87,7 +88,7 @@ export function visitorOverview(events: QuoteEvent[], range: ReturnType<typeof r
     const has = (type: string) => inRange.some(e => e.event_type === type)
     const isRecent = Math.min(now.getTime(), end) - Date.parse(inRange[inRange.length - 1].created_at) < VISIT_GAP_MS
     if (has('quote_reveal')) revealed++
-    if (has('quote_form_submit')) submitted++
+    if (has('quote_form_submit') || has('repair_request_submitted')) submitted++
     else if (isRecent) active++
     else if (has('quote_reveal')) viewedOnly++
     else {
@@ -112,6 +113,7 @@ export type VisitorOverview = ReturnType<typeof visitorOverview>
 
 
 const DEVICE_ARRIVED_STATUSES = new Set([
+  'DROPPED_OFF',
   'RECEIVED',
   'DIAGNOSTIC',
   'AWAITING_CUSTOMER',
