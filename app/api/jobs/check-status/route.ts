@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { shortTrackingLink } from '@/lib/utils'
-import { requireStaffUser } from '@/lib/api-auth'
+import { requireStaffOrCron } from '@/lib/api-auth'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/jobs/check-status?phone=+447410381247
  */
 export async function GET(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
+  const authResponse = await requireStaffOrCron(request)
   if (authResponse) return authResponse
 
   try {
