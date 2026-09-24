@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {data && data.total_sessions === 0 && data.quote_journey.submitted === 0 && !loading && (
+        {data && data.website_conversion.visits === 0 && data.total_sessions === 0 && data.quote_journey.submitted === 0 && !loading && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
             <BarChart3 className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">No analytics data yet for this period. Start using the quote form to collect data.</p>
@@ -629,14 +629,14 @@ function WebsiteConversionOverview({ data, onDetails }: { data: AnalyticsData; o
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-3">
           <DetailBar label="Saw an on-page price" count={w.price_viewed} max={max} color="blue" />
-          <DetailBar label="Clicked continue / quote" count={w.continued} max={max} color="purple" />
+          <DetailBar label="Clicked continue after price" count={w.continued} max={max} color="purple" />
           <DetailBar label="Submitted repair enquiry" count={w.submitted} max={max} color="green" />
           <DetailBar label="Converted to job" count={w.booked} max={max} color="green" />
         </div>
         <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4 space-y-2">
           <DetailRow label="Looked at price, did not continue" value={w.price_only} valueColor="text-orange-600 dark:text-orange-400" />
           <DetailRow label="Continued, did not submit" value={w.continued_without_submit} valueColor="text-orange-600 dark:text-orange-400" />
-          <DetailRow label="Direct quote CTA visits" value={w.quote_cta_clicks} />
+          <DetailRow label="Clicked a direct quote CTA" value={w.quote_cta_clicks} />
           <DetailRow label="Submitted → accepted" value={w.submitted > 0 ? pct(w.accepted, w.submitted) : '0%'} />
         </div>
       </div>
