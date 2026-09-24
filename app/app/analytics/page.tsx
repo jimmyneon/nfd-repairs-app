@@ -11,6 +11,38 @@ interface AnalyticsData {
   success: boolean
   period_days: number
   total_sessions: number
+  website_conversion: {
+    unique_visitors: number
+    visits: number
+    price_checker_loaded: number
+    model_selected: number
+    price_viewed: number
+    price_only: number
+    quote_cta_clicks: number
+    continued: number
+    continued_without_submit: number
+    submitted: number
+    accepted: number
+    booked: number
+    rates: {
+      visit_to_price: number
+      price_to_continue: number
+      continue_to_submit: number
+      visit_to_submit: number
+      submit_to_booked: number
+    }
+    landing_pages: {
+      path: string
+      title: string
+      visits: number
+      price_views: number
+      continues: number
+      submissions: number
+      booked: number
+      visit_to_submit_rate: number
+      price_to_continue_rate: number
+    }[]
+  }
   funnel: {
     steps: Record<number, { count: number; label: string }>
     actions: {
@@ -82,7 +114,7 @@ function pct(n: number, d: number): string {
   return Math.round((n / d) * 100) + '%'
 }
 
-type SheetType = 'funnel' | 'journey' | 'traffic' | 'devices' | 'behavior' | 'abandonment' | 'actions' | 'errors' | 'search' | 'addons' | 'budget' | 'insights' | null
+type SheetType = 'website' | 'funnel' | 'journey' | 'traffic' | 'devices' | 'behavior' | 'abandonment' | 'actions' | 'errors' | 'search' | 'addons' | 'budget' | 'insights' | null
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -149,7 +181,7 @@ export default function AnalyticsPage() {
               </Link>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-green-600" />
-                Quote analytics
+                Website & quote analytics
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -217,7 +249,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {data && data.total_sessions === 0 && data.quote_journey.submitted === 0 && !loading && (
+        {data && data.website_conversion.visits === 0 && data.total_sessions === 0 && data.quote_journey.submitted === 0 && !loading && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
             <BarChart3 className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">No analytics data yet for this period. Start using the quote form to collect data.</p>
@@ -226,6 +258,7 @@ export default function AnalyticsPage() {
 
         {data && (
           <>
+            <WebsiteConversionOverview data={data} onDetails={setActiveSheet} />
             <Overview data={data} onDetails={setActiveSheet} />
             <details className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
               <summary className="cursor-pointer font-semibold text-gray-900 dark:text-white">Explore detailed breakdowns</summary>
@@ -342,6 +375,7 @@ export default function AnalyticsPage() {
       {/* Slide-up Bottom Sheet */}
       {activeSheet && data && (
         <BottomSheet onClose={() => setActiveSheet(null)} title={sheetTitle(activeSheet)} icon={sheetIcon(activeSheet)}>
+          {activeSheet === 'website' && <WebsiteConversionSheet data={data} />}
           {activeSheet === 'insights' && <InsightsSheet data={data} />}
           {activeSheet === 'funnel' && <FunnelSheet data={data} maxStepCount={maxStepCount} />}
           {activeSheet === 'journey' && <QuoteJourneySheet data={data} />}
@@ -366,6 +400,7 @@ export default function AnalyticsPage() {
 
 function sheetTitle(sheet: SheetType): string {
   const titles: Record<string, string> = {
+    website: 'Website Conversion',
     insights: 'Key Insights',
     funnel: 'Quote Funnel',
     journey: 'Saved Quote Journey',
@@ -384,6 +419,7 @@ function sheetTitle(sheet: SheetType): string {
 
 function sheetIcon(sheet: SheetType): React.ReactNode {
   const icons: Record<string, React.ReactNode> = {
+    website: <Target className="w-5 h-5 text-green-600" />,
     insights: <Lightbulb className="w-5 h-5 text-amber-500" />,
     funnel: <BarChart3 className="w-5 h-5 text-green-600" />,
     journey: <ArrowRight className="w-5 h-5 text-blue-500" />,
@@ -567,6 +603,102 @@ function SourceList({ title, items }: { title: string; items: [string, number][]
 // ============================================
 // Sheet Content Components
 // ============================================
+
+function WebsiteConversionOverview({ data, onDetails }: { data: AnalyticsData; onDetails: (sheet: SheetType) => void }) {
+  const w = data.website_conversion
+  const max = Math.max(w.visits, 1)
+  return (
+    <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="font-semibold text-gray-900 dark:text-white">Website → repair conversion</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Anonymous visits from landing page to price check, enquiry and booked job.</p>
+        </div>
+        <button onClick={() => onDetails('website')} className="text-sm font-medium text-green-700 dark:text-green-400">Landing pages →</button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+        <Metric label="Website visits" value={w.visits} note={`${w.unique_visitors} anonymous browsers`} />
+        <Metric label="Model selected" value={w.model_selected} note={`${pct(w.model_selected, w.visits)} of visits`} />
+        <Metric label="Saw a price" value={w.price_viewed} note={`${w.rates.visit_to_price}% of visits`} />
+        <Metric label="Clicked continue" value={w.continued} note={`${w.rates.price_to_continue}% of price viewers`} />
+        <Metric label="Enquiry submitted" value={w.submitted} note={`${w.rates.visit_to_submit}% of visits`} />
+        <Metric label="Converted to job" value={w.booked} note={`${w.rates.submit_to_booked}% of submitted`} />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <DetailBar label="Saw an on-page price" count={w.price_viewed} max={max} color="blue" />
+          <DetailBar label="Clicked continue after price" count={w.continued} max={max} color="purple" />
+          <DetailBar label="Submitted repair enquiry" count={w.submitted} max={max} color="green" />
+          <DetailBar label="Converted to job" count={w.booked} max={max} color="green" />
+        </div>
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4 space-y-2">
+          <DetailRow label="Looked at price, did not continue" value={w.price_only} valueColor="text-orange-600 dark:text-orange-400" />
+          <DetailRow label="Continued, did not submit" value={w.continued_without_submit} valueColor="text-orange-600 dark:text-orange-400" />
+          <DetailRow label="Clicked a direct quote CTA" value={w.quote_cta_clicks} />
+          <DetailRow label="Submitted → accepted" value={w.submitted > 0 ? pct(w.accepted, w.submitted) : '0%'} />
+        </div>
+      </div>
+
+      {w.visits === 0 && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">Website-level tracking starts collecting after this analytics update is deployed; older quote analytics remain unchanged.</p>
+      )}
+    </section>
+  )
+}
+
+function WebsiteConversionSheet({ data }: { data: AnalyticsData }) {
+  const w = data.website_conversion
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Each row starts with the first website page recorded in a visit, then follows the same anonymous browser into the price checker and quote form. A new visit starts after 30 minutes without activity.
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{w.price_only}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Price viewers who stopped there</div>
+        </div>
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{w.continued_without_submit}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">Continued but did not submit</div>
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3 text-sm text-green-900 dark:text-green-200">
+        Price → continue: <strong>{w.rates.price_to_continue}%</strong> · Continue → enquiry: <strong>{w.rates.continue_to_submit}%</strong> · Visit → enquiry: <strong>{w.rates.visit_to_submit}%</strong>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Landing pages</h3>
+        {w.landing_pages.length === 0 ? (
+          <EmptyState text="No website conversion visits recorded yet." />
+        ) : (
+          <div className="space-y-2">
+            {w.landing_pages.map(page => (
+              <div key={page.path} className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
+                <div className="font-medium text-sm text-gray-900 dark:text-white truncate" title={page.title}>{page.title || page.path}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate mb-2">{page.path}</div>
+                <div className="grid grid-cols-5 gap-1 text-center">
+                  <div><div className="font-semibold text-gray-900 dark:text-white">{page.visits}</div><div className="text-[10px] text-gray-500">Visits</div></div>
+                  <div><div className="font-semibold text-gray-900 dark:text-white">{page.price_views}</div><div className="text-[10px] text-gray-500">Prices</div></div>
+                  <div><div className="font-semibold text-gray-900 dark:text-white">{page.continues}</div><div className="text-[10px] text-gray-500">Continue</div></div>
+                  <div><div className="font-semibold text-gray-900 dark:text-white">{page.submissions}</div><div className="text-[10px] text-gray-500">Enquiries</div></div>
+                  <div><div className="font-semibold text-gray-900 dark:text-white">{page.booked}</div><div className="text-[10px] text-gray-500">Jobs</div></div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Visit → enquiry {page.visit_to_submit_rate}%{page.price_views > 0 ? ` · Price → continue ${page.price_to_continue_rate}%` : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function InsightsSheet({ data }: { data: AnalyticsData }) {
   return (

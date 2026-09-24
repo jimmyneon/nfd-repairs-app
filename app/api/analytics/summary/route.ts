@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { reportRange, visitorOverview, readAllPages, QuoteEvent, quoteJobHasDeviceArrived, quoteJobIsCompleted } from '@/lib/quote-analytics'
+import { reportRange, visitorOverview, websiteConversionOverview, readAllPages, QuoteEvent, quoteJobHasDeviceArrived, quoteJobIsCompleted } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
     const lookback = new Date(Date.parse(range.startISO) - 30 * 60 * 1000).toISOString()
     const [allEvents, enquiryJourneyData] = await Promise.all([
       readAllPages<QuoteEvent>((from, to) => supabase.from('quote_analytics_events')
-        .select('id, session_id, event_type, event_data, created_at, referrer, utm_source, utm_medium, source_tag, is_mobile')
+        .select('id, session_id, enquiry_ref, event_type, event_data, created_at, page_path, referrer, utm_source, utm_medium, source_tag, is_mobile')
         .gte('created_at', lookback).lt('created_at', range.endISO)
         .order('created_at').order('id').range(from, to)),
       readAllPages<any>((from, to) => supabase.from('enquiries')
-        .select('id, status, quote_sent_method, hesitation_reason, customer_budget, part_reserved, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
+        .select('id, enquiry_ref, status, quote_sent_method, hesitation_reason, customer_budget, part_reserved, repair_reserved, proceed_with_repair, converted_to_job, converted_job_id')
         .eq('enquiry_type', 'repair_quote').gte('created_at', range.startISO).lt('created_at', range.endISO)
         .order('created_at').order('id').range(from, to)),
     ])
@@ -68,7 +68,22 @@ export async function GET(request: NextRequest) {
       if (job.quote_request_id) jobsByEnquiry.set(job.quote_request_id, job)
     }
 
+    // Current outcomes keyed by public enquiry reference let an anonymous
+    // website visit be followed into the saved enquiry/job without storing
+    // customer details in analytics events.
+    const enquiryOutcomesByRef: Record<string, { accepted: boolean; booked: boolean }> = {}
+    for (const enquiry of enquiryJourneyData) {
+      if (!enquiry.enquiry_ref) continue
+      const booked = Boolean(enquiry.converted_job_id || enquiry.converted_to_job)
+      const accepted = booked ||
+        enquiry.status === 'approved' ||
+        enquiry.status === 'converted' ||
+        Boolean(enquiry.repair_reserved || enquiry.proceed_with_repair)
+      enquiryOutcomesByRef[String(enquiry.enquiry_ref)] = { accepted, booked }
+    }
+
     const overview = visitorOverview(allEvents, range)
+    const websiteConversion = websiteConversionOverview(allEvents, range, enquiryOutcomesByRef)
     const funnelData = allEvents.filter(e => Date.parse(e.created_at) >= Date.parse(range.startISO))
     const byType = (...types: string[]) => funnelData.filter(e => types.includes(e.event_type))
     const stepEnterData = byType('quote_step_enter')
@@ -369,6 +384,7 @@ export async function GET(request: NextRequest) {
       period_days: days,
       range,
       overview,
+      website_conversion: websiteConversion,
       total_sessions: totalSessions,
       funnel: {
         steps: stepFunnel,
@@ -440,4 +456,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
