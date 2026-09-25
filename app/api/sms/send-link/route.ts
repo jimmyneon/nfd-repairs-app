@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffOrCron } from '@/lib/api-auth'
-import { sendSms, isSmsConfigured } from '@/lib/resilience'
+import { sendViaMacroDroid } from '@/lib/resilience'
 
 /**
  * POST /api/sms/send-link
@@ -23,21 +23,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Normalise + validate UK mobile
-    let normalised = typeof phone === 'string' ? phone.trim().replace(/\s+/g, '') : ''
-    if (normalised.startsWith('07')) {
-      normalised = '+44' + normalised.substring(1)
-    } else if (normalised.startsWith('7') && !normalised.startsWith('+')) {
-      normalised = '+44' + normalised
+    // Normalise phone number
+    let normalisedPhone = typeof phone === 'string' ? phone.trim().replace(/\s+/g, '') : ''
+    if (normalisedPhone.startsWith('07')) {
+      normalisedPhone = '+44' + normalisedPhone.substring(1)
+    } else if (normalisedPhone.startsWith('7') && !normalisedPhone.startsWith('+')) {
+      normalisedPhone = '+44' + normalisedPhone
     }
-    if (!/^\+447\d{9}$/.test(normalised)) {
+    if (!/^\+447\d{9}$/.test(normalisedPhone)) {
       return NextResponse.json(
         { error: 'a valid UK mobile number is required' },
         { status: 400 }
       )
     }
 
-    if (!isSmsConfigured()) {
+    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+    if (!webhookUrl) {
+      console.error('MACRODROID_WEBHOOK_URL not configured')
       return NextResponse.json(
         { error: 'SMS service not configured' },
         { status: 500 }
@@ -45,8 +47,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = message.trim()
-    const smsResponse = await sendSms(normalised, body)
+    const smsResponse = await sendViaMacroDroid(webhookUrl, normalisedPhone, body)
 
+    // Log to sms_logs for audit trail
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -54,20 +57,19 @@ export async function POST(request: NextRequest) {
     await supabase.from('sms_logs').insert({
       template_key: 'AI_DESK_LINK',
       body_rendered: body,
-      status: smsResponse.ok ? (smsResponse.queued ? 'PENDING' : 'SENT') : 'FAILED',
-      sent_at: smsResponse.ok && !smsResponse.queued ? new Date().toISOString() : null,
-      error_message: smsResponse.relayMessageId
-        ? `relay_message_id:${smsResponse.relayMessageId}`
-        : smsResponse.ok
-          ? undefined
-          : smsResponse.body.substring(0, 500),
+      status: smsResponse.ok ? 'SENT' : 'FAILED',
+      sent_at: smsResponse.ok ? new Date().toISOString() : null,
+      error_message: smsResponse.ok
+        ? undefined
+        : smsResponse.body.substring(0, 500),
     } as any)
 
     if (!smsResponse.ok) {
+      console.error('SMS send failed:', smsResponse.body)
       return NextResponse.json({ error: 'Failed to send SMS' }, { status: 502 })
     }
 
-    return NextResponse.json({ success: true, queued: !!smsResponse.queued })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in send-link:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
