@@ -456,7 +456,7 @@ export async function POST(request: NextRequest) {
     const notificationWebhookUrl =
       process.env.MACRODROID_NOTIFICATION_WEBHOOK_URL ||
       'https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request'
-    if (isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) {
+    if (isProceed || isPayday || isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport || body.source === 'ai-desk') {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
