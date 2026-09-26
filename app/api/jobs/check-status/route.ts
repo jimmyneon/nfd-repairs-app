@@ -64,6 +64,9 @@ export async function GET(request: NextRequest) {
         deposit_amount,
         deposit_received,
         tracking_token,
+        status_changed_at,
+        parts_tracking_status,
+        device_in_shop,
         created_at,
         updated_at
       `)
