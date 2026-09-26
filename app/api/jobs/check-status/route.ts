@@ -37,7 +37,16 @@ export async function GET(request: NextRequest) {
 
     console.log('Checking jobs for phone:', normalizedPhone)
 
-    // Query jobs by phone number
+    // Query jobs by phone number — match BOTH formats in one query so a
+    // job stored as 07… is found for a +44… caller and vice versa.
+    let alternativePhone: string | null = null
+    if (normalizedPhone.startsWith('+44')) {
+      alternativePhone = '0' + normalizedPhone.substring(3)
+    } else if (normalizedPhone.startsWith('0')) {
+      alternativePhone = '+44' + normalizedPhone.substring(1)
+    }
+    const phones = [normalizedPhone, alternativePhone].filter(Boolean) as string[]
+
     const { data: jobs, error } = await supabase
       .from('jobs')
       .select(`
@@ -58,7 +67,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at
       `)
-      .eq('customer_phone', normalizedPhone)
+      .in('customer_phone', phones)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -69,51 +78,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // If no jobs found, try alternative phone formats
-    if (!jobs || jobs.length === 0) {
-      // Try without country code if it has one
-      let alternativePhone = normalizedPhone
-      if (normalizedPhone.startsWith('+44')) {
-        alternativePhone = '0' + normalizedPhone.substring(3)
-      } else if (normalizedPhone.startsWith('0')) {
-        alternativePhone = '+44' + normalizedPhone.substring(1)
-      }
-
-      const { data: altJobs } = await supabase
-        .from('jobs')
-        .select(`
-          id,
-          job_ref,
-          customer_name,
-          customer_phone,
-          device_make,
-          device_model,
-          issue,
-          status,
-          quoted_price,
-          price_total,
-          deposit_required,
-          deposit_amount,
-          deposit_received,
-          tracking_token,
-          created_at,
-          updated_at
-        `)
-        .eq('customer_phone', alternativePhone)
-        .order('created_at', { ascending: false })
-
-      if (altJobs && altJobs.length > 0) {
-        return NextResponse.json({
-          success: true,
-          phone: normalizedPhone,
-          jobs: altJobs.map(job => ({
-            ...job,
-            tracking_url: shortTrackingLink((job as any).short_token || job.tracking_token),
-            status_label: getStatusLabel(job.status),
-          }))
-        })
-      }
-    }
+    console.log('check-status', normalizedPhone, 'matched', jobs?.length ?? 0, 'jobs:', (jobs ?? []).map(j => j.job_ref).join(',') || 'none')
 
     // Return results
     return NextResponse.json({
