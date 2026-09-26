@@ -150,7 +150,6 @@ export default function ProfitabilityPage() {
 
   const load = async () => {
     setLoading(true)
-    setMessage(null)
     try {
       const response = await fetch('/api/profitability?days=120', { cache: 'no-store' })
       const json = await response.json()
