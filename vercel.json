@@ -10,10 +10,6 @@
     {
       "path": "/api/profitability/reminder",
       "schedule": "30 15 * * *"
-    },
-    {
-      "path": "/api/profitability/reminder",
-      "schedule": "30 16 * * *"
     }
   ]
 }
