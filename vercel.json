@@ -5,5 +5,11 @@
   "framework": "nextjs",
   "regions": [
     "lhr1"
+  ],
+  "crons": [
+    {
+      "path": "/api/profitability/reminder",
+      "schedule": "0 18 * * *"
+    }
   ]
 }
