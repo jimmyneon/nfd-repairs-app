@@ -342,6 +342,7 @@ export async function POST(request: NextRequest) {
           additional_info: enquiry_type === 'remote_support'
             ? [additional_info, stripePaymentVerified ? `Stripe: PAID £${(stripePaymentAmount / 100).toFixed(0)} (session: ${stripe_session_id?.substring(0, 20)}...)` : 'Stripe: NOT VERIFIED'].filter(Boolean).join(' | ')
             : additional_info || null,
+          help_type: body.help_type || null,
           status: proceed_with_repair ? 'approved' : 'pending',
         })
         .select()
@@ -441,7 +442,7 @@ export async function POST(request: NextRequest) {
       ? `${customer_name} - ${issue_description || 'Remote support request'} - £60 PAID${additional_info ? ' - ' + additional_info : ''}`
       : enquiry_type === 'repair_quote'
       ? `${customer_name} - ${repair_type || 'Repair'}${verifiedQuotedPrice ? ' - £' + verifiedQuotedPrice : ' - Personalized quote'}${isTimingLossRisk ? ' - TIMING BLOCKED: review only; do not promise late opening' : isPriceOptionReview ? ' - REVIEW CURRENT SUITABLE OPTIONS; no price haggling' : isPayday ? ` - PAYDAY: ${payday_date} - ORDER PART & HOLD SLOT` : isProceed ? ' - CHECK STOCK & CONVERT TO JOB' : isPersonalisedQuoteNeeded ? ' - SEND QUOTE FROM APP' : ''}${priceTampered ? ' - ⚠️ PRICE TAMPERED' : ''}`
-      : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}`
+      : `${customer_name} - ${enquiry_type === 'web_services' ? project_type : enquiry_type === 'business' ? (body.help_type || 'Business') : service_type}${enquiry_type === 'business' && additional_info ? ` — ${String(additional_info).slice(0, 140)}` : ''}`
 
     await supabase.from('notifications').insert({
       type: isRemoteSupport ? 'REMOTE_SUPPORT' : isRecoveryReview ? 'NEW_ENQUIRY' : isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
@@ -462,7 +463,7 @@ export async function POST(request: NextRequest) {
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
         await fetch(notificationWebhookUrl, {
           method: 'POST',
-          body: enquiryUrl,
+          body: `${notifTitle}: ${notifBody}\n${enquiryUrl}`,
         })
       } catch (e) {
         console.error('[MacroDroid] Failed to send staff notification:', e)

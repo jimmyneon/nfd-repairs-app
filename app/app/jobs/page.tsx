@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job } from '@/lib/types-v3'
-import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, BellRing, PoundSterling } from 'lucide-react'
+import { Search, QrCode, Plus, ChevronDown, Flame, Zap, Clock, CheckCircle, Package, Wrench, AlertTriangle, Archive, MapPin, BellRing } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import NotificationSetup from '@/components/NotificationSetup'
@@ -36,12 +36,6 @@ export default function JobsListPageV2() {
   const [sendInCount, setSendInCount] = useState(0)
   const [enquiryCount, setEnquiryCount] = useState(0)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
-  const [profitabilityReminder, setProfitabilityReminder] = useState<{
-    show: boolean
-    missing_dates: string[]
-    previous_missing: number
-    today_missing: boolean
-  } | null>(null)
   const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
   const [pendingQuoteEnquiries, setPendingQuoteEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; repair_type: string | null}[]>([])
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -59,7 +53,6 @@ export default function JobsListPageV2() {
     loadSendInCount()
     loadEnquiryCount()
     loadUnreadMessageCount()
-    loadProfitabilityReminder()
 
     // Reload on bfcache restoration (back button) - show loading state during reload
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -72,7 +65,6 @@ export default function JobsListPageV2() {
       loadSendInCount()
       loadEnquiryCount()
       loadUnreadMessageCount()
-      loadProfitabilityReminder()
     }
     window.addEventListener('pageshow', handlePageShow)
 
@@ -248,17 +240,6 @@ export default function JobsListPageV2() {
     }
   }
 
-  const loadProfitabilityReminder = async () => {
-    try {
-      const res = await fetch('/api/profitability?days=30', { cache: 'no-store' })
-      if (!res.ok) return
-      const payload = await res.json()
-      setProfitabilityReminder(payload.reminder || null)
-    } catch {
-      // Profitability reminders are helpful, but should never block the jobs dashboard.
-    }
-  }
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -328,28 +309,6 @@ export default function JobsListPageV2() {
       
       {/* Customer Waiting Banner - Shows when customer has arrived */}
       <CustomerWaitingBanner jobs={jobs} />
-      
-      {profitabilityReminder?.show && (
-        <div className="bg-amber-500 px-4 py-3 text-amber-950 shadow-lg">
-          <div className="flex items-center gap-3">
-            <PoundSterling className="h-6 w-6 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black">
-                {profitabilityReminder.previous_missing > 0
-                  ? `${profitabilityReminder.previous_missing} PROFITABILITY ${profitabilityReminder.previous_missing === 1 ? 'DAY' : 'DAYS'} MISSING`
-                  : 'TODAY’S PROFITABILITY NEEDS ENTERING'}
-              </p>
-              <p className="text-xs font-medium opacity-90">Revenue, parts, petty cash and jobs — about 30 seconds.</p>
-            </div>
-            <Link
-              href="/app/profitability"
-              className="flex-shrink-0 rounded-xl bg-amber-950 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-black active:scale-95"
-            >
-              Enter now
-            </Link>
-          </div>
-        </div>
-      )}
       
       {/* Pending Quote Banner - Shows when customers are waiting for a personalised quote response */}
       {pendingQuoteEnquiries.length > 0 && (

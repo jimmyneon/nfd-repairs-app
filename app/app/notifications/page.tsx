@@ -73,8 +73,6 @@ export default function NotificationsPage() {
 
     if (notification.job_id) {
       router.push(`/app/jobs/${notification.job_id}`)
-    } else if (notification.type === 'ACTION_REQUIRED' && notification.title === 'Profitability entry due') {
-      router.push('/app/profitability')
     }
   }
 

@@ -3,13 +3,5 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": [
-    "lhr1"
-  ],
-  "crons": [
-    {
-      "path": "/api/profitability/reminder",
-      "schedule": "30 15 * * *"
-    }
-  ]
+  "regions": ["lhr1"]
 }
