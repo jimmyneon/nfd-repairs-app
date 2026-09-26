@@ -3,9 +3,7 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["lhr1"],
-  "crons": [
-    { "path": "/api/sms/relay-poll", "schedule": "* * * * *" },
-    { "path": "/api/sms/relay-health", "schedule": "*/5 * * * *" }
+  "regions": [
+    "lhr1"
   ]
 }
