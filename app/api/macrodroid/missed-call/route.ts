@@ -36,7 +36,10 @@ const FALLBACK_HOURS: Record<string, { isOpen: boolean; formatted: string; open?
 }
 
 const DEFAULT_MAPS_URL = 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7'
-const QUOTE_URL = 'nfdr.uk/quote'
+// ?s= tags feed the quote analytics source_tag — lets us count how many
+// people clicked through from each SMS flavour.
+const QUOTE_URL_MISSED = 'nfdr.uk/quote?s=missed-call'
+const QUOTE_URL_ANSWERED = 'nfdr.uk/quote?s=ai-desk'
 const START_URL = 'nfdr.uk/start'
 
 export async function OPTIONS() {
@@ -168,7 +171,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL_MISSED}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
           try {
             const { sendSms } = await import('@/lib/resilience')
             const result = await sendSms(from, repeatBody)
@@ -410,13 +413,14 @@ function buildMissedCallMessage(ctx: {
   const lines: string[] = ctx.answered
     ? ['Thanks for calling New Forest Device Repairs! 👋']
     : ['Hi, sorry we missed your call! 👋']
+  const quoteUrl = ctx.answered ? QUOTE_URL_ANSWERED : QUOTE_URL_MISSED
 
   // Special hours / holiday banner takes priority over regular hours
   if (ctx.specialHours?.active && ctx.specialHours?.note) {
     lines.push(ctx.specialHours.note)
     lines.push('')
     lines.push('Get an instant repair price in 60 seconds:')
-    lines.push(QUOTE_URL)
+    lines.push(quoteUrl)
     lines.push('')
     lines.push('No need to book — just pop in.')
     lines.push('')
@@ -444,7 +448,7 @@ function buildMissedCallMessage(ctx: {
 
   lines.push('')
   lines.push('Get an instant repair price in 60 seconds:')
-  lines.push(QUOTE_URL)
+  lines.push(quoteUrl)
   lines.push('')
   lines.push('No need to book — just pop in.')
   lines.push('')

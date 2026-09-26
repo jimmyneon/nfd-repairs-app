@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
       // Map short tags to readable names for dashboard display
       const tagMap: Record<string, string> = {
         'sms': 'SMS Text',
+        'ai-desk': 'AI Desk Call',
+        'missed-call': 'Missed Call Text',
         'wa': 'WhatsApp',
         'fb': 'Facebook',
         'ig': 'Instagram',
