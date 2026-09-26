@@ -52,19 +52,25 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse body — accept JSON or form-encoded (MacroDroid sends either)
+    // Parse body — accept JSON or form-encoded (MacroDroid sends either).
+    // source: 'ai-desk' means AI Desk ANSWERED the call — same rate limits,
+    // but the message must not say "sorry we missed your call".
     let from: string | undefined
     let channel = 'sms'
+    let source: string | undefined
     const contentType = request.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {
       const body = await request.json()
       from = body.from || body.phone || body.caller
       channel = body.channel || 'sms'
+      source = body.source
     } else {
       const formData = await request.formData()
       from = (formData.get('from') || formData.get('phone') || formData.get('caller') || undefined) as string | undefined
       channel = (formData.get('channel') as string) || 'sms'
+      source = (formData.get('source') as string) || undefined
     }
+    const answeredByAiDesk = source === 'ai-desk'
 
     if (!from) {
       return NextResponse.json(
@@ -250,6 +256,7 @@ export async function POST(request: NextRequest) {
       nextOpen: status.nextOpen,
       googleMapsUrl,
       specialHours,
+      answered: answeredByAiDesk,
     })
 
     // Send via SMS transport (relay or MacroDroid — sendSms picks automatically)
@@ -258,7 +265,7 @@ export async function POST(request: NextRequest) {
     // Log to sms_logs for audit trail
     try {
       await supabase.from('sms_logs').insert({
-        template_key: 'MISSED_CALL',
+        template_key: answeredByAiDesk ? 'AI_DESK_ANSWERED' : 'MISSED_CALL',
         body_rendered: message,
         status: sendResult.ok ? (sendResult.queued ? 'PENDING' : 'SENT') : 'FAILED',
         sent_at: sendResult.ok && !sendResult.queued ? new Date().toISOString() : null,
@@ -391,15 +398,18 @@ function computeHoursStatus(weeklyHours: Record<string, any>): {
   }
 }
 
-/** Build the context-aware missed-call SMS. */
+/** Build the context-aware missed-call / AI-answered-call SMS. */
 function buildMissedCallMessage(ctx: {
   isOpen: boolean
   todayFormatted: string
   nextOpen: string | null
   googleMapsUrl: string
   specialHours: { active?: boolean; note?: string | null; expiry_date?: string | null } | null
+  answered?: boolean
 }): string {
-  const lines: string[] = ['Hi, sorry we missed your call! 👋']
+  const lines: string[] = ctx.answered
+    ? ['Thanks for calling New Forest Device Repairs! 👋']
+    : ['Hi, sorry we missed your call! 👋']
 
   // Special hours / holiday banner takes priority over regular hours
   if (ctx.specialHours?.active && ctx.specialHours?.note) {

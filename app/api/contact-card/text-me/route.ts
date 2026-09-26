@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { phone } = await request.json()
+    // variant 'directions' sends just the map link — the full digital
+    // card is overkill when a caller asked "where are you?".
+    const { phone, variant } = await request.json()
 
     if (!phone || phone.trim().length < 7) {
       return NextResponse.json(
@@ -55,7 +57,17 @@ export async function POST(request: NextRequest) {
     const vcardUrl = 'https://nfdr.uk/new-forest-device-repairs.vcf'
     const contactCardUrl = 'https://nfdr.uk/c'
 
-    const smsBody = `New Forest Device Repairs
+    const smsBody = variant === 'directions'
+      ? `Hi, here's where to find us:
+
+5A New Street, Lymington SO41 9BH
+Town centre — not the High Street.
+
+Map: ${mapsLink}
+
+John
+NFD Repairs`
+      : `New Forest Device Repairs
 Phone, Tablet, Laptop & Console Repairs
 Lymington
 
@@ -93,7 +105,7 @@ Opening hours: ${hoursLink}`
 
     // Log to sms_logs for audit trail
     await supabase.from('sms_logs').insert({
-      template_key: 'CONTACT_CARD_TEXT_ME',
+      template_key: variant === 'directions' ? 'CONTACT_CARD_DIRECTIONS' : 'CONTACT_CARD_TEXT_ME',
       body_rendered: smsBody,
       status: smsResponse.queued ? 'PENDING' : 'SENT',
       sent_at: smsResponse.queued ? null : new Date().toISOString(),

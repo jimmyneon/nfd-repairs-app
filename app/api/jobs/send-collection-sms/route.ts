@@ -3,7 +3,7 @@ import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
-import { createServiceClient, supabaseRetry, sendSms, isWithinUKSendingHours } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
 
 // Allow up to 5 minutes for the cron handler (it has 30s delays between sends)
 export const maxDuration = 300
