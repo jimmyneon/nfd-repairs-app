@@ -8,6 +8,7 @@ import {
   dateOffsetKey,
   isTradingDate,
   londonDateKey,
+  missingProfitabilityFields,
   roundMoney,
   toMoneyNumber,
 } from '@/lib/profitability'
@@ -191,6 +192,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid entry date' }, { status: 400 })
     }
 
+    const missingFields = missingProfitabilityFields(body)
+    if (missingFields.length > 0) {
+      return NextResponse.json({
+        error: 'Fill in all four daily figures — enter 0 where none applies.',
+        missing_fields: missingFields,
+      }, { status: 400 })
+    }
+
     const revenue = cleanMoney(body.revenue)
     const partsCost = cleanMoney(body.parts_cost)
     const pettyCashCost = cleanMoney(body.petty_cash_cost)
@@ -213,11 +222,23 @@ export async function POST(request: NextRequest) {
 
     const storage = await saveProfitabilityEntry(supabase, entry)
 
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('title', 'Profitability entry due')
-      .eq('is_read', false)
+    // Keep the action-required reminder active until every outstanding
+    // trading day has been completed, rather than clearing it after the
+    // first saved day.
+    const { entries: latestEntries } = await loadProfitabilityStorage(
+      supabase,
+      dateOffsetKey(today, -20),
+      today
+    )
+    const stillMissing = missingTradingDates(latestEntries, today)
+
+    if (stillMissing.length === 0) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('title', 'Profitability entry due')
+        .eq('is_read', false)
+    }
 
     return NextResponse.json({
       success: true,
