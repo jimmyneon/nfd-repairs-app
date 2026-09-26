@@ -3,10 +3,9 @@ import webpush from 'web-push'
 import { requireCronSecret } from '@/lib/api-auth'
 import { createServiceClient } from '@/lib/resilience'
 import { PROFITABILITY_TRACKING_START, isTradingDate, londonDateKey } from '@/lib/profitability'
+import { profitabilityEntryExists } from '@/lib/profitability-storage'
 
 export const dynamic = 'force-dynamic'
-
-const DAY_PREFIX = 'profitability_day_'
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -27,14 +26,8 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createServiceClient()
-    const { data: entry, error: entryError } = await supabase
-      .from('admin_settings')
-      .select('key')
-      .eq('key', `${DAY_PREFIX}${today}`)
-      .maybeSingle()
 
-    if (entryError) throw entryError
-    if (entry) {
+    if (await profitabilityEntryExists(supabase, today)) {
       return NextResponse.json({ success: true, skipped: true, reason: 'already-entered' })
     }
 
