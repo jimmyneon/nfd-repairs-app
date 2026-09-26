@@ -71,19 +71,26 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  // Protect /app routes - redirect to login if no user
+  // Protect /app routes - redirect to login if no user, preserving the
+  // intended destination so deep links (e.g. /app/enquiries?ref=ENQ-123
+  // from notification taps) survive the login round-trip.
   if (req.nextUrl.pathname.startsWith('/app')) {
+    const loginUrl = new URL('/login', req.url)
+    loginUrl.searchParams.set(
+      'next',
+      req.nextUrl.pathname + req.nextUrl.search,
+    )
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
       if (!user) {
-        return NextResponse.redirect(new URL('/login', req.url))
+        return NextResponse.redirect(loginUrl)
       }
     } catch (error) {
       // If auth check fails, redirect to login
-      return NextResponse.redirect(new URL('/login', req.url))
+      return NextResponse.redirect(loginUrl)
     }
   }
 

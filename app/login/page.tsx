@@ -17,11 +17,18 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient() as any
 
+  // Honour ?next= so deep links that bounced through login land where
+  // they were going — only allow internal /app paths (no open redirect).
+  const destination = () => {
+    const next = new URLSearchParams(window.location.search).get('next')
+    return next && next.startsWith('/app') ? next : '/app/jobs'
+  }
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.replace('/app/jobs')
+        router.replace(destination())
       } else {
         setCheckingAuth(false)
       }
@@ -48,7 +55,7 @@ export default function LoginPage() {
         console.log('Login successful, redirecting...')
         // Refresh the page to trigger middleware with new session
         router.refresh()
-        router.push('/app/jobs')
+        router.push(destination())
       } else {
         setError('Login failed - no session created')
         setLoading(false)
