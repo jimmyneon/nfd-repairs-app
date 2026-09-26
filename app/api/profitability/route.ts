@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireStaffUser } from '@/lib/api-auth'
 import { createServiceClient } from '@/lib/resilience'
 import {
-  DEFAULT_PROFITABILITY_SETTINGS,
   PROFITABILITY_TRACKING_START,
   ProfitabilitySettings,
   dailyOverhead,
   dateOffsetKey,
   isTradingDate,
   londonDateKey,
-  toMoneyNumber,
 } from '@/lib/profitability'
+import {
+  loadProfitabilityStorage,
+  saveProfitabilityEntry,
+  saveProfitabilitySettings,
+} from '@/lib/profitability-storage'
 
 export const dynamic = 'force-dynamic'
-
-const SETTINGS_KEY = 'profitability_settings'
-const DAY_PREFIX = 'profitability_day_'
 
 function cleanMoney(value: unknown): number | null {
   const parsed = Number(value)
@@ -27,48 +27,6 @@ function cleanJobCount(value: unknown): number | null {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 10000) return null
   return parsed
-}
-
-function parseJson(value: unknown): any {
-  if (value && typeof value === 'object') return value
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value)
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-function errorMessage(error: any): string {
-  return String(
-    error?.message ||
-    error?.details ||
-    error?.hint ||
-    error?.code ||
-    error ||
-    'Unknown error'
-  )
-}
-
-async function getSettings(supabase: any): Promise<ProfitabilitySettings> {
-  const { data, error } = await supabase
-    .from('admin_settings')
-    .select('value')
-    .eq('key', SETTINGS_KEY)
-    .maybeSingle()
-
-  if (error) throw error
-  const parsed = parseJson(data?.value)
-  if (!parsed) return DEFAULT_PROFITABILITY_SETTINGS
-
-  return {
-    rent_monthly: toMoneyNumber(parsed.rent_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.rent_monthly),
-    internet_monthly: toMoneyNumber(parsed.internet_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.internet_monthly),
-    water_monthly: toMoneyNumber(parsed.water_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.water_monthly),
-    electricity_monthly: toMoneyNumber(parsed.electricity_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.electricity_monthly),
-  }
 }
 
 function getLondonHour(): number {
@@ -93,6 +51,10 @@ function missingTradingDates(entries: Array<{ entry_date: string }>, today: stri
   return result
 }
 
+function errorMessage(error: any): string {
+  return String(error?.message || error?.details || error?.hint || error?.code || error || 'Unknown error')
+}
+
 export async function GET(request: NextRequest) {
   const { response: authResponse } = await requireStaffUser(request)
   if (authResponse) return authResponse
@@ -104,64 +66,34 @@ export async function GET(request: NextRequest) {
     const today = londonDateKey()
     const from = dateOffsetKey(today, -(days - 1))
 
-    const [{ data: rows, error }, settings] = await Promise.all([
-      supabase
-        .from('admin_settings')
-        .select('key,value,updated_at')
-        .like('key', `${DAY_PREFIX}%`)
-        .order('key', { ascending: false }),
-      getSettings(supabase),
-    ])
+    const { entries, settings, storage } = await loadProfitabilityStorage(supabase, from, today)
 
-    if (error) throw error
-
-    const entries = (rows || [])
-      .map((row: any) => {
-        const parsed = parseJson(row.value)
-        const entryDate = String(parsed?.entry_date || row.key.replace(DAY_PREFIX, ''))
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) return null
-        return {
-          id: row.key,
-          entry_date: entryDate,
-          revenue: toMoneyNumber(parsed?.revenue),
-          parts_cost: toMoneyNumber(parsed?.parts_cost),
-          petty_cash_cost: toMoneyNumber(parsed?.petty_cash_cost),
-          job_count: Number(parsed?.job_count || 0),
-          daily_overhead: toMoneyNumber(parsed?.daily_overhead),
-          updated_at: row.updated_at || undefined,
-        }
-      })
-      .filter(Boolean)
-      .filter((entry: any) => entry.entry_date >= from && entry.entry_date <= today)
-      .sort((a: any, b: any) => b.entry_date.localeCompare(a.entry_date))
-
-    const missingDates = missingTradingDates(entries as any, today)
+    const missingDates = missingTradingDates(entries, today)
     const previousMissing = missingDates.filter(date => date < today)
     const todayMissing = missingDates.includes(today)
-    const showReminder = previousMissing.length > 0 || (todayMissing && getLondonHour() >= 16)
 
     return NextResponse.json({
       success: true,
       today,
       entries,
       settings,
+      storage,
       overhead: {
         monthly: settings.rent_monthly + settings.internet_monthly + settings.water_monthly + settings.electricity_monthly,
         daily: dailyOverhead(settings),
       },
       reminder: {
-        show: showReminder,
+        show: previousMissing.length > 0 || (todayMissing && getLondonHour() >= 16),
         missing_dates: missingDates,
         previous_missing: previousMissing.length,
         today_missing: todayMissing,
       },
     })
   } catch (error: any) {
-    const details = errorMessage(error)
     console.error('Profitability GET error:', error)
     return NextResponse.json({
       error: 'Failed to load profitability data',
-      details,
+      details: errorMessage(error),
     }, { status: 500 })
   }
 }
@@ -179,31 +111,27 @@ export async function POST(request: NextRequest) {
       const internet = cleanMoney(body.internet_monthly)
       const water = cleanMoney(body.water_monthly)
       const electricity = cleanMoney(body.electricity_monthly)
+
       if ([rent, internet, water, electricity].some(value => value === null)) {
         return NextResponse.json({ error: 'Enter valid monthly costs' }, { status: 400 })
       }
 
-      const payload = {
-        rent_monthly: rent,
-        internet_monthly: internet,
-        water_monthly: water,
-        electricity_monthly: electricity,
+      const settings = {
+        rent_monthly: rent!,
+        internet_monthly: internet!,
+        water_monthly: water!,
+        electricity_monthly: electricity!,
       }
 
-      const { error } = await supabase.from('admin_settings').upsert({
-        key: SETTINGS_KEY,
-        value: payload,
-        description: 'Recurring monthly costs used by the profitability tracker',
-      }, { onConflict: 'key' })
-
-      if (error) throw error
+      const storage = await saveProfitabilitySettings(supabase, settings)
 
       return NextResponse.json({
         success: true,
-        settings: payload,
+        settings,
+        storage,
         overhead: {
           monthly: rent! + internet! + water! + electricity!,
-          daily: dailyOverhead(payload as ProfitabilitySettings),
+          daily: dailyOverhead(settings as ProfitabilitySettings),
         },
       })
     }
@@ -222,8 +150,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Enter valid non-negative figures' }, { status: 400 })
     }
 
-    const settings = await getSettings(supabase)
-    const payload = {
+    const today = londonDateKey()
+    const { settings } = await loadProfitabilityStorage(supabase, dateOffsetKey(today, -1), today)
+    const entry = {
       entry_date: entryDate,
       revenue,
       parts_cost: partsCost,
@@ -232,14 +161,7 @@ export async function POST(request: NextRequest) {
       daily_overhead: dailyOverhead(settings),
     }
 
-    const key = `${DAY_PREFIX}${entryDate}`
-    const { error } = await supabase.from('admin_settings').upsert({
-      key,
-      value: payload,
-      description: `Profitability entry for ${entryDate}`,
-    }, { onConflict: 'key' })
-
-    if (error) throw error
+    const storage = await saveProfitabilityEntry(supabase, entry)
 
     await supabase
       .from('notifications')
@@ -249,17 +171,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      storage,
       entry: {
-        id: key,
-        ...payload,
+        id: entryDate,
+        ...entry,
       },
     })
   } catch (error: any) {
-    const details = errorMessage(error)
     console.error('Profitability POST error:', error)
     return NextResponse.json({
       error: 'Failed to save profitability data',
-      details,
+      details: errorMessage(error),
     }, { status: 500 })
   }
 }
