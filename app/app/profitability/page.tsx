@@ -30,6 +30,12 @@ type ApiData = {
   entries: ProfitabilityEntry[]
   settings: ProfitabilitySettings
   storage: 'supabase_table' | 'admin_settings_fallback'
+  suggestion?: {
+    date: string
+    revenue: number
+    job_count: number
+    job_refs: string[]
+  }
   overhead: { monthly: number; daily: number }
   reminder: {
     show: boolean
@@ -138,6 +144,7 @@ export default function ProfitabilityPage() {
   const [showCosts, setShowCosts] = useState(false)
 
   const [entryDate, setEntryDate] = useState('')
+  const [suggestion, setSuggestion] = useState<ApiData['suggestion'] | null>(null)
   const [revenue, setRevenue] = useState('')
   const [partsCost, setPartsCost] = useState('')
   const [pettyCashCost, setPettyCashCost] = useState('')
@@ -155,6 +162,7 @@ export default function ProfitabilityPage() {
       const json = await response.json()
       if (!response.ok) throw new Error(json.details || json.error || 'Failed to load profitability')
       setData(json)
+      if (json.suggestion) setSuggestion(json.suggestion)
       if (!entryDate) setEntryDate(json.today)
       setRent(toInput(json.settings.rent_monthly))
       setInternet(toInput(json.settings.internet_monthly))
@@ -179,6 +187,21 @@ export default function ProfitabilityPage() {
     setPettyCashCost(existing ? toInput(existing.petty_cash_cost) : '')
     setJobCount(existing ? toInput(existing.job_count) : '')
     setMessage(null)
+
+    if (existing) {
+      setSuggestion(null)
+      return
+    }
+    if (data.suggestion?.date === entryDate) {
+      setSuggestion(data.suggestion)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/profitability?suggest=${entryDate}`, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(json => { if (!cancelled) setSuggestion(json?.suggestion || null) })
+      .catch(() => { if (!cancelled) setSuggestion(null) })
+    return () => { cancelled = true }
   }, [entryDate, data])
 
   const period = PERIODS[periodIndex]
@@ -480,6 +503,24 @@ export default function ProfitabilityPage() {
                   className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
+
+              {suggestion && suggestion.date === entryDate && suggestion.job_count > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRevenue(String(suggestion.revenue))
+                    setJobCount(String(suggestion.job_count))
+                  }}
+                  className="mb-4 flex w-full items-center justify-between gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-left transition-colors hover:bg-green-100 dark:border-green-800 dark:bg-green-900/20 dark:hover:bg-green-900/30"
+                >
+                  <span className="text-sm font-semibold text-green-800 dark:text-green-300">
+                    {suggestion.job_count} job{suggestion.job_count === 1 ? '' : 's'} collected · {money(suggestion.revenue, 2)} — tap to fill
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400">
+                    {suggestion.job_refs.join(', ')}
+                  </span>
+                </button>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <label>

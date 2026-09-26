@@ -8,6 +8,8 @@ import {
   dateOffsetKey,
   isTradingDate,
   londonDateKey,
+  roundMoney,
+  toMoneyNumber,
 } from '@/lib/profitability'
 import {
   loadProfitabilityStorage,
@@ -55,6 +57,43 @@ function errorMessage(error: any): string {
   return String(error?.message || error?.details || error?.hint || error?.code || error || 'Unknown error')
 }
 
+// Suggest a day's revenue/job count from jobs that reached a final status
+// that day (same effective-date logic as the job analytics route).
+async function suggestFromJobs(supabase: any, dateKey: string) {
+  // Every effective-date component is <= updated_at, so jobs untouched
+  // before the day started can never land on this date.
+  const scanFrom = new Date(`${dateOffsetKey(dateKey, -1)}T00:00:00.000Z`)
+
+  const rows: any[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('job_ref,status,type,price_total,collected_at,closed_at,status_changed_at,updated_at')
+      .in('status', ['COLLECTED', 'COMPLETED'])
+      .gte('updated_at', scanFrom.toISOString())
+      .order('created_at', { ascending: true })
+      .range(from, from + 999)
+    if (error) throw error
+    const batch = data || []
+    rows.push(...batch)
+    if (batch.length < 1000) break
+    from += 1000
+  }
+
+  const matched = rows.filter(job =>
+    (job.type || 'repair') === 'repair' &&
+    londonDateKey(new Date(job.closed_at || job.collected_at || job.status_changed_at || job.updated_at)) === dateKey
+  )
+
+  return {
+    date: dateKey,
+    revenue: roundMoney(matched.reduce((sum, job) => sum + toMoneyNumber(job.price_total), 0)),
+    job_count: matched.length,
+    job_refs: matched.map(job => String(job.job_ref)),
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { response: authResponse } = await requireStaffUser(request)
   if (authResponse) return authResponse
@@ -64,9 +103,19 @@ export async function GET(request: NextRequest) {
     const rawDays = Number(request.nextUrl.searchParams.get('days') || 120)
     const days = Number.isFinite(rawDays) ? Math.min(Math.max(Math.round(rawDays), 14), 400) : 120
     const today = londonDateKey()
+
+    const suggestDate = request.nextUrl.searchParams.get('suggest')
+    if (suggestDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(suggestDate) || suggestDate < PROFITABILITY_TRACKING_START || suggestDate > today) {
+        return NextResponse.json({ error: 'Invalid suggest date' }, { status: 400 })
+      }
+      return NextResponse.json({ success: true, suggestion: await suggestFromJobs(supabase, suggestDate) })
+    }
+
     const from = dateOffsetKey(today, -(days - 1))
 
     const { entries, settings, storage } = await loadProfitabilityStorage(supabase, from, today)
+    const suggestion = await suggestFromJobs(supabase, today)
 
     const missingDates = missingTradingDates(entries, today)
     const previousMissing = missingDates.filter(date => date < today)
@@ -78,6 +127,7 @@ export async function GET(request: NextRequest) {
       entries,
       settings,
       storage,
+      suggestion,
       overhead: {
         monthly: settings.rent_monthly + settings.internet_monthly + settings.water_monthly + settings.electricity_monthly,
         daily: dailyOverhead(settings),
