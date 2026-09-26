@@ -14,28 +14,16 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   )
 }
 
-function londonTimeParts() {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date())
-  const value = (type: string) => Number(parts.find(part => part.type === type)?.value || 0)
-  return { hour: value('hour'), minute: value('minute') }
-}
-
 export async function GET(request: NextRequest) {
   const cronResponse = requireCronSecret(request)
   if (cronResponse) return cronResponse
 
   try {
     const today = londonDateKey()
-    const { hour } = londonTimeParts()
-
-    // Vercel calls this twice in UTC so one execution lands at 16:30 in London
-    // through both BST and GMT. Only the London 16:xx execution does work.
-    if (hour !== 16 || today < PROFITABILITY_TRACKING_START || !isTradingDate(today)) {
+    // The cron runs at 15:30 UTC: 15:30 in winter and 16:30 in summer.
+    // The in-app banner also appears from 16:00 London time, so the reminder
+    // remains useful across GMT/BST without duplicate cron calls.
+    if (today < PROFITABILITY_TRACKING_START || !isTradingDate(today)) {
       return NextResponse.json({ success: true, skipped: true })
     }
 
@@ -58,6 +46,7 @@ export async function GET(request: NextRequest) {
       .select('id')
       .eq('title', 'Profitability entry due')
       .eq('body', body)
+      .limit(1)
       .maybeSingle()
 
     if (existing) {
