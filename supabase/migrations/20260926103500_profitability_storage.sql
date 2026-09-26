@@ -60,10 +60,10 @@ INSERT INTO profitability_settings (
 )
 SELECT
   1,
-  COALESCE((value->>'rent_monthly')::NUMERIC, 1300),
-  COALESCE((value->>'internet_monthly')::NUMERIC, 40),
-  COALESCE((value->>'water_monthly')::NUMERIC, 40),
-  COALESCE((value->>'electricity_monthly')::NUMERIC, 150)
+  COALESCE(((value::jsonb)->>'rent_monthly')::NUMERIC, 1300),
+  COALESCE(((value::jsonb)->>'internet_monthly')::NUMERIC, 40),
+  COALESCE(((value::jsonb)->>'water_monthly')::NUMERIC, 40),
+  COALESCE(((value::jsonb)->>'electricity_monthly')::NUMERIC, 150)
 FROM admin_settings
 WHERE key = 'profitability_settings'
 ON CONFLICT (id) DO UPDATE SET
@@ -83,14 +83,14 @@ INSERT INTO daily_profitability (
 )
 SELECT
   COALESCE(
-    NULLIF(value->>'entry_date', '')::DATE,
+    NULLIF((value::jsonb)->>'entry_date', '')::DATE,
     REPLACE(key, 'profitability_day_', '')::DATE
   ),
-  COALESCE((value->>'revenue')::NUMERIC, 0),
-  COALESCE((value->>'parts_cost')::NUMERIC, 0),
-  COALESCE((value->>'petty_cash_cost')::NUMERIC, 0),
-  COALESCE((value->>'job_count')::INTEGER, 0),
-  COALESCE((value->>'daily_overhead')::NUMERIC, 0)
+  COALESCE(((value::jsonb)->>'revenue')::NUMERIC, 0),
+  COALESCE(((value::jsonb)->>'parts_cost')::NUMERIC, 0),
+  COALESCE(((value::jsonb)->>'petty_cash_cost')::NUMERIC, 0),
+  COALESCE(((value::jsonb)->>'job_count')::INTEGER, 0),
+  COALESCE(((value::jsonb)->>'daily_overhead')::NUMERIC, 0)
 FROM admin_settings
 WHERE key LIKE 'profitability_day_%'
 ON CONFLICT (entry_date) DO UPDATE SET
