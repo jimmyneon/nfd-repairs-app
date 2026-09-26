@@ -22,6 +22,26 @@ export type ProfitabilityEntry = {
   updated_at?: string
 }
 
+export const PROFITABILITY_REQUIRED_FIELDS = [
+  'revenue',
+  'parts_cost',
+  'petty_cash_cost',
+  'job_count',
+] as const
+
+export type ProfitabilityRequiredField = typeof PROFITABILITY_REQUIRED_FIELDS[number]
+
+export function missingProfitabilityFields(
+  input: Partial<Record<ProfitabilityRequiredField, unknown>>
+): ProfitabilityRequiredField[] {
+  return PROFITABILITY_REQUIRED_FIELDS.filter(field => {
+    const value = input[field]
+    return value === null ||
+      value === undefined ||
+      (typeof value === 'string' && value.trim() === '')
+  })
+}
+
 export const DEFAULT_PROFITABILITY_SETTINGS: ProfitabilitySettings = {
   rent_monthly: 1300,
   internet_monthly: 40,

@@ -21,6 +21,7 @@ import {
   ProfitabilitySettings,
   dateOffsetKey,
   entryNetProfit,
+  missingProfitabilityFields,
   monthlyOverhead,
 } from '@/lib/profitability'
 
@@ -291,18 +292,31 @@ export default function ProfitabilityPage() {
 
   const saveEntry = async (event: React.FormEvent) => {
     event.preventDefault()
-    setSaving(true)
     setMessage(null)
+
+    const missing = missingProfitabilityFields({
+      revenue,
+      parts_cost: partsCost,
+      petty_cash_cost: pettyCashCost,
+      job_count: jobCount,
+    })
+
+    if (missing.length > 0) {
+      setMessage('Fill in all four daily figures — enter 0 where none applies.')
+      return
+    }
+
+    setSaving(true)
     try {
       const response = await fetch('/api/profitability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           entry_date: entryDate,
-          revenue: Number(revenue || 0),
-          parts_cost: Number(partsCost || 0),
-          petty_cash_cost: Number(pettyCashCost || 0),
-          job_count: Number(jobCount || 0),
+          revenue: Number(revenue),
+          parts_cost: Number(partsCost),
+          petty_cash_cost: Number(pettyCashCost),
+          job_count: Number(jobCount),
         }),
       })
       const json = await response.json()
@@ -493,7 +507,7 @@ export default function ProfitabilityPage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="font-black text-gray-900 dark:text-white">Daily entry</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Four numbers. Done.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Four numbers. Use 0 when there is nothing to enter.</p>
                 </div>
                 <input
                   type="date"

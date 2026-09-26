@@ -5,6 +5,7 @@ import {
   dateOffsetKey,
   entryNetProfit,
   isTradingDate,
+  missingProfitabilityFields,
   monthlyOverhead,
 } from '@/lib/profitability'
 
@@ -35,5 +36,21 @@ describe('profitability helpers', () => {
       petty_cash_cost: 10,
       daily_overhead: 70.62,
     })).toBe(124.38)
+  })
+
+  it('requires every daily field to be explicitly entered while allowing zero', () => {
+    expect(missingProfitabilityFields({
+      revenue: '270',
+      parts_cost: '',
+      petty_cash_cost: '0',
+      job_count: 0,
+    })).toEqual(['parts_cost'])
+
+    expect(missingProfitabilityFields({
+      revenue: 0,
+      parts_cost: 0,
+      petty_cash_cost: 0,
+      job_count: 0,
+    })).toEqual([])
   })
 })
