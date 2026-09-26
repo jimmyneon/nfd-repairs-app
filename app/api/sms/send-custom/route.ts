@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms, isSmsConfigured } from '@/lib/resilience'
 
 /**
  * POST /api/sms/send-custom
@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     let smsDeliveryStatus = 'FAILED'
 
-    if (webhookUrl) {
+    if (isSmsConfigured()) {
       try {
-        const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+        const smsResponse = await sendSms(job.customer_phone, smsBody)
 
         smsDeliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 

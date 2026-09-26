@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms } from '@/lib/resilience'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,7 +81,7 @@ Opening hours: ${hoursLink}`
       )
     }
 
-    const smsResponse = await sendViaMacroDroid(webhookUrl, normalisedPhone, smsBody)
+    const smsResponse = await sendSms(normalisedPhone, smsBody)
 
     if (!smsResponse.ok) {
       console.error('SMS send failed:', smsResponse.body)
@@ -95,8 +95,11 @@ Opening hours: ${hoursLink}`
     await supabase.from('sms_logs').insert({
       template_key: 'CONTACT_CARD_TEXT_ME',
       body_rendered: smsBody,
-      status: 'SENT',
-      sent_at: new Date().toISOString(),
+      status: smsResponse.queued ? 'PENDING' : 'SENT',
+      sent_at: smsResponse.queued ? null : new Date().toISOString(),
+      error_message: smsResponse.relayMessageId
+        ? `relay_message_id:${smsResponse.relayMessageId}`
+        : undefined,
     } as any)
 
     console.log('Contact card SMS sent to:', normalisedPhone)

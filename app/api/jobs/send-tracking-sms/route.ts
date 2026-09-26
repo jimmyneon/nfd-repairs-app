@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/resilience'
+import { createServiceClient, fetchWithTimeout, isSmsConfigured } from '@/lib/resilience'
 import { getFirstName } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
-import { fetchWithTimeout } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
   const { response: authResponse } = await requireStaffUser(request)
@@ -67,28 +66,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create SMS log' }, { status: 500 })
     }
 
-    // Send via MacroDroid webhook
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (webhookUrl) {
+    // Send via SMS transport (relay or MacroDroid)
+    if (isSmsConfigured()) {
       try {
-        const response = await fetchWithTimeout(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: job.customer_phone,
-            message: smsBody,
-            sms_log_id: smsLog.id,
-          }),
-        })
+        const { sendSms } = await import('@/lib/resilience')
+        const result = await sendSms(job.customer_phone, smsBody)
 
-        if (response.ok) {
-          await supabase
-            .from('sms_logs')
-            .update({ status: 'sent', sent_at: new Date().toISOString() })
-            .eq('id', smsLog.id)
+        if (result.ok) {
+          if (result.queued && result.relayMessageId) {
+            // Relay: queued, not sent yet — store relay message_id for poll cron
+            await supabase
+              .from('sms_logs')
+              .update({ status: 'pending', error_message: `relay_message_id:${result.relayMessageId}` })
+              .eq('id', smsLog.id)
+          } else {
+            // MacroDroid: fire-and-forget, treat as sent
+            await supabase
+              .from('sms_logs')
+              .update({ status: 'sent', sent_at: new Date().toISOString() })
+              .eq('id', smsLog.id)
+          }
         }
-      } catch (webhookError) {
-        console.error('Webhook error:', webhookError)
+      } catch (sendError) {
+        console.error('SMS send error:', sendError)
       }
     }
 

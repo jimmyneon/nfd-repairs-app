@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms, isWithinUKSendingHours } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
 
 // Allow up to 5 minutes for draining large queues
@@ -28,11 +28,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServiceClient()
 
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (!webhookUrl) {
-      console.error('MACRODROID_WEBHOOK_URL not configured')
+    // Check that at least one SMS transport is configured.
+    // The sendSms() helper picks relay if RELAY_* is set, else MacroDroid.
+    const hasRelay = process.env.RELAY_URL && process.env.RELAY_API_KEY
+    const hasMacroDroid = process.env.MACRODROID_WEBHOOK_URL
+    if (!hasRelay && !hasMacroDroid) {
+      console.error('No SMS transport configured (RELAY_* or MACRODROID_WEBHOOK_URL)')
       return NextResponse.json(
-        { error: 'SMS webhook not configured' },
+        { error: 'SMS transport not configured' },
         { status: 500 }
       )
     }
@@ -153,20 +156,37 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`Sending SMS ${i + 1}/${pendingSms.length} - log ${smsLog.id} to ${smsLog.jobs.customer_phone}`)
 
-        const smsResult = await sendViaMacroDroid(webhookUrl, smsLog.jobs.customer_phone, smsLog.body_rendered)
+        const smsResult = await sendSms(smsLog.jobs.customer_phone, smsLog.body_rendered)
 
         if (smsResult.ok) {
-          await supabaseRetry(() =>
-            supabase
-              .from('sms_logs')
-              .update({
-                status: 'SENT',
-                sent_at: new Date().toISOString(),
-              })
-              .eq('id', smsLog.id)
-          )
-          sentCount++
-          results.push({ id: smsLog.id, status: 'SENT' })
+          if (smsResult.queued && smsResult.relayMessageId) {
+            // Relay transport: queued, not yet sent. Store relay message_id
+            // for the relay-poll cron to sync status later.
+            await supabaseRetry(() =>
+              supabase
+                .from('sms_logs')
+                .update({
+                  status: 'PENDING',
+                  error_message: `relay_message_id:${smsResult.relayMessageId}`,
+                })
+                .eq('id', smsLog.id)
+            )
+            sentCount++
+            results.push({ id: smsLog.id, status: 'QUEUED', relay_message_id: smsResult.relayMessageId })
+          } else {
+            // MacroDroid transport: fire-and-forget, treat as sent
+            await supabaseRetry(() =>
+              supabase
+                .from('sms_logs')
+                .update({
+                  status: 'SENT',
+                  sent_at: new Date().toISOString(),
+                })
+                .eq('id', smsLog.id)
+            )
+            sentCount++
+            results.push({ id: smsLog.id, status: 'SENT' })
+          }
         } else {
           console.error(`MacroDroid webhook failed for sms_log ${smsLog.id}:`, smsResult.body)
           // Keep as PENDING for retry on next cron run, unless it was a 4xx rejection

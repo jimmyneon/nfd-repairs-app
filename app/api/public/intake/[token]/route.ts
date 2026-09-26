@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 const VALID_TOKEN = /^[a-zA-Z0-9-]{10,64}$/
 
@@ -11,7 +12,14 @@ function getAdminClient() {
   )
 }
 
-export async function GET(_request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+  // Rate limit: intake form loads + polling.
+  const ip = getClientIP(request)
+  const rl = await checkRateLimit(ip, 'intake:get', 20)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   if (!VALID_TOKEN.test(params.token)) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
@@ -19,7 +27,11 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from('jobs')
-    .select('id,job_ref,customer_name,customer_email,device_type,device_make,device_model,issue,description,device_password,password_not_applicable,terms_accepted,onboarding_completed,is_warranty,tracking_token')
+    // Select only the fields needed to prefill the customer's own form.
+    // device_password is selected ONLY to compute has_device_password —
+    // its value is never sent to the browser (see the explicit allowlist
+    // in the response below). tracking_token and id are internal.
+    .select('job_ref,customer_name,customer_email,device_type,device_make,device_model,issue,description,device_password,password_not_applicable,terms_accepted,onboarding_completed,is_warranty')
     .eq('tracking_token', params.token)
     .single()
 
@@ -27,17 +39,34 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
 
-  // Never return a stored device password to a public browser.
+  // Return ONLY the customer-safe prefill fields. Never echo device_password.
   return NextResponse.json({
     job: {
-      ...data,
-      device_password: undefined,
+      job_ref: data.job_ref,
+      customer_name: data.customer_name,
+      customer_email: data.customer_email,
+      device_type: data.device_type,
+      device_make: data.device_make,
+      device_model: data.device_model,
+      issue: data.issue,
+      description: data.description,
+      password_not_applicable: data.password_not_applicable,
       has_device_password: Boolean(data.device_password),
+      terms_accepted: data.terms_accepted,
+      onboarding_completed: data.onboarding_completed,
+      is_warranty: data.is_warranty,
     },
   })
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { token: string } }) {
+  // Rate limit: intake form submissions.
+  const ip = getClientIP(request)
+  const rl = await checkRateLimit(ip, 'intake:patch', 10)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429 })
+  }
+
   if (!VALID_TOKEN.test(params.token)) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }

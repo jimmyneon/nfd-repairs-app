@@ -269,3 +269,55 @@ export function isTrackingLinkExpired(expiresAt: string | null | undefined): boo
   const expires = new Date(expiresAt)
   return now > expires
 }
+
+/**
+ * Check if a quote-action token is valid (present, not expired, not revoked).
+ */
+export function isQuoteActionTokenValid(
+  token: string | null | undefined,
+  expiresAt: string | null | undefined,
+  revokedAt: string | null | undefined
+): boolean {
+  if (!token) return false
+  if (revokedAt) return false
+  // A token without an expiry was never properly issued — treat as invalid.
+  // All issuance paths (migration backfill + send-quote/enquiry routes) set
+  // token and expiry together, so NULL expiry is an inconsistent state.
+  if (!expiresAt) return false
+  return new Date() <= new Date(expiresAt)
+}
+
+/**
+ * Default quote-action token validity window (60 days).
+ */
+export const QUOTE_ACTION_TOKEN_TTL_DAYS = 60
+
+/**
+ * Expiry timestamp for a freshly issued quote-action token.
+ */
+export function quoteActionTokenExpiry(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + QUOTE_ACTION_TOKEN_TTL_DAYS)
+  return d.toISOString()
+}
+
+/**
+ * Generate a cryptographically-random quote-action token (64 hex chars).
+ * Uses Node crypto when available; falls back to Web Crypto.
+ */
+export function generateQuoteActionToken(): string {
+  try {
+    // Use Node's crypto.randomBytes for a 256-bit random token.
+    const nodeCrypto = require('crypto')
+    return nodeCrypto.randomBytes(32).toString('hex')
+  } catch {
+    // Browser/edge fallback
+    const arr = new Uint8Array(32)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      crypto.getRandomValues(arr)
+      return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+    // Last-resort fallback (should not happen in practice)
+    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+  }
+}

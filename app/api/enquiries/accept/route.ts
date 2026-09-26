@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
       let smsOk = false
       try {
-        const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
+        const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
         smsOk = smsResponse.ok
         if (!smsOk) {
           console.error('Confirmation SMS failed:', smsResponse.body)

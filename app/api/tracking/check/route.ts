@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { trackPackage } from '@/lib/trackers'
+import { requireStaffUser } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 /**
  * POST /api/tracking/check
@@ -8,9 +10,21 @@ import { trackPackage } from '@/lib/trackers'
  * Called by staff via the "Check Again" button on the job detail page.
  *
  * Body: { jobId: string }
+ *
+ * SECURITY: staff-only — this mutates job state and can trigger SMS.
  */
 
 export async function POST(request: NextRequest) {
+  const { response: authResponse } = await requireStaffUser(request)
+  if (authResponse) return authResponse
+
+  // Rate limit: carrier scraping is expensive.
+  const ip = getClientIP(request)
+  const rl = await checkRateLimit(ip, 'tracking:check', 20)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   try {
     const { jobId, carrierOverride } = await request.json()
 

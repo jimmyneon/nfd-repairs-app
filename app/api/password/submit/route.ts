@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createCipheriv, randomBytes } from 'crypto'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 /**
  * POST /api/password/submit
@@ -9,6 +10,13 @@ import { createCipheriv, randomBytes } from 'crypto'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: password submission.
+    const ip = getClientIP(request)
+    const rl = await checkRateLimit(ip, 'password:submit', 10)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429 })
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -132,6 +140,13 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Rate limit: password link validation.
+    const ip = getClientIP(request)
+    const rl = await checkRateLimit(ip, 'password:validate', 20)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms } from '@/lib/resilience'
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,27 +98,49 @@ export async function POST(request: NextRequest) {
       message: smsLog.body_rendered,
     }
 
-    console.log('Sending to MacroDroid webhook...')
+    console.log('Sending via SMS transport (relay or MacroDroid)...')
 
-    const result = await sendViaMacroDroid(webhookUrl, smsLog.jobs.customer_phone, smsLog.body_rendered)
+    const result = await sendSms(smsLog.jobs.customer_phone, smsLog.body_rendered)
 
-    console.log('MacroDroid response:', result.status, result.ok)
+    console.log('SMS transport response:', result.status, result.ok)
 
     if (result.ok) {
-      console.log('✅ SMS sent successfully via MacroDroid, response:', result.body.substring(0, 200))
-      await supabaseRetry(() =>
-        supabase
-          .from('sms_logs')
-          .update({
-            status: 'SENT',
-            sent_at: new Date().toISOString(),
-            // Store the MacroDroid response body for diagnostics
-            error_message: `macrodroid_${result.status}:${result.body.substring(0, 200)}`,
-          })
-          .eq('id', sms_log_id)
-      )
+      if (result.queued && result.relayMessageId) {
+        // Relay transport: message is queued, not sent yet.
+        // Store the relay message_id so the relay-poll cron can sync status.
+        // Keep status as PENDING — the poll cron will update to SENT/DELIVERED/FAILED.
+        console.log(`✅ SMS queued via relay: ${result.relayMessageId}`)
+        await supabaseRetry(() =>
+          supabase
+            .from('sms_logs')
+            .update({
+              status: 'PENDING',
+              error_message: `relay_message_id:${result.relayMessageId}`,
+            })
+            .eq('id', sms_log_id)
+        )
 
-      return NextResponse.json({ success: true, macrodroid_response: result.body.substring(0, 200) })
+        return NextResponse.json({
+          success: true,
+          queued: true,
+          relay_message_id: result.relayMessageId,
+        })
+      } else {
+        // MacroDroid transport: fire-and-forget, treat as sent
+        console.log('✅ SMS sent successfully via MacroDroid, response:', result.body.substring(0, 200))
+        await supabaseRetry(() =>
+          supabase
+            .from('sms_logs')
+            .update({
+              status: 'SENT',
+              sent_at: new Date().toISOString(),
+              error_message: `macrodroid_${result.status}:${result.body.substring(0, 200)}`,
+            })
+            .eq('id', sms_log_id)
+        )
+
+        return NextResponse.json({ success: true, macrodroid_response: result.body.substring(0, 200) })
+      }
     } else {
       console.error('❌ MacroDroid webhook failed:', result.body)
 

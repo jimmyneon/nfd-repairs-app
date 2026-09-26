@@ -9,6 +9,106 @@ import { useTheme } from 'next-themes'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * SMS Phone Pairing Card
+ *
+ * Shows a 6-digit code that the user enters in the Android SMS Relay app
+ * to pair their phone. The code is fetched from the relay's Supabase
+ * project via the create_pairing_code RPC function.
+ *
+ * This is the "super simple" onboarding: user opens this page, sees the
+ * code, types it into the Android app. Done.
+ */
+function SmsPhonePairingCard() {
+  const [pairingCode, setPairingCode] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [expiresAt, setExpiresAt] = useState<number | null>(null)
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)
+
+  // Countdown timer for the pairing code expiry
+  useEffect(() => {
+    if (!expiresAt) return
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
+      setTimeLeft(remaining)
+      if (remaining <= 0) {
+        setPairingCode(null)
+        setExpiresAt(null)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [expiresAt])
+
+  const generateCode = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/sms/pairing-code', { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Could not generate code')
+      }
+      const data = await res.json()
+      setPairingCode(data.code)
+      setExpiresAt(Date.now() + (data.expires_in * 1000))
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="card dark:bg-gray-800">
+      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+        <Smartphone className="h-6 w-6 mr-2" />
+        SMS Phone Connection
+      </h2>
+      <div className="space-y-3">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Pair an Android phone to send and receive SMS messages for this app.
+          Install the SMS Relay app on the phone, then generate a code below.
+        </p>
+
+        {pairingCode ? (
+          <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Enter this code in the SMS Relay app:
+            </p>
+            <p className="text-4xl font-bold tracking-[0.5em] text-gray-900 dark:text-white mb-2">
+              {pairingCode}
+            </p>
+            {timeLeft !== null && (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+              </p>
+            )}
+            <button
+              onClick={generateCode}
+              className="mt-4 text-sm text-primary hover:underline"
+            >
+              Generate new code
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={generateCode}
+            disabled={loading}
+            className="w-full p-4 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-semibold disabled:opacity-50"
+          >
+            {loading ? 'Generating...' : 'Generate pairing code'}
+          </button>
+        )}
+
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
@@ -153,6 +253,9 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+
+        {/* SMS Phone Pairing */}
+        <SmsPhonePairingCard />
 
         {/* Quick Actions */}
         <div className="card dark:bg-gray-800">

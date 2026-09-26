@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendViaMacroDroid, supabaseRetry } from '@/lib/resilience'
+import { sendSms, supabaseRetry } from '@/lib/resilience'
 import { shortTrackingLink } from '@/lib/utils'
 import { getFirstName } from '@/lib/sms-template'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,67 +17,38 @@ function getAdminClient() {
   )
 }
 
-function normalisePhone(phone: string): string {
-  return phone.replace(/\s+/g, '').replace(/^0/, '44')
-}
-
 /**
- * POST /api/public/walk-in/lookup
- * Body: { phone: string }
- *
- * Looks for an existing incomplete walk-in job for this phone number.
- * Returns the job data if found, so the form can pre-fill.
- *
  * POST /api/public/walk-in/submit
- * Body: { customer_name, customer_phone, customer_email?, device_type, device_make,
- *         device_model, issue, description?, terms_accepted, job_id? }
  *
- * Creates a new walk-in job OR updates an existing one (if job_id provided).
- * Sends the RECEIVED SMS to the customer.
+ * SECURITY:
+ *  - No phone-number lookup. A previous "lookup by phone" mode returned an
+ *    existing customer's name, email, device and fault details to anyone who
+ *    supplied a phone number — that was an enumeration attack and has been
+ *    removed. Resume now happens client-side via the tracking token stored in
+ *    localStorage when the quick-intake job was first created.
+ *  - Updating an existing job by job_id requires the matching `token`
+ *    (tracking_token) that was issued when the job was created. A bare job_id
+ *    supplied by the browser is NOT sufficient.
+ *  - Rate limited per IP.
+ *
+ * Body: { customer_name, customer_phone, customer_email?, device_type, device_make,
+ *         device_model, issue, description?, terms_accepted, job_id?, token? }
+ *
+ * Creates a new walk-in job OR updates an existing one (if job_id + token
+ * provided and verified). Sends the RECEIVED SMS to the customer on completion.
  */
 export async function POST(request: NextRequest) {
+  // Rate limit: walk-in form submissions + auto-saves. Auto-save fires once
+  // per device step, so 10/min is generous for a single customer while
+  // throttling enumeration/abuse.
+  const ip = getClientIP(request)
+  const rl = await checkRateLimit(ip, 'walk-in:submit', 10)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests. Please wait a moment and try again.' }, { status: 429 })
+  }
+
   const supabase = getAdminClient()
   const body = await request.json().catch(() => ({}))
-
-  // --- Lookup mode: find existing incomplete job by phone ---
-  if (body.lookup === true && body.phone) {
-    const phone = normalisePhone(String(body.phone).trim())
-    const phoneVariants = [body.phone.trim(), phone, '0' + phone.slice(2)]
-
-    const { data: jobs } = await supabase
-      .from('jobs')
-      .select('id,job_ref,customer_name,customer_phone,customer_email,device_type,device_make,device_model,issue,description,tracking_token,short_token,quick_intake,onboarding_completed,source,status')
-      .eq('source', 'walk_in_self')
-      .eq('quick_intake', true)
-      .eq('onboarding_completed', false)
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    // Match by phone (try variants)
-    const match = (jobs || []).find((j: any) =>
-      phoneVariants.some(p => j.customer_phone?.replace(/\s+/g, '') === p.replace(/\s+/g, ''))
-    )
-
-    if (match) {
-      return NextResponse.json({
-        found: true,
-        job: {
-          id: match.id,
-          job_ref: match.job_ref,
-          customer_name: match.customer_name,
-          customer_phone: match.customer_phone,
-          customer_email: match.customer_email,
-          device_type: match.device_type,
-          device_make: match.device_make,
-          device_model: match.device_model,
-          issue: match.issue,
-          description: match.description,
-        },
-      })
-    }
-
-    return NextResponse.json({ found: false })
-  }
 
   // --- Submit mode: create or update a walk-in job ---
   const {
@@ -90,6 +62,7 @@ export async function POST(request: NextRequest) {
     description,
     terms_accepted,
     job_id,
+    token,
   } = body
 
   if (!customer_name || !customer_phone) {
@@ -98,13 +71,22 @@ export async function POST(request: NextRequest) {
 
   const now = new Date().toISOString()
 
-  // If job_id provided, update the existing job
+  // If job_id provided, update the existing job — but ONLY after verifying
+  // the caller holds the LONG tracking token issued for that job. A bare
+  // job_id is never trusted on its own, and the short_token (24-bit) is
+  // never accepted as an authority for updates — it is a cosmetic redirect
+  // only.
   if (job_id) {
+    if (!token || typeof token !== 'string' || token.length < 10 || token.length > 64) {
+      return NextResponse.json({ error: 'Authorisation token required to update a booking' }, { status: 403 })
+    }
+
     const { data: existing, error: findErr } = await supabase
       .from('jobs')
       .select('id,job_ref,tracking_token,short_token')
       .eq('id', job_id)
       .eq('source', 'walk_in_self')
+      .eq('tracking_token', token)
       .single()
 
     if (existing && !findErr) {
@@ -171,6 +153,11 @@ export async function POST(request: NextRequest) {
         short_token: existing.short_token,
       })
     }
+
+    // job_id was provided but the token did not match this job (or the job
+    // is not a self-service walk-in). Do NOT fall through to create a new
+    // job — the caller intended an update and must be denied.
+    return NextResponse.json({ error: 'Invalid or expired authorisation token' }, { status: 403 })
   }
 
   // Create a new job
@@ -305,13 +292,16 @@ async function sendWalkInSms(
   }
 
   try {
-    const result = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
+    const result = await sendSms(customerPhone, smsBody)
     await supabase.from('sms_logs').insert({
       job_id: jobId,
       template_key: 'RECEIVED',
       body_rendered: smsBody,
-      status: result.ok ? 'SENT' : 'FAILED',
+      status: result.ok ? (result.queued ? 'PENDING' : 'SENT') : 'FAILED',
       recipient_phone: customerPhone,
+      error_message: result.ok && result.relayMessageId
+        ? `relay_message_id:${result.relayMessageId}`
+        : undefined,
     } as any)
   } catch (err) {
     console.error('Walk-in SMS error:', err)

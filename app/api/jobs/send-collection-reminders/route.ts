@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
-import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms, isSmsConfigured, isWithinUKSendingHours } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
 
 // Allow up to 5 minutes for the cron handler
@@ -232,24 +232,29 @@ export async function GET(request: NextRequest) {
 
       // Send via MacroDroid
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-      if (webhookUrl) {
+      if (isSmsConfigured()) {
         try {
-          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+          const smsResult = await sendSms(job.customer_phone, smsBody)
 
-          const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
+          const deliveryStatus = smsResult.ok
+            ? (smsResult.queued ? 'PENDING' : 'SENT')
+            : 'FAILED'
 
-          // Update SMS log — only write sent_at if actually sent
+          // Update SMS log — only write sent_at if actually sent (not just queued)
           await supabaseRetry(() =>
             supabase
               .from('sms_logs')
               .update({
                 status: deliveryStatus,
-                ...(smsResult.ok ? { sent_at: now.toISOString() } : {}),
+                ...(smsResult.ok && !smsResult.queued ? { sent_at: now.toISOString() } : {}),
+                ...(smsResult.ok && smsResult.relayMessageId
+                  ? { error_message: `relay_message_id:${smsResult.relayMessageId}` }
+                  : {}),
               })
               .eq('id', smsLog.id)
           )
 
-          // Update reminder tracking field — only if actually sent
+          // Update reminder tracking field — only if send succeeded (queued counts)
           if (smsResult.ok) {
             const updateField = `collection_reminder_${reminderNumber}_sent_at`
             await supabaseRetry(() =>

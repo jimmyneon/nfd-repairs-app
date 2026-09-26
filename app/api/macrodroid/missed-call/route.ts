@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { sendSms, isWithinUKSendingHours } from '@/lib/resilience'
 
 /**
  * POST /api/macrodroid/missed-call
@@ -163,21 +163,21 @@ export async function POST(request: NextRequest) {
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
           const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
-          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (webhookUrl) {
-            try {
-              const { sendViaMacroDroid } = await import('@/lib/resilience')
-              const result = await sendViaMacroDroid(webhookUrl, from, repeatBody)
-              await supabase.from('sms_logs').insert({
-                template_key: 'MISSED_CALL_REPEAT',
-                recipient_phone: from,
-                body_rendered: repeatBody,
-                status: result.ok ? 'SENT' : 'FAILED',
-                sent_at: result.ok ? new Date().toISOString() : null,
-              } as any)
-            } catch (e) {
-              console.error('[missed-call] Failed to send repeat-caller message:', e)
-            }
+          try {
+            const { sendSms } = await import('@/lib/resilience')
+            const result = await sendSms(from, repeatBody)
+            await supabase.from('sms_logs').insert({
+              template_key: 'MISSED_CALL_REPEAT',
+              recipient_phone: from,
+              body_rendered: repeatBody,
+              status: result.ok ? (result.queued ? 'PENDING' : 'SENT') : 'FAILED',
+              sent_at: result.ok && !result.queued ? new Date().toISOString() : null,
+              error_message: result.ok && result.relayMessageId
+                ? `relay_message_id:${result.relayMessageId}`
+                : undefined,
+            } as any)
+          } catch (e) {
+            console.error('[missed-call] Failed to send repeat-caller message:', e)
           }
         }
 
@@ -252,26 +252,19 @@ export async function POST(request: NextRequest) {
       specialHours,
     })
 
-    // Send via MacroDroid
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (!webhookUrl) {
-      console.error('[missed-call] MACRODROID_WEBHOOK_URL not configured')
-      return NextResponse.json(
-        { success: false, error: 'SMS provider not configured' },
-        { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-      )
-    }
-
-    const sendResult = await sendViaMacroDroid(webhookUrl, from, message)
+    // Send via SMS transport (relay or MacroDroid — sendSms picks automatically)
+    const sendResult = await sendSms(from, message)
 
     // Log to sms_logs for audit trail
     try {
       await supabase.from('sms_logs').insert({
         template_key: 'MISSED_CALL',
         body_rendered: message,
-        status: sendResult.ok ? 'SENT' : 'FAILED',
-        sent_at: sendResult.ok ? new Date().toISOString() : null,
-        error_message: sendResult.ok ? null : sendResult.body,
+        status: sendResult.ok ? (sendResult.queued ? 'PENDING' : 'SENT') : 'FAILED',
+        sent_at: sendResult.ok && !sendResult.queued ? new Date().toISOString() : null,
+        error_message: sendResult.ok
+          ? (sendResult.relayMessageId ? `relay_message_id:${sendResult.relayMessageId}` : null)
+          : sendResult.body,
       } as any)
     } catch (e) {
       console.error('[missed-call] Failed to log to sms_logs:', e)

@@ -5,7 +5,7 @@ import { MapPin, Loader2, CheckCircle, XCircle } from 'lucide-react'
 
 interface ImHereButtonProps {
   jobId: string
-  jobRef: string
+  token: string
   shopLatitude: number
   shopLongitude: number
   radiusMeters?: number
@@ -13,7 +13,7 @@ interface ImHereButtonProps {
 
 export default function ImHereButton({
   jobId,
-  jobRef,
+  token,
   shopLatitude,
   shopLongitude,
   radiusMeters = 100
@@ -76,7 +76,7 @@ export default function ImHereButton({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jobId,
-            jobRef,
+            token,
             customerLatitude: latitude,
             customerLongitude: longitude,
             distanceMeters: Math.round(distanceMeters)

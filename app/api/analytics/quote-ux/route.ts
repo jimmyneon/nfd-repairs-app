@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived, quoteJobIsCompleted } from '@/lib/quote-analytics'
+import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -19,10 +19,6 @@ type Visit = { sessionId: string; events: EventRow[] }
 
 const granularTypes = new Set([
   'quote_instrumentation_ready',
-  'repair_start_clicked',
-  'repair_request_opened',
-  'repair_request_submitted',
-  'not_ready_opened',
   'quote_category_selected',
   'quote_brand_selected',
   'quote_model_help_opened',
@@ -114,34 +110,35 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Keep the lookback attached to visits, but count only activity in the range.
-    const visits = splitVisits(events).filter(visit => visit.events.some(event =>
-      Date.parse(event.created_at) >= Date.parse(range.startISO)))
-    const relevantEvents = events.filter(event => Date.parse(event.created_at) >= Date.parse(range.startISO))
+    const instrumentationStart = Date.parse(firstGranular.created_at)
+    // Include a short lead-in so the step-1 event fired just before DOMContentLoaded
+    // stays attached to the first instrumented visit.
+    const relevantEvents = events.filter(event => Date.parse(event.created_at) >= instrumentationStart - 60_000)
+    const visits = splitVisits(relevantEvents)
 
-    const has = (visit: Visit, type: string) => visit.events.some(event => event.event_type === type && Date.parse(event.created_at) >= Date.parse(range.startISO))
-    const hasStep = (visit: Visit, step: number) => visit.events.some(event => event.event_type === 'quote_step_enter' && Number(event.event_data?.step) === step && Date.parse(event.created_at) >= Date.parse(range.startISO))
+    const has = (visit: Visit, type: string) => visit.events.some(event => event.event_type === type)
+    const hasStep = (visit: Visit, step: number) => visit.events.some(event => event.event_type === 'quote_step_enter' && Number(event.event_data?.step) === step)
     const routeMode = (visit: Visit) => {
       if (has(visit, 'quote_search_result_selected')) return 'search'
       const explicit = [...visit.events].reverse().find(event => typeof event.event_data?.journey_mode === 'string')?.event_data?.journey_mode
       return ['guided', 'search', 'deep_link', 'restored'].includes(explicit) ? explicit : 'unknown'
     }
 
-    const instrumentedVisits = visits.filter(visit => visit.events.some(event => granularTypes.has(event.event_type)))
-    const started = instrumentedVisits
-    const categoryEntrants = started.filter(visit => hasStep(visit, 1))
+    const instrumentedVisits = visits.filter(visit => has(visit, 'quote_instrumentation_ready'))
+    const started = instrumentedVisits.filter(visit => hasStep(visit, 1))
     const categorySelected = started.filter(visit => has(visit, 'quote_category_selected'))
     const brandSelected = started.filter(visit => has(visit, 'quote_brand_selected'))
     const modelSelected = started.filter(visit => has(visit, 'quote_model_selected'))
     const repairSelected = started.filter(visit => has(visit, 'quote_repair_selected'))
     const quoteReached = started.filter(visit => has(visit, 'quote_reveal'))
-    const submitted = started.filter(visit => has(visit, 'quote_form_submit') || has(visit, 'repair_request_submitted'))
+    const submitted = started.filter(visit => has(visit, 'quote_form_submit'))
     const repairStartClicked = started.filter(visit => has(visit, 'repair_start_clicked'))
     const repairRequestOpened = started.filter(visit => has(visit, 'repair_request_opened'))
     const repairRequestSubmitted = started.filter(visit => has(visit, 'repair_request_submitted'))
     const notReadyOpened = started.filter(visit => has(visit, 'not_ready_opened'))
 
-    // Distinct successful requests in the range; outcomes use current job state.
+    // Join submitted website requests to their eventual jobs so the commercial
+    // funnel ends at the outcome that matters: the device reaching the workshop.
     const submittedRefs = [...new Set(
       relevantEvents
         .filter(event => event.event_type === 'repair_request_submitted' && event.enquiry_ref)
@@ -170,42 +167,26 @@ export async function GET(request: NextRequest) {
       const ids = enquiryIds.slice(offset, offset + 100)
       const rows = await readAllPages<any>((from, to) => supabase
         .from('jobs')
-        .select('id, quote_request_id, status, device_in_shop, payment_received')
+        .select('id, quote_request_id, status, device_in_shop')
         .in('quote_request_id', ids)
         .order('created_at')
         .order('id')
         .range(from, to))
       linkedJobs.push(...rows)
     }
-    // Older conversions may only have the forward link on the enquiry.
-    const knownJobIds = new Set(linkedJobs.map(job => job.id))
-    const missingJobIds = [...new Set(submittedEnquiries.map(enquiry => enquiry.converted_job_id)
-      .filter(id => id && !knownJobIds.has(id)))]
-    for (let offset = 0; offset < missingJobIds.length; offset += 100) {
-      linkedJobs.push(...await readAllPages<any>((from, to) => supabase.from('jobs')
-        .select('id, quote_request_id, status, device_in_shop, payment_received')
-        .in('id', missingJobIds.slice(offset, offset + 100))
-        .order('created_at').order('id').range(from, to)))
+    const jobByEnquiry = new Map<string, any>()
+    for (const job of linkedJobs) {
+      if (job.quote_request_id) jobByEnquiry.set(job.quote_request_id, job)
     }
-    const uniqueJobs = [...new Map(linkedJobs.map(job => [job.id, job])).values()]
-    const jobsForEnquiry = (enquiry: any) => uniqueJobs.filter(job =>
-      job.quote_request_id === enquiry.id || job.id === enquiry.converted_job_id)
-    const visitHasDeviceArrived = (visit: Visit) => visit.events.some(event => {
-      if (event.event_type !== 'repair_request_submitted' || !event.enquiry_ref ||
-        Date.parse(event.created_at) < Date.parse(range.startISO)) return false
-      const enquiry = enquiryByRef.get(event.enquiry_ref)
-      return enquiry && jobsForEnquiry(enquiry).some(quoteJobHasDeviceArrived)
-    })
-    const deviceReceived = started.filter(visitHasDeviceArrived)
-    const outcomes = {
-      requests: submittedRefs.length,
-      matched_requests: submittedEnquiries.length,
-      unmatched_requests: submittedRefs.filter(ref => !enquiryByRef.has(ref)).length,
-      linked_jobs: uniqueJobs.length,
-      device_received: uniqueJobs.filter(quoteJobHasDeviceArrived).length,
-      completed: uniqueJobs.filter(quoteJobIsCompleted).length,
-      completed_marked_paid: uniqueJobs.filter(job => quoteJobIsCompleted(job) && job.payment_received === true).length,
+    const visitEnquiryRef = (visit: Visit) =>
+      [...visit.events].reverse().find(event => event.enquiry_ref)?.enquiry_ref || null
+    const visitHasDeviceArrived = (visit: Visit) => {
+      const ref = visitEnquiryRef(visit)
+      if (!ref) return false
+      const enquiry = enquiryByRef.get(ref)
+      return Boolean(enquiry && quoteJobHasDeviceArrived(jobByEnquiry.get(enquiry.id)))
     }
+    const deviceReceived = started.filter(visit => visitHasDeviceArrived(visit))
 
     const routeNames = ['guided', 'search', 'deep_link', 'restored', 'unknown'] as const
     const routes = routeNames.map(mode => {
@@ -247,8 +228,7 @@ export async function GET(request: NextRequest) {
       visits: {
         started: started.length,
         category_selected: categorySelected.length,
-        no_category_selection: categoryEntrants.filter(visit => !has(visit, 'quote_category_selected')).length,
-        category_entrants: categoryEntrants.length,
+        no_category_selection: Math.max(0, started.length - categorySelected.length),
         brand_selected: brandSelected.length,
         model_selected: modelSelected.length,
         repair_selected: repairSelected.length,
@@ -257,7 +237,6 @@ export async function GET(request: NextRequest) {
         category_selected_while_loading: beforeReadyVisits.length,
         category_loading_then_progressed: beforeReadyProgressed.length,
       },
-      outcomes,
       conversion: {
         quote_reached: quoteReached.length,
         repair_start_clicked: repairStartClicked.length,
@@ -287,4 +266,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load quote UX analytics' }, { status: 500 })
   }
 }
-

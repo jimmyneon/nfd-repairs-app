@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortPasswordLink } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms, isSmsConfigured } from '@/lib/resilience'
 
 /**
  * POST /api/password/request
@@ -99,9 +99,9 @@ export async function POST(request: NextRequest) {
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
     let smsStatus = 'FAILED'
 
-    if (webhookUrl) {
+    if (isSmsConfigured()) {
       try {
-        const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+        const smsResponse = await sendSms(job.customer_phone, smsBody)
         smsStatus = smsResponse.ok ? 'SENT' : 'FAILED'
       } catch (err) {
         console.error('MacroDroid send failed:', err)

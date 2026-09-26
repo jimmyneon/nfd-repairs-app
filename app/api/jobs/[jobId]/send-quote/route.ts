@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
 import { shortQuoteApprovalLink } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
+import { generateQuoteActionToken, quoteActionTokenExpiry, isQuoteActionTokenValid } from '@/lib/job-utils'
 
 export async function POST(
   request: NextRequest,
@@ -29,6 +30,23 @@ export async function POST(
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    // Ensure a valid quote-action token exists on the job. Issue a fresh one
+    // if none exists or the existing one has expired/been revoked. The token
+    // is the authorisation key for the public quote link — the job id alone
+    // is not enough.
+    let quoteToken = job.quote_action_token
+    if (!isQuoteActionTokenValid(quoteToken, job.quote_action_token_expires_at, job.quote_action_token_revoked_at)) {
+      quoteToken = generateQuoteActionToken()
+      await supabase
+        .from('jobs')
+        .update({
+          quote_action_token: quoteToken,
+          quote_action_token_expires_at: quoteActionTokenExpiry(),
+          quote_action_token_revoked_at: null,
+        })
+        .eq('id', jobId)
     }
 
     // Update job with quote price and parts requirement
@@ -71,7 +89,7 @@ export async function POST(
     }
 
     // Send SMS with quote approval link
-    const quoteApprovalUrl = shortQuoteApprovalLink(jobId)
+    const quoteApprovalUrl = shortQuoteApprovalLink(jobId, quoteToken)
     
     const smsMessage = `Your repair quote for ${job.device_make} ${job.device_model} is ready: £${quoted_price.toFixed(2)}. ${requires_parts_order ? '(Parts required - £20 deposit)' : ''} Approve: ${quoteApprovalUrl}`
 

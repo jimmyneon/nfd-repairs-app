@@ -224,6 +224,149 @@ export async function sendViaMacroDroid(
 }
 
 /**
+ * Result of an SMS send attempt.
+ * - ok=true + queued=false → actually sent (MacroDroid fire-and-forget)
+ * - ok=true + queued=true  → queued in relay, not yet sent (relay transport)
+ * - ok=false               → send failed
+ */
+export type SmsSendResult = {
+  ok: boolean
+  status: number
+  body: string
+  queued?: boolean       // true when message is queued but not yet sent
+  relayMessageId?: string // relay message UUID (for status polling)
+}
+
+/**
+ * Send an SMS via the NFD SMS Relay (new — replaces MacroDroid).
+ *
+ * The relay is a standalone Supabase project that queues messages and
+ * pushes them to a paired Android phone via Realtime. The phone sends
+ * the SMS via its own SIM and reports delivery status back.
+ *
+ * IMPORTANT: when this returns ok=true, the message is QUEUED, not sent.
+ * The relay-poll cron will later sync the actual SENT/DELIVERED/FAILED
+ * status back to sms_logs. Callers should store relayMessageId so the
+ * poll cron can find and update the sms_log entry.
+ *
+ * @param phone - recipient phone number
+ * @param message - message body
+ * @returns SmsSendResult — ok=true means queued (not sent)
+ */
+export async function sendViaRelay(
+  phone: string,
+  message: string,
+  timeoutMs = 15000
+): Promise<SmsSendResult> {
+  // Same safety guards as sendViaMacroDroid
+  if (!phone || !phone.trim() || !message || !message.trim()) {
+    console.warn('[sms-safety] Blocked empty phone or message to relay')
+    return { ok: false, status: 422, body: 'BLOCKED_EMPTY_PHONE_OR_MESSAGE' }
+  }
+
+  const destination = isSafeSmsDestination(phone)
+  if (!destination.ok) {
+    const body = `BLOCKED_CHARGEABLE_NUMBER:${destination.reason}`
+    console.warn(`[sms-safety] Blocked automatic SMS to ${phone}: ${destination.reason}`)
+    return { ok: false, status: 422, body }
+  }
+
+  const relayUrl = process.env.RELAY_URL
+  const relayAnonKey = process.env.RELAY_ANON_KEY
+  const relayApiKey = process.env.RELAY_API_KEY
+
+  if (!relayUrl || !relayAnonKey || !relayApiKey) {
+    console.error('[relay] RELAY_URL, RELAY_ANON_KEY, or RELAY_API_KEY not configured')
+    return { ok: false, status: 500, body: 'Relay not configured' }
+  }
+
+  try {
+    const response = await fetchWithTimeout(
+      `${relayUrl}/rest/v1/rpc/send_message`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': relayAnonKey,
+          'Authorization': `Bearer ${relayAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: relayApiKey,
+          to_phone: phone,
+          body: message,
+        }),
+      },
+      timeoutMs
+    )
+
+    const body = await response.text()
+
+    if (response.ok) {
+      const data = JSON.parse(body)
+      console.log(`[relay] Queued message ${data.message_id} to ${phone}`)
+      return {
+        ok: true,
+        status: 200,
+        body,
+        queued: true,
+        relayMessageId: data.message_id,
+      }
+    } else {
+      console.error(`[relay] Send failed: ${response.status} ${body}`)
+      return { ok: false, status: response.status, body }
+    }
+  } catch (err: any) {
+    console.error('[relay] Send failed:', err.message)
+    return { ok: false, status: 0, body: err.message || 'Network error' }
+  }
+}
+
+/**
+ * Check if any SMS transport is configured (relay or MacroDroid).
+ * Use this instead of `if (webhookUrl)` guards so the code works
+ * with either transport.
+ */
+export function isSmsConfigured(): boolean {
+  return !!(process.env.RELAY_URL && process.env.RELAY_API_KEY) || !!process.env.MACRODROID_WEBHOOK_URL
+}
+
+/**
+ * Unified SMS sender — uses the relay when configured, falls back to MacroDroid.
+ *
+ * This is the function new code should call. It picks the transport based
+ * on which env vars are set:
+ *   - If RELAY_URL + RELAY_API_KEY are set → use the relay (new)
+ *   - Else if MACRODROID_WEBHOOK_URL is set → use MacroDroid (legacy)
+ *   - Else → fail
+ *
+ * This lets you migrate from MacroDroid to the relay by just adding the
+ * RELAY_* env vars. Once the relay is working, remove MACRODROID_WEBHOOK_URL
+ * to fully switch over.
+ *
+ * Same return shape as sendViaMacroDroid and sendViaRelay.
+ */
+export async function sendSms(
+  phone: string,
+  message: string,
+  timeoutMs = 15000
+): Promise<SmsSendResult> {
+  const relayUrl = process.env.RELAY_URL
+  const relayApiKey = process.env.RELAY_API_KEY
+
+  if (relayUrl && relayApiKey) {
+    return sendViaRelay(phone, message, timeoutMs)
+  }
+
+  const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
+  if (webhookUrl) {
+    return sendViaMacroDroid(webhookUrl, phone, message, timeoutMs)
+  }
+
+  console.error('[sms] No SMS transport configured (neither RELAY_* nor MACRODROID_WEBHOOK_URL)')
+  return { ok: false, status: 500, body: 'No SMS transport configured' }
+}
+
+/**
  * Get current hour in UK local time (handles BST/GMT).
  * Vercel runs in UTC, so we need this for sending-hour windows.
  */

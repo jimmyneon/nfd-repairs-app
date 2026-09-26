@@ -30,6 +30,7 @@ interface SavedProgress {
   formData: typeof defaultFormData
   jobId: string | null
   jobRef: string | null
+  jobToken: string | null
 }
 
 const defaultFormData = {
@@ -56,6 +57,7 @@ export default function WalkInSelfBookingPage() {
   const [catalogue, setCatalogue] = useState<Record<string, Record<string, string[]>> | null>(null)
   const [catalogueError, setCatalogueError] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [jobToken, setJobToken] = useState<string | null>(null)
   const [restored, setRestored] = useState(false)
 
   const [formData, setFormData] = useState(defaultFormData)
@@ -86,6 +88,7 @@ export default function WalkInSelfBookingPage() {
           setCurrentStep(parsed.step || 0)
           setJobId(parsed.jobId || null)
           setJobRef(parsed.jobRef || '')
+          setJobToken(parsed.jobToken || null)
           setRestored(true)
         }
       }
@@ -112,6 +115,7 @@ export default function WalkInSelfBookingPage() {
       formData,
       jobId,
       jobRef,
+      jobToken,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
@@ -187,40 +191,16 @@ export default function WalkInSelfBookingPage() {
 
   // --- Auto-create job when moving past the phone step ---
   const autoCreateJob = async () => {
-    if (jobId) return // Already have a job
+    if (jobId) return // Already have a job (resumed from localStorage)
     if (!formData.customerName.trim() || !formData.customerPhone.trim()) return
 
     setAutoSaving(true)
     try {
-      // First, check if there's an existing incomplete job for this phone
-      const lookupRes = await fetch('/api/public/walk-in/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lookup: true, phone: formData.customerPhone.trim() }),
-      })
-      const lookupData = await lookupRes.json()
-
-      if (lookupData.found && lookupData.job) {
-        // Restore from existing job
-        setJobId(lookupData.job.id)
-        setJobRef(lookupData.job.job_ref || '')
-        // Pre-fill any missing fields from the existing job
-        setFormData(prev => ({
-          ...prev,
-          customerName: prev.customerName || lookupData.job.customer_name || '',
-          customerPhone: prev.customerPhone || lookupData.job.customer_phone || '',
-          customerEmail: prev.customerEmail || lookupData.job.customer_email || '',
-          deviceType: prev.deviceType !== 'phone' ? prev.deviceType : (lookupData.job.device_type || 'phone'),
-          deviceMake: prev.deviceMake || (lookupData.job.device_make && lookupData.job.device_make !== 'To be added' ? lookupData.job.device_make : ''),
-          deviceModel: prev.deviceModel || (lookupData.job.device_model && lookupData.job.device_model !== 'To be added' ? lookupData.job.device_model : ''),
-          issue: prev.issue || (lookupData.job.issue && lookupData.job.issue !== 'To be assessed' ? lookupData.job.issue : ''),
-          description: prev.description || lookupData.job.description || '',
-        }))
-        setAutoSaving(false)
-        return
-      }
-
-      // No existing job — create a new quick-intake job
+      // Create a new quick-intake job. Resume of an existing incomplete job is
+      // handled entirely client-side via the jobId + token stored in
+      // localStorage when the job was first created — we never look up an
+      // existing customer by phone number (that would expose PII to anyone
+      // who supplied a phone number).
       const createRes = await fetch('/api/public/walk-in/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,6 +221,7 @@ export default function WalkInSelfBookingPage() {
       if (createData.success) {
         setJobId(createData.job_id)
         setJobRef(createData.job_ref || '')
+        setJobToken(createData.tracking_token || null)
       }
     } catch (err) {
       console.error('Auto-create job error:', err)
@@ -308,6 +289,7 @@ export default function WalkInSelfBookingPage() {
         description: formData.description.trim() || null,
         terms_accepted: true,
         job_id: jobId, // Include if we already created a job
+        token: jobToken, // Required by the API to authorise an update by job_id
       }
 
       const response = await fetch('/api/public/walk-in/submit', {

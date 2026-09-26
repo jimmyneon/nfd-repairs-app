@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms } from '@/lib/resilience'
 
 /**
  * POST /api/warranty/send-sms
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SMS template is empty or unavailable' }, { status: 500 })
     }
 
-    const smsResponse = await sendViaMacroDroid(webhookUrl, ticketData.customer_phone, smsBody)
+    const smsResponse = await sendSms(ticketData.customer_phone, smsBody)
 
     const sentAt = new Date().toISOString()
 
@@ -100,8 +100,11 @@ export async function POST(request: NextRequest) {
           template_key: resolvedTemplateKey,
           body_template: smsBody,
           body_rendered: smsBody,
-          status: 'SENT',
-          sent_at: sentAt,
+          status: smsResponse.queued ? 'PENDING' : 'SENT',
+          sent_at: smsResponse.queued ? null : sentAt,
+          error_message: smsResponse.relayMessageId
+            ? `relay_message_id:${smsResponse.relayMessageId}`
+            : undefined,
         } as any)
       }
 

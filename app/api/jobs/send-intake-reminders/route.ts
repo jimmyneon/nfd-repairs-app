@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName } from '@/lib/sms-template'
 import { getAppUrl } from '@/lib/utils'
-import { createServiceClient, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { createServiceClient, sendSms, isWithinUKSendingHours } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
 
 export const maxDuration = 300
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       const smsBody = `Hi ${firstName}! 👋\n\nYou started checking in your device but didn'\''t finish.\n\nTap here to complete it:\n${walkInUrl}\n\nNFD Repairs`
 
       try {
-        const result = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+        const result = await sendSms(job.customer_phone, smsBody)
 
         if (result.ok) {
           sentCount++
@@ -93,8 +93,11 @@ export async function GET(request: NextRequest) {
             job_id: job.id,
             template_key: 'INTAKE_REMINDER',
             body_rendered: smsBody,
-            status: 'SENT',
+            status: result.queued ? 'PENDING' : 'SENT',
             recipient_phone: job.customer_phone,
+            error_message: result.relayMessageId
+              ? `relay_message_id:${result.relayMessageId}`
+              : undefined,
           } as any)
         } else {
           failedCount++

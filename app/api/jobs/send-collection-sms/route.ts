@@ -3,7 +3,7 @@ import { generatePostCollectionEmail } from '@/lib/email-post-collection'
 import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
-import { createServiceClient, supabaseRetry, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms, isWithinUKSendingHours } from '@/lib/resilience'
 
 // Allow up to 5 minutes for the cron handler (it has 30s delays between sends)
 export const maxDuration = 300
@@ -458,7 +458,7 @@ export async function GET(request: NextRequest) {
 
           console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, aftercareBody)
+          const smsResult = await sendSms(job.customer_phone, aftercareBody)
 
           const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()
@@ -565,7 +565,7 @@ export async function GET(request: NextRequest) {
 
           console.log(`Sending review reminder SMS ${i + 1}/${jobsNeedingReminder.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, reminderBody)
+          const smsResult = await sendSms(job.customer_phone, reminderBody)
 
           const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()

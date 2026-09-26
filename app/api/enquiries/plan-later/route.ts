@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, sendViaMacroDroid } from '@/lib/resilience'
+import { createServiceClient, sendSms, isSmsConfigured } from '@/lib/resilience'
 import { corsHeaders } from '@/lib/api-auth'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortQuoteApprovalLink } from '@/lib/utils'
+import { generateQuoteActionToken, quoteActionTokenExpiry, isQuoteActionTokenValid } from '@/lib/job-utils'
 
 const MIN_DAYS_AHEAD = 3
 const MAX_DAYS_AHEAD = 180
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient()
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('id, enquiry_ref, enquiry_type, status, converted_to_job, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, screen_option, warranty, estimated_time, quote_key, planned_repair_date, reminder_requested, additional_info')
+      .select('id, enquiry_ref, enquiry_type, status, converted_to_job, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, screen_option, warranty, estimated_time, quote_key, planned_repair_date, reminder_requested, additional_info, quote_action_token, quote_action_token_expires_at, quote_action_token_revoked_at')
       .eq('enquiry_ref', enquiryRef)
       .single()
 
@@ -117,6 +118,12 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString()
     const additionalInfo = mergeReminderNote(enquiry.additional_info, plannedRepairDate, reminderAt)
 
+    // Ensure a valid quote-action token for the customer link.
+    let quoteActionToken = enquiry.quote_action_token
+    if (!isQuoteActionTokenValid(quoteActionToken, enquiry.quote_action_token_expires_at, enquiry.quote_action_token_revoked_at)) {
+      quoteActionToken = generateQuoteActionToken()
+    }
+
     const { error: updateError } = await supabase
       .from('enquiries')
       .update({
@@ -137,6 +144,9 @@ export async function POST(request: NextRequest) {
         additional_info: additionalInfo,
         status: 'pending',
         updated_at: now,
+        quote_action_token: quoteActionToken,
+        quote_action_token_expires_at: quoteActionTokenExpiry(),
+        quote_action_token_revoked_at: null,
       } as any)
       .eq('id', enquiry.id)
 
@@ -152,10 +162,10 @@ export async function POST(request: NextRequest) {
     let confirmationSmsSent = false
     if (enquiry.customer_phone) {
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-      if (webhookUrl) {
+      if (isSmsConfigured()) {
         const firstName = getFirstName(enquiry.customer_name)
         const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
-        const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
+        const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref, quoteActionToken)
         const priceText = enquiry.display_price
           ? ` ${enquiry.display_price}.`
           : enquiry.quoted_price ? ` £${enquiry.quoted_price}.` : ''
@@ -163,7 +173,7 @@ export async function POST(request: NextRequest) {
         const smsBody = `Hi ${firstName}! 👋\n\n💾 ${device} ${repairLabel(enquiry.repair_type)}${optionText}${priceText}\n\n📅 We'll remind you on ${formatReminderDate(reminderAt || `${plannedRepairDate}T09:00:00Z`)}\n\n🔗 ${quoteLink}\n\nNothing is booked and there's nothing to pay now. When you're ready, use the link to go ahead. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
 
         try {
-          const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
+          const smsResult = await sendSms(enquiry.customer_phone, smsBody)
           confirmationSmsSent = smsResult.ok
           await supabase.from('sms_logs').insert({
             template_key: 'QUOTE_REMIND_LATER_SAVED', body_rendered: smsBody,

@@ -5,6 +5,8 @@
  * All turnaround times are deliberately under-promised based on real job data.
  */
 
+import { JOB_STATUS_LABELS } from './constants'
+
 export interface TurnaroundEstimate {
   /** Human-readable range, e.g. "1–3 hours" */
   display: string
@@ -961,15 +963,18 @@ export interface ActivityEntry {
 export function generateActivityLog(
   statusChangedAt: string | null,
   pageViews: { viewed_at: string }[],
-  jobEvents: { created_at: string; message: string }[]
+  jobEvents: { created_at: string; status: string | null }[]
 ): ActivityEntry[] {
   const entries: ActivityEntry[] = []
 
-  // Add real status change events
+  // Add real status change events — only the parsed status label is sent
+  // to the client; the raw staff-authored message never leaves the server.
   for (const event of jobEvents.slice(0, 5)) {
+    if (!event.status) continue
+    const label = (JOB_STATUS_LABELS as Record<string, string>)[event.status]
     entries.push({
       timestamp: event.created_at,
-      label: event.message.replace('Status changed to ', 'Status updated: '),
+      label: label ? `Status updated: ${label}` : 'Status updated',
       isStatusChange: true,
     })
   }

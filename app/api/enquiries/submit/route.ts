@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { corsHeaders } from '@/lib/api-auth'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { generateQuoteActionToken, quoteActionTokenExpiry } from '@/lib/job-utils'
+import { shortQuoteApprovalLink } from '@/lib/utils'
 
 // Server-side price verification: fetch catalogue and look up the real price by quote_key
 async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
@@ -290,6 +292,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Issue a quote-action token up front for repair enquiries so callers
+    // (e.g. AI Desk phone flow) can be texted a link to THEIR quote page
+    // immediately — not the generic quote form.
+    const quoteActionToken =
+      enquiry_type === 'repair_quote' ? generateQuoteActionToken() : null
+    let quoteUrl: string | null = null
+
     // Insert enquiry into database
     let enquiryRef: string = ''
     try {
@@ -343,6 +352,10 @@ export async function POST(request: NextRequest) {
             ? [additional_info, stripePaymentVerified ? `Stripe: PAID £${(stripePaymentAmount / 100).toFixed(0)} (session: ${stripe_session_id?.substring(0, 20)}...)` : 'Stripe: NOT VERIFIED'].filter(Boolean).join(' | ')
             : additional_info || null,
           help_type: body.help_type || null,
+          quote_action_token: quoteActionToken,
+          quote_action_token_expires_at: quoteActionToken
+            ? quoteActionTokenExpiry()
+            : null,
           status: proceed_with_repair ? 'approved' : 'pending',
         })
         .select()
@@ -403,6 +416,9 @@ export async function POST(request: NextRequest) {
         enquiryRef = enquiry2.enquiry_ref
       } else {
         enquiryRef = enquiry.enquiry_ref
+        if (quoteActionToken) {
+          quoteUrl = shortQuoteApprovalLink(enquiryRef, quoteActionToken)
+        }
       }
     } catch (insertErr: any) {
       console.error('Insert exception:', insertErr)
@@ -461,18 +477,23 @@ export async function POST(request: NextRequest) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         const enquiryUrl = `${appUrl}/app/enquiries?ref=${enquiryRef}`
+        // Body must be the bare URL — the MacroDroid macro opens the webhook
+        // body as a link, so any surrounding text breaks tap-to-open. The
+        // human-readable detail goes out via the NF Hub push below instead.
         await fetch(notificationWebhookUrl, {
           method: 'POST',
-          body: `${notifTitle}: ${notifBody}\n${enquiryUrl}`,
+          body: enquiryUrl,
         })
       } catch (e) {
         console.error('[MacroDroid] Failed to send staff notification:', e)
       }
     }
 
-    // Send NF Hub push notification for personalised quotes and remote support
-    // (so a banner appears even if the staff member misses the MacroDroid SMS)
-    if (isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport) {
+    // Send NF Hub push notification — carries the full title/body text and a
+    // deep link, unlike MacroDroid whose body must stay a bare URL. Fires for
+    // personalised quotes, reviews, remote support, and every AI Desk call
+    // outcome so staff see WHAT the caller wanted without opening the app.
+    if (isPersonalisedQuoteNeeded || isRecoveryReview || isRemoteSupport || body.source === 'ai-desk') {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
         await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
@@ -499,6 +520,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       enquiry_ref: enquiryRef,
+      quote_url: quoteUrl,
       message: 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
     }, {
       headers,

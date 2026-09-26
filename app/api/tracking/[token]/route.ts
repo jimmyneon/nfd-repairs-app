@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
 import crypto from 'crypto'
 import { isTrackingLinkExpired } from '@/lib/job-utils'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { JOB_STATUS_LABELS } from '@/lib/constants'
 
 /**
  * Public tracking data endpoint.
@@ -10,8 +12,10 @@ import { isTrackingLinkExpired } from '@/lib/job-utils'
  * Uses the service role key (bypasses RLS) so customers can view their
  * tracking page without logging in.
  *
- * Only returns data for the job matching the token — no personal data
- * is exposed (no customer name, phone, email, or address).
+ * SECURITY: Returns ONLY customer-safe fields for the single job matching
+ * the token. It never returns customer name, phone, email, address,
+ * device passcode, internal diagnosis notes, delay/cancellation notes,
+ * staff notes, or any token value. Link expiry is enforced.
  *
  * GET /api/tracking/[token]
  */
@@ -20,32 +24,50 @@ export async function GET(
   { params }: { params: { token: string } }
 ) {
   try {
+    // Rate limit: tracking page polls every 30s, so allow 30/min per IP.
+    const ip = getClientIP(request)
+    const rl = await checkRateLimit(ip, 'tracking:get', 30)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const token = params.token
-    if (!token || token.length < 4 || token.length > 64) {
+    // Only accept the long tracking_token (≥10 chars). Short tokens
+    // (6-8 chars, 24-bit) are too weak for a capability link and are
+    // resolved server-side by the /t/[token] page wrapper, never by
+    // this API.
+    if (!token || token.length < 10 || token.length > 64) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 400 })
     }
 
     const supabase = createServiceClient()
 
-    // Fetch job by tracking_token or short_token
+    // Fetch only the job row matching this LONG tracking token, selecting
+    // ONLY customer-safe fields. Free-text fields that could contain PII,
+    // staff notes, passcodes, serial numbers, addresses, or sensitive
+    // diagnosis details are deliberately excluded:
+    //   - customer_notes: staff-written free text, could contain PII
+    //   - diagnostic_report: diagnosis details, could be sensitive
+    //   - description: customer free text, could contain PII/passcodes
+    //   - job_ref: internal reference, not needed by the customer
+    //   - delay_notes, cancellation_notes, diagnosis_notes: internal
+    //   - tracking_token, short_token: capability keys, never exposed
     const { data: job, error }: any = await supabaseRetry(() =>
       supabase
         .from('jobs')
         .select(`
-          id, job_ref, tracking_token, short_token, status,
-          device_make, device_model, issue, description,
+          id, status,
+          device_make, device_model, issue,
           created_at, status_changed_at,
           parts_required, deposit_required,
-          source, delay_reason, delay_notes,
-          cancellation_reason, cancellation_notes,
-          customer_notes, tracking_link_expires_at,
+          source,
+          tracking_link_expires_at,
           closed_at, show_tracking_to_customer,
           parts_tracking_status,
-          repair_agreed_at, repair_declined_at,
-          diagnosis_notes, diagnostic_report,
+          repair_agreed_at,
           device_in_shop
         `)
-        .or(`tracking_token.eq.${token},short_token.eq.${token}`)
+        .eq('tracking_token', token)
         .maybeSingle()
     )
 
@@ -58,8 +80,15 @@ export async function GET(
       return NextResponse.json({ error: 'Tracking link expired', expired: true }, { status: 410 })
     }
 
-    // Fetch job events (status changes)
-    const { data: events }: any = await supabaseRetry(() =>
+    // Strip the expiry timestamp from the public response — it is an
+    // internal field only needed server-side for the expiry check above.
+    delete job.tracking_link_expires_at
+
+    // Fetch job events (status changes). We parse the raw message
+    // server-side and return ONLY the derived status key + timestamp —
+    // the raw `message` field is staff-authored free text and must never
+    // be sent to the browser.
+    const { data: rawEvents }: any = await supabaseRetry(() =>
       supabase
         .from('job_events')
         .select('created_at, message')
@@ -68,6 +97,18 @@ export async function GET(
         .order('created_at', { ascending: false })
         .limit(10)
     )
+
+    const statusLabelToKey: Record<string, string> = {}
+    for (const [key, label] of Object.entries(JOB_STATUS_LABELS)) {
+      statusLabelToKey[label] = key
+    }
+    const events = (rawEvents || []).map((e: any) => {
+      const match = typeof e.message === 'string'
+        ? e.message.match(/Status changed to (.+?)(?:\s*-|$)/)
+        : null
+      const label = match ? match[1].trim() : null
+      return { created_at: e.created_at, status: label ? statusLabelToKey[label] ?? null : null }
+    })
 
     // Log page view (privacy-preserving — hashed IP only)
     const userAgent = request.headers.get('user-agent') || ''

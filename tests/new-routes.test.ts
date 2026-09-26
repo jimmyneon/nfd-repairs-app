@@ -18,12 +18,12 @@ describe('New consolidation routes', () => {
       expect(content).toContain('Access-Control-Allow-Origin')
     })
 
-    it('uses sendViaMacroDroid from lib/resilience', () => {
+    it('uses sendSms from lib/resilience', () => {
       const content = fs.readFileSync(
         path.join(process.cwd(), 'app/api/macrodroid/missed-call/route.ts'),
         'utf-8'
       )
-      expect(content).toContain('sendViaMacroDroid')
+      expect(content).toContain('sendSms')
       expect(content).toContain('@/lib/resilience')
     })
 
@@ -210,7 +210,7 @@ describe('New consolidation routes', () => {
         path.join(process.cwd(), 'app/api/public/start-repair/route.ts'),
         'utf-8'
       )
-      expect(content).toContain('sendViaMacroDroid')
+      expect(content).toContain('sendSms')
       expect(content).toContain('REPAIR_REQUEST_ACK')
     })
 

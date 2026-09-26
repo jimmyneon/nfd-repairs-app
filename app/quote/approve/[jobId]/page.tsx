@@ -17,6 +17,7 @@ function QuoteApprovalContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const jobId = searchParams.get('jobId')
+  const quoteToken = searchParams.get('t')
   const [loading, setLoading] = useState(true)
   const [approving, setApproving] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -27,7 +28,8 @@ function QuoteApprovalContent() {
 
   useEffect(() => {
     if (jobId) {
-      fetch(`/api/public/quote/${jobId}`)
+      const url = `/api/public/quote/${jobId}${quoteToken ? `?t=${encodeURIComponent(quoteToken)}` : ''}`
+      fetch(url)
         .then(res => res.json())
         .then(data => {
           if (data.error) { setError(data.error); setLoading(false) }
@@ -35,7 +37,7 @@ function QuoteApprovalContent() {
         })
         .catch(() => { setLoading(false); setError('Failed to load quote') })
     }
-  }, [jobId])
+  }, [jobId, quoteToken])
 
   // Fetch add-on repairs from catalogue once job is loaded
   useEffect(() => {
@@ -114,7 +116,7 @@ function QuoteApprovalContent() {
           price: a.discountPrice,
         }))
       }
-      const response = await fetch(`/api/public/quote/${jobId}/approve`, {
+      const response = await fetch(`/api/public/quote/${jobId}/approve${quoteToken ? `?t=${encodeURIComponent(quoteToken)}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -130,7 +132,7 @@ function QuoteApprovalContent() {
   const handleReject = async () => {
     setRejecting(true)
     try {
-      const response = await fetch(`/api/public/quote/${jobId}/reject`, { method: 'POST' })
+      const response = await fetch(`/api/public/quote/${jobId}/reject${quoteToken ? `?t=${encodeURIComponent(quoteToken)}` : ''}`, { method: 'POST' })
       if (!response.ok) throw new Error('Failed to reject quote')
       router.push(`/quote/rejected?jobId=${jobId}`)
     } catch (err) {

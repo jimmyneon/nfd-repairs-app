@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -15,6 +16,16 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: public business enquiry form.
+    const ip = getClientIP(request)
+    const rl = await checkRateLimit(ip, 'business-enquiry', 5)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a few minutes and try again.' },
+        { status: 429, headers: { 'Access-Control-Allow-Origin': '*' } }
+      )
+    }
+
     const body = await request.json()
 
     const {

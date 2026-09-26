@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortReviewLink } from '@/lib/utils'
-import { createServiceClient, supabaseRetry, sendViaMacroDroid } from '@/lib/resilience'
+import { createServiceClient, supabaseRetry, sendSms } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
 
 export const maxDuration = 300;
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Sending manual aftercare SMS for job ${job.job_ref} to ${job.customer_phone}`)
 
-    const smsResult = await sendViaMacroDroid(webhookUrl, job.customer_phone, aftercareBody)
+    const smsResult = await sendSms(job.customer_phone, aftercareBody)
 
     const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
     const now = new Date().toISOString()

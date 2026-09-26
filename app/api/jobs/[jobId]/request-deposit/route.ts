@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/resilience'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms, isSmsConfigured } from '@/lib/resilience'
 
 export async function POST(
   request: NextRequest,
@@ -108,8 +108,8 @@ export async function POST(
       }
 
       const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-      if (webhookUrl) {
-        await sendViaMacroDroid(webhookUrl, job.customer_phone, smsMessage)
+      if (isSmsConfigured()) {
+        await sendSms(job.customer_phone, smsMessage)
       } else {
         console.error('MACRODROID_WEBHOOK_URL not configured')
       }

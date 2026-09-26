@@ -67,7 +67,14 @@ export function shortPasswordLink(token: string): string {
   return `${SHORT_LINK_BASE}/p/${token}`
 }
 
-export function shortQuoteApprovalLink(jobId: string): string {
+export function shortQuoteApprovalLink(jobId: string, token?: string | null): string {
+  // The token is the authorisation key (long random per-record value), NOT
+  // the guessable enquiry_ref/jobId. When a token is available we append it
+  // as `?t=` so the public quote API can verify it. Legacy links without a
+  // token are only accepted for rows that have no quote_action_token yet.
+  if (token) {
+    return `${SHORT_LINK_BASE}/q/${jobId}?t=${encodeURIComponent(token)}`
+  }
   return `${SHORT_LINK_BASE}/q/${jobId}`
 }
 

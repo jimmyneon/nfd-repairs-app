@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient, isWithinUKSendingHours, sendViaMacroDroid } from '@/lib/resilience'
+import { createServiceClient, isWithinUKSendingHours, sendSms } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortQuoteApprovalLink } from '@/lib/utils'
+import { generateQuoteActionToken, quoteActionTokenExpiry, isQuoteActionTokenValid } from '@/lib/job-utils'
 
 export const maxDuration = 300
 
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     const { data: reminders, error: fetchError } = await supabase
       .from('enquiries')
-      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, planned_repair_date, reminder_at, reminder_count, reminder_last_attempt_at, status, converted_to_job, proceed_with_repair')
+      .select('id, enquiry_ref, customer_name, customer_phone, device_make, device_model, repair_type, quoted_price, display_price, part_option, planned_repair_date, reminder_at, reminder_count, reminder_last_attempt_at, status, converted_to_job, proceed_with_repair, quote_action_token, quote_action_token_expires_at, quote_action_token_revoked_at')
       .eq('enquiry_type', 'repair_quote')
       .eq('commitment_type', 'remind_later')
       .eq('reminder_requested', true)
@@ -115,7 +116,27 @@ export async function GET(request: NextRequest) {
       const device = safeDeviceLabel(enquiry.device_make, enquiry.device_model) || 'device'
       const repair = repairLabel(enquiry.repair_type)
       const targetDate = formatDate(enquiry.planned_repair_date)
-      const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref)
+
+      // Ensure a valid quote-action token for the reminder link. Issue a
+      // fresh one if missing/expired and persist it with the reminder update.
+      let quoteActionToken = enquiry.quote_action_token
+      const tokenNeedsRefresh = !isQuoteActionTokenValid(
+        quoteActionToken, enquiry.quote_action_token_expires_at, enquiry.quote_action_token_revoked_at
+      )
+      if (tokenNeedsRefresh) {
+        quoteActionToken = generateQuoteActionToken()
+        await supabase
+          .from('enquiries')
+          .update({
+            quote_action_token: quoteActionToken,
+            quote_action_token_expires_at: quoteActionTokenExpiry(),
+            quote_action_token_revoked_at: null,
+            updated_at: attemptAt,
+          } as any)
+          .eq('id', enquiry.id)
+      }
+
+      const quoteLink = shortQuoteApprovalLink(enquiry.enquiry_ref, quoteActionToken)
       const priceText = enquiry.display_price
         ? ` for ${enquiry.display_price}`
         : enquiry.quoted_price
@@ -126,16 +147,18 @@ export async function GET(request: NextRequest) {
       const smsBody = `Hi ${firstName}! 👋\n\nStill want your ${device} ${repair}${optionText} done on ${targetDate}${priceText}?\n\n🔗 ${quoteLink}\n\nOr just reply to this text. We'll check parts are in stock before you make a trip. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
 
       try {
-        const smsResult = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsBody)
+        const smsResult = await sendSms(enquiry.customer_phone, smsBody)
         const sentOk = smsResult.ok
 
         try {
           await supabase.from('sms_logs').insert({
             template_key: 'QUOTE_REMIND_LATER_DUE',
             body_rendered: smsBody,
-            status: sentOk ? 'SENT' : 'FAILED',
-            sent_at: sentOk ? new Date().toISOString() : null,
-            error_message: sentOk ? null : String(smsResult.body || '').substring(0, 500),
+            status: sentOk ? (smsResult.queued ? 'PENDING' : 'SENT') : 'FAILED',
+            sent_at: sentOk && !smsResult.queued ? new Date().toISOString() : null,
+            error_message: sentOk
+              ? (smsResult.relayMessageId ? `relay_message_id:${smsResult.relayMessageId}` : null)
+              : String(smsResult.body || '').substring(0, 500),
           } as any)
         } catch (logError) {
           console.error('[quote-reminders] SMS log failed:', logError)

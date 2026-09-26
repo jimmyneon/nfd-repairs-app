@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms, isSmsConfigured } from '@/lib/resilience'
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -208,9 +208,9 @@ export async function GET(request: NextRequest) {
 
           // Send via MacroDroid
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (webhookUrl) {
+          if (isSmsConfigured()) {
             try {
-              const smsResponse = await sendViaMacroDroid(webhookUrl, job.customer_phone, smsBody)
+              const smsResponse = await sendSms(job.customer_phone, smsBody)
 
               const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 

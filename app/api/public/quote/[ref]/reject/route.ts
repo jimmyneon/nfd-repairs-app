@@ -1,27 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
+import { isQuoteActionTokenValid } from '@/lib/job-utils'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * POST /api/public/quote/[ref]/reject
+ * POST /api/public/quote/[ref]/reject?t=<quote_action_token>
  *
  * Public endpoint for customers to reject their quote without signing in.
+ * Token-authorised and rate limited (see approve route for details). A
+ * valid token is ALWAYS required — NULL-token rows are not publicly
+ * accessible.
  */
-export async function POST(_request: NextRequest, { params }: { params: { ref: string } }) {
+export async function POST(request: NextRequest, { params }: { params: { ref: string } }) {
+  // Rate limit: quote reject attempts.
+  const ip = getClientIP(request)
+  const rl = await checkRateLimit(ip, 'quote:reject', 10)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const supabase = createServiceClient()
 
   try {
     const { ref } = params
+    const token = new URL(request.url).searchParams.get('t')
 
     // Try enquiries table first
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('*')
+      .select('enquiry_ref,device_make,device_model,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_ref', ref)
-      .single()
+      .maybeSingle()
 
     if (enquiry && !enquiryError) {
+      // Authorise: a valid token is always required. NULL-token rows are
+      // not publicly accessible — staff must send a new secure link.
+      if (!enquiry.quote_action_token ||
+          !isQuoteActionTokenValid(token, enquiry.quote_action_token_expires_at, enquiry.quote_action_token_revoked_at) ||
+          token !== enquiry.quote_action_token) {
+        return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403 })
+      }
+
       const { error: updateErr } = await supabase
         .from('enquiries')
         .update({
@@ -48,12 +69,20 @@ export async function POST(_request: NextRequest, { params }: { params: { ref: s
     // Fallback: jobs table by UUID
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('*')
+      .select('id,job_ref,device_make,device_model,quoted_price,price_total,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('id', ref)
-      .single()
+      .maybeSingle()
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    // Authorise: a valid token is always required. NULL-token rows are
+    // not publicly accessible — staff must send a new secure link.
+    if (!job.quote_action_token ||
+        !isQuoteActionTokenValid(token, job.quote_action_token_expires_at, job.quote_action_token_revoked_at) ||
+        token !== job.quote_action_token) {
+      return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403 })
     }
 
     const { error: updateError } = await supabase

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
-import { sendViaMacroDroid } from '@/lib/resilience'
+import { sendSms, isSmsConfigured } from '@/lib/resilience'
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
@@ -62,6 +62,39 @@ export async function POST(request: NextRequest) {
     console.log(`[sms/reply] Message: "${message.substring(0, 120)}"`)
     console.log(`[sms/reply] Timestamp: ${timestamp || 'none'}`)
     console.log(`[sms/reply] ThreadId: ${threadId || 'none'}`)
+    console.log(`[sms/reply] Source: ${body.source || 'unknown'}`)
+
+    // ------------------------------------------------------------------
+    // Deduplication: during dual-running (MacroDroid + relay), the same
+    // customer reply may arrive via both transports. Skip if we've seen
+    // the same (phone, body) in the last 10 minutes.
+    // ------------------------------------------------------------------
+    const crypto = require('crypto')
+    const dedupPhone = normaliseUkPhoneForLookup(phone)
+    const bodyHash = crypto.createHash('md5').update(message.substring(0, 500)).digest('hex')
+    try {
+      const { error: dedupInsertError } = await supabase
+        .from('inbound_dedup')
+        .insert({
+          phone: dedupPhone,
+          body_hash: bodyHash,
+        })
+      // If the insert fails with a unique constraint violation, it's a duplicate
+      if (dedupInsertError && dedupInsertError.code === '23505') {
+        console.log(`[sms/reply] Duplicate inbound from ${phone} — already processed`)
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          reason: 'Duplicate inbound — already processed in last 10 minutes',
+        })
+      }
+      // Other errors (e.g. table doesn't exist yet) — don't block processing
+      if (dedupInsertError && dedupInsertError.code !== '23505') {
+        console.warn('[sms/reply] Dedup table not available, continuing without dedup:', dedupInsertError.message)
+      }
+    } catch (dedupErr) {
+      console.warn('[sms/reply] Dedup check failed, continuing:', dedupErr)
+    }
 
     // Guard: ignore SMS from the shop's own number. When the app sends a
     // text to the shop phone (e.g. a test or a job booked under the shop
@@ -258,9 +291,9 @@ export async function POST(request: NextRequest) {
 
           // Send confirmation SMS
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (webhookUrl) {
+          if (isSmsConfigured()) {
             const smsBody = `Hi ${getFirstName(jobData.data.customer_name)}! �\n\nGot your deposit — thanks! Parts are being ordered now 💳\n\nUsually next-day delivery during working days. We will text you when they arrive.\n\nNFD Repairs`
-            const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+            const result = await sendSms(phone, smsBody)
             await logSms(supabase, 'DEPOSIT_CONFIRMED', smsBody, result.ok, job.id, phone)
           }
 
@@ -270,7 +303,7 @@ export async function POST(request: NextRequest) {
             routed_to: 'deposit_paid',
             job_ref: job.job_ref,
             deposit_confirmed: true,
-            sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+            sms_sent: isSmsConfigured(),
           })
         }
       }
@@ -290,9 +323,9 @@ export async function POST(request: NextRequest) {
           if (!completed.includes('trustpilot')) {
             const trustpilotLink = process.env.TRUSTPILOT_REVIEW_LINK || 'https://www.trustpilot.com'
             const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-            if (webhookUrl) {
+            if (isSmsConfigured()) {
               const reviewBody = `Hi ${getFirstName(job.customer_name)} 👋\n\nThank you so much for the Google review — it really means a lot ⭐\n\nIf you have a spare minute, we would love a Trustpilot one too:\n${trustpilotLink}\n\nNo pressure at all — every review helps us a lot.\n\nNFD Repairs`
-              const result = await sendViaMacroDroid(webhookUrl, phone, reviewBody)
+              const result = await sendSms(phone, reviewBody)
               await logSms(supabase, 'REVIEW_FLIP_TRUSTPILOT', reviewBody, result.ok, job.id, phone)
             }
             console.log(`[sms/reply] Review flip: Google marked done, Trustpilot sent for ${job.job_ref}`)
@@ -301,21 +334,21 @@ export async function POST(request: NextRequest) {
               routed_to: 'review_flip',
               job_ref: job.job_ref,
               flipped_to: 'trustpilot',
-              sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+              sms_sent: isSmsConfigured(),
             })
           } else {
             // Both platforms done — just acknowledge
             const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-            if (webhookUrl) {
+            if (isSmsConfigured()) {
               const ackBody = `Hi ${getFirstName(job.customer_name)} 👋\n\nThank you so much for leaving a review — we really appreciate it! ⭐\n\nNFD Repairs`
-              const result = await sendViaMacroDroid(webhookUrl, phone, ackBody)
+              const result = await sendSms(phone, ackBody)
               await logSms(supabase, 'AUTO_REVIEW_ACK', ackBody, result.ok, job.id, phone)
             }
             return NextResponse.json({
               success: true,
               routed_to: 'review_ack',
               job_ref: job.job_ref,
-              sms_sent: !!process.env.MACRODROID_WEBHOOK_URL,
+              sms_sent: isSmsConfigured(),
             })
           }
         }
@@ -366,8 +399,8 @@ export async function POST(request: NextRequest) {
         }
 
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-        if (webhookUrl) {
-          const result = await sendViaMacroDroid(webhookUrl, phone, autoReply.body)
+        if (isSmsConfigured()) {
+          const result = await sendSms(phone, autoReply.body)
           await logSms(supabase, autoReply.templateKey, autoReply.body, result.ok, job.id, phone)
         }
         // Log the auto-reply as a job event
@@ -383,7 +416,7 @@ export async function POST(request: NextRequest) {
           routed_to: 'auto_reply',
           auto_reply_type: autoReply.templateKey,
           job_ref: job.job_ref,
-          sms_sent: !!webhookUrl,
+          sms_sent: isSmsConfigured(),
         })
       }
 
@@ -396,11 +429,11 @@ export async function POST(request: NextRequest) {
       const completedStatuses = ['COMPLETED', 'COLLECTED', 'READY_TO_COLLECT']
       if (!completedStatuses.includes(job.status) && !autoReplyRateLimited && !staffInConversation) {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-        if (webhookUrl) {
+        if (isSmsConfigured()) {
           const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
           const firstName = getFirstName(job.customer_name)
           const fallbackBody = `Hi ${firstName} 👋\n\nThanks for your text — we've got your message and will get back to you.\n\nTrack your repair here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNFD Repairs`
-          const result = await sendViaMacroDroid(webhookUrl, phone, fallbackBody)
+          const result = await sendSms(phone, fallbackBody)
           await logSms(supabase, 'AUTO_FALLBACK_REPLY', fallbackBody, result.ok, job.id, phone)
           await supabase.from('job_events').insert({
             job_id: job.id,
@@ -450,10 +483,10 @@ export async function POST(request: NextRequest) {
     if (orphanIntent === 'opening_hours') {
       // Customer is asking about opening hours/directions — send a helpful
       // reply with hours + directions, not the "cannot find a repair job" message.
-      if (webhookUrl) {
+      if (isSmsConfigured()) {
         const hoursStatus = await computeHoursStatus(supabase)
         const hoursBody = buildHoursReply(hoursStatus)
-        const result = await sendViaMacroDroid(webhookUrl, phone, hoursBody)
+        const result = await sendSms(phone, hoursBody)
         await logSms(supabase, 'OPENING_HOURS_REPLY', hoursBody, result.ok, undefined, phone)
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent opening hours reply to ${phone}`)
@@ -461,14 +494,14 @@ export async function POST(request: NextRequest) {
     } else if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'collection' || orphanIntent === 'turnaround') {
       // These are clearly about an existing repair — send the "cannot find your
       // number" reply so the customer knows to text the booking number.
-      if (webhookUrl) {
+      if (isSmsConfigured()) {
         const orphanBody = `Hi,\n\nWe cannot find a repair job linked to this phone number. If you booked your repair under a different number, please text us the number it is booked in under and we will find it straight away.\n\nNFD Repairs`
-        const result = await sendViaMacroDroid(webhookUrl, phone, orphanBody)
+        const result = await sendSms(phone, orphanBody)
         await logSms(supabase, 'ORPHAN_STATUS_REPLY', orphanBody, result.ok, undefined, phone)
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent orphan status reply to ${phone}`)
       }
-    } else if (webhookUrl) {
+    } else if (isSmsConfigured()) {
       // Not a clear status query (includes turnaround, location, and anything
       // not understood) — send the generic welcome message with useful links
       // rather than the unhelpful "cannot find a repair job" reply.
@@ -501,7 +534,7 @@ export async function POST(request: NextRequest) {
       } else if ((recentIntroSms.count || 0) === 0 && (recentMissedCallSms.count || 0) === 0) {
         const hoursStatus = await computeHoursStatus(supabase)
         const welcomeBody = buildWelcomeMessage(hoursStatus)
-        const result = await sendViaMacroDroid(webhookUrl, phone, welcomeBody)
+        const result = await sendSms(phone, welcomeBody)
         await logSms(supabase, 'FIRST_TEXT_WELCOME', welcomeBody, result.ok, undefined, phone)
         orphanSmsSent = result.ok
         console.log(`[sms/reply] Sent first-text welcome to ${phone}`)
@@ -589,8 +622,8 @@ async function handleEnquiryReply({
     const deviceLabel = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
     const smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nJust to confirm — would you like to go ahead with the ${deviceLabel} repair${enquiry.quoted_price ? ` at £${enquiry.quoted_price}` : ''}?\n\nReply YES to book it in, or let me know if you have any questions.\n\nNFD Repairs`
 
-    if (webhookUrl) {
-      const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+    if (isSmsConfigured()) {
+      const result = await sendSms(phone, smsBody)
       await logSms(supabase, 'QUOTE_CONFIRM_PROMPT', smsBody, result.ok, undefined, phone)
     }
 
@@ -611,7 +644,7 @@ async function handleEnquiryReply({
       routed_to: 'enquiry_medium',
       enquiry_ref: enquiry.enquiry_ref,
       classification: detection.classification,
-      sms_sent: !!webhookUrl,
+      sms_sent: isSmsConfigured(),
     })
   }
 
@@ -624,8 +657,8 @@ async function handleEnquiryReply({
 
     const smsBody = `Hi ${getFirstName(enquiry.customer_name)} 👋\n\nNo problem at all. If you change your mind or need anything else in the future, just give us a call or text.\n\nTake care,\nNFD Repairs`
 
-    if (webhookUrl) {
-      const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+    if (isSmsConfigured()) {
+      const result = await sendSms(phone, smsBody)
       await logSms(supabase, 'QUOTE_DECLINED_AUTO', smsBody, result.ok, undefined, phone)
     }
 
@@ -705,9 +738,9 @@ async function handleRemindLaterAcceptance({
   } as any)
 
   // Send customer acknowledgement
-  if (webhookUrl) {
+  if (isSmsConfigured()) {
     const smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks — we've got your request to go ahead with the ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\nWe'll check parts availability and text you with the next step. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
-    const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+    const result = await sendSms(phone, smsBody)
     await logSms(supabase, 'REMIND_LATER_ACCEPTED', smsBody, result.ok, undefined, phone)
   }
 
@@ -838,8 +871,8 @@ async function autoConvertEnquiry({
   const deviceLabel = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
   const smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nGreat news — your ${deviceLabel} repair is booked in ✅\n\nPop in with your device whenever you are ready — no appointment needed.\n\n📍 Opening hours: ${shortHoursLink()}\n🔗 Track your repair: ${shortTrackingLink(shortToken)}\n\nSee you soon!\nNFD Repairs`
 
-  if (webhookUrl) {
-    const result = await sendViaMacroDroid(webhookUrl, phone, smsBody)
+  if (isSmsConfigured()) {
+    const result = await sendSms(phone, smsBody)
     await logSms(supabase, 'QUOTE_ACCEPTED_AUTO', smsBody, result.ok, job.id, phone)
   }
 
@@ -852,7 +885,7 @@ async function autoConvertEnquiry({
     job_ref: jobRef,
     job_id: job.id,
     tracking_token: trackingToken,
-    sms_sent: !!webhookUrl,
+    sms_sent: isSmsConfigured(),
   })
 }
 

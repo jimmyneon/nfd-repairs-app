@@ -1,27 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * API endpoint for customer "I'm Here" notification
  * POST /api/notifications/customer-arrived
+ *
+ * SECURITY: requires the job's long tracking_token in addition to the
+ * job UUID. A bare jobId is not sufficient — without the token anyone who
+ * learns a job UUID could forge arrival notifications and stamp
+ * customer_arrived_at. Short tokens are never accepted.
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: arrival notifications.
+    const ip = getClientIP(request)
+    const rl = await checkRateLimit(ip, 'customer-arrived', 10)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { jobId, jobRef, customerLatitude, customerLongitude, distanceMeters } = await request.json()
+    const { jobId, token, customerLatitude, customerLongitude, distanceMeters } = await request.json()
 
-    if (!jobId || !jobRef) {
+    if (!jobId || !token || token.length < 10 || token.length > 64) {
       return NextResponse.json(
-        { error: 'Job ID and reference required' },
+        { error: 'Job ID and tracking token required' },
         { status: 400 }
       )
     }
+
+    // Look up job_ref server-side and verify the tracking token matches
+    // this exact job — never trust a browser-supplied reference, and never
+    // accept a bare jobId or short token as authorisation.
+    const { data: jobRow } = await supabase
+      .from('jobs')
+      .select('job_ref')
+      .eq('id', jobId)
+      .eq('tracking_token', token)
+      .maybeSingle()
+
+    if (!jobRow) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 403 }
+      )
+    }
+
+    const jobRef = jobRow.job_ref || 'Unknown'
 
     // Update job with customer arrival timestamp
     await supabase
