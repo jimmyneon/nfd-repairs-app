@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
     if (enquiry_type === 'repair_quote' && quote_key) {
       const verification = await verifyQuotePrice(quote_key, quoted_price)
       if (verification.verifiedPrice !== null) {
-        if (quoted_price !== null && quoted_price !== verification.verifiedPrice) {
+        if (quoted_price != null && quoted_price !== verification.verifiedPrice) {
           console.warn(`[PRICE VERIFICATION] Tampered price detected for quote_key=${quote_key}: client sent ${quoted_price}, catalogue says ${verification.verifiedPrice}`)
           priceTampered = true
         }
@@ -464,6 +464,7 @@ export async function POST(request: NextRequest) {
       type: isRemoteSupport ? 'REMOTE_SUPPORT' : isRecoveryReview ? 'NEW_ENQUIRY' : isPayday ? 'CUSTOMER_PROCEED' : isProceed ? 'CUSTOMER_PROCEED' : isPersonalisedQuoteNeeded ? 'PERSONALISED_QUOTE' : 'NEW_ENQUIRY',
       title: notifTitle,
       body: notifBody,
+      link: `/app/enquiries?ref=${enquiryRef}`,
       is_read: false,
     } as any)
 

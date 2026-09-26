@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         // Instead of going silent, send a one-off message asking them to use the form/links/reply
         // (we can't take calls while working on devices)
         if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL_MISSED}\n\nNo need to book — just pop in.\n\n📍 Hours & directions:\nnfdr.uk/h\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
+          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL_MISSED}\n\nNo need to book — just pop in.\n\n📍 Find us & opening hours:\nnfdr.uk/contact-us/#hours\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
           try {
             const { sendSms } = await import('@/lib/resilience')
             const result = await sendSms(from, repeatBody)
@@ -424,8 +424,8 @@ function buildMissedCallMessage(ctx: {
     lines.push('')
     lines.push('No need to book — just pop in.')
     lines.push('')
-    lines.push('📍 Hours & directions:')
-    lines.push('nfdr.uk/h')
+    lines.push('📍 Find us & opening hours:')
+    lines.push('nfdr.uk/contact-us/#hours')
     lines.push('')
     lines.push('Existing repair? Reply UPDATE.')
     lines.push('Anything else? Just reply here.')
@@ -452,8 +452,8 @@ function buildMissedCallMessage(ctx: {
   lines.push('')
   lines.push('No need to book — just pop in.')
   lines.push('')
-  lines.push('📍 Hours & directions:')
-  lines.push('nfdr.uk/h')
+  lines.push('📍 Find us & opening hours:')
+  lines.push('nfdr.uk/contact-us/#hours')
   lines.push('')
   lines.push('Existing repair? Reply UPDATE.')
   lines.push('Anything else? Just reply here.')

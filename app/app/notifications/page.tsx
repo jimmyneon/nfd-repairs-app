@@ -71,6 +71,10 @@ export default function NotificationsPage() {
       await markAsRead(notification.id)
     }
 
+    if (notification.link) {
+      router.push(notification.link)
+      return
+    }
     if (notification.job_id) {
       router.push(`/app/jobs/${notification.job_id}`)
     }
