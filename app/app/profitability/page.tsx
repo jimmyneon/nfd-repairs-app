@@ -29,6 +29,7 @@ type ApiData = {
   today: string
   entries: ProfitabilityEntry[]
   settings: ProfitabilitySettings
+  storage: 'supabase_table' | 'admin_settings_fallback'
   overhead: { monthly: number; daily: number }
   reminder: {
     show: boolean
@@ -373,6 +374,12 @@ export default function ProfitabilityPage() {
         {message && (
           <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${message === 'Saved' || message.includes('updated') ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
             {message}
+          </div>
+        )}
+
+        {data?.storage === 'admin_settings_fallback' && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+            <strong>Temporary storage active:</strong> entries are being saved safely in Supabase now, but the dedicated profitability SQL migration has not been applied yet. Once it is run, existing entries are copied across automatically.
           </div>
         )}
 
