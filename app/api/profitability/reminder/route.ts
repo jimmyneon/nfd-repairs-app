@@ -6,6 +6,8 @@ import { PROFITABILITY_TRACKING_START, isTradingDate, londonDateKey } from '@/li
 
 export const dynamic = 'force-dynamic'
 
+const DAY_PREFIX = 'profitability_day_'
+
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     'mailto:nfdrepairs@gmail.com',
@@ -20,18 +22,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const today = londonDateKey()
-    // The cron runs at 15:30 UTC: 15:30 in winter and 16:30 in summer.
-    // The in-app banner also appears from 16:00 London time, so the reminder
-    // remains useful across GMT/BST without duplicate cron calls.
     if (today < PROFITABILITY_TRACKING_START || !isTradingDate(today)) {
       return NextResponse.json({ success: true, skipped: true })
     }
 
     const supabase = createServiceClient()
     const { data: entry, error: entryError } = await supabase
-      .from('daily_profitability')
-      .select('id')
-      .eq('entry_date', today)
+      .from('admin_settings')
+      .select('key')
+      .eq('key', `${DAY_PREFIX}${today}`)
       .maybeSingle()
 
     if (entryError) throw entryError
@@ -53,13 +52,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, skipped: true, reason: 'already-reminded' })
     }
 
-    await supabase.from('notifications').insert({
+    const { error: notificationError } = await supabase.from('notifications').insert({
       type: 'ACTION_REQUIRED',
       title: 'Profitability entry due',
       body,
       job_id: null,
       is_read: false,
     })
+
+    if (notificationError) throw notificationError
 
     let sent = 0
     if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -93,11 +94,12 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, reminded: true, push_sent: sent })
-  } catch (error) {
+  } catch (error: any) {
+    const details = String(error?.message || error?.details || error?.code || error || 'Unknown error')
     console.error('Profitability reminder error:', error)
     return NextResponse.json({
       error: 'Failed to process profitability reminder',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      details,
     }, { status: 500 })
   }
 }

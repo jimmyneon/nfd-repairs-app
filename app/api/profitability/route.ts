@@ -14,6 +14,9 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+const SETTINGS_KEY = 'profitability_settings'
+const DAY_PREFIX = 'profitability_day_'
+
 function cleanMoney(value: unknown): number | null {
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1000000) return null
@@ -26,22 +29,45 @@ function cleanJobCount(value: unknown): number | null {
   return parsed
 }
 
+function parseJson(value: unknown): any {
+  if (value && typeof value === 'object') return value
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function errorMessage(error: any): string {
+  return String(
+    error?.message ||
+    error?.details ||
+    error?.hint ||
+    error?.code ||
+    error ||
+    'Unknown error'
+  )
+}
+
 async function getSettings(supabase: any): Promise<ProfitabilitySettings> {
-  const { data } = await supabase
-    .from('profitability_settings')
-    .select('id,rent_monthly,internet_monthly,water_monthly,electricity_monthly')
-    .order('created_at', { ascending: true })
-    .limit(1)
+  const { data, error } = await supabase
+    .from('admin_settings')
+    .select('value')
+    .eq('key', SETTINGS_KEY)
     .maybeSingle()
 
-  if (!data) return DEFAULT_PROFITABILITY_SETTINGS
+  if (error) throw error
+  const parsed = parseJson(data?.value)
+  if (!parsed) return DEFAULT_PROFITABILITY_SETTINGS
 
   return {
-    id: data.id,
-    rent_monthly: toMoneyNumber(data.rent_monthly),
-    internet_monthly: toMoneyNumber(data.internet_monthly),
-    water_monthly: toMoneyNumber(data.water_monthly),
-    electricity_monthly: toMoneyNumber(data.electricity_monthly),
+    rent_monthly: toMoneyNumber(parsed.rent_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.rent_monthly),
+    internet_monthly: toMoneyNumber(parsed.internet_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.internet_monthly),
+    water_monthly: toMoneyNumber(parsed.water_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.water_monthly),
+    electricity_monthly: toMoneyNumber(parsed.electricity_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.electricity_monthly),
   }
 }
 
@@ -80,26 +106,36 @@ export async function GET(request: NextRequest) {
 
     const [{ data: rows, error }, settings] = await Promise.all([
       supabase
-        .from('daily_profitability')
-        .select('id,entry_date,revenue,parts_cost,petty_cash_cost,job_count,daily_overhead,created_at,updated_at')
-        .gte('entry_date', from)
-        .lte('entry_date', today)
-        .order('entry_date', { ascending: false }),
+        .from('admin_settings')
+        .select('key,value,updated_at')
+        .like('key', `${DAY_PREFIX}%`)
+        .order('key', { ascending: false }),
       getSettings(supabase),
     ])
 
     if (error) throw error
 
-    const entries = (rows || []).map((row: any) => ({
-      ...row,
-      revenue: toMoneyNumber(row.revenue),
-      parts_cost: toMoneyNumber(row.parts_cost),
-      petty_cash_cost: toMoneyNumber(row.petty_cash_cost),
-      job_count: Number(row.job_count || 0),
-      daily_overhead: toMoneyNumber(row.daily_overhead),
-    }))
+    const entries = (rows || [])
+      .map((row: any) => {
+        const parsed = parseJson(row.value)
+        const entryDate = String(parsed?.entry_date || row.key.replace(DAY_PREFIX, ''))
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) return null
+        return {
+          id: row.key,
+          entry_date: entryDate,
+          revenue: toMoneyNumber(parsed?.revenue),
+          parts_cost: toMoneyNumber(parsed?.parts_cost),
+          petty_cash_cost: toMoneyNumber(parsed?.petty_cash_cost),
+          job_count: Number(parsed?.job_count || 0),
+          daily_overhead: toMoneyNumber(parsed?.daily_overhead),
+          updated_at: row.updated_at || undefined,
+        }
+      })
+      .filter(Boolean)
+      .filter((entry: any) => entry.entry_date >= from && entry.entry_date <= today)
+      .sort((a: any, b: any) => b.entry_date.localeCompare(a.entry_date))
 
-    const missingDates = missingTradingDates(entries, today)
+    const missingDates = missingTradingDates(entries as any, today)
     const previousMissing = missingDates.filter(date => date < today)
     const todayMissing = missingDates.includes(today)
     const showReminder = previousMissing.length > 0 || (todayMissing && getLondonHour() >= 16)
@@ -120,11 +156,12 @@ export async function GET(request: NextRequest) {
         today_missing: todayMissing,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
+    const details = errorMessage(error)
     console.error('Profitability GET error:', error)
     return NextResponse.json({
       error: 'Failed to load profitability data',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      details,
     }, { status: 500 })
   }
 }
@@ -146,7 +183,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Enter valid monthly costs' }, { status: 400 })
       }
 
-      const current = await getSettings(supabase)
       const payload = {
         rent_monthly: rent,
         internet_monthly: internet,
@@ -154,11 +190,12 @@ export async function POST(request: NextRequest) {
         electricity_monthly: electricity,
       }
 
-      const query = current.id
-        ? supabase.from('profitability_settings').update(payload).eq('id', current.id)
-        : supabase.from('profitability_settings').insert(payload)
+      const { error } = await supabase.from('admin_settings').upsert({
+        key: SETTINGS_KEY,
+        value: payload,
+        description: 'Recurring monthly costs used by the profitability tracker',
+      }, { onConflict: 'key' })
 
-      const { error } = await query
       if (error) throw error
 
       return NextResponse.json({
@@ -195,15 +232,15 @@ export async function POST(request: NextRequest) {
       daily_overhead: dailyOverhead(settings),
     }
 
-    const { data, error } = await supabase
-      .from('daily_profitability')
-      .upsert(payload, { onConflict: 'entry_date' })
-      .select('id,entry_date,revenue,parts_cost,petty_cash_cost,job_count,daily_overhead,created_at,updated_at')
-      .single()
+    const key = `${DAY_PREFIX}${entryDate}`
+    const { error } = await supabase.from('admin_settings').upsert({
+      key,
+      value: payload,
+      description: `Profitability entry for ${entryDate}`,
+    }, { onConflict: 'key' })
 
     if (error) throw error
 
-    // Saving an entry resolves any profitability reminder currently sitting in the inbox.
     await supabase
       .from('notifications')
       .update({ is_read: true })
@@ -213,19 +250,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       entry: {
-        ...data,
-        revenue: toMoneyNumber(data.revenue),
-        parts_cost: toMoneyNumber(data.parts_cost),
-        petty_cash_cost: toMoneyNumber(data.petty_cash_cost),
-        job_count: Number(data.job_count || 0),
-        daily_overhead: toMoneyNumber(data.daily_overhead),
+        id: key,
+        ...payload,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
+    const details = errorMessage(error)
     console.error('Profitability POST error:', error)
     return NextResponse.json({
       error: 'Failed to save profitability data',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      details,
     }, { status: 500 })
   }
 }
