@@ -652,22 +652,26 @@ function EnquiriesContent() {
   const handleSaveEdit = async () => {
     if (!editingEnquiry) return
     setSavingEdit(true)
+    const updatedFields = {
+      customer_name: editName.trim() || editingEnquiry.customer_name,
+      customer_phone: editPhone.trim() || null,
+      customer_email: editEmail.trim() || null,
+      status: editStatus || editingEnquiry.status,
+      staff_notes: editNotes.trim() || null,
+      updated_at: new Date().toISOString(),
+    }
     const { error } = await supabase
       .from('enquiries')
-      .update({
-        customer_name: editName.trim() || editingEnquiry.customer_name,
-        customer_phone: editPhone.trim() || null,
-        customer_email: editEmail.trim() || null,
-        status: editStatus || editingEnquiry.status,
-        staff_notes: editNotes.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatedFields)
       .eq('id', editingEnquiry.id)
     setSavingEdit(false)
     if (error) {
       alert('Could not save changes. Please try again.')
       return
     }
+    setSelectedEnquiry(current => current?.id === editingEnquiry.id
+      ? { ...current, ...updatedFields } as Enquiry
+      : current)
     setEditingEnquiry(null)
     loadEnquiries()
   }
@@ -1523,10 +1527,18 @@ function EnquiriesContent() {
 
                 {/* Customer info */}
                 <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-1">
-                  <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                    <p><span className="font-semibold">Name:</span> {selectedEnquiry.customer_name}</p>
-                    <p><span className="font-semibold">Phone:</span> {selectedEnquiry.customer_phone || '—'}</p>
-                    {selectedEnquiry.customer_email && <p><span className="font-semibold">Email:</span> {selectedEnquiry.customer_email}</p>}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                      <p><span className="font-semibold">Name:</span> {selectedEnquiry.customer_name}</p>
+                      <p><span className="font-semibold">Phone:</span> {selectedEnquiry.customer_phone || '—'}</p>
+                      {selectedEnquiry.customer_email && <p><span className="font-semibold">Email:</span> {selectedEnquiry.customer_email}</p>}
+                    </div>
+                    <button
+                      onClick={() => openEdit(selectedEnquiry)}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit details
+                    </button>
                   </div>
                 </div>
 
@@ -1576,7 +1588,22 @@ function EnquiriesContent() {
                 )}
 
                 {/* === MAIN ACTIONS === */}
-                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
+                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && !selectedEnquiry.customer_phone?.trim() && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4 space-y-3">
+                    <div>
+                      <p className="font-bold text-amber-900 dark:text-amber-200">Phone number needed before creating the job</p>
+                      <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">Jobs require a phone number for repair updates and tracking messages.</p>
+                    </div>
+                    <button
+                      onClick={() => openEdit(selectedEnquiry)}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 transition-colors active:scale-95"
+                    >
+                      <Phone className="h-4 w-4" /> Add phone number
+                    </button>
+                  </div>
+                )}
+
+                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && Boolean(selectedEnquiry.customer_phone?.trim()) && (
                   <div className="space-y-3 pt-2">
                     <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Convert to job — what's the situation?</p>
 

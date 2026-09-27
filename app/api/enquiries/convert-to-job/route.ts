@@ -110,6 +110,18 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const customerPhone = String(enquiry.customer_phone || '').trim()
+    if (!customerPhone) {
+      return NextResponse.json(
+        {
+          error: 'Customer phone number required',
+          code: 'CUSTOMER_PHONE_REQUIRED',
+          details: 'Add the customer\'s phone number to this enquiry, then try creating the job again.',
+        },
+        { status: 400 }
+      )
+    }
+
     const now = new Date().toISOString()
     const isDeviceInShop = stock_status === 'device_in_shop'
     const requiresParts = stock_status !== 'in_stock' && !isDeviceInShop
@@ -153,7 +165,7 @@ export async function POST(request: NextRequest) {
 
       // Customer details
       customer_name: enquiry.customer_name,
-      customer_phone: enquiry.customer_phone,
+      customer_phone: customerPhone,
       customer_email: enquiry.customer_email || null,
 
       // Device details
@@ -260,7 +272,6 @@ export async function POST(request: NextRequest) {
 
     // Send SMS to customer
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    const customerPhone = enquiry.customer_phone
 
     let smsBody = ''
     if (isDeviceInShop) {
