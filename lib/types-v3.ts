@@ -37,7 +37,7 @@ export interface Job {
   
   // Customer details
   customer_name: string
-  customer_phone: string
+  customer_phone: string | null
   customer_email?: string | null
   
   // Device details

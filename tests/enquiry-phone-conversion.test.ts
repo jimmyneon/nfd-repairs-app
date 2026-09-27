@@ -2,30 +2,32 @@ import { describe, expect, it } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
-describe('accepted enquiry phone requirement', () => {
-  it('rejects job conversion cleanly before inserting a job', () => {
+describe('accepted enquiry contact requirement', () => {
+  it('accepts either phone or email and preserves a missing phone as null', () => {
     const content = fs.readFileSync(
       path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),
       'utf-8'
     )
 
-    const guardIndex = content.indexOf("code: 'CUSTOMER_PHONE_REQUIRED'")
+    const guardIndex = content.indexOf("code: 'CUSTOMER_CONTACT_REQUIRED'")
     const insertIndex = content.indexOf(".from('jobs')\n      .insert(jobData)")
 
     expect(guardIndex).toBeGreaterThan(-1)
     expect(insertIndex).toBeGreaterThan(guardIndex)
-    expect(content).toContain('customer_phone: customerPhone')
+    expect(content).toContain('if (!customerPhone && !customerEmail)')
+    expect(content).toContain('customer_phone: customerPhone || null')
+    expect(content).toContain('customer_email: customerEmail || null')
   })
 
-  it('prompts staff to add the phone and only shows conversion controls once present', () => {
+  it('does not block conversion controls when an accepted enquiry has no phone', () => {
     const content = fs.readFileSync(
       path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
       'utf-8'
     )
 
-    expect(content).toContain('Phone number needed before creating the job')
-    expect(content).toContain('Add phone number')
-    expect(content).toContain('Boolean(selectedEnquiry.customer_phone?.trim())')
+    expect(content).not.toContain('Phone number needed before creating the job')
+    expect(content).not.toContain('Boolean(selectedEnquiry.customer_phone?.trim())')
+    expect(content).toContain("selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry)")
     expect(content).toContain('setSelectedEnquiry(current => current?.id === editingEnquiry.id')
   })
 })

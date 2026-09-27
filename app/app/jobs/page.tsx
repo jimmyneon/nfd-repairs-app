@@ -128,7 +128,7 @@ export default function JobsListPageV2() {
       filtered = filtered.filter(job =>
         job.job_ref.toLowerCase().includes(search) ||
         job.customer_name.toLowerCase().includes(search) ||
-        job.customer_phone.toLowerCase().includes(search) ||
+        (job.customer_phone || '').toLowerCase().includes(search) ||
         (job.device_make || '').toLowerCase().includes(search) ||
         (job.device_model || '').toLowerCase().includes(search) ||
         (job.issue || '').toLowerCase().includes(search) ||

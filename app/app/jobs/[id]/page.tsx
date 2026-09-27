@@ -2364,14 +2364,18 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <a
-                  href={`sms:${job!.customer_phone}`}
-                  className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors"
-                >
-                  {job!.customer_phone}
-                </a>
+                {job!.customer_phone ? (
+                  <a
+                    href={`sms:${job!.customer_phone}`}
+                    className="text-base text-gray-900 dark:text-white font-medium hover:text-primary transition-colors"
+                  >
+                    {job!.customer_phone}
+                  </a>
+                ) : (
+                  <span className="text-sm text-gray-400">No phone provided</span>
+                )}
                 <button
-                  onClick={() => { setPhoneValue(job!.customer_phone); setEditingPhone(true) }}
+                  onClick={() => { setPhoneValue(job!.customer_phone || ''); setEditingPhone(true) }}
                   className="p-1 text-gray-400 hover:text-primary transition-colors"
                   title="Edit phone number"
                 >
@@ -2442,6 +2446,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           <p className="text-sm text-gray-600 dark:text-gray-400">Tap to call, text, or message</p>
           <ContactActions
             phone={job!.customer_phone}
+            email={job!.customer_email || undefined}
             name={job!.customer_name}
             job={job}
             onMessageSent={loadJobData}
@@ -2494,7 +2499,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           activeTab={historyTab}
           onTabChange={setHistoryTab}
           jobId={job?.id}
-          customerPhone={job?.customer_phone}
+          customerPhone={job?.customer_phone || undefined}
           onRetrySms={async () => {
             setActionLoading(true)
             try {

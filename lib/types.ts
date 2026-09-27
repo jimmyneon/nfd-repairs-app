@@ -35,7 +35,7 @@ export interface Job {
   deposit_amount: number | null
   deposit_received: boolean
   customer_name: string
-  customer_phone: string
+  customer_phone: string | null
   tracking_token: string
   created_at: string
   updated_at: string

@@ -1588,22 +1588,7 @@ function EnquiriesContent() {
                 )}
 
                 {/* === MAIN ACTIONS === */}
-                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && !selectedEnquiry.customer_phone?.trim() && (
-                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4 space-y-3">
-                    <div>
-                      <p className="font-bold text-amber-900 dark:text-amber-200">Phone number needed before creating the job</p>
-                      <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">Jobs require a phone number for repair updates and tracking messages.</p>
-                    </div>
-                    <button
-                      onClick={() => openEdit(selectedEnquiry)}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 transition-colors active:scale-95"
-                    >
-                      <Phone className="h-4 w-4" /> Add phone number
-                    </button>
-                  </div>
-                )}
-
-                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && Boolean(selectedEnquiry.customer_phone?.trim()) && (
+                {selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry) && (
                   <div className="space-y-3 pt-2">
                     <p className="text-center text-sm font-bold text-gray-700 dark:text-gray-300">Convert to job — what's the situation?</p>
 

@@ -6,7 +6,7 @@ import { Job } from '@/lib/types-v3'
 import CustomSmsComposer from './CustomSmsComposer'
 
 interface ContactActionsProps {
-  phone: string
+  phone?: string | null
   email?: string
   name: string
   job?: Job
@@ -22,6 +22,7 @@ export default function ContactActions({ phone, email, name, job, onMessageSent 
   }
 
   const handleWhatsApp = () => {
+    if (!phone) return
     const cleanPhone = phone.replace(/\D/g, '')
     window.open(`https://wa.me/${cleanPhone}`, '_blank')
   }
@@ -35,7 +36,7 @@ export default function ContactActions({ phone, email, name, job, onMessageSent 
   return (
     <div className="space-y-3">
       {/* Phone Actions */}
-      <div className="relative">
+      {phone && <div className="relative">
         <button
           onClick={() => setShowPhoneMenu(!showPhoneMenu)}
           className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-primary transition-colors"
@@ -76,7 +77,7 @@ export default function ContactActions({ phone, email, name, job, onMessageSent 
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Email Actions */}
       {email && (

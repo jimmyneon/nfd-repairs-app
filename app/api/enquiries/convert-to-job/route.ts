@@ -111,12 +111,13 @@ export async function POST(request: NextRequest) {
     }
 
     const customerPhone = String(enquiry.customer_phone || '').trim()
-    if (!customerPhone) {
+    const customerEmail = String(enquiry.customer_email || '').trim()
+    if (!customerPhone && !customerEmail) {
       return NextResponse.json(
         {
-          error: 'Customer phone number required',
-          code: 'CUSTOMER_PHONE_REQUIRED',
-          details: 'Add the customer\'s phone number to this enquiry, then try creating the job again.',
+          error: 'Customer contact details required',
+          code: 'CUSTOMER_CONTACT_REQUIRED',
+          details: 'Add either a phone number or an email address to this enquiry, then try creating the job again.',
         },
         { status: 400 }
       )
@@ -165,8 +166,8 @@ export async function POST(request: NextRequest) {
 
       // Customer details
       customer_name: enquiry.customer_name,
-      customer_phone: customerPhone,
-      customer_email: enquiry.customer_email || null,
+      customer_phone: customerPhone || null,
+      customer_email: customerEmail || null,
 
       // Device details
       device_type: enquiry.device_category || null,

@@ -14,12 +14,12 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState(job.customer_name)
-  const [phone, setPhone] = useState(job.customer_phone)
+  const [phone, setPhone] = useState(job.customer_phone || '')
   const [email, setEmail] = useState(job.customer_email || '')
   const supabase = createClient() as any
 
   const handleSave = async () => {
-    if (!name.trim() || !phone.trim()) return
+    if (!name.trim() || (!phone.trim() && !email.trim())) return
 
     setSaving(true)
     try {
@@ -27,7 +27,7 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
         .from('jobs')
         .update({
           customer_name: name.trim(),
-          customer_phone: phone.trim(),
+          customer_phone: phone.trim() || null,
           customer_email: email.trim() || null,
         })
         .eq('id', job.id)
@@ -52,7 +52,7 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
 
   const handleCancel = () => {
     setName(job.customer_name)
-    setPhone(job.customer_phone)
+    setPhone(job.customer_phone || '')
     setEmail(job.customer_email || '')
     setEditing(false)
   }
@@ -101,6 +101,7 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          placeholder="(optional when email is provided)"
           className="w-full px-3 py-2 text-sm border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
       </div>
@@ -120,7 +121,7 @@ export default function EditCustomerDetails({ job, onUpdate }: EditCustomerDetai
 
       <button
         onClick={handleSave}
-        disabled={saving || !name.trim() || !phone.trim()}
+        disabled={saving || !name.trim() || (!phone.trim() && !email.trim())}
         className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
       >
         {saving ? (
