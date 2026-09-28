@@ -465,6 +465,34 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
             )}
           </button>
 
+          {!job.device_in_shop && !job.terms_accepted && ['AWAITING_DEVICE', 'PARTS_ARRIVED'].includes(job.status) && (
+            <div className="px-5 md:px-6 pb-5">
+              <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 p-4 text-center">
+                <p className="font-black text-emerald-900 dark:text-emerald-200 text-lg">⚡ Fast Drop-Off</p>
+                <p className="text-sm text-emerald-800 dark:text-emerald-300 mt-1">
+                  Complete the one-minute repair agreement before you come in. Then just hand us the device and go.
+                </p>
+                <a
+                  href={`/f/${resolvedToken}`}
+                  className="mt-4 block bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl transition-all active:scale-95"
+                >
+                  Set Up Fast Drop-Off
+                </a>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-2">
+                  Optional — if you skip this, we can complete the check-in with you when you arrive. No appointment needed.
+                </p>
+                <a
+                  href={SHOP_INFO.google_maps_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-emerald-800 dark:text-emerald-300 underline"
+                >
+                  <MapPin className="h-4 w-4" /> Directions & opening hours
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* READY_TO_COLLECT — directions and I'm Here button */}
           {job.status === 'READY_TO_COLLECT' && (
             <div className="px-5 md:px-6 pb-5 space-y-3">
