@@ -169,9 +169,11 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                         <div style="width: 36px; height: 36px; background-color: #DBEAFE; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">💬</div>
                       </td>
                       <td style="padding-left: 15px;">
-                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">1. You'll Receive a Tracking Link</h4>
+                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">1. You Have a Tracking Link</h4>
                         <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          We've sent you a text message with a link to track your repair. You can check the status anytime, 24/7.
+                          ${job.customer_phone
+                            ? "We've sent you a text message with a link to track your repair. You can check the status anytime, 24/7."
+                            : "Your tracking link is in this email — tap View Full Tracking Page below. You can check the status anytime, 24/7."}
                         </p>
                       </td>
                     </tr>
@@ -188,7 +190,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
                       <td style="padding-left: 15px;">
                         <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">2. We'll Keep You Updated</h4>
                         <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          Use the tracking link to check progress anytime. We'll send you detailed email updates at each stage of the repair. You'll also get a text when your repair is ready for collection.
+                          Use the tracking link to check progress anytime. We'll send you detailed ${job.customer_phone ? 'email updates at each stage of the repair. You\'ll also get a text when your repair is ready for collection' : 'updates at each stage of the repair by email'}.
                         </p>
                       </td>
                     </tr>

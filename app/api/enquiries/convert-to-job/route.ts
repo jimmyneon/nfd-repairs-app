@@ -374,7 +374,10 @@ export async function POST(request: NextRequest) {
         const appUrl = getAppUrl()
         await fetch(`${appUrl}/api/email/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          },
           body: JSON.stringify({
             jobId: job.id,
             type: 'JOB_CREATED',

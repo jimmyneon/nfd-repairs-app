@@ -120,6 +120,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Email-only jobs have no number to text — the status email path handles
+    // them separately, so never queue an SMS that can only fail.
+    if (!job.customer_phone || !String(job.customer_phone).trim()) {
+      console.log(`Job ${job.job_ref} has no customer phone — skipping SMS queue for ${status}`)
+      return NextResponse.json({ success: true, message: 'No customer phone — SMS skipped' })
+    }
+
     // Only send SMS for key status changes
     const smsStatuses = ['QUOTE_APPROVED', 'AWAITING_DEVICE', 'RECEIVED', 'DROPPED_OFF', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'IN_REPAIR', 'READY_TO_COLLECT', 'COMPLETED', 'CANCELLED', 'DELAYED']
     
