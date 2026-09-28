@@ -85,7 +85,7 @@ export const SHOP_INFO = {
   address: 'Lymington, Hampshire',
   phone: '07410381247',
   email: 'nfdrepairs@gmail.com',
-  opening_times: 'Mon-Fri 9am-5:30pm',
+  opening_times: 'Mon 10am-5pm, Tue closed, Wed-Fri 10am-5pm, Sat 10am-3pm, Sun closed',
   google_maps_link: 'https://maps.app.goo.gl/oVczouUePXkRbrKb7',
 }
 
