@@ -65,7 +65,8 @@ export async function GET(
           closed_at, show_tracking_to_customer,
           parts_tracking_status,
           repair_agreed_at,
-          device_in_shop
+          device_in_shop,
+          terms_accepted
         `)
         .eq('tracking_token', token)
         .maybeSingle()
