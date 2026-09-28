@@ -122,6 +122,7 @@ function EnquiriesContent() {
     job_id: string
     job_ref: string
     tracking_url: string
+    fast_dropoff_url?: string | null
     status: string
     sms_sent: boolean
     sms_error?: string | null
@@ -445,6 +446,7 @@ function EnquiriesContent() {
           job_id: data.job_id,
           job_ref: data.job_ref,
           tracking_url: data.tracking_url,
+          fast_dropoff_url: data.fast_dropoff_url || null,
           status: data.status,
           sms_sent: data.sms_sent === true,
           sms_error: data.sms_error || null,
@@ -1274,6 +1276,19 @@ function EnquiriesContent() {
                     </p>
                   )}
                 </div>
+                {convertResult.fast_dropoff_url && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 p-4 text-left">
+                    <p className="font-bold text-emerald-900 dark:text-emerald-200">⚡ Fast Drop-Off available</p>
+                    <p className="text-sm text-emerald-800 dark:text-emerald-300 mt-1">The customer can complete the repair agreement before arriving, then simply hand over the device and go. If they do not, complete it with them in the shop as normal.</p>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(convertResult.fast_dropoff_url || '')}
+                      className="mt-3 text-sm font-bold text-emerald-700 dark:text-emerald-300 underline"
+                    >
+                      Copy Fast Drop-Off link
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <Link
                     href={`/app/jobs/${convertResult.job_id}`}
