@@ -175,7 +175,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nfd-repairs-app.vercel.app'
       await fetch(`${appUrl}/api/email/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+        },
         body: JSON.stringify({ jobId: job.id, type: 'JOB_CREATED' }),
       })
     } catch (err) {
