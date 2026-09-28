@@ -3,6 +3,7 @@ import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-temp
 import { shortTrackingLink, shortHoursLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
+import { SHOP_INFO } from '@/lib/constants'
 
 export const maxDuration = 300;
 
@@ -207,7 +208,7 @@ export async function POST(request: NextRequest) {
       location_link: mapsLink,
       hours_link: includeMapsLink ? hoursLink : '',
       shop_address: includeMapsLink ? 'Lymington, Hampshire' : '',
-      opening_times: includeMapsLink ? 'Mon-Fri 9am-5:30pm' : '',
+      opening_times: includeMapsLink ? SHOP_INFO.opening_times : '',
       deposit_amount: job.deposit_required ? (job.deposit_amount?.toString() || '20.00') : '',
       deposit_link: job.deposit_required ? depositUrl : '',
       delay_reason: status === 'DELAYED' ? (job.delay_reason || '') : '',
