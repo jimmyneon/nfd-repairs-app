@@ -48,6 +48,14 @@ describe('Fast Drop-Off flow', () => {
     expect(patchSection).not.toContain('device_in_shop: true')
   })
 
+  it('records fast drop-off completion so the funnel can be measured', () => {
+    const page = read('app/walk-in/complete/[token]/page.tsx')
+    const route = read('app/api/public/intake/[token]/route.ts')
+    expect(page).toContain("completion_mode: agreementOnly ? 'fast_dropoff' : 'standard'")
+    expect(route).toContain("completionMode === 'fast_dropoff'")
+    expect(route).toContain('Fast Drop-Off ready')
+  })
+
   it('includes fast drop-off in customer email notifications', () => {
     const route = read('app/api/email/send/route.ts')
     const template = read('lib/email-templates-embedded.ts')
