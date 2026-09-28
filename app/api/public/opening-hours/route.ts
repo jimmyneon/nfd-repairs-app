@@ -121,7 +121,7 @@ export async function GET() {
 
     let weeklyHours = FALLBACK_HOURS
     let specialHours = { active: false, note: null }
-    let googleMapsUrl = 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7'
+    let googleMapsUrl = 'https://maps.app.goo.gl/oVczouUePXkRbrKb7'
 
     if (settings && settings.length > 0) {
       for (const setting of settings) {
@@ -174,7 +174,7 @@ export async function GET() {
     console.error('Error in opening-hours API, using fallback:', error)
 
     // Return fallback data if DB fails
-    const data = buildResponse(FALLBACK_HOURS, { active: false, note: null }, 'https://maps.app.goo.gl/AEfEr4ZRhjB8rVSC7')
+    const data = buildResponse(FALLBACK_HOURS, { active: false, note: null }, 'https://maps.app.goo.gl/oVczouUePXkRbrKb7')
 
     return NextResponse.json(data, {
       headers: {
