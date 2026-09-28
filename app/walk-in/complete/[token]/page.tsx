@@ -186,16 +186,27 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
         <div className="max-w-lg w-full bg-white rounded-3xl shadow-xl p-8 sm:p-12 text-center">
           <CheckCircle className="h-20 w-20 text-green-600 mx-auto mb-5" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">All done</h1>
-          <p className="text-gray-600 mb-6">Your details and repair agreement have been saved.</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">{agreementOnly ? 'Fast Drop-Off ready' : 'All done'}</h1>
+          <p className="text-gray-600 mb-6">
+            {agreementOnly
+              ? 'Your repair agreement is saved. When you come in, you can simply hand us the device and go.'
+              : 'Your details and repair agreement have been saved.'}
+          </p>
           <div className="rounded-2xl bg-blue-50 border border-blue-200 p-5 mb-6">
             <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Repair reference</p>
             <p className="text-3xl font-bold font-mono text-blue-700 mt-1">{job.job_ref}</p>
           </div>
           {agreementOnly ? (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <a href="/app/jobs/create" className="inline-flex justify-center bg-primary text-white font-bold py-3 px-5 rounded-xl">Book next customer</a>
-              <a href="/app/jobs" className="inline-flex justify-center bg-gray-200 text-gray-900 font-bold py-3 px-5 rounded-xl">Return to jobs</a>
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-green-50 border border-green-200 p-5 text-left">
+                <p className="font-bold text-green-900 mb-1">No appointment needed</p>
+                <p className="text-sm text-green-800">Bring the device in whenever suits you during our opening hours. Give us your name or repair reference, hand over the device, and you can be on your way.</p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <a href="/h" className="inline-flex justify-center bg-primary text-white font-bold py-3 px-5 rounded-xl">View opening hours</a>
+                <a href={`/t/${params.token}`} className="inline-flex justify-center bg-gray-200 text-gray-900 font-bold py-3 px-5 rounded-xl">Track my repair</a>
+              </div>
+              <p className="text-xs text-gray-500">Prefer not to do this online? That is fine too — we can complete the check-in with you when you arrive.</p>
             </div>
           ) : (
             <a href={`/t/${params.token}`} className="inline-flex justify-center bg-primary text-white font-bold py-3 px-8 rounded-xl">Track my repair</a>
@@ -212,8 +223,12 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
       <div className="max-w-2xl mx-auto">
         <div className="mb-5 text-center">
           <p className="text-sm font-semibold text-primary mb-1">New Forest Device Repairs · {job.job_ref}</p>
-          <h1 className="text-3xl font-bold text-gray-900">{agreementOnly ? 'Confirm your repair' : 'Complete your check-in'}</h1>
-          <p className="text-gray-600 mt-2">Hi {job.customer_name.split(' ')[0]}, this should only take a minute.</p>
+          <h1 className="text-3xl font-bold text-gray-900">{agreementOnly ? 'Set up Fast Drop-Off' : 'Complete your check-in'}</h1>
+          <p className="text-gray-600 mt-2">
+            {agreementOnly
+              ? `Hi ${job.customer_name.split(' ')[0]}, complete this now and when you arrive you can simply hand us the device and go. No appointment needed.`
+              : `Hi ${job.customer_name.split(' ')[0]}, this should only take a minute.`}
+          </p>
         </div>
 
         {!agreementOnly && (
@@ -271,6 +286,12 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
 
           {currentStep === 2 && (
             <section className="space-y-5">
+              {agreementOnly && (
+                <div className="rounded-2xl bg-green-50 border-2 border-green-200 p-4">
+                  <p className="font-bold text-green-900">Fast Drop-Off</p>
+                  <p className="text-sm text-green-800 mt-1">Complete the agreement below before you visit. When you arrive, just give us your name or repair reference and hand over the device. If you would rather do this in the shop, simply close this page.</p>
+                </div>
+              )}
               <div><h2 className="text-2xl font-bold text-gray-900">Repair agreement</h2><p className="text-sm text-gray-500 mt-1">Please check the information below before confirming.</p></div>
               <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-sm space-y-2">
                 <p><span className="text-gray-500">Device:</span> <strong>{formData.notSure ? 'Staff to identify' : (`${formData.deviceMake || job.device_make || ''} ${formData.deviceModel || job.device_model || ''}`.trim() || 'Staff to identify')}</strong></p>
@@ -282,7 +303,9 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
               </>}
               {job.is_warranty && <div className="rounded-xl bg-green-50 border-2 border-green-200 p-4 flex gap-3"><Shield className="h-5 w-5 text-green-700" /><p className="text-sm text-green-900"><strong>Warranty return:</strong> there is no diagnostic charge for work covered by the warranty.</p></div>}
               <label className="flex items-start gap-3 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 cursor-pointer"><input type="checkbox" checked={formData.termsAccepted} onChange={event => setField('termsAccepted', event.target.checked)} className="h-6 w-6 mt-0.5 rounded text-primary" /><span className="text-sm"><strong>I accept the repair terms and authorise inspection and agreed repair work for this booking.</strong><a href="https://nfdr.uk/terms-and-conditions/" target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()} className="block mt-1 text-primary font-semibold underline">Read the full terms</a></span></label>
-              <label className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer"><input type="checkbox" checked={formData.marketingOptIn} onChange={event => setField('marketingOptIn', event.target.checked)} className="h-5 w-5 mt-0.5 rounded text-primary" /><span className="text-sm"><strong>Send me occasional offers and repair tips</strong><span className="block text-xs text-gray-500 mt-1">Optional. You can unsubscribe at any time.</span></span></label>
+              {!agreementOnly && (
+                <label className="flex items-start gap-3 p-4 rounded-xl border border-gray-200 cursor-pointer"><input type="checkbox" checked={formData.marketingOptIn} onChange={event => setField('marketingOptIn', event.target.checked)} className="h-5 w-5 mt-0.5 rounded text-primary" /><span className="text-sm"><strong>Send me occasional offers and repair tips</strong><span className="block text-xs text-gray-500 mt-1">Optional. You can unsubscribe at any time.</span></span></label>
+              )}
             </section>
           )}
         </div>
