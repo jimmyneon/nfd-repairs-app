@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
-import { shortTrackingLink } from '@/lib/utils'
+import { shortTrackingLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
 
@@ -69,6 +69,13 @@ export async function POST(request: NextRequest) {
     }
 
     const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
+    const fastDropoffUrl =
+      !job.device_in_shop &&
+      !job.terms_accepted &&
+      job.tracking_token &&
+      (job.status === 'AWAITING_DEVICE' || job.status === 'PARTS_ARRIVED')
+        ? shortFastDropoffLink(job.tracking_token)
+        : undefined
     const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
 
     const statusMessages: Record<string, string> = {
@@ -92,6 +99,7 @@ export async function POST(request: NextRequest) {
         trackingUrl,
         depositUrl: job.deposit_required ? depositUrl : undefined,
         statusMessage: type === 'STATUS_UPDATE' ? statusMessages[job.status] : undefined,
+        fastDropoffUrl,
         includePrice: sendPriceInSms !== false,
       },
       type as 'JOB_CREATED' | 'STATUS_UPDATE'
