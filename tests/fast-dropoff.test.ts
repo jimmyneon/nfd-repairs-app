@@ -19,8 +19,9 @@ describe('Fast Drop-Off flow', () => {
     expect(content).toContain('/f/')
   })
 
-  it('offers fast drop-off after an in-stock enquiry is converted', () => {
+  it('offers fast drop-off only after an in-stock enquiry is converted', () => {
     const content = read('app/api/enquiries/convert-to-job/route.ts')
+    expect(content).toContain("stock_status === 'in_stock'")
     expect(content).toContain('shortFastDropoffLink')
     expect(content).toContain('Want a quicker drop-off?')
     expect(content).toContain('Or ignore this and we’ll do it with you when you arrive.')
