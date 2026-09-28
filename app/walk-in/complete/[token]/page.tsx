@@ -203,7 +203,7 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
                 <p className="text-sm text-green-800">Bring the device in whenever suits you during our opening hours. Give us your name or repair reference, hand over the device, and you can be on your way.</p>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
-                <a href="/h" className="inline-flex justify-center bg-primary text-white font-bold py-3 px-5 rounded-xl">View opening hours</a>
+                <a href="/h" className="inline-flex justify-center bg-primary text-white font-bold py-3 px-5 rounded-xl">Directions & opening hours</a>
                 <a href={`/t/${params.token}`} className="inline-flex justify-center bg-gray-200 text-gray-900 font-bold py-3 px-5 rounded-xl">Track my repair</a>
               </div>
               <p className="text-xs text-gray-500">Prefer not to do this online? That is fine too — we can complete the check-in with you when you arrive.</p>
