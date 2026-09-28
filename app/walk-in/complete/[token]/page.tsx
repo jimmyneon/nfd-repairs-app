@@ -152,6 +152,7 @@ export default function CompleteWalkInPage({ params }: { params: { token: string
           terms_accepted: formData.termsAccepted,
           diagnostic_fee_acknowledged: formData.diagnosticFeeAcknowledged,
           marketing_opt_in: formData.marketingOptIn,
+          completion_mode: agreementOnly ? 'fast_dropoff' : 'standard',
         }),
       })
       const result = await response.json()
