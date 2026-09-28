@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, shortHoursLink, getAppUrl } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink, shortFastDropoffLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 
@@ -234,6 +234,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const fastDropoffUrl = enquiry.terms_accepted ? null : shortFastDropoffLink(job.tracking_token)
+
     // Update enquiry as converted
     const { error: enquiryUpdateError } = await supabase
       .from('enquiries')
@@ -334,7 +336,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
     }
 
     let smsSent = false
@@ -394,6 +396,7 @@ export async function POST(request: NextRequest) {
       job_ref: job.job_ref,
       tracking_token: job.tracking_token,
       tracking_url: shortTrackingLink(job.short_token || job.tracking_token),
+      fast_dropoff_url: fastDropoffUrl,
       status: job.status,
       sms_sent: smsSent,
       sms_error: smsError,
