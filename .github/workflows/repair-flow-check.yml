@@ -1,0 +1,61 @@
+name: Repair flow validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/api/email/**'
+      - 'app/api/enquiries/**'
+      - 'app/api/jobs/queue-status-sms/**'
+      - 'app/api/public/intake/**'
+      - 'app/api/public/opening-hours/**'
+      - 'app/api/tracking/**'
+      - 'app/app/enquiries/**'
+      - 'app/f/**'
+      - 'app/t/**'
+      - 'app/walk-in/complete/**'
+      - 'lib/constants.ts'
+      - 'lib/email-templates-embedded.ts'
+      - 'lib/utils.ts'
+      - 'tests/fast-dropoff.test.ts'
+      - '.github/workflows/repair-flow-check.yml'
+  pull_request:
+    paths:
+      - 'app/api/email/**'
+      - 'app/api/enquiries/**'
+      - 'app/api/jobs/queue-status-sms/**'
+      - 'app/api/public/intake/**'
+      - 'app/api/public/opening-hours/**'
+      - 'app/api/tracking/**'
+      - 'app/app/enquiries/**'
+      - 'app/f/**'
+      - 'app/t/**'
+      - 'app/walk-in/complete/**'
+      - 'lib/constants.ts'
+      - 'lib/email-templates-embedded.ts'
+      - 'lib/utils.ts'
+      - 'tests/fast-dropoff.test.ts'
+      - '.github/workflows/repair-flow-check.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run repair-flow tests
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts
+
+      - name: Type-check application
+        run: npx tsc --noEmit
