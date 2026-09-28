@@ -117,6 +117,10 @@ export async function POST(request: NextRequest) {
       quote_key,
       payday_date,
       accessories,
+      // Repair Quote drop-off preference (when the customer hopes to bring it in)
+      dropoff_preference,
+      dropoff_date,
+      dropoff_note,
       // Common
       additional_info,
       // Remote Support fields
@@ -347,6 +351,9 @@ export async function POST(request: NextRequest) {
           quote_key: quote_key || null,
           payday_date: payday_date || null,
           accessories: accessories || null,
+          dropoff_preference: dropoff_preference || null,
+          dropoff_date: dropoff_date || null,
+          dropoff_note: dropoff_note ? clampLength(dropoff_note, MAX_TEXT) : null,
           // Common
           additional_info: enquiry_type === 'remote_support'
             ? [additional_info, stripePaymentVerified ? `Stripe: PAID £${(stripePaymentAmount / 100).toFixed(0)} (session: ${stripe_session_id?.substring(0, 20)}...)` : 'Stripe: NOT VERIFIED'].filter(Boolean).join(' | ')

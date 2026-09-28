@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
-import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor, Pencil, Trash2 } from 'lucide-react'
+import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor, Pencil, Trash2, CalendarCheck } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import SlideUpPanel from '@/components/SlideUpPanel'
@@ -66,6 +66,10 @@ interface Enquiry {
   quote_valid_until?: string | null
   staff_notes?: string | null
   staff_response?: string | null
+  dropoff_preference?: string | null
+  dropoff_date?: string | null
+  dropoff_note?: string | null
+  dropoff_status?: string | null
   additional_repairs?: Array<{ repair: string; display_name: string; price: number }> | null
   responded_at?: string | null
   updated_at?: string | null
@@ -136,6 +140,7 @@ function EnquiriesContent() {
   const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both'>('sms')
   const [sendingQuote, setSendingQuote] = useState(false)
   const [sendingInspection, setSendingInspection] = useState(false)
+  const [sendingDropoff, setSendingDropoff] = useState(false)
   const [quoteResult, setQuoteResult] = useState<{ success: boolean; message: string } | null>(null)
   const [remoteSessionTime, setRemoteSessionTime] = useState('')
   const [schedulingRemote, setSchedulingRemote] = useState(false)
@@ -292,6 +297,25 @@ function EnquiriesContent() {
   )
   const isFollowUp = (e: Enquiry) => e.enquiry_type === 'repair_quote' && e.status !== 'rejected' && !isConverted(e) && !isAccepted(e) && Boolean(e.hesitation_reason || e.customer_budget != null || e.part_reserved)
   const hasQuoteBeenSent = (e: Enquiry) => Boolean(e.quote_sent_method && e.quote_sent_method !== 'none')
+
+  // Day the customer hopes to bring the device in — structured columns when
+  // present (add-enquiry-dropoff.sql), else parsed from the note the site
+  // appends to issue_description ("Preferred drop-off: X.").
+  const getDropoffLabel = (e: Enquiry): string | null => {
+    const fmt = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (e.dropoff_date) {
+      const d = new Date(`${e.dropoff_date}T12:00:00`)
+      if (!isNaN(d.getTime())) return fmt(d)
+    }
+    if (e.dropoff_preference === 'today' || e.dropoff_preference === 'tomorrow') {
+      const base = e.created_at ? new Date(e.created_at) : new Date()
+      if (e.dropoff_preference === 'tomorrow') base.setDate(base.getDate() + 1)
+      return fmt(base)
+    }
+    if (e.dropoff_preference === 'alternative_time') return 'An alternative / out-of-hours time'
+    const m = (e.issue_description || '').match(/Preferred drop-off:\s*(.+?)\./)
+    return m ? m[1].trim() : null
+  }
   // Whether staff can still send a personalised quote for this enquiry —
   // a repair_quote with no price set yet, not yet accepted/converted, and not
   // dismissed. The quote_sent_method being set just means the customer asked
@@ -551,6 +575,33 @@ function EnquiriesContent() {
       setQuoteResult({ success: false, message: 'Failed to send. Please try again.' })
     }
     setSendingInspection(false)
+  }
+
+  const handleDropoffResponse = async (confirmed: boolean) => {
+    if (!selectedEnquiry) return
+    setSendingDropoff(true)
+    try {
+      const res = await fetch('/api/enquiries/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enquiry_ref: selectedEnquiry.enquiry_ref,
+          action: confirmed ? 'confirm_dropoff' : 'decline_dropoff',
+          data: { day_label: getDropoffLabel(selectedEnquiry) },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSelectedEnquiry({ ...selectedEnquiry, dropoff_status: confirmed ? 'confirmed' : 'alternative_suggested' })
+        loadEnquiries()
+      } else {
+        alert(data.error || 'Failed to send. Please try again.')
+      }
+    } catch (e) {
+      console.error('Failed to send drop-off response:', e)
+      alert('Failed to send. Please try again.')
+    }
+    setSendingDropoff(false)
   }
 
   const handleScheduleRemoteSession = async () => {
@@ -1584,6 +1635,41 @@ function EnquiriesContent() {
                   <div>
                     <p className="text-xs font-bold text-gray-500 mb-1">Issue Description</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 whitespace-pre-wrap">{selectedEnquiry.issue_description}</p>
+                  </div>
+                )}
+
+                {/* Drop-off preference — confirm the customer's hoped-for day
+                    or redirect them to opening hours */}
+                {getDropoffLabel(selectedEnquiry) && (
+                  <div className="rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-3">
+                    <p className="text-sm text-sky-900 dark:text-sky-200">
+                      <CalendarCheck className="inline h-4 w-4 mr-1 -mt-0.5" />
+                      Customer hopes to bring it in: <span className="font-bold">{getDropoffLabel(selectedEnquiry)}</span>
+                    </p>
+                    {selectedEnquiry.dropoff_status === 'confirmed' ? (
+                      <p className="text-xs font-bold text-green-700 dark:text-green-400 mt-2">✓ Confirmed — customer told that day works</p>
+                    ) : selectedEnquiry.dropoff_status === 'alternative_suggested' ? (
+                      <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mt-2">Redirected — customer told to come during opening hours</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <button
+                          onClick={() => handleDropoffResponse(true)}
+                          disabled={sendingDropoff}
+                          className="flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          {sendingDropoff ? 'Sending...' : 'Confirm Day'}
+                        </button>
+                        <button
+                          onClick={() => handleDropoffResponse(false)}
+                          disabled={sendingDropoff}
+                          className="flex items-center justify-center gap-1.5 py-2.5 bg-amber-500 text-white font-bold rounded-lg hover:bg-amber-600 transition-colors active:scale-95 disabled:opacity-50 text-sm"
+                        >
+                          <Clock className="h-4 w-4" />
+                          {sendingDropoff ? 'Sending...' : 'That Day Won\'t Work'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

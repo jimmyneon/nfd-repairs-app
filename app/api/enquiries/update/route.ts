@@ -48,6 +48,96 @@ function clampLength(str: string, max: number): string {
   return String(str || '').substring(0, max)
 }
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function fmtHourShort(t: string): string {
+  const [h, m] = String(t || '').split(':').map(Number)
+  if (isNaN(h)) return String(t || '')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  const hh = h % 12 || 12
+  return m ? `${hh}.${String(m).padStart(2, '0')}${ampm}` : `${hh}${ampm}`
+}
+
+// admin_settings.opening_hours → { Monday: { isOpen, open, close, formatted }, ... }
+async function getOpeningHours(supabase: any): Promise<Record<string, any> | null> {
+  try {
+    const { data } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'opening_hours')
+      .maybeSingle()
+    const parsed = typeof data?.value === 'string' ? JSON.parse(data.value) : data?.value
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+// "Mon 10am–5pm, Wed–Fri 10am–5pm, Sat 10am–3pm"
+function openingHoursSummary(map: Record<string, any> | null): string {
+  if (!map) return 'our usual opening hours (nfdr.uk/h)'
+  const open = WEEKDAYS.map((d, i) => ({ d, i, h: map[d] }))
+    .filter(x => x.h && x.h.isOpen && x.h.open && x.h.close)
+  if (!open.length) return 'our usual opening hours (nfdr.uk/h)'
+  const groups: { key: string; start: number; end: number }[] = []
+  for (const x of open) {
+    const key = `${x.h.open}-${x.h.close}`
+    const last = groups[groups.length - 1]
+    if (last && last.key === key && x.i === last.end + 1) last.end = x.i
+    else groups.push({ key, start: x.i, end: x.i })
+  }
+  return groups.map(g => {
+    const names = g.start === g.end
+      ? WEEKDAYS[g.start].slice(0, 3)
+      : `${WEEKDAYS[g.start].slice(0, 3)}–${WEEKDAYS[g.end].slice(0, 3)}`
+    const [o, c] = g.key.split('-')
+    return `${names} ${fmtHourShort(o)}–${fmtHourShort(c)}`
+  }).join(', ')
+}
+
+// Hours text for the weekday named inside a label like "Monday 28 September"
+function hoursForLabel(map: Record<string, any> | null, dayLabel: string): string | null {
+  if (!map) return null
+  const day = WEEKDAYS.find(d => dayLabel.toLowerCase().includes(d.toLowerCase()))
+  const h = day ? map[day] : null
+  return h && h.isOpen && h.open && h.close ? `${fmtHourShort(h.open)}–${fmtHourShort(h.close)}` : null
+}
+
+function londonDay(iso: string): Date {
+  const s = new Date(iso).toLocaleString('en-GB', {
+    timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+  const [d, m, y] = s.split('/').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 12))
+}
+
+function prettyDay(d: Date): string {
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+  })
+}
+
+// Day the customer hoped to come in — structured fields first, then the label
+// the client parsed from "Preferred drop-off: X." inside issue_description.
+function resolveDropoffDayLabel(enquiry: any, clientLabel?: string): string {
+  if (enquiry.dropoff_date) {
+    const d = new Date(`${enquiry.dropoff_date}T12:00:00Z`)
+    if (!isNaN(d.getTime())) return prettyDay(d)
+  }
+  if (enquiry.dropoff_preference === 'today' || enquiry.dropoff_preference === 'tomorrow') {
+    // Resolve against the day the enquiry was submitted, London time
+    const base = londonDay(enquiry.created_at || new Date().toISOString())
+    if (enquiry.dropoff_preference === 'tomorrow') base.setUTCDate(base.getUTCDate() + 1)
+    return prettyDay(base)
+  }
+  if (enquiry.dropoff_preference === 'alternative_time') {
+    return 'an alternative / out-of-hours time'
+  }
+  if (clientLabel) return clientLabel
+  const m = String(enquiry.issue_description || '').match(/Preferred drop-off:\s*(.+?)\./)
+  return m ? m[1].trim() : 'that day'
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
@@ -82,7 +172,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Staff-only actions require an authenticated staff session
-    const staffOnlyActions = ['send_personalised_quote', 'send_needs_inspection']
+    const staffOnlyActions = ['send_personalised_quote', 'send_needs_inspection', 'confirm_dropoff', 'decline_dropoff']
     if (staffOnlyActions.includes(action)) {
       const { response: authResponse } = await requireStaffUser(request)
       if (authResponse) return authResponse
@@ -331,6 +421,40 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'confirm_dropoff':
+      case 'decline_dropoff': {
+        // Customer stated a hoped-for drop-off day; staff either confirm it
+        // or redirect them to come during opening hours instead.
+        const confirmed = action === 'confirm_dropoff'
+        const deviceName = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'your device'
+        const dayLabel = resolveDropoffDayLabel(enquiry, data?.day_label)
+        const hoursMap = await getOpeningHours(supabase)
+        const dayHours = hoursForLabel(hoursMap, dayLabel)
+
+        const dropoffMessage = confirmed
+          ? `Hi ${enquiry.customer_name}! 👋\n\nYes — ${dayLabel} works for us. Pop in any time${dayHours ? ` between ${dayHours}` : ' during opening hours'} and we'll get your ${deviceName} booked in.\n\nJust so you know: drop-off isn't a booked slot, and not every repair is done same-day — we'll assess it and keep you posted.\n\nNFD Repairs\nnfdr.uk/h`
+          : `Hi ${enquiry.customer_name}! 👋\n\nUnfortunately ${dayLabel} doesn't work for us. We're open ${openingHoursSummary(hoursMap)} — pop in any time during those hours, no appointment needed, and we'll get your ${deviceName} sorted.\n\nNFD Repairs\nnfdr.uk/h`
+
+        updateFields.dropoff_status = confirmed ? 'confirmed' : 'alternative_suggested'
+        updateFields.staff_response = dropoffMessage
+        updateFields.responded_at = now
+
+        notificationTitle = `Drop-off ${confirmed ? 'Confirmed' : 'Redirected'}: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
+        notificationBody = `${enquiry.customer_name} — ${dayLabel}`
+
+        pendingQuoteSend = {
+          method: 'both',
+          deviceName,
+          isInspection: true,
+          inspectionMessage: dropoffMessage,
+          templateKey: confirmed ? 'DROPOFF_CONFIRMED' : 'DROPOFF_ALTERNATIVE',
+          emailSubject: confirmed
+            ? `${deviceName} — ${dayLabel} works, pop in during opening hours`
+            : `${deviceName} — please come during our opening hours`,
+        } as any
+        break
+      }
+
       default: {
         return NextResponse.json({ error: 'Unknown action: ' + action }, { status: 400, headers })
       }
@@ -343,13 +467,14 @@ export async function POST(request: NextRequest) {
       .eq('id', enquiry.id)
 
     if (updateError) {
-      // If the quote-action-token migration hasn't been applied yet the
+      // If a migration adding these columns hasn't been applied yet the
       // update fails on the unknown columns — retry without them so the
       // core enquiry update (price, status) still lands.
       const {
         quote_action_token,
         quote_action_token_expires_at,
         quote_action_token_revoked_at,
+        dropoff_status,
         ...coreFields
       } = updateFields
       const { error: retryError } = await supabase
@@ -359,7 +484,7 @@ export async function POST(request: NextRequest) {
       if (retryError) {
         console.error('Failed to update enquiry:', retryError)
       } else {
-        console.error('Enquiry updated without quote-action token fields (migration pending?):', updateError)
+        console.error('Enquiry updated without optional columns (migration pending?):', updateError)
       }
     }
 
@@ -480,8 +605,10 @@ export async function POST(request: NextRequest) {
       const personalisedMessage: string = pqs.personalisedMessage || ''
       const isInspection: boolean = pqs.isInspection === true
       const inspectionMessage: string = pqs.inspectionMessage || ''
+      const templateKey: string = pqs.templateKey || 'NEEDS_INSPECTION'
+      const emailSubject: string = pqs.emailSubject || `Your Repair Enquiry: ${deviceName || 'Your Device'} — We'd Like to Take a Look`
 
-      // --- Inspection message (no quote link, just "bring it in") ---
+      // --- Inspection / drop-off message (no quote link, just "bring it in") ---
       if (isInspection) {
         if (method === 'sms' || method === 'both') {
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
@@ -489,7 +616,7 @@ export async function POST(request: NextRequest) {
             try {
               const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, inspectionMessage)
               await supabase.from('sms_logs').insert({
-                template_key: 'NEEDS_INSPECTION',
+                template_key: templateKey,
                 body_rendered: inspectionMessage,
                 status: smsResponse.ok ? 'SENT' : 'FAILED',
                 sent_at: smsResponse.ok ? now : null,
@@ -499,7 +626,6 @@ export async function POST(request: NextRequest) {
         }
         if (method === 'email' || method === 'both') {
           if (enquiry.customer_email) {
-            const emailSubject = `Your Repair Enquiry: ${deviceName || 'Your Device'} — We'd Like to Take a Look`
             const emailHtml = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#FAF5E9;">
