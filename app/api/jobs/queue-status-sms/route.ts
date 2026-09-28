@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { shortTrackingLink, shortHoursLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
 
@@ -251,6 +251,19 @@ export async function POST(request: NextRequest) {
         .replace(/^Drop it in whenever you're ready: ?$/gim, '')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
+    }
+
+    // If the customer still has the device and the repair is ready for drop-off,
+    // offer the optional one-minute agreement so they can hand over the device
+    // and leave immediately. They can ignore it and complete check-in in-store.
+    if (
+      (status === 'AWAITING_DEVICE' || status === 'PARTS_ARRIVED') &&
+      !job.device_in_shop &&
+      !job.terms_accepted &&
+      job.tracking_token
+    ) {
+      const fastDropoffUrl = shortFastDropoffLink(job.tracking_token)
+      smsBody += `\n\n⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.`
     }
 
     // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
