@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
 
     const statusMessages: Record<string, string> = {
       'QUOTE_APPROVED': 'Your repair quote has been approved! Please use the booking link below to get started.',
+      'AWAITING_DEVICE': 'Your repair is ready for drop-off. Bring the device in whenever suits you during opening hours — no appointment needed.',
       'DROPPED_OFF': 'We have received your device and will begin the repair process.',
       'RECEIVED': 'Your device is now booked in with us. We will keep you updated throughout the repair.',
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
