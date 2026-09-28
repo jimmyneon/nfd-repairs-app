@@ -56,6 +56,14 @@ describe('Fast Drop-Off flow', () => {
     expect(route).toContain('Fast Drop-Off ready')
   })
 
+  it('keeps Fast Drop-Off visible on the customer tracking page until terms are complete', () => {
+    const api = read('app/api/tracking/[token]/route.ts')
+    const client = read('app/t/[token]/TrackingPageClient.tsx')
+    expect(api).toContain('terms_accepted')
+    expect(client).toContain('Set Up Fast Drop-Off')
+    expect(client).toContain("['AWAITING_DEVICE', 'PARTS_ARRIVED']")
+  })
+
   it('includes fast drop-off in customer email notifications', () => {
     const route = read('app/api/email/send/route.ts')
     const template = read('lib/email-templates-embedded.ts')
