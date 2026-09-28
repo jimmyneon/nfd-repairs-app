@@ -23,6 +23,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
 
   const statusLabels: Record<string, string> = {
     QUOTE_APPROVED: 'Quote Approved',
+    AWAITING_DEVICE: 'Awaiting Device',
     DROPPED_OFF: 'Dropped Off',
     RECEIVED: 'Received',
     AWAITING_DEPOSIT: 'Awaiting Deposit',
@@ -39,6 +40,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
 
   const statusColors: Record<string, string> = {
     QUOTE_APPROVED: '#0891B2',
+    AWAITING_DEVICE: '#0F766E',
     DROPPED_OFF: '#3B82F6',
     RECEIVED: '#2563EB',
     AWAITING_DEPOSIT: '#EAB308',
