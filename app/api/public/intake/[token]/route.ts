@@ -93,6 +93,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
   const emailOptOut = body.email_opt_out === true
   const email = emailOptOut ? null : (text(body.customer_email, 254) || null)
   const passcodeChoice = body.passcode_choice
+  const completionMode = body.completion_mode === 'fast_dropoff' ? 'fast_dropoff' : 'standard'
   const passwordNotApplicable = passcodeChoice === 'not_needed'
   const devicePassword = passcodeChoice === 'provided' ? text(body.device_password, 100) : null
 
@@ -150,14 +151,18 @@ export async function PATCH(request: NextRequest, { params }: { params: { token:
   await supabase.from('job_events').insert({
     job_id: job.id,
     type: 'SYSTEM',
-    message: `Customer completed intake and accepted repair terms${job.is_warranty ? '' : ' and diagnostic fee policy'}`,
+    message: completionMode === 'fast_dropoff'
+      ? `Customer completed Fast Drop-Off agreement before arrival${job.is_warranty ? '' : ' and acknowledged diagnostic fee policy'}`
+      : `Customer completed intake and accepted repair terms${job.is_warranty ? '' : ' and diagnostic fee policy'}`,
   } as any)
 
   // Notify staff that the customer completed their intake form
   await supabase.from('notifications').insert({
     type: 'INTAKE_COMPLETED',
-    title: 'Intake form completed',
-    body: `${job.is_warranty ? 'Warranty' : 'Walk-in'}: customer finished their check-in form`,
+    title: completionMode === 'fast_dropoff' ? 'Fast Drop-Off ready' : 'Intake form completed',
+    body: completionMode === 'fast_dropoff'
+      ? 'Customer completed the repair agreement before arriving — quick hand-over is ready.'
+      : `${job.is_warranty ? 'Warranty' : 'Walk-in'}: customer finished their check-in form`,
     job_id: job.id,
     is_read: false,
   } as any)
