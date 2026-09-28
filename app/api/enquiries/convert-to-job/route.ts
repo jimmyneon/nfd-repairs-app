@@ -234,7 +234,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const fastDropoffUrl = enquiry.terms_accepted ? null : shortFastDropoffLink(job.tracking_token)
+    const fastDropoffUrl = stock_status === 'in_stock' && !enquiry.terms_accepted
+      ? shortFastDropoffLink(job.tracking_token)
+      : null
 
     // Update enquiry as converted
     const { error: enquiryUpdateError } = await supabase
