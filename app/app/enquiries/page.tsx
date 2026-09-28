@@ -316,6 +316,24 @@ function EnquiriesContent() {
     const m = (e.issue_description || '').match(/Preferred drop-off:\s*(.+?)\./)
     return m ? m[1].trim() : null
   }
+
+  // Contact channels this enquiry can actually be reached on — used to stop
+  // offering "Text" to a customer who only gave an email (and vice versa).
+  const getContactMethods = (e: Enquiry): Array<'sms' | 'email' | 'both'> => {
+    const hasPhone = !!e.customer_phone?.trim()
+    const hasEmail = !!e.customer_email?.trim()
+    if (hasPhone && hasEmail) return ['sms', 'email', 'both']
+    if (hasPhone) return ['sms']
+    if (hasEmail) return ['email']
+    return []
+  }
+
+  // The channel picker's selection may not exist on this enquiry (e.g. 'both'
+  // carried over from another customer) — fall back to a real channel.
+  const effectiveMessageMethod = (e: Enquiry): 'sms' | 'email' | 'both' | null => {
+    const methods = getContactMethods(e)
+    return methods.includes(messageMethod) ? messageMethod : (methods[0] ?? null)
+  }
   // Whether staff can still send a personalised quote for this enquiry —
   // a repair_quote with no price set yet, not yet accepted/converted, and not
   // dismissed. The quote_sent_method being set just means the customer asked
@@ -449,7 +467,9 @@ function EnquiriesContent() {
     if (!selectedEnquiry || !smsMessage.trim()) return
     setSendingSms(true)
     try {
-      if (messageMethod === 'sms' || messageMethod === 'both') {
+      const method = effectiveMessageMethod(selectedEnquiry)
+      if (!method) return
+      if ((method === 'sms' || method === 'both') && selectedEnquiry.customer_phone) {
         await fetch('/api/enquiries/send-sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -460,7 +480,7 @@ function EnquiriesContent() {
           }),
         })
       }
-      if (messageMethod === 'email' || messageMethod === 'both') {
+      if (method === 'email' || method === 'both') {
         if (selectedEnquiry.customer_email) {
           await fetch('/api/email/send', {
             method: 'POST',
@@ -1282,14 +1302,15 @@ function EnquiriesContent() {
                   </button>
                 </div>
 
-                {/* Method selector */}
-                <div className="grid grid-cols-3 gap-2">
-                  {(['sms', 'email', 'both'] as const).map((method) => (
+                {/* Method selector — only channels the customer actually has */}
+                {getContactMethods(selectedEnquiry).length > 0 && (
+                <div className="flex gap-2">
+                  {getContactMethods(selectedEnquiry).map((method) => (
                     <button
                       key={method}
                       onClick={() => setMessageMethod(method)}
-                      className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                        messageMethod === method
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                        effectiveMessageMethod(selectedEnquiry) === method
                           ? 'bg-primary text-white'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                       }`}
@@ -1298,6 +1319,7 @@ function EnquiriesContent() {
                     </button>
                   ))}
                 </div>
+                )}
 
                 {/* Template picker */}
                 <div className="flex items-center justify-between">
@@ -1335,11 +1357,13 @@ function EnquiriesContent() {
 
                 <button
                   onClick={handleSendMessage}
-                  disabled={sendingSms || !smsMessage.trim()}
+                  disabled={sendingSms || !smsMessage.trim() || !effectiveMessageMethod(selectedEnquiry)}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors active:scale-95 disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  {sendingSms ? 'Sending...' : `Send ${messageMethod === 'both' ? 'Text + Email' : messageMethod === 'sms' ? 'Text' : 'Email'}`}
+                  {sendingSms ? 'Sending...' : !effectiveMessageMethod(selectedEnquiry)
+                    ? 'No Contact Method on File'
+                    : `Send ${effectiveMessageMethod(selectedEnquiry) === 'both' ? 'Text + Email' : effectiveMessageMethod(selectedEnquiry) === 'sms' ? 'Text' : 'Email'}`}
                 </button>
               </div>
             ) : (

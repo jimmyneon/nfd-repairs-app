@@ -48,49 +48,66 @@ export async function POST(request: NextRequest) {
     const smsBody = message.trim()
     const now = new Date().toISOString()
 
-    // 1. Queue SMS in sms_logs
-    const { data: smsLog, error: smsLogError } = await supabase
-      .from('sms_logs')
-      .insert({
-        job_id: jobId,
-        template_key: 'CUSTOM',
-        body_rendered: smsBody,
-        status: 'PENDING',
-      })
-      .select()
-      .single()
+    const hasPhone = !!job.customer_phone?.trim()
+    const wantsEmail = !!shouldSendEmail && !!job.customer_email
 
-    if (smsLogError) {
-      console.error('Failed to log custom SMS:', smsLogError)
-      return NextResponse.json({ error: 'Failed to log SMS' }, { status: 500 })
+    // No deliverable channel — nothing to do
+    if (!hasPhone && !wantsEmail) {
+      return NextResponse.json(
+        { error: job.customer_email ? 'No phone number on this job — tick "Also email" to send it by email' : 'No phone number or email on this job' },
+        { status: 400 }
+      )
     }
 
-    // 2. Send via MacroDroid
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    let smsDeliveryStatus = 'FAILED'
+    // 1. Queue SMS in sms_logs — skipped entirely when the job has no phone,
+    // so no dead PENDING/FAILED rows land in the conversation thread
+    let smsLog: { id: string } | null = null
+    let smsDeliveryStatus = 'SKIPPED'
 
-    if (isSmsConfigured()) {
-      try {
-        const smsResponse = await sendSms(job.customer_phone, smsBody)
+    if (hasPhone) {
+      const { data: logRow, error: smsLogError } = await supabase
+        .from('sms_logs')
+        .insert({
+          job_id: jobId,
+          template_key: 'CUSTOM',
+          body_rendered: smsBody,
+          status: 'PENDING',
+        })
+        .select()
+        .single()
 
-        smsDeliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
-
-        await supabase
-          .from('sms_logs')
-          .update({
-            status: smsDeliveryStatus,
-            sent_at: smsDeliveryStatus === 'SENT' ? now : null,
-          })
-          .eq('id', smsLog.id)
-      } catch (err) {
-        console.error('MacroDroid send failed:', err)
-        await supabase
-          .from('sms_logs')
-          .update({ status: 'FAILED', error_message: 'Send failed' })
-          .eq('id', smsLog.id)
+      if (smsLogError || !logRow) {
+        console.error('Failed to log custom SMS:', smsLogError)
+        return NextResponse.json({ error: 'Failed to log SMS' }, { status: 500 })
       }
-    } else {
-      console.error('MACRODROID_WEBHOOK_URL not configured')
+      smsLog = logRow
+      const smsLogId = logRow.id
+      smsDeliveryStatus = 'FAILED'
+
+      // 2. Send via MacroDroid
+      if (isSmsConfigured()) {
+        try {
+          const smsResponse = await sendSms(job.customer_phone, smsBody)
+
+          smsDeliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
+
+          await supabase
+            .from('sms_logs')
+            .update({
+              status: smsDeliveryStatus,
+              sent_at: smsDeliveryStatus === 'SENT' ? now : null,
+            })
+            .eq('id', smsLogId)
+        } catch (err) {
+          console.error('MacroDroid send failed:', err)
+          await supabase
+            .from('sms_logs')
+            .update({ status: 'FAILED', error_message: 'Send failed' })
+            .eq('id', smsLogId)
+        }
+      } else {
+        console.error('MACRODROID_WEBHOOK_URL not configured')
+      }
     }
 
     // 3. Send email if requested and email address exists
@@ -123,17 +140,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Log job event
+    const channelSummary = hasPhone
+      ? `SMS (${smsDeliveryStatus})${shouldSendEmail ? ` + email (${emailDeliveryStatus})` : ''}`
+      : `email (${emailDeliveryStatus})`
     await supabase.from('job_events').insert({
       job_id: jobId,
       type: 'SYSTEM',
-      message: `Custom SMS sent (${smsDeliveryStatus})${shouldSendEmail ? ` + email (${emailDeliveryStatus})` : ''}: "${smsBody.substring(0, 80)}${smsBody.length > 80 ? '...' : ''}"`,
+      message: `Custom message sent via ${channelSummary}: "${smsBody.substring(0, 80)}${smsBody.length > 80 ? '...' : ''}"`,
     })
 
+    // Success if ANY channel actually delivered — an email-only job reporting
+    // "failed" because SMS couldn't send is wrong when the email went out.
     return NextResponse.json({
-      success: smsDeliveryStatus === 'SENT',
+      success: smsDeliveryStatus === 'SENT' || emailDeliveryStatus === 'SENT',
       smsDeliveryStatus,
       emailDeliveryStatus,
-      smsLogId: smsLog.id,
+      smsLogId: smsLog?.id || null,
     })
   } catch (error) {
     console.error('Error in send-custom:', error)

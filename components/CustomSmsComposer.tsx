@@ -19,7 +19,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
   const [sendEmailToo, setSendEmailToo] = useState(true)
   const [sending, setSending] = useState(false)
   const [channel, setChannel] = useState<'sms' | 'whatsapp'>(job.message_preference === 'whatsapp' ? 'whatsapp' : 'sms')
-  const [result, setResult] = useState<{ success: boolean; smsStatus?: string; emailStatus?: string } | null>(null)
+  const [result, setResult] = useState<{ success: boolean; smsStatus?: string; emailStatus?: string; smsDeliveryStatus?: string; emailDeliveryStatus?: string } | null>(null)
   const [showPicker, setShowPicker] = useState<'templates' | 'inserts' | null>(null)
   const [sendingPasswordRequest, setSendingPasswordRequest] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -46,6 +46,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
 
   const deviceName = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device'
   const firstName = getFirstName(job.customer_name)
+  const hasPhone = !!(job.customer_phone || '').trim()
 
   const messageTemplates = [
     {
@@ -131,7 +132,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
   const handleSend = async () => {
     if (!message.trim() || sending) return
 
-    if (channel === 'whatsapp') {
+    if (channel === 'whatsapp' && hasPhone) {
       const phone = (job.customer_phone || '').replace(/[^0-9]/g, '')
       const text = encodeURIComponent(message.trim())
       window.open(`https://wa.me/${phone}?text=${text}`, '_blank')
@@ -151,7 +152,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
         body: JSON.stringify({
           jobId: job.id,
           message: message.trim(),
-          sendEmail: sendEmailToo,
+          sendEmail: sendEmailToo || !hasPhone,
         }),
       })
 
@@ -214,7 +215,24 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
             })}
           </div>
 
+          {/* No phone and no email — nothing can be sent */}
+          {!hasPhone && !job.customer_email && (
+            <div className="p-2.5 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              No phone number or email on file for this customer.
+            </div>
+          )}
+
+          {/* Email-only customer — say so instead of offering dead channels */}
+          {!hasPhone && job.customer_email && (
+            <div className="p-2.5 rounded-lg text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              No phone on file — this will be sent by email.
+            </div>
+          )}
+
           {/* Channel toggle: SMS vs WhatsApp */}
+          {hasPhone && (
           <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             <button
               onClick={() => setChannel('sms')}
@@ -235,6 +253,7 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
               WhatsApp
             </button>
           </div>
+          )}
 
           {/* Textarea - small, auto-grow */}
           <textarea
@@ -272,20 +291,22 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
               result.success ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
             }`}>
               {result.success ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-              {result.success ? `Sent${result.emailStatus === 'SENT' ? ' (SMS + Email)' : ''}` : `Failed${result.smsStatus ? ` — ${result.smsStatus}` : ''}`}
+              {result.success
+                ? `Sent${result.emailDeliveryStatus === 'SENT' ? (result.smsDeliveryStatus === 'SENT' ? ' (SMS + Email)' : ' (Email)') : ''}`
+                : `Failed${result.smsStatus ? ` — ${result.smsStatus}` : ''}`}
             </div>
           )}
 
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={!message.trim() || sending}
+            disabled={!message.trim() || sending || (!hasPhone && !job.customer_email)}
             className={`w-full flex items-center justify-center gap-2 py-3 text-white font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
               channel === 'whatsapp' ? 'bg-green-500 hover:bg-green-600' : 'bg-primary hover:bg-primary-dark'
             }`}
           >
-            {channel === 'whatsapp' ? <MessageCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-            {channel === 'whatsapp' ? 'Open in WhatsApp' : sending ? 'Sending...' : 'Send SMS'}
+            {channel === 'whatsapp' && hasPhone ? <MessageCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            {channel === 'whatsapp' && hasPhone ? 'Open in WhatsApp' : sending ? 'Sending...' : hasPhone ? 'Send SMS' : 'Send Email'}
           </button>
         </div>
       </SlideUpPanel>
