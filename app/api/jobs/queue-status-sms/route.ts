@@ -264,7 +264,14 @@ export async function POST(request: NextRequest) {
       job.tracking_token
     ) {
       const fastDropoffUrl = shortFastDropoffLink(job.tracking_token)
-      smsBody += `\n\n⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.`
+      const fastDropoffBlock = `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.`
+      const signature = 'NFD Repairs'
+      const trimmedBody = smsBody.trimEnd()
+      if (trimmedBody.endsWith(signature)) {
+        smsBody = trimmedBody.slice(0, -signature.length).trimEnd() + `\n\n${fastDropoffBlock}\n\n${signature}`
+      } else {
+        smsBody = trimmedBody + `\n\n${fastDropoffBlock}`
+      }
     }
 
     // DYNAMIC MESSAGING: For RECEIVED status, add email notification info if customer has email
