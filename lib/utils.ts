@@ -63,6 +63,10 @@ export function shortOnboardingLink(token: string): string {
   return `${SHORT_LINK_BASE}/o/${token}`
 }
 
+export function shortFastDropoffLink(token: string): string {
+  return `${SHORT_LINK_BASE}/f/${token}`
+}
+
 export function shortPasswordLink(token: string): string {
   return `${SHORT_LINK_BASE}/p/${token}`
 }
