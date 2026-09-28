@@ -5,11 +5,12 @@ export interface EmbeddedEmailData {
   trackingUrl: string
   depositUrl?: string
   statusMessage?: string
+  fastDropoffUrl?: string
   includePrice?: boolean
 }
 
 export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CREATED' | 'STATUS_UPDATE'): { subject: string; html: string; text: string } {
-  const { job, trackingUrl, depositUrl, statusMessage } = data
+  const { job, trackingUrl, depositUrl, statusMessage, fastDropoffUrl } = data
   // Suppress price when explicitly disabled or when price is 0/null (backup measure
   // so customers never see "£0.00" and think the repair is free)
   const hasValidPrice = job.price_total != null && parseFloat(job.price_total.toString()) > 0
@@ -258,6 +259,22 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
               </div>
               ` : ''}
 
+              ${fastDropoffUrl ? `
+              <!-- Optional Fast Drop-Off -->
+              <div style="background-color: #ECFDF5; border: 2px solid #A7F3D0; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                <h3 style="color: #047857; margin: 0 0 10px 0; font-size: 19px;">⚡ Fast Drop-Off</h3>
+                <p style="color: #065F46; margin: 0 0 15px 0; font-size: 14px; line-height: 1.6;">
+                  Complete the one-minute repair agreement before you come in. Then simply hand us the device and go — no appointment needed.
+                </p>
+                <a href="${fastDropoffUrl}" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; padding: 13px 24px; border-radius: 7px; font-weight: bold; font-size: 14px;">
+                  Set Up Fast Drop-Off
+                </a>
+                <p style="color: #047857; margin: 12px 0 0 0; font-size: 12px;">
+                  Prefer not to do it online? No problem — we can complete the check-in with you when you arrive.
+                </p>
+              </div>
+              ` : ''}
+
               <!-- Action Buttons -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
@@ -307,7 +324,9 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
 Hi ${job.customer_name},
 
 ${type === 'JOB_CREATED' 
-  ? `Thank you for choosing New Forest Device Repairs! We've received your ${job.device_make} ${job.device_model} and created a repair job for you.`
+  ? (job.device_in_shop
+      ? `Thank you for choosing New Forest Device Repairs! We've received your ${job.device_make} ${job.device_model} and created a repair job for you.`
+      : `Thank you for choosing New Forest Device Repairs! We've created a repair job for your ${job.device_make} ${job.device_model}.`)
   : `Your ${job.device_make} ${job.device_model} repair has been updated.`
 }
 
@@ -327,6 +346,13 @@ ${job.deposit_required && !job.deposit_received && depositUrl ? `
 DEPOSIT REQUIRED
 We need a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order the parts for your repair.
 Pay here: ${depositUrl}
+` : ''}
+
+${fastDropoffUrl ? `
+FAST DROP-OFF
+Complete the one-minute repair agreement before you come in, then simply hand us the device and go. No appointment needed.
+Set it up here: ${fastDropoffUrl}
+If you prefer, ignore this and we'll complete the check-in with you when you arrive.
 ` : ''}
 
 View full tracking page: ${trackingUrl}
