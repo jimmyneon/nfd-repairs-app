@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
         // appointment and never a reason to block the already-captured enquiry.
         updateFields.dropoff_preference = preference
         updateFields.dropoff_date = null
-        updateFields.dropoff_status = 'customer_intent'
+        updateFields.dropoff_status = null
         break
       }
 
