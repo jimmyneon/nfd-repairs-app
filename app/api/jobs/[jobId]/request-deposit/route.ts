@@ -107,21 +107,47 @@ export async function POST(
         smsMessage = `Hi ${firstName}!\n\nWe need to order parts for your ${job.device_model || 'device'} repair.\n\nTo get the order started, we just need a £${depositAmount} deposit.\n\nThis secures the part and your repair slot. The £${depositAmount} comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
       }
 
-      const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-      if (isSmsConfigured()) {
-        await sendSms(job.customer_phone, smsMessage)
+      if (job.customer_phone && String(job.customer_phone).trim()) {
+        if (isSmsConfigured()) {
+          await sendSms(job.customer_phone, smsMessage)
+          await supabase.from('job_events').insert({
+            job_id: jobId,
+            type: 'SYSTEM',
+            message: 'Deposit request SMS sent to customer',
+          })
+        } else {
+          console.error('MACRODROID_WEBHOOK_URL not configured')
+        }
       } else {
-        console.error('MACRODROID_WEBHOOK_URL not configured')
+        console.log(`Job ${job.job_ref} has no phone number — deposit SMS skipped`)
       }
-
-      // Log the SMS
-      await supabase.from('job_events').insert({
-        job_id: jobId,
-        type: 'SYSTEM',
-        message: 'Deposit request SMS sent to customer',
-      })
     } catch (smsError) {
       console.error('Failed to send deposit SMS:', smsError)
+    }
+
+    // Email-only customers still need the deposit request and payment link.
+    // STATUS_UPDATE uses the same AWAITING_DEPOSIT job data and now falls
+    // back to email when SMS is the configured channel but no phone exists.
+    if (job.customer_email) {
+      try {
+        const appUrl = getAppUrl()
+        const emailResponse = await fetch(`${appUrl}/api/email/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          },
+          body: JSON.stringify({
+            jobId,
+            type: 'STATUS_UPDATE',
+          }),
+        })
+        if (!emailResponse.ok) {
+          console.error('Failed to send deposit email:', await emailResponse.text())
+        }
+      } catch (emailError) {
+        console.error('Failed to send deposit email:', emailError)
+      }
     }
 
     return NextResponse.json({ success: true })
