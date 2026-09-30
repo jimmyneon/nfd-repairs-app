@@ -126,6 +126,9 @@ function EnquiriesContent() {
     status: string
     sms_sent: boolean
     sms_error?: string | null
+    email_sent: boolean
+    email_error?: string | null
+    customer_notified: boolean
   } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
@@ -450,6 +453,9 @@ function EnquiriesContent() {
           status: data.status,
           sms_sent: data.sms_sent === true,
           sms_error: data.sms_error || null,
+          email_sent: data.email_sent === true,
+          email_error: data.email_error || null,
+          customer_notified: data.customer_notified === true,
         })
         setConvertFormOpen(null)
         setConvertEarliestDate('')
@@ -1268,13 +1274,31 @@ function EnquiriesContent() {
                   <p className="text-sm text-gray-500 mt-1">
                     {convertResult.status === 'AWAITING_DEPOSIT' ? 'Parts required · awaiting £20 deposit' : 'In stock · ready to book in'}
                   </p>
-                  {convertResult.sms_sent ? (
-                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">Customer message sent successfully.</p>
-                  ) : (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                      Job saved, but the customer message was not sent{convertResult.sms_error ? `: ${convertResult.sms_error}` : '.'}
-                    </p>
-                  )}
+                  <div className="mt-3 space-y-1">
+                    {selectedEnquiry?.customer_email && (
+                      convertResult.email_sent ? (
+                        <p className="text-sm text-green-600 dark:text-green-400">Email confirmation sent successfully.</p>
+                      ) : (
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          Email was not sent{convertResult.email_error ? `: ${convertResult.email_error}` : '.'}
+                        </p>
+                      )
+                    )}
+                    {selectedEnquiry?.customer_phone && (
+                      convertResult.sms_sent ? (
+                        <p className="text-sm text-green-600 dark:text-green-400">Text message sent successfully.</p>
+                      ) : (
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                          Text message was not sent{convertResult.sms_error ? `: ${convertResult.sms_error}` : '.'}
+                        </p>
+                      )
+                    )}
+                    {!convertResult.customer_notified && (
+                      <p className="text-sm text-red-600 dark:text-red-400 font-semibold">
+                        Job saved, but no customer notification was delivered.
+                      </p>
+                    )}
+                  </div>
                 </div>
                 {convertResult.fast_dropoff_url && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 p-4 text-left">
