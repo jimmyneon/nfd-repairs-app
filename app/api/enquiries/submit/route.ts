@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
+import { sendSms } from '@/lib/resilience'
 import { corsHeaders } from '@/lib/api-auth'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { generateQuoteActionToken, quoteActionTokenExpiry } from '@/lib/job-utils'
@@ -44,6 +45,19 @@ function isValidUkPhone(phone: string): boolean {
 
 function clampLength(str: string, max: number): string {
   return String(str || '').substring(0, max)
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function humaniseRepair(value: unknown): string {
+  return String(value || 'repair').replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -530,15 +544,75 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Note: Customer-facing SMS is NOT sent here — it's only sent when the customer
-    // explicitly clicks "Send Me This Quote" via the /api/enquiries/update endpoint
-    // with action: 'send_quote'. This prevents double-sending.
+    // The normal fixed-price "Get This Repair Started" path is a real customer
+    // commitment, so acknowledge it immediately after the enquiry is safely saved.
+    // This is a service message about their request, not a marketing follow-up.
+    const acknowledgement = { sms: false, email: false }
+    if (isProceed) {
+      const deviceLabel = [device_make, device_model].filter(Boolean).join(' ').trim() || 'device'
+      const repairLabel = humaniseRepair(repair_type)
+      const priceLabel = verifiedDisplayPrice || (verifiedQuotedPrice ? `£${verifiedQuotedPrice}` : '')
+      const priceText = priceLabel ? ` at ${priceLabel}` : ''
+      const secureQuoteUrl = quoteUrl || ''
+      const firstName = sanitizedName.split(/\s+/)[0] || sanitizedName || 'there'
+
+      if (sanitizedPhone) {
+        const smsBody = `Hi ${firstName}! 👋\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're checking the part now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNFD Repairs`
+        try {
+          const smsResult = await sendSms(sanitizedPhone, smsBody)
+          acknowledgement.sms = smsResult.ok
+          try {
+            await supabase.from('sms_logs').insert({
+              template_key: 'REPAIR_REQUEST_RECEIVED',
+              recipient_phone: sanitizedPhone,
+              body_rendered: smsBody,
+              status: smsResult.ok ? (smsResult.queued ? 'PENDING' : 'SENT') : 'FAILED',
+              sent_at: smsResult.ok && !smsResult.queued ? new Date().toISOString() : null,
+              error_message: smsResult.ok ? null : String(smsResult.body || '').substring(0, 500),
+            } as any)
+          } catch (logError) {
+            console.error('[submit] Repair request acknowledgement SMS log failed:', logError)
+          }
+        } catch (smsError) {
+          console.error('[submit] Repair request acknowledgement SMS failed:', smsError)
+        }
+      }
+
+      if (sanitizedEmail) {
+        const safeName = escapeHtml(firstName)
+        const safeDevice = escapeHtml(deviceLabel)
+        const safeRepair = escapeHtml(repairLabel)
+        const safePrice = escapeHtml(priceLabel)
+        const safeUrl = escapeHtml(secureQuoteUrl)
+        const subject = `Repair request received — ${deviceLabel}`
+        const emailHtml = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#222;">
+            <h2 style="color:#009B4D;">Repair request received</h2>
+            <p>Hi ${safeName},</p>
+            <p>We've got your request for the <strong>${safeDevice}</strong> ${safeRepair}${safePrice ? ` at <strong>${safePrice}</strong>` : ''}.</p>
+            <p>We're checking the part now. We'll let you know if there's anything you need to know before coming in.</p>
+            ${safeUrl ? `<p><a href="${safeUrl}" style="display:inline-block;background:#009B4D;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:bold;">View your quote</a></p>` : ''}
+            <p style="color:#666;font-size:14px;">Nothing else is required right now. If a part needs ordering, we'll let you know before asking for any deposit.</p>
+            <p>NFD Repairs</p>
+          </div>`
+        const emailText = `Hi ${firstName},\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're checking the part now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNothing else is required right now. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
+        try {
+          const emailResult = await sendEmail(sanitizedEmail, subject, emailHtml, emailText)
+          acknowledgement.email = emailResult.success === true
+        } catch (emailError) {
+          console.error('[submit] Repair request acknowledgement email failed:', emailError)
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
       enquiry_ref: enquiryRef,
       quote_url: quoteUrl,
-      message: 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
+      acknowledgement,
+      message: isProceed
+        ? 'Your repair request has been saved. We are checking the part now.'
+        : 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
     }, {
       headers,
     })
