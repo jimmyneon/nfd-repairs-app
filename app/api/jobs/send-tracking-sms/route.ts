@@ -3,6 +3,7 @@ import { createServiceClient, fetchWithTimeout, isSmsConfigured } from '@/lib/re
 import { getFirstName } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
+import { sendEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   const { response: authResponse } = await requireStaffUser(request)
@@ -52,6 +53,47 @@ export async function POST(request: NextRequest) {
       .replace('{device_make}', job.device_make)
       .replace('{device_model}', job.device_model)
       .replace('{job_ref}', job.job_ref)
+
+    const hasPhone = !!String(job.customer_phone || '').trim()
+    const hasEmail = !!String(job.customer_email || '').trim()
+
+    if (!hasPhone && hasEmail) {
+      const escapedBody = smsBody
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+      const subject = `Your repair tracking link - ${job.job_ref}`
+      const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${escapedBody}</p></div>`
+      const emailResult = await sendEmail(job.customer_email, subject, htmlBody, smsBody)
+
+      await supabase.from('email_logs').insert({
+        job_id: job.id,
+        template_key: 'TRACKING_LINK_ONLY',
+        recipient_email: job.customer_email,
+        subject,
+        body_text: smsBody,
+        body_html: htmlBody,
+        status: emailResult.success ? 'SENT' : 'FAILED',
+        sent_at: emailResult.success ? new Date().toISOString() : null,
+      })
+
+      await supabase.from('job_events').insert({
+        job_id: job.id,
+        type: 'SYSTEM',
+        message: `Tracking link email ${emailResult.success ? 'sent' : 'failed'}`,
+      })
+
+      return NextResponse.json({
+        success: emailResult.success,
+        channel: 'email',
+      })
+    }
+
+    if (!hasPhone) {
+      return NextResponse.json({ error: 'No phone number or email address on this job' }, { status: 400 })
+    }
 
     // Insert SMS log
     const { data: smsLog } = await supabase.from('sms_logs').insert({
