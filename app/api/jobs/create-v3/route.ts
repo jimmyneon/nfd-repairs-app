@@ -490,8 +490,15 @@ export async function POST(request: NextRequest) {
         smsBody += '\n\nWe\'ll text you when it\'s ready for collection.'
       }
 
-      // Guard: don't queue empty SMS
-      if (!smsBody || !smsBody.trim()) {
+      // Email-only jobs should never create a phantom failed SMS row.
+      if (!jobData.customer_phone || !String(jobData.customer_phone).trim()) {
+        console.log(`Job ${job.job_ref} has no customer phone — initial SMS skipped`)
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'SYSTEM',
+          message: 'Initial SMS skipped - customer provided email only',
+        } as any)
+      } else if (!smsBody || !smsBody.trim()) {
         console.error(`SMS body is empty for new job ${job.job_ref} - not queuing`)
         await supabase.from('job_events').insert({
           job_id: job.id,
