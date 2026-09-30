@@ -1,8 +1,10 @@
 import {
   DEFAULT_PROFITABILITY_SETTINGS,
+  DEFAULT_TRADING_WEEKDAYS,
   ProfitabilityEntry,
   ProfitabilitySettings,
   toMoneyNumber,
+  tradingWeekdaysFromOpeningHours,
 } from '@/lib/profitability'
 
 const SETTINGS_KEY = 'profitability_settings'
@@ -222,4 +224,20 @@ export async function profitabilityEntryExists(supabase: any, entryDate: string)
 
   if (fallbackError) throw fallbackError
   return Boolean(fallback)
+}
+
+
+export async function loadProfitabilityTradingWeekdays(supabase: any): Promise<Set<number>> {
+  const { data, error } = await supabase
+    .from('admin_settings')
+    .select('value')
+    .eq('key', 'opening_hours')
+    .maybeSingle()
+
+  if (error) {
+    console.warn('Profitability opening-hours lookup failed; using defaults:', error)
+    return new Set(DEFAULT_TRADING_WEEKDAYS)
+  }
+
+  return tradingWeekdaysFromOpeningHours(data?.value)
 }
