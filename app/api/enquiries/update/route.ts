@@ -225,6 +225,23 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case 'set_dropoff_intent': {
+        const preference = String(data?.preference || '')
+        if (!['today', 'tomorrow'].includes(preference)) {
+          return NextResponse.json({ error: 'Invalid drop-off preference' }, { status: 400, headers })
+        }
+        if (enquiry.enquiry_type !== 'repair_quote' || !enquiry.proceed_with_repair) {
+          return NextResponse.json({ error: 'Drop-off intent is only available after a repair request is accepted.' }, { status: 409, headers })
+        }
+
+        // Progressive commitment only: this is a rough intention, never a booked
+        // appointment and never a reason to block the already-captured enquiry.
+        updateFields.dropoff_preference = preference
+        updateFields.dropoff_date = null
+        updateFields.dropoff_status = 'customer_intent'
+        break
+      }
+
       case 'send_quote': {
         const method = data?.method || 'sms'
         updateFields.quote_sent_method = method
