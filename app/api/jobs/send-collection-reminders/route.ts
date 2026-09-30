@@ -3,6 +3,7 @@ import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-temp
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendSms, isSmsConfigured, isWithinUKSendingHours } from '@/lib/resilience'
 import { requireCronSecret } from '@/lib/api-auth'
+import { sendEmail } from '@/lib/email'
 
 // Allow up to 5 minutes for the cron handler
 export const maxDuration = 300
@@ -199,6 +200,72 @@ export async function GET(request: NextRequest) {
       // Add footer to all collection reminders
       if (smsBody && smsBody.trim()) {
         smsBody += "\n\nIf you've already collected your device, please ignore this message."
+      }
+
+      const hasPhone = !!String(job.customer_phone || '').trim()
+      const hasEmail = !!String(job.customer_email || '').trim()
+
+      // Email fallback for customers who chose email only.
+      if (!hasPhone && hasEmail) {
+        try {
+          const subject = `Collection reminder - ${job.job_ref}`
+          const escapedBody = smsBody
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+          const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${escapedBody}</p></div>`
+          const emailResult = await sendEmail(job.customer_email, subject, htmlBody, smsBody)
+          const deliveryStatus = emailResult.success ? 'SENT' : 'FAILED'
+
+          await supabase.from('email_logs').insert({
+            job_id: job.id,
+            template_key: templateKey,
+            recipient_email: job.customer_email,
+            subject,
+            body_text: smsBody,
+            body_html: htmlBody,
+            status: deliveryStatus,
+            sent_at: deliveryStatus === 'SENT' ? now.toISOString() : null,
+          })
+
+          if (emailResult.success) {
+            const updateField = `collection_reminder_${reminderNumber}_sent_at`
+            await supabaseRetry(() =>
+              supabase
+                .from('jobs')
+                .update({ [updateField]: now.toISOString() })
+                .eq('id', job.id)
+            )
+            reminderCount++
+          }
+
+          await supabaseRetry(() =>
+            supabase.from('job_events').insert({
+              job_id: job.id,
+              type: 'SYSTEM',
+              message: `Collection reminder ${reminderNumber} sent by email (day ${daysInStatus}) - ${deliveryStatus}`,
+            } as any)
+          )
+
+          results.push({
+            jobRef: job.job_ref,
+            action: `reminder_${reminderNumber}_email`,
+            daysInStatus,
+            deliveryStatus,
+            success: emailResult.success,
+          })
+        } catch (err) {
+          console.error(`Failed to send reminder email for ${job.job_ref}:`, err)
+          results.push({ jobRef: job.job_ref, action: `reminder_${reminderNumber}_email`, success: false, error: 'Send failed' })
+        }
+        continue
+      }
+
+      if (!hasPhone) {
+        results.push({ jobRef: job.job_ref, action: `reminder_${reminderNumber}`, success: false, error: 'No contact channel' })
+        continue
       }
 
       // Queue SMS
