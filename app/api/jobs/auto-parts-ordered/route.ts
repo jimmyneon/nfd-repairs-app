@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink } from '@/lib/utils'
 import { sendSms, isSmsConfigured } from '@/lib/resilience'
+import { sendEmail } from '@/lib/email'
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -107,7 +108,10 @@ export async function GET(request: NextRequest) {
           try {
             await fetch(`${appUrl}/api/email/send`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+              },
               body: JSON.stringify({ jobId: job.id, type: 'STATUS_UPDATE' }),
             })
           } catch (emailError) {
@@ -206,12 +210,14 @@ export async function GET(request: NextRequest) {
             continue
           }
 
-          // Send via MacroDroid
-          const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-          if (isSmsConfigured()) {
+          // Deliver by SMS when a phone exists. If the customer is email-only,
+          // send the same reassurance content by email instead.
+          const hasPhone = !!String(job.customer_phone || '').trim()
+          const hasEmail = !!String(job.customer_email || '').trim()
+
+          if (hasPhone && isSmsConfigured()) {
             try {
               const smsResponse = await sendSms(job.customer_phone, smsBody)
-
               const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
 
               await supabase
@@ -219,20 +225,20 @@ export async function GET(request: NextRequest) {
                 .update({ status: deliveryStatus, sent_at: deliveryStatus === 'SENT' ? now.toISOString() : null })
                 .eq('id', smsLog.id)
 
-              // Mark reassurance as sent
-              await supabase
-                .from('jobs')
-                .update({ parts_reassurance_sms_sent_at: now.toISOString() })
-                .eq('id', job.id)
+              if (deliveryStatus === 'SENT') {
+                await supabase
+                  .from('jobs')
+                  .update({ parts_reassurance_sms_sent_at: now.toISOString() })
+                  .eq('id', job.id)
+              }
 
-              // Log event
               await supabase.from('job_events').insert({
                 job_id: job.id,
                 type: 'SYSTEM',
                 message: `Parts reassurance SMS sent (parts still on order) - ${deliveryStatus}`,
               })
 
-              reassuranceSentCount++
+              if (deliveryStatus === 'SENT') reassuranceSentCount++
               results.push({
                 jobRef: job.job_ref,
                 action: 'parts_reassurance_sms',
@@ -245,6 +251,52 @@ export async function GET(request: NextRequest) {
               await new Promise((resolve) => setTimeout(resolve, 30000))
             } catch (err) {
               console.error(`Failed to send reassurance SMS for ${job.job_ref}:`, err)
+            }
+          } else if (!hasPhone && hasEmail) {
+            try {
+              // Remove the unused SMS log row because no SMS was attempted.
+              await supabase.from('sms_logs').delete().eq('id', smsLog.id)
+
+              const emailResult = await sendEmail(
+                job.customer_email,
+                `Parts update - ${job.job_ref}`,
+                `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${smsBody}</p></div>`,
+                smsBody
+              )
+              const deliveryStatus = emailResult.success ? 'SENT' : 'FAILED'
+
+              await supabase.from('email_logs').insert({
+                job_id: job.id,
+                template_key: 'PARTS_REASSURANCE',
+                recipient_email: job.customer_email,
+                subject: `Parts update - ${job.job_ref}`,
+                body_text: smsBody,
+                body_html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${smsBody}</p></div>`,
+                status: deliveryStatus,
+                sent_at: deliveryStatus === 'SENT' ? now.toISOString() : null,
+              })
+
+              if (deliveryStatus === 'SENT') {
+                await supabase
+                  .from('jobs')
+                  .update({ parts_reassurance_sms_sent_at: now.toISOString() })
+                  .eq('id', job.id)
+                reassuranceSentCount++
+              }
+
+              await supabase.from('job_events').insert({
+                job_id: job.id,
+                type: 'SYSTEM',
+                message: `Parts reassurance email sent (parts still on order) - ${deliveryStatus}`,
+              })
+
+              results.push({
+                jobRef: job.job_ref,
+                action: 'parts_reassurance_email',
+                deliveryStatus,
+              })
+            } catch (err) {
+              console.error(`Failed to send reassurance email for ${job.job_ref}:`, err)
             }
           }
         }
