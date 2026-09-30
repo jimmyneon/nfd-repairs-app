@@ -52,20 +52,39 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Checking notification config for status:', job.status)
       const { data: config } = await supabase
         .from('notification_config')
-        .select('send_email, is_active')
+        .select('send_sms, send_email, is_active')
         .eq('status_key', job.status)
         .single()
 
       console.log('📋 Notification config:', config)
 
-      if (config && (!config.send_email || !config.is_active)) {
-        console.log(`⚠️ Email disabled for status: ${job.status}`)
-        return NextResponse.json({ 
-          success: true, 
-          message: `Email notifications disabled for ${job.status}` 
+      // If a status is normally SMS-only but this customer has no phone,
+      // use email as the fallback channel so email-only customers still
+      // receive the same important journey update.
+      const hasPhone = !!String(job.customer_phone || '').trim()
+      const emailFallbackForSms = !hasPhone && config?.send_sms === true
+
+      if (config && !config.is_active) {
+        console.log(`⚠️ Notifications disabled for status: ${job.status}`)
+        return NextResponse.json({
+          success: true,
+          message: `Notifications disabled for ${job.status}`
         })
       }
-      console.log('✓ Email enabled for this status')
+
+      if (config && !config.send_email && !emailFallbackForSms) {
+        console.log(`⚠️ Email disabled for status: ${job.status}`)
+        return NextResponse.json({
+          success: true,
+          message: `Email notifications disabled for ${job.status}`
+        })
+      }
+
+      if (emailFallbackForSms && !config?.send_email) {
+        console.log(`✓ Using email fallback for SMS-only status: ${job.status}`)
+      } else {
+        console.log('✓ Email enabled for this status')
+      }
     }
 
     const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
