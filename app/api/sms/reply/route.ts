@@ -64,6 +64,19 @@ export async function POST(request: NextRequest) {
     console.log(`[sms/reply] ThreadId: ${threadId || 'none'}`)
     console.log(`[sms/reply] Source: ${body.source || 'unknown'}`)
 
+    // Ignore alphanumeric/short-code senders such as banks and delivery
+    // services. They are not reply-capable customer mobile numbers and must
+    // never receive first-text welcome messages.
+    const senderDigits = String(phone).replace(/\D/g, '')
+    if (senderDigits.length < 7) {
+      console.log(`[sms/reply] Ignored non-customer sender: "${phone}"`)
+      return NextResponse.json({
+        success: true,
+        ignored: true,
+        reason: 'NON_CUSTOMER_SENDER',
+      })
+    }
+
     // ------------------------------------------------------------------
     // Deduplication: during dual-running (MacroDroid + relay), the same
     // customer reply may arrive via both transports. Skip if we've seen
