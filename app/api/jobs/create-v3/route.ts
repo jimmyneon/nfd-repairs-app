@@ -568,7 +568,10 @@ export async function POST(request: NextRequest) {
         const appUrl = 'https://nfd-repairs-app.vercel.app'
         await fetchWithTimeout(`${appUrl}/api/email/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          },
           body: JSON.stringify({
             jobId: job.id,
             type: 'JOB_CREATED',
