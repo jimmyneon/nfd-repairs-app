@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
     const repairStartClicked = started.filter(visit => has(visit, 'repair_start_clicked'))
     const repairRequestOpened = started.filter(visit => has(visit, 'repair_request_opened'))
     const repairRequestSubmitted = started.filter(visit => has(visit, 'repair_request_submitted'))
+    const postCaptureTimingSelected = started.filter(visit => has(visit, 'post_capture_timing_selected'))
     const notReadyOpened = started.filter(visit => has(visit, 'not_ready_opened'))
 
     // Join submitted website requests to their eventual jobs so the commercial
@@ -242,6 +243,7 @@ export async function GET(request: NextRequest) {
         repair_start_clicked: repairStartClicked.length,
         repair_request_opened: repairRequestOpened.length,
         repair_request_submitted: repairRequestSubmitted.length,
+        post_capture_timing_selected: postCaptureTimingSelected.length,
         device_received: deviceReceived.length,
         not_ready_opened: notReadyOpened.length,
         routes,
