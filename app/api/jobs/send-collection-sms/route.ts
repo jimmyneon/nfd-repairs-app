@@ -44,8 +44,10 @@ export async function POST(request: NextRequest) {
     // Retry each channel independently. A failed SMS must never resend an
     // email that already succeeded (and vice versa). Staff can still resend
     // deliberately using the existing manual override.
-    const shouldSendSms = manual === true || !job.post_collection_sms_sent_at
-    const shouldSendEmail = Boolean(job.customer_email) &&
+    const hasPhone = !!String(job.customer_phone || '').trim()
+    const hasEmail = !!String(job.customer_email || '').trim()
+    const shouldSendSms = hasPhone && (manual === true || !job.post_collection_sms_sent_at)
+    const shouldSendEmail = hasEmail &&
       (manual === true || !job.post_collection_email_sent_at)
 
     if (!shouldSendSms && !shouldSendEmail) {
