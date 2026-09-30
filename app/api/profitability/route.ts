@@ -14,6 +14,7 @@ import {
 } from '@/lib/profitability'
 import {
   loadProfitabilityStorage,
+  loadProfitabilityTradingWeekdays,
   saveProfitabilityEntry,
   saveProfitabilitySettings,
 } from '@/lib/profitability-storage'
@@ -40,14 +41,18 @@ function getLondonHour(): number {
   }).format(new Date()))
 }
 
-function missingTradingDates(entries: Array<{ entry_date: string }>, today: string) {
+function missingTradingDates(
+  entries: Array<{ entry_date: string }>,
+  today: string,
+  tradingWeekdays: Set<number>
+) {
   const present = new Set(entries.map(entry => entry.entry_date))
   const result: string[] = []
 
   for (let offset = 0; offset >= -20 && result.length < 8; offset--) {
     const key = dateOffsetKey(today, offset)
     if (key < PROFITABILITY_TRACKING_START) break
-    if (!isTradingDate(key)) continue
+    if (!isTradingDate(key, tradingWeekdays)) continue
     if (!present.has(key)) result.push(key)
   }
 
@@ -115,10 +120,13 @@ export async function GET(request: NextRequest) {
 
     const from = dateOffsetKey(today, -(days - 1))
 
-    const { entries, settings, storage } = await loadProfitabilityStorage(supabase, from, today)
+    const [{ entries, settings, storage }, tradingWeekdays] = await Promise.all([
+      loadProfitabilityStorage(supabase, from, today),
+      loadProfitabilityTradingWeekdays(supabase),
+    ])
     const suggestion = await suggestFromJobs(supabase, today)
 
-    const missingDates = missingTradingDates(entries, today)
+    const missingDates = missingTradingDates(entries, today, tradingWeekdays)
     const previousMissing = missingDates.filter(date => date < today)
     const todayMissing = missingDates.includes(today)
 
@@ -131,7 +139,9 @@ export async function GET(request: NextRequest) {
       suggestion,
       overhead: {
         monthly: settings.rent_monthly + settings.internet_monthly + settings.water_monthly + settings.electricity_monthly,
-        daily: dailyOverhead(settings),
+        daily: dailyOverhead(settings, today, tradingWeekdays),
+        trading_days_per_week: tradingWeekdays.size,
+        trading_weekdays: [...tradingWeekdays].sort((a, b) => a - b),
       },
       reminder: {
         show: previousMissing.length > 0 || (todayMissing && getLondonHour() >= 16),
@@ -174,7 +184,10 @@ export async function POST(request: NextRequest) {
         electricity_monthly: electricity!,
       }
 
-      const storage = await saveProfitabilitySettings(supabase, settings)
+      const [storage, tradingWeekdays] = await Promise.all([
+        saveProfitabilitySettings(supabase, settings),
+        loadProfitabilityTradingWeekdays(supabase),
+      ])
 
       return NextResponse.json({
         success: true,
@@ -182,7 +195,9 @@ export async function POST(request: NextRequest) {
         storage,
         overhead: {
           monthly: rent! + internet! + water! + electricity!,
-          daily: dailyOverhead(settings as ProfitabilitySettings),
+          daily: dailyOverhead(settings as ProfitabilitySettings, londonDateKey(), tradingWeekdays),
+          trading_days_per_week: tradingWeekdays.size,
+          trading_weekdays: [...tradingWeekdays].sort((a, b) => a - b),
         },
       })
     }
@@ -210,14 +225,17 @@ export async function POST(request: NextRequest) {
     }
 
     const today = londonDateKey()
-    const { settings } = await loadProfitabilityStorage(supabase, dateOffsetKey(today, -1), today)
+    const [{ settings }, tradingWeekdays] = await Promise.all([
+      loadProfitabilityStorage(supabase, dateOffsetKey(today, -1), today),
+      loadProfitabilityTradingWeekdays(supabase),
+    ])
     const entry = {
       entry_date: entryDate,
       revenue,
       parts_cost: partsCost,
       petty_cash_cost: pettyCashCost,
       job_count: jobCount,
-      daily_overhead: dailyOverhead(settings),
+      daily_overhead: dailyOverhead(settings, entryDate, tradingWeekdays),
     }
 
     const storage = await saveProfitabilityEntry(supabase, entry)
@@ -230,7 +248,7 @@ export async function POST(request: NextRequest) {
       dateOffsetKey(today, -20),
       today
     )
-    const stillMissing = missingTradingDates(latestEntries, today)
+    const stillMissing = missingTradingDates(latestEntries, today, tradingWeekdays)
 
     if (stillMissing.length === 0) {
       await supabase
