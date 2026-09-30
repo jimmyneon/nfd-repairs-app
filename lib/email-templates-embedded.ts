@@ -15,6 +15,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   // so customers never see "£0.00" and think the repair is free)
   const hasValidPrice = job.price_total != null && parseFloat(job.price_total.toString()) > 0
   const showPrice = hasValidPrice && data.includePrice !== false
+  const isReadyForDropoff = type === 'JOB_CREATED' && job.status === 'AWAITING_DEVICE' && !job.device_in_shop
 
   // Generate QR code for READY_TO_COLLECT status
   const qrCodeUrl = job.status === 'READY_TO_COLLECT' 
@@ -56,7 +57,9 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   }
 
   const subject = type === 'JOB_CREATED' 
-    ? `Job Created: ${job.job_ref} - ${job.device_make} ${job.device_model}`
+    ? (isReadyForDropoff
+        ? `Ready for Drop-Off: ${job.job_ref} - ${job.device_make} ${job.device_model}`
+        : `Job Created: ${job.job_ref} - ${job.device_make} ${job.device_model}`)
     : `Status Update: ${job.job_ref} - ${statusLabels[job.status]}`
 
   // Embedded job tracking section
@@ -142,7 +145,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           <tr>
             <td style="background: linear-gradient(135deg, #009B4D 0%, #007A3D 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">New Forest Device Repairs</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? 'We\'ve got your repair' : 'Quick update on your repair'}</p>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? (isReadyForDropoff ? 'Your repair is ready for drop-off' : 'We\'ve got your repair') : 'Quick update on your repair'}</p>
             </td>
           </tr>
 
@@ -150,13 +153,28 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           <tr>
             <td style="padding: 30px;">
               <h2 style="color: #111827; margin: 0 0 20px 0; font-size: 24px;">
-                ${type === 'JOB_CREATED' ? 'Thanks for choosing us!' : 'Here\'s what\'s happening'}
+                ${type === 'JOB_CREATED' ? (isReadyForDropoff ? 'You’re all set — just bring it in' : 'Thanks for choosing us!') : 'Here\'s what\'s happening'}
               </h2>
               
               ${statusMessage ? `
               <p style="color: #4B5563; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
                 ${statusMessage}
               </p>
+              ` : ''}
+
+              ${isReadyForDropoff ? `
+              <div style="background-color: #ECFDF5; border: 2px solid #86EFAC; border-radius: 10px; padding: 22px; margin: 0 0 24px 0;">
+                <h3 style="color: #047857; margin: 0 0 10px 0; font-size: 20px;">Bring your device in whenever suits you</h3>
+                <p style="color: #065F46; margin: 0 0 12px 0; font-size: 15px; line-height: 1.6;">
+                  No appointment is needed. Pop into the shop with your device during opening hours and we’ll take it from there.
+                </p>
+                <p style="color: #065F46; margin: 0 0 12px 0; font-size: 14px; line-height: 1.6;">
+                  <strong>New Forest Device Repairs</strong><br>
+                  5A New Street, Lymington, Hampshire<br>
+                  Mon 10am–5pm · Tue closed · Wed–Fri 10am–5pm · Sat 10am–3pm · Sun closed
+                </p>
+                <a href="https://nfdr.uk/h" style="display: inline-block; color: #047857; font-weight: 700; font-size: 14px; text-decoration: underline;">Check live opening hours &amp; directions</a>
+              </div>
               ` : ''}
 
               ${type === 'JOB_CREATED' ? `
@@ -333,6 +351,15 @@ ${type === 'JOB_CREATED'
 }
 
 ${statusMessage ? `\n${statusMessage}\n` : ''}
+
+${isReadyForDropoff ? `
+NEXT STEP — BRING YOUR DEVICE IN
+No appointment needed. Pop into New Forest Device Repairs whenever convenient during opening hours.
+
+5A New Street, Lymington, Hampshire
+Normal hours: Mon 10am–5pm, Tue closed, Wed–Fri 10am–5pm, Sat 10am–3pm, Sun closed.
+Live opening hours & directions: https://nfdr.uk/h
+` : ''}
 
 JOB DETAILS
 -----------
