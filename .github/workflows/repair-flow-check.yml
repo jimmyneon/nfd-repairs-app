@@ -7,12 +7,14 @@ on:
     paths:
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
+      - 'app/api/analytics/quote-ux/**'
       - 'app/api/jobs/**'
       - 'app/api/password/**'
       - 'app/api/sms/**'
       - 'app/api/public/**'
       - 'app/api/tracking/**'
       - 'app/app/enquiries/**'
+      - 'app/app/analytics/quote-ux/**'
       - 'app/app/jobs/**'
       - 'app/f/**'
       - 'app/t/**'
@@ -26,12 +28,14 @@ on:
     paths:
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
+      - 'app/api/analytics/quote-ux/**'
       - 'app/api/jobs/**'
       - 'app/api/password/**'
       - 'app/api/sms/**'
       - 'app/api/public/**'
       - 'app/api/tracking/**'
       - 'app/app/enquiries/**'
+      - 'app/app/analytics/quote-ux/**'
       - 'app/app/jobs/**'
       - 'app/f/**'
       - 'app/t/**'
@@ -60,6 +64,18 @@ jobs:
 
       - name: Run repair-flow tests
         run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts
+
+      - name: Verify progressive quote commitment safeguards
+        run: |
+          grep -Fq "case 'set_dropoff_intent'" app/api/enquiries/update/route.ts
+          grep -Fq "['today', 'tomorrow']" app/api/enquiries/update/route.ts
+          grep -Fq "Drop-off intent is only available after a repair request is accepted." app/api/enquiries/update/route.ts
+          grep -Fq "const acknowledgement = { sms: false, email: false }" app/api/enquiries/submit/route.ts
+          grep -Fq "REPAIR_REQUEST_RECEIVED" app/api/enquiries/submit/route.ts
+          grep -Fq "await sendSms" app/api/enquiries/submit/route.ts
+          grep -Fq "await sendEmail" app/api/enquiries/submit/route.ts
+          grep -Fq "post_capture_timing_selected" app/api/analytics/quote-ux/route.ts
+          grep -Fq "Timing supplied after capture" app/app/analytics/quote-ux/page.tsx
 
       - name: Type-check application
         run: npx tsc --noEmit

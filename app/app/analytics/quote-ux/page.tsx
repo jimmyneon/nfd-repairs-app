@@ -26,6 +26,7 @@ type Data = {
     repair_start_clicked: number
     repair_request_opened: number
     repair_request_submitted: number
+    post_capture_timing_selected: number
     device_received: number
     not_ready_opened: number
     routes: Array<{
@@ -148,6 +149,7 @@ export default function QuoteUxPage() {
                   <Stage label="Get repair started" count={data.conversion.repair_start_clicked} base={data.conversion.quote_reached} />
                   <Stage label="Request opened" count={data.conversion.repair_request_opened} base={data.conversion.quote_reached} />
                   <Stage label="Repair request submitted" count={data.conversion.repair_request_submitted} base={data.conversion.quote_reached} />
+                  <Stage label="Timing supplied after capture" count={data.conversion.post_capture_timing_selected} base={data.conversion.quote_reached} />
                   <Stage label="Device actually arrived" count={data.conversion.device_received} base={data.conversion.quote_reached} />
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-sm">
