@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Menu, Home, Plus, Smartphone, Shield, Bell, Settings, Mail, Package, Clock, X, BarChart3, MessageSquareText, MessageCircle, PoundSterling } from 'lucide-react'
+import { Menu, Home, Plus, Smartphone, Shield, Bell, Settings, Mail, Package, Clock, X, BarChart3, MessageSquareText, MessageCircle, PoundSterling, Zap } from 'lucide-react'
 
 interface NavLink {
   href: string
@@ -40,6 +40,7 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
   ]
 
   const secondaryLinks: NavLink[] = [
+    { href: '/app/jobs/quick-log', label: 'Quick Repair Log', icon: Zap },
     { href: '/app/messages', label: 'Messages', icon: MessageCircle, badge: unreadMessageCount },
     { href: '/app/send-in-requests', label: 'Send-In Requests', icon: Package, badge: sendInCount },
     { href: '/app/enquiries', label: 'Enquiries', icon: Mail, badge: enquiryCount },

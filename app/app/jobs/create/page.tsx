@@ -680,6 +680,9 @@ function CreateJobContent() {
       </header>
 
       <main className="p-4 max-w-2xl mx-auto">
+        {!jobId && <Link href="/app/jobs/quick-log" className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-amber-100 dark:bg-amber-900/30 px-4 py-3 text-sm font-bold text-amber-900 dark:text-amber-200">
+          <Zap className="h-5 w-5" />Quick repair log · no customer details
+        </Link>}
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Intake mode */}
           <div className="flex gap-3 justify-center">

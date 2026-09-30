@@ -461,6 +461,9 @@ export default function JobsListPageV2() {
               <NavDropdown unreadCount={unreadCount} warrantyCount={warrantyCount} sendInCount={sendInCount} enquiryCount={enquiryCount} unreadMessageCount={unreadMessageCount} />
             </div>
           </div>
+          <Link href="/app/jobs/quick-log" className="mb-3 flex items-center justify-center gap-2 rounded-xl bg-amber-100 dark:bg-amber-900/30 px-4 py-3 text-sm font-bold text-amber-900 dark:text-amber-200">
+            <Zap className="h-5 w-5" />Quick repair log · no customer details
+          </Link>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input type="text" placeholder="Search by job ref, name, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
