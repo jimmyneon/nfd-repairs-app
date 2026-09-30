@@ -128,7 +128,7 @@ export async function POST(
     // Email-only customers still need the deposit request and payment link.
     // STATUS_UPDATE uses the same AWAITING_DEPOSIT job data and now falls
     // back to email when SMS is the configured channel but no phone exists.
-    if (job.customer_email) {
+    if (job.customer_email && !String(job.customer_phone || '').trim()) {
       try {
         const appUrl = getAppUrl()
         const emailResponse = await fetch(`${appUrl}/api/email/send`, {
