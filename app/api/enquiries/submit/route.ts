@@ -139,6 +139,13 @@ export async function POST(request: NextRequest) {
     const sanitizedName = clampLength(customer_name, MAX_NAME)
     const sanitizedEmail = customer_email ? clampLength(customer_email, MAX_EMAIL) : null
     const sanitizedPhone = customer_phone ? clampLength(customer_phone, MAX_PHONE) : null
+    const preferredContactMethod = sanitizedPhone && sanitizedEmail
+      ? 'both'
+      : sanitizedEmail
+        ? 'email'
+        : sanitizedPhone
+          ? 'sms'
+          : null
 
     if (sanitizedEmail && !isValidEmail(sanitizedEmail)) {
       return NextResponse.json(
@@ -313,6 +320,7 @@ export async function POST(request: NextRequest) {
           customer_name: sanitizedName,
           customer_email: sanitizedEmail || null,
           customer_phone: sanitizedPhone || null,
+          preferred_contact_method: preferredContactMethod,
           // Web Services fields
           project_type: project_type || null,
           sector: sector || null,
@@ -378,6 +386,7 @@ export async function POST(request: NextRequest) {
             customer_name,
             customer_email: customer_email || null,
             customer_phone: customer_phone || null,
+            preferred_contact_method: preferredContactMethod,
             project_type: project_type || null,
             sector: sector || null,
             number_pages: number_pages || null,
