@@ -236,14 +236,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', status)
       .single()
     
-    // Special handling for PARTS_ARRIVED: Don't send SMS if device already in shop
-    let shouldSendSMS = config?.send_sms && config?.is_active || false
+    // Only offer channels the customer actually has. If this status is
+    // normally SMS-only but the customer has no phone, offer email instead.
+    const hasPhone = !!String(job?.customer_phone || '').trim()
+    const hasEmail = !!String(job?.customer_email || '').trim()
+    let shouldSendSMS = !!(config?.send_sms && config?.is_active && hasPhone)
     if (status === 'PARTS_ARRIVED' && job?.device_in_shop) {
       shouldSendSMS = false
     }
+    const shouldSendEmail = !!(
+      config?.is_active &&
+      hasEmail &&
+      (config?.send_email || (!hasPhone && config?.send_sms))
+    )
     
     setWillSendSMS(shouldSendSMS)
-    setWillSendEmail(config?.send_email && config?.is_active || false)
+    setWillSendEmail(shouldSendEmail)
     setOverrideSMS(false)
     setOverrideEmail(false)
     setSendPriceInSms(true)
@@ -383,14 +391,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', status)
       .single()
     
-    // Special handling for PARTS_ARRIVED: Don't send SMS if device already in shop
-    let shouldSendSMS = config?.send_sms && config?.is_active || false
+    // Only offer channels the customer actually has. If this status is
+    // normally SMS-only but the customer has no phone, offer email instead.
+    const hasPhone = !!String(job?.customer_phone || '').trim()
+    const hasEmail = !!String(job?.customer_email || '').trim()
+    let shouldSendSMS = !!(config?.send_sms && config?.is_active && hasPhone)
     if (status === 'PARTS_ARRIVED' && job?.device_in_shop) {
       shouldSendSMS = false
     }
+    const shouldSendEmail = !!(
+      config?.is_active &&
+      hasEmail &&
+      (config?.send_email || (!hasPhone && config?.send_sms))
+    )
     
     setWillSendSMS(shouldSendSMS)
-    setWillSendEmail(config?.send_email && config?.is_active || false)
+    setWillSendEmail(shouldSendEmail)
     setOverrideSMS(false)
     setOverrideEmail(false)
     setSendPriceInSms(true)
@@ -522,8 +538,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', 'DELAYED')
       .single()
     
-    setWillSendSMS(config?.send_sms && config?.is_active || false)
-    setWillSendEmail(config?.send_email && config?.is_active || false)
+    {
+      const hasPhone = !!String(job?.customer_phone || '').trim()
+      const hasEmail = !!String(job?.customer_email || '').trim()
+      setWillSendSMS(!!(config?.send_sms && config?.is_active && hasPhone))
+      setWillSendEmail(!!(
+        config?.is_active &&
+        hasEmail &&
+        (config?.send_email || (!hasPhone && config?.send_sms))
+      ))
+    }
     setOverrideSMS(false)
     setOverrideEmail(false)
     setSendPriceInSms(true)
@@ -615,8 +639,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       .eq('status_key', 'CANCELLED')
       .single()
     
-    setWillSendSMS(config?.send_sms && config?.is_active || false)
-    setWillSendEmail(config?.send_email && config?.is_active || false)
+    {
+      const hasPhone = !!String(job?.customer_phone || '').trim()
+      const hasEmail = !!String(job?.customer_email || '').trim()
+      setWillSendSMS(!!(config?.send_sms && config?.is_active && hasPhone))
+      setWillSendEmail(!!(
+        config?.is_active &&
+        hasEmail &&
+        (config?.send_email || (!hasPhone && config?.send_sms))
+      ))
+    }
     setOverrideSMS(false)
     setOverrideEmail(false)
     setSendPriceInSms(true)
