@@ -19,6 +19,7 @@ import {
 import {
   ProfitabilityEntry,
   ProfitabilitySettings,
+  dailyOverhead,
   dateOffsetKey,
   entryNetProfit,
   missingProfitabilityFields,
@@ -37,7 +38,12 @@ type ApiData = {
     job_count: number
     job_refs: string[]
   }
-  overhead: { monthly: number; daily: number }
+  overhead: {
+    monthly: number
+    daily: number
+    trading_days_per_week: number
+    trading_weekdays: number[]
+  }
   reminder: {
     show: boolean
     missing_dates: string[]
@@ -358,17 +364,23 @@ export default function ProfitabilityPage() {
   }
 
   const formPreview = useMemo(() => {
-    if (!data) return { gross: 0, net: 0, averageJob: 0 }
+    if (!data) return { gross: 0, overhead: 0, net: 0, averageJob: 0 }
     const rev = Number(revenue || 0)
     const parts = Number(partsCost || 0)
     const petty = Number(pettyCashCost || 0)
     const jobs = Number(jobCount || 0)
+    const overhead = dailyOverhead(
+      data.settings,
+      entryDate || data.today,
+      new Set(data.overhead.trading_weekdays)
+    )
     return {
       gross: rev - parts - petty,
-      net: rev - parts - petty - data.overhead.daily,
+      overhead,
+      net: rev - parts - petty - overhead,
       averageJob: jobs > 0 ? rev / jobs : 0,
     }
-  }, [data, revenue, partsCost, pettyCashCost, jobCount])
+  }, [data, entryDate, revenue, partsCost, pettyCashCost, jobCount])
 
   if (loading && !data) {
     return (
@@ -450,7 +462,7 @@ export default function ProfitabilityPage() {
             <div className="mb-4">
               <h2 className="font-bold text-gray-900 dark:text-white">Recurring monthly costs</h2>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Edit these whenever the regular shop bills change. Daily overhead is spread across the normal five trading days each week.
+                Edit these whenever the regular shop bills change. Fixed overhead is spread across the actual dates marked open in Admin Settings for each calendar month. Currently {data.overhead.trading_days_per_week} trading days per week.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -604,7 +616,7 @@ export default function ProfitabilityPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Overhead</p>
-                  <p className="font-black text-gray-900 dark:text-white">{money(data.overhead.daily)}</p>
+                  <p className="font-black text-gray-900 dark:text-white">{money(formPreview.overhead)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Net</p>

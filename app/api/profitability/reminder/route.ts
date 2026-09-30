@@ -8,7 +8,10 @@ import {
   isTradingDate,
   londonDateKey,
 } from '@/lib/profitability'
-import { loadProfitabilityStorage } from '@/lib/profitability-storage'
+import {
+  loadProfitabilityStorage,
+  loadProfitabilityTradingWeekdays,
+} from '@/lib/profitability-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,14 +23,18 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   )
 }
 
-function missingTradingDates(entries: Array<{ entry_date: string }>, today: string) {
+function missingTradingDates(
+  entries: Array<{ entry_date: string }>,
+  today: string,
+  tradingWeekdays: Set<number>
+) {
   const present = new Set(entries.map(entry => entry.entry_date))
   const result: string[] = []
 
   for (let offset = 0; offset >= -20 && result.length < 8; offset--) {
     const key = dateOffsetKey(today, offset)
     if (key < PROFITABILITY_TRACKING_START) break
-    if (!isTradingDate(key)) continue
+    if (!isTradingDate(key, tradingWeekdays)) continue
     if (!present.has(key)) result.push(key)
   }
 
@@ -63,8 +70,16 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient()
     const from = dateOffsetKey(today, -20)
-    const { entries } = await loadProfitabilityStorage(supabase, from, today)
-    const missingDates = missingTradingDates(entries, today)
+    const [{ entries }, tradingWeekdays] = await Promise.all([
+      loadProfitabilityStorage(supabase, from, today),
+      loadProfitabilityTradingWeekdays(supabase),
+    ])
+
+    if (!isTradingDate(today, tradingWeekdays)) {
+      return NextResponse.json({ success: true, skipped: true, reason: 'closed-day' })
+    }
+
+    const missingDates = missingTradingDates(entries, today, tradingWeekdays)
 
     if (missingDates.length === 0) {
       return NextResponse.json({ success: true, skipped: true, reason: 'nothing-missing' })

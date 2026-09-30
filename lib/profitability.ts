@@ -1,6 +1,15 @@
 export const PROFITABILITY_TRACKING_START = '2026-09-26'
-export const TRADING_WEEKDAYS = new Set([1, 3, 4, 5, 6]) // Mon, Wed, Thu, Fri, Sat
-export const AVERAGE_TRADING_DAYS_PER_MONTH = (52 * 5) / 12
+export const DEFAULT_TRADING_WEEKDAYS = new Set([1, 3, 4, 5, 6]) // Mon, Wed, Thu, Fri, Sat
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+}
 
 export type ProfitabilitySettings = {
   id?: string
@@ -67,8 +76,54 @@ export function monthlyOverhead(settings: ProfitabilitySettings): number {
   )
 }
 
-export function dailyOverhead(settings: ProfitabilitySettings): number {
-  return roundMoney(monthlyOverhead(settings) / AVERAGE_TRADING_DAYS_PER_MONTH)
+export function tradingWeekdaysFromOpeningHours(value: unknown): Set<number> {
+  let parsed: any = value
+
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      return new Set(DEFAULT_TRADING_WEEKDAYS)
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return new Set(DEFAULT_TRADING_WEEKDAYS)
+  }
+
+  const result = new Set<number>()
+  for (const [day, index] of Object.entries(WEEKDAY_INDEX)) {
+    if (parsed?.[day]?.isOpen === true) result.add(index)
+  }
+
+  return result.size > 0 ? result : new Set(DEFAULT_TRADING_WEEKDAYS)
+}
+
+export function tradingDaysInMonth(
+  dateKey: string,
+  tradingWeekdays: Set<number> = DEFAULT_TRADING_WEEKDAYS
+): number {
+  const [year, month] = dateKey.split('-').map(Number)
+  if (!year || !month) return 0
+
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  let count = 0
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(Date.UTC(year, month - 1, day, 12))
+    if (tradingWeekdays.has(date.getUTCDay())) count++
+  }
+
+  return count
+}
+
+export function dailyOverhead(
+  settings: ProfitabilitySettings,
+  dateKey = londonDateKey(),
+  tradingWeekdays: Set<number> = DEFAULT_TRADING_WEEKDAYS
+): number {
+  const tradingDays = tradingDaysInMonth(dateKey, tradingWeekdays)
+  return roundMoney(monthlyOverhead(settings) / Math.max(tradingDays, 1))
 }
 
 export function londonDateKey(date = new Date()): string {
@@ -86,9 +141,12 @@ export function dateOffsetKey(dateKey: string, days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-export function isTradingDate(dateKey: string): boolean {
+export function isTradingDate(
+  dateKey: string,
+  tradingWeekdays: Set<number> = DEFAULT_TRADING_WEEKDAYS
+): boolean {
   const date = new Date(`${dateKey}T12:00:00.000Z`)
-  return TRADING_WEEKDAYS.has(date.getUTCDay())
+  return tradingWeekdays.has(date.getUTCDay())
 }
 
 export function entryNetProfit(entry: Pick<ProfitabilityEntry, 'revenue' | 'parts_cost' | 'petty_cash_cost' | 'daily_overhead'>): number {
