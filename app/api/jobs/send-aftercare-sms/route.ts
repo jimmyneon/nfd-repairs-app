@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortReviewLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendSms } from '@/lib/resilience'
+import { sendEmail } from '@/lib/email'
 import { requireStaffOrCron } from '@/lib/api-auth'
 
 export const maxDuration = 300;
@@ -115,29 +116,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Send SMS via MacroDroid
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-    if (!webhookUrl) {
-      console.error('MACRODROID_WEBHOOK_URL not configured')
+    const hasPhone = !!String(job.customer_phone || '').trim()
+    const hasEmail = !!String(job.customer_email || '').trim()
+    const now = new Date().toISOString()
+
+    if (!hasPhone && !hasEmail) {
       return NextResponse.json(
-        { error: 'SMS webhook not configured' },
-        { status: 500 }
+        { error: 'No phone number or email address on this job' },
+        { status: 400 }
       )
     }
 
-    console.log(`Sending manual aftercare SMS for job ${job.job_ref} to ${job.customer_phone}`)
+    let deliveryStatus = 'FAILED'
+    let channel: 'sms' | 'email' = hasPhone ? 'sms' : 'email'
 
-    const smsResult = await sendSms(job.customer_phone, aftercareBody)
+    if (hasPhone) {
+      console.log(`Sending manual aftercare SMS for job ${job.job_ref} to ${job.customer_phone}`)
+      const smsResult = await sendSms(job.customer_phone, aftercareBody)
+      deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
+    } else {
+      const emailResult = await sendEmail(
+        job.customer_email,
+        `How is your repair going? - ${job.job_ref}`,
+        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${aftercareBody}</p></div>`,
+        aftercareBody
+      )
+      deliveryStatus = emailResult.success ? 'SENT' : 'FAILED'
 
-    const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
-    const now = new Date().toISOString()
+      await supabase.from('email_logs').insert({
+        job_id: jobId,
+        template_key: 'AFTERCARE_CHECKIN',
+        recipient_email: job.customer_email,
+        subject: `How is your repair going? - ${job.job_ref}`,
+        body_text: aftercareBody,
+        body_html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><p style="white-space:pre-line;">${aftercareBody}</p></div>`,
+        status: deliveryStatus,
+        sent_at: deliveryStatus === 'SENT' ? now : null,
+      })
+    }
 
-    // Only write sent_at if actually sent — otherwise the cron never retries it
     await supabaseRetry(() =>
       supabase
         .from('jobs')
         .update({
-          ...(smsResult.ok ? { aftercare_sms_sent_at: now } : {}),
+          ...(deliveryStatus === 'SENT' ? { aftercare_sms_sent_at: now } : {}),
           aftercare_sms_delivery_status: deliveryStatus,
           aftercare_sms_body: aftercareBody,
         })
@@ -148,16 +170,15 @@ export async function POST(request: NextRequest) {
       supabase.from('job_events').insert({
         job_id: jobId,
         type: 'SYSTEM',
-        message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent manually`,
+        message: `Aftercare ${channel} ${deliveryStatus.toLowerCase()}: check-in sent manually`,
       } as any)
     )
 
-    console.log(`Aftercare SMS ${deliveryStatus} for job ${job.job_ref}`)
-
     return NextResponse.json({
-      success: smsResult.ok,
+      success: deliveryStatus === 'SENT',
       deliveryStatus,
-      message: `Aftercare SMS ${deliveryStatus.toLowerCase()}`
+      channel,
+      message: `Aftercare ${channel} ${deliveryStatus.toLowerCase()}`
     })
 
   } catch (error) {
