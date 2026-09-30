@@ -372,11 +372,14 @@ export async function POST(request: NextRequest) {
       smsError = 'MacroDroid webhook is not configured'
     }
 
-    // Send email if customer has email
-    if (enquiry.customer_email) {
+    // Send email if customer has email, and report the result independently
+    // from SMS so email-only customers are not shown as "message not sent".
+    let emailSent = false
+    let emailError: string | null = null
+    if (customerEmail) {
       try {
         const appUrl = getAppUrl()
-        await fetch(`${appUrl}/api/email/send`, {
+        const emailResponse = await fetch(`${appUrl}/api/email/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -387,9 +390,25 @@ export async function POST(request: NextRequest) {
             type: 'JOB_CREATED',
           }),
         })
-      } catch (emailError) {
-        console.error('Failed to send email:', emailError)
+
+        let emailResult: any = null
+        try {
+          emailResult = await emailResponse.json()
+        } catch {
+          // A non-JSON response is still a failure if the HTTP request failed.
+        }
+
+        emailSent = emailResponse.ok && emailResult?.success !== false
+        if (!emailSent) {
+          emailError = emailResult?.error || emailResult?.details || `Email send failed (HTTP ${emailResponse.status})`
+          console.error('Failed to send email:', emailError)
+        }
+      } catch (error) {
+        emailError = error instanceof Error ? error.message : 'Email request failed'
+        console.error('Failed to send email:', error)
       }
+    } else {
+      emailError = 'No customer email address'
     }
 
     return NextResponse.json({
@@ -402,6 +421,9 @@ export async function POST(request: NextRequest) {
       status: job.status,
       sms_sent: smsSent,
       sms_error: smsError,
+      email_sent: emailSent,
+      email_error: emailError,
+      customer_notified: smsSent || emailSent,
     })
   } catch (error) {
     console.error('Error converting enquiry to job:', error)
