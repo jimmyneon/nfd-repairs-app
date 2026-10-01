@@ -229,7 +229,6 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
         issue: enquiry.repair_type,
         device_category: enquiry.device_category,
         quoted_price: enquiry.quoted_price,
-        price_total: enquiry.quoted_price,
         quote_type: enquiry.quote_type,
         part_option: enquiry.part_option || enquiry.screen_option,
         display_price: enquiry.display_price,
@@ -245,7 +244,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
         dropoff_preference: enquiry.dropoff_preference || null,
         dropoff_date: enquiry.dropoff_date || null,
         created_at: enquiry.created_at,
-        requires_parts_order: false,
+        requires_parts_order: linkedJob?.requires_parts_order ?? false,
         status: enquiry.status,
       })
     }
@@ -253,7 +252,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
     // Fallback: try jobs table by UUID
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('id,job_ref,device_make,device_model,issue,device_type,quoted_price,price_total,requires_parts_order,additional_issues,status,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('id,job_ref,device_make,device_model,issue,device_type,quoted_price,price_total,requires_parts_order,parts_required,deposit_required,deposit_amount,deposit_received,parts_expected_at,parts_tracking_eta,parts_tracking_status,device_in_shop,additional_issues,status,status_changed_at,updated_at,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('id', ref)
       .maybeSingle()
 
