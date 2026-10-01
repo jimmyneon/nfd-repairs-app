@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'fs'
 import path from 'path'
+import './public-quote-options.test'
 
 describe('accepted enquiry contact requirement', () => {
   it('accepts either phone or email and preserves a missing phone as null', () => {
