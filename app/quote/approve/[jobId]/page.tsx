@@ -137,11 +137,20 @@ function QuoteApprovalContent() {
     })
     if (!response.ok) throw new Error('Failed to save options')
     const data = await response.json()
-    setJob((current: any) => current ? {
-      ...current,
-      additional_repairs: data.additional_repairs || current.additional_repairs,
-      accessories: data.accessories || current.accessories,
-    } : current)
+    setJob((current: any) => {
+      if (!current) return current
+      const savedRepairs = new Set(
+        (data.additional_repairs || []).map((item: any) => String(item?.repair || '').toLowerCase())
+      )
+      return {
+        ...current,
+        additional_repairs: data.additional_repairs || current.additional_repairs,
+        accessories: data.accessories || current.accessories,
+        available_addons: (current.available_addons || []).filter(
+          (item: any) => !savedRepairs.has(String(item?.repair || '').toLowerCase())
+        ),
+      }
+    })
     setSelectedAddOns(new Set())
     setSelectedAccessories(new Set())
     return data
