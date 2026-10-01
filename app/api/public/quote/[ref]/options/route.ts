@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { isQuoteActionTokenValid } from '@/lib/job-utils'
+import { normalizePublicQuoteRef } from '@/lib/public-quote-options'
 import {
   mergeNamedItems,
   verifyRequestedAccessories,
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
 
   try {
     const supabase = createServiceClient()
-    const { ref } = params
+    const ref = normalizePublicQuoteRef(params.ref)
     const token = new URL(request.url).searchParams.get('t')
     const body = await request.json().catch(() => ({}))
     const requestedRepairs = Array.isArray(body?.additional_repairs) ? body.additional_repairs : []
