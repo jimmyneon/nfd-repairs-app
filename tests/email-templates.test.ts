@@ -63,3 +63,20 @@ describe('Supabase client safety', () => {
     expect(content).toMatch(/if\s*\(!url\s*\|\|\s*!key\)/)
   })
 })
+
+
+describe('Initial job email customer journey', () => {
+  it('spells out parts confirmation, shop drop-off, tracking and collection', () => {
+    const content = fs.readFileSync(
+      path.join(process.cwd(), 'lib/email-templates-embedded.ts'),
+      'utf-8'
+    )
+
+    expect(content).toContain('We confirm the part')
+    expect(content).toContain('Bring your device to our Lymington shop')
+    expect(content).toContain('5A New Street, Lymington')
+    expect(content).toContain('online repair requests do not book a home visit')
+    expect(content).toContain('follow progress using your tracking link')
+    expect(content).toContain('ready to collect')
+  })
+})
