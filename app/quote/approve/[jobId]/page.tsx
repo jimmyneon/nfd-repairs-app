@@ -351,10 +351,10 @@ function QuoteApprovalContent() {
                 </label>
               ))}
             </div>
-            {selectedAddOns.size > 0 && (
+            {(selectedAddOns.size + selectedAccessories.size) > 0 && (
               <div className="mt-4 p-4 bg-green-50 rounded-xl flex justify-between items-center">
                 <span className="text-sm text-gray-600">
-                  Additional repairs: {selectedAddOns.size} item{selectedAddOns.size > 1 ? 's' : ''}
+                  Added options: {selectedAddOns.size + selectedAccessories.size} item{(selectedAddOns.size + selectedAccessories.size) > 1 ? 's' : ''}
                 </span>
                 <div className="text-right">
                   <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
