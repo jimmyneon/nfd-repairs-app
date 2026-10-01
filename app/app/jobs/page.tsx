@@ -42,7 +42,7 @@ export default function JobsListPageV2() {
     previous_missing: number
     today_missing: boolean
   } | null>(null)
-  const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null}[]>([])
+  const [approvedEnquiries, setApprovedEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; quoted_price: number | null; created_at: string; updated_at: string | null}[]>([])
   const [pendingQuoteEnquiries, setPendingQuoteEnquiries] = useState<{enquiry_ref: string; customer_name: string; device_make: string | null; device_model: string | null; repair_type: string | null}[]>([])
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
@@ -142,6 +142,8 @@ export default function JobsListPageV2() {
         switch (activeFilter) {
           case 'in_shop': return job.device_in_shop
           case 'needs_parts': return job.parts_required || job.requires_parts_order
+          case 'awaiting_device': return ['AWAITING_DEVICE', 'QUOTE_APPROVED', 'PARTS_ARRIVED'].includes(job.status) && !job.device_in_shop
+          case 'followed_up': return ['AWAITING_DEVICE', 'QUOTE_APPROVED', 'PARTS_ARRIVED'].includes(job.status) && !job.device_in_shop && Boolean(job.awaiting_device_followup_at)
           case 'overdue': return getHoursInStatus(job.status_changed_at, job.created_at) > 72
           case 'deposit': return job.deposit_required && !job.deposit_received
           case 'arrived': return job.customer_arrived_at && (new Date().getTime() - new Date(job.customer_arrived_at).getTime()) < 30 * 60 * 1000
@@ -215,7 +217,7 @@ export default function JobsListPageV2() {
     // Load approved enquiries for banner
     const { data: approved } = await supabase
       .from('enquiries')
-      .select('enquiry_ref, customer_name, device_make, device_model, quoted_price')
+      .select('enquiry_ref, customer_name, device_make, device_model, quoted_price, created_at, updated_at')
       .eq('status', 'approved')
       .order('updated_at', { ascending: false })
     setApprovedEnquiries(approved || [])
@@ -316,6 +318,14 @@ export default function JobsListPageV2() {
     }
   }
 
+  const awaitingDeviceJobs = jobs.filter(job =>
+    ['AWAITING_DEVICE', 'QUOTE_APPROVED', 'PARTS_ARRIVED'].includes(job.status) && !job.device_in_shop
+  )
+  const followedUpWaitingJobs = awaitingDeviceJobs.filter(job => Boolean(job.awaiting_device_followup_at))
+  const staleApprovedCount = approvedEnquiries.filter(enquiry =>
+    getHoursInStatus(enquiry.updated_at || enquiry.created_at, enquiry.created_at) > 24
+  ).length
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <NotificationSetup />
@@ -402,9 +412,11 @@ export default function JobsListPageV2() {
             <BellRing className="h-6 w-6 animate-pulse flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-black text-sm">
-                {approvedEnquiries.length === 1 
-                  ? 'QUOTE APPROVED - Action Needed!' 
-                  : `${approvedEnquiries.length} QUOTES APPROVED - Action Needed!`}
+                {staleApprovedCount > 0
+                  ? `${staleApprovedCount} APPROVED ${staleApprovedCount === 1 ? 'QUOTE' : 'QUOTES'} WAITING FOR STOCK CHECK`
+                  : approvedEnquiries.length === 1
+                    ? 'QUOTE APPROVED - Action Needed!'
+                    : `${approvedEnquiries.length} QUOTES APPROVED - Action Needed!`}
               </p>
               <div className="flex gap-2 mt-1 overflow-x-auto pb-1">
                 {approvedEnquiries.slice(0, 4).map((enq) => (
@@ -436,6 +448,31 @@ export default function JobsListPageV2() {
             >
               View All
             </Link>
+          </div>
+        </div>
+      )}
+
+      {awaitingDeviceJobs.length > 0 && (
+        <div className="bg-amber-500 text-amber-950 px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <Clock className="h-6 w-6 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">
+                {awaitingDeviceJobs.length} {awaitingDeviceJobs.length === 1 ? 'REPAIR' : 'REPAIRS'} WAITING FOR THE DEVICE
+              </p>
+              <p className="text-xs font-semibold mt-0.5">
+                {followedUpWaitingJobs.length > 0
+                  ? `${followedUpWaitingJobs.length} overdue ${followedUpWaitingJobs.length === 1 ? 'customer has' : 'customers have'} had the one-off follow-up.`
+                  : 'These are accepted/stock-checked repairs where the customer has not dropped the device in yet.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveFilter(followedUpWaitingJobs.length > 0 ? 'followed_up' : 'awaiting_device')}
+              className="flex-shrink-0 bg-white text-amber-800 font-black text-xs px-4 py-2 rounded-xl hover:bg-amber-50 transition-colors active:scale-95"
+            >
+              View
+            </button>
           </div>
         </div>
       )}
@@ -472,6 +509,8 @@ export default function JobsListPageV2() {
             {[
               ['all', 'All'],
               ['needs_info', 'Needs info'],
+              ['awaiting_device', 'Awaiting device'],
+              ['followed_up', 'Overdue / followed up'],
               ['in_shop', 'In shop'],
               ['needs_parts', 'Parts'],
               ['deposit', 'Deposit'],

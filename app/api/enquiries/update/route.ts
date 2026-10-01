@@ -197,24 +197,17 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'reserve_repair': {
-        if (enquiry.repair_reserved) {
-          return NextResponse.json({
-            success: true,
-            action: 'reserve_repair',
-            enquiry_ref: enquiry.enquiry_ref,
-            already_reserved: true,
-          }, {
-            headers,
-          })
-        }
-        updateFields.repair_reserved = true
-        // Approved is the pre-job state. Only convert-to-job should mark an
-        // enquiry as converted, otherwise it disappears before stock is checked.
-        updateFields.status = 'approved'
-        updateFields.proceed_with_repair = true
-        notificationTitle = `Repair Reserved: ${enquiry.device_make || ''} ${enquiry.device_model || ''}`
-        notificationBody = `${enquiry.customer_name} reserved their repair${enquiry.quoted_price ? ' (£' + enquiry.quoted_price + ')' : ''}. Text them to arrange a time.`
-        break
+        // Legacy public approval used only the guessable enquiry reference.
+        // It is retired in favour of /api/public/quote/[ref]/approve?t=...
+        // where the cryptographically-random quote-action token authorises
+        // the customer action.
+        return NextResponse.json(
+          {
+            error: 'This legacy approval route has been retired. Please use the secure quote link from the latest message.',
+            code: 'LEGACY_QUOTE_APPROVAL_RETIRED',
+          },
+          { status: 410, headers }
+        )
       }
 
       case 'reserve_part': {
