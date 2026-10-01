@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import fs from 'fs'
 import path from 'path'
+import './public-quote-options.test'
 
 describe('accepted enquiry contact requirement', () => {
   it('accepts either phone or email and preserves a missing phone as null', () => {
@@ -29,5 +30,40 @@ describe('accepted enquiry contact requirement', () => {
     expect(content).not.toContain('Boolean(selectedEnquiry.customer_phone?.trim())')
     expect(content).toContain("selectedEnquiry.enquiry_type === 'repair_quote' && isAccepted(selectedEnquiry)")
     expect(content).toContain('setSelectedEnquiry(current => current?.id === editingEnquiry.id')
+  })
+})
+
+
+describe('secure quote return path', () => {
+  it('keeps post-submit options behind the secure quote token', () => {
+    const optionsRoute = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/public/quote/[ref]/options/route.ts'),
+      'utf-8'
+    )
+    expect(optionsRoute).toContain("const token = new URL(request.url).searchParams.get('t')")
+    expect(optionsRoute).toContain('token !== enquiry.quote_action_token')
+    expect(optionsRoute).toContain('verifyRequestedAddOns')
+    expect(optionsRoute).toContain('verifyRequestedAccessories')
+  })
+
+  it('lets an already accepted quote return to a saved option manager', () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), 'app/quote/approve/[jobId]/page.tsx'),
+      'utf-8'
+    )
+    expect(page).toContain('useParams')
+    expect(page).toContain('Your repair request is already saved')
+    expect(page).toContain('Save Added Options')
+    expect(page).toContain('/options?t=')
+  })
+
+  it('carries saved accessories into the created job and total', () => {
+    const conversion = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),
+      'utf-8'
+    )
+    expect(conversion).toContain('const accessories = Array.isArray(enquiry.accessories)')
+    expect(conversion).toContain('accessoryIssues')
+    expect(conversion).toContain('additionalRepairsTotal + accessoriesTotal')
   })
 })
