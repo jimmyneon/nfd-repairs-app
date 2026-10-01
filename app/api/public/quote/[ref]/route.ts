@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { isQuoteActionTokenValid } from '@/lib/job-utils'
+import { normalizePublicQuoteRef } from '@/lib/public-quote-options'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
 
   try {
     const supabase = getAdminClient()
-    const { ref } = params
+    const ref = normalizePublicQuoteRef(params.ref)
     const token = new URL(request.url).searchParams.get('t')
 
     // Try enquiries table first (ref is enquiry_ref for quote approvals)
