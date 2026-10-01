@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
     // Try enquiries table first (ref is enquiry_ref for quote approvals)
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('enquiry_ref,device_make,device_model,repair_type,device_category,quoted_price,quoted_price_high,quote_type,part_option,screen_option,display_price,warranty,estimated_time,additional_repairs,status,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('enquiry_ref,device_make,device_model,repair_type,device_category,quoted_price,quoted_price_high,quote_type,part_option,screen_option,display_price,warranty,estimated_time,additional_repairs,accessories,status,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_ref', ref)
       .maybeSingle()
 
@@ -73,6 +73,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
         warranty: enquiry.warranty,
         estimated_time: enquiry.estimated_time,
         additional_repairs: enquiry.additional_repairs || [],
+        accessories: enquiry.accessories || [],
         requires_parts_order: false,
         status: enquiry.status,
       })
@@ -111,7 +112,10 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
       display_price: null,
       warranty: null,
       estimated_time: null,
-      additional_repairs: job.additional_issues || [],
+      additional_repairs: (job.additional_issues || []).filter((item: any) => item?.option_type !== 'accessory'),
+      accessories: (job.additional_issues || [])
+        .filter((item: any) => item?.option_type === 'accessory')
+        .map((item: any) => ({ name: item.display_name || item.repair, price: Number(item.price || 0) })),
       requires_parts_order: job.requires_parts_order,
       status: job.status,
     })
