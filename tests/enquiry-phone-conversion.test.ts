@@ -67,3 +67,23 @@ describe('secure quote return path', () => {
     expect(conversion).toContain('additionalRepairsTotal + accessoriesTotal')
   })
 })
+
+
+describe('preferred drop-off on secure quote', () => {
+  it('normalizes the returned ref before fetching and shows the saved preferred day', () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), 'app/quote/approve/[jobId]/page.tsx'),
+      'utf-8'
+    )
+    const route = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/public/quote/[ref]/route.ts'),
+      'utf-8'
+    )
+
+    expect(page).toContain('normalizePublicQuoteRef')
+    expect(page).toContain('Preferred drop-off:')
+    expect(page).toContain('Preference only — not a fixed appointment.')
+    expect(route).toContain('dropoff_preference')
+    expect(route).toContain('dropoff_date')
+  })
+})
