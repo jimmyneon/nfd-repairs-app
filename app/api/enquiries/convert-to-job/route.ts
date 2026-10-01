@@ -136,13 +136,21 @@ export async function POST(request: NextRequest) {
     // (array of { repair, display_name, price }). The job's price_total must
     // include all repairs.
     const primaryPrice = enquiry.quoted_price || 0
-    let additionalRepairsTotal = 0
-    if (Array.isArray(enquiry.additional_repairs)) {
-      additionalRepairsTotal = enquiry.additional_repairs.reduce((sum: number, r: any) => {
-        return sum + (typeof r.price === 'number' ? r.price : 0)
-      }, 0)
-    }
-    const totalPrice = primaryPrice + additionalRepairsTotal
+    const additionalRepairs = Array.isArray(enquiry.additional_repairs) ? enquiry.additional_repairs : []
+    const accessories = Array.isArray(enquiry.accessories) ? enquiry.accessories : []
+    const additionalRepairsTotal = additionalRepairs.reduce((sum: number, r: any) => {
+      return sum + (typeof r.price === 'number' ? r.price : 0)
+    }, 0)
+    const accessoriesTotal = accessories.reduce((sum: number, item: any) => {
+      return sum + (typeof item.price === 'number' ? item.price : 0)
+    }, 0)
+    const accessoryIssues = accessories.map((item: any) => ({
+      repair: 'accessory_' + String(item.name || 'extra').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+      display_name: item.name || 'Extra',
+      price: typeof item.price === 'number' ? item.price : 0,
+      option_type: 'accessory',
+    }))
+    const totalPrice = primaryPrice + additionalRepairsTotal + accessoriesTotal
 
     // Determine job status
     const jobStatus = isDeviceInShop
@@ -175,7 +183,7 @@ export async function POST(request: NextRequest) {
       device_model: enquiry.device_model || 'Unknown',
       issue: enquiry.repair_type || 'Repair needed',
       description: enquiry.issue_description || null,
-      additional_issues: enquiry.additional_repairs || [],
+      additional_issues: [...additionalRepairs, ...accessoryIssues],
 
       // Type & source
       type: 'repair',
