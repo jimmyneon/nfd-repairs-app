@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  getAvailableAccessories,
+  getAvailableAddOns,
   isScreenRepair,
   mergeNamedItems,
   normalizePublicQuoteRef,
@@ -93,5 +95,53 @@ describe('public quote reference normalization', () => {
   it('extracts the enquiry ref from legacy redirect noise', () => {
     expect(normalizePublicQuoteRef('ENQ-QLPGARZ6/?t=abc123')).toBe('ENQ-QLPGARZ6')
     expect(normalizePublicQuoteRef('quote/accept/ENQ-qlpgarz6')).toBe('ENQ-QLPGARZ6')
+  })
+})
+
+
+describe('secure quote upsells', () => {
+  const iphone15Catalogue = [
+    { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Screen replacement', priceType: 'fixed', customerPriceGbp: 90, enabled: true, priority: 1 },
+    { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Screen replacement', priceType: 'fixed', customerPriceGbp: 150, enabled: true, priority: 1 },
+    { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Battery replacement', priceType: 'fixed', customerPriceGbp: 90, enabled: true, priority: 2 },
+    { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Battery replacement', priceType: 'fixed', customerPriceGbp: 125, enabled: true, priority: 2 },
+    { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Charging port service', priceType: 'fixed', customerPriceGbp: 39, enabled: true, priority: 3 },
+  ]
+
+  it('treats Phones and Phone as the same category', () => {
+    expect(verifyRequestedAccessories(
+      [{ name: 'Tempered glass screen protector' }],
+      { category: 'Phones', brand: 'Apple', primaryRepair: 'Screen replacement' }
+    )).toEqual([{ name: 'Tempered glass screen protector', price: 15 }])
+  })
+
+  it('offers the free health check and screen protector on an iPhone screen repair', () => {
+    expect(getAvailableAccessories({
+      category: 'Phones',
+      brand: 'Apple',
+      primaryRepair: 'Screen replacement',
+    })).toEqual([
+      { name: 'Free battery health check', price: 0 },
+      { name: 'Tempered glass screen protector', price: 15 },
+    ])
+  })
+
+  it('offers battery replacement as a discounted add-on for the iPhone 15 Pro screen quote', () => {
+    const addOns = getAvailableAddOns(iphone15Catalogue, {
+      category: 'Phones',
+      brand: 'Apple',
+      model: 'iPhone 15 Pro',
+      primaryRepair: 'Screen replacement',
+    })
+
+    expect(addOns[0]).toMatchObject({
+      repair: 'Battery replacement',
+      originalPrice: 90,
+      discountPrice: 68,
+      hasDiscount: true,
+      saving: 22,
+    })
+    expect(addOns.some(item => item.repair === 'Charging port service')).toBe(true)
+    expect(addOns.some(item => item.repair === 'Screen replacement')).toBe(false)
   })
 })

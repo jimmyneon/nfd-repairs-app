@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
 
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('enquiry_ref,device_category,device_make,device_model,repair_type,additional_repairs,accessories,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('enquiry_ref,device_category,device_make,device_model,repair_type,additional_repairs,accessories,converted_to_job,converted_job_id,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_ref', ref)
       .maybeSingle()
 
@@ -93,6 +93,47 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
 
       if (updateError) {
         return NextResponse.json({ error: 'Failed to save repair options' }, { status: 500, headers: CORS_HEADERS })
+      }
+
+      if (enquiry.converted_to_job && enquiry.converted_job_id) {
+        const { data: linkedJob } = await supabase
+          .from('jobs')
+          .select('id,quoted_price,additional_issues')
+          .eq('id', enquiry.converted_job_id)
+          .maybeSingle()
+
+        if (linkedJob) {
+          const accessoryIssues = mergedAccessories.map((accessory: any) => ({
+            repair: accessoryRepairKey(String(accessory.name || 'extra')),
+            display_name: accessory.name || 'Extra',
+            price: Number(accessory.price || 0),
+            option_type: 'accessory',
+          }))
+          const repairIssues = mergedRepairs.map((repair: any) => ({
+            ...repair,
+            option_type: repair.option_type || 'repair',
+          }))
+          const mergedJobIssues = mergeNamedItems(
+            mergeNamedItems(linkedJob.additional_issues, repairIssues, 'repair'),
+            accessoryIssues,
+            'repair'
+          )
+          const additionsTotal = mergedJobIssues.reduce((sum, item) => sum + Number(item?.price || 0), 0)
+          const basePrice = Number(linkedJob.quoted_price || 0)
+
+          const { error: linkedJobUpdateError } = await supabase
+            .from('jobs')
+            .update({
+              additional_issues: mergedJobIssues,
+              price_total: basePrice + additionsTotal,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', linkedJob.id)
+
+          if (linkedJobUpdateError) {
+            return NextResponse.json({ error: 'Repair options were saved to the quote but could not be added to the live job' }, { status: 500, headers: CORS_HEADERS })
+          }
+        }
       }
 
       if (changed) {

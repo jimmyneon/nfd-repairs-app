@@ -12,6 +12,7 @@ on:
       - 'app/api/password/**'
       - 'app/api/sms/**'
       - 'app/api/public/**'
+      - 'app/quote/**'
       - 'app/api/tracking/**'
       - 'app/app/enquiries/**'
       - 'app/app/analytics/quote-ux/**'
@@ -24,10 +25,12 @@ on:
       - 'lib/utils.ts'
       - 'lib/types-v3.ts'
       - 'lib/awaiting-device-followup.ts'
+      - 'lib/public-quote-options.ts'
       - 'vercel.json'
       - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
       - 'tests/awaiting-device-followup.test.ts'
+      - 'tests/public-quote-options.test.ts'
       - '.github/workflows/repair-flow-check.yml'
   pull_request:
     paths:
@@ -38,6 +41,7 @@ on:
       - 'app/api/password/**'
       - 'app/api/sms/**'
       - 'app/api/public/**'
+      - 'app/quote/**'
       - 'app/api/tracking/**'
       - 'app/app/enquiries/**'
       - 'app/app/analytics/quote-ux/**'
@@ -50,10 +54,12 @@ on:
       - 'lib/utils.ts'
       - 'lib/types-v3.ts'
       - 'lib/awaiting-device-followup.ts'
+      - 'lib/public-quote-options.ts'
       - 'vercel.json'
       - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
       - 'tests/awaiting-device-followup.test.ts'
+      - 'tests/public-quote-options.test.ts'
       - '.github/workflows/repair-flow-check.yml'
 
 jobs:
@@ -93,6 +99,12 @@ jobs:
           grep -Fq "/api/jobs/send-awaiting-device-followups" vercel.json
           grep -Fq "Awaiting device" app/app/jobs/page.tsx
           grep -Fq "Overdue / followed up" app/app/jobs/page.tsx
+          grep -Fq "available_addons" "app/api/public/quote/[ref]/route.ts"
+          grep -Fq "customer_update: buildCustomerUpdate(linkedJob)" "app/api/public/quote/[ref]/route.ts"
+          grep -Fq "Save selected extras" "app/quote/approve/[jobId]/page.tsx"
+          grep -Fq "What happens next" "app/quote/approve/[jobId]/page.tsx"
+          grep -Fq "parts_expected_at: requiresParts && earliest_date" app/api/enquiries/convert-to-job/route.ts
+          grep -Fq "converted_job_id" "app/api/public/quote/[ref]/options/route.ts"
 
       - name: Type-check application
         run: npx tsc --noEmit

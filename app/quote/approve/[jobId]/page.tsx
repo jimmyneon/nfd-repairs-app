@@ -46,59 +46,17 @@ function QuoteApprovalContent() {
     }
   }, [jobId, quoteToken])
 
-  // Fetch add-on repairs from catalogue once job is loaded
+  // The server resolves add-ons against the catalogue. Keeping this server-side
+  // avoids cross-origin browser failures and ensures the price shown here is the
+  // same price the secure save endpoint will accept.
   useEffect(() => {
-    if (!job || !job.device_category || !job.device_make || !job.device_model) return
+    if (!job) return
+    const result: AddOnRepair[] = Array.isArray(job.available_addons) ? job.available_addons : []
+    setAddOns(result)
 
-    const existingRepairs = new Set<string>([job.issue?.toLowerCase()].filter(Boolean) as string[])
-    if (job.additional_repairs) {
-      job.additional_repairs.forEach((r: any) => existingRepairs.add((r.repair || '').toLowerCase()))
+    if (requestedAddOn && result.some(item => item.repair === requestedAddOn)) {
+      setSelectedAddOns(prev => new Set([...prev, requestedAddOn]))
     }
-
-    fetch('https://newforestdevicerepairs.co.uk/data/quote-catalogue.json')
-      .then(res => res.json())
-      .then(catalogue => {
-        const quotes = catalogue.quotes || []
-        const matching = quotes.filter((q: any) =>
-          q.category === job.device_category &&
-          q.brand === job.device_make &&
-          q.model === job.device_model &&
-          q.priceType === 'fixed' &&
-          q.customerPriceGbp !== null &&
-          q.enabled !== false
-        )
-
-        const byRepair: Record<string, any[]> = {}
-        matching.forEach((q: any) => {
-          if (!byRepair[q.repair]) byRepair[q.repair] = []
-          byRepair[q.repair].push(q)
-        })
-
-        const SCREEN_KEYWORDS = ['screen', 'display', 'lcd', 'oled', 'digitiser', 'digitizer', 'touch-glass', 'touch glass', 'touchscreen', 'inner screen', 'outer screen']
-        const isScreen = (r: string) => SCREEN_KEYWORDS.some(kw => r.toLowerCase().includes(kw))
-
-        const result: AddOnRepair[] = []
-        Object.keys(byRepair).forEach(repair => {
-          if (existingRepairs.has(repair.toLowerCase())) return
-          const opts = byRepair[repair]
-          const minPrice = Math.min(...opts.map((o: any) => o.customerPriceGbp))
-          const screen = isScreen(repair)
-          const discountPrice = screen ? minPrice : Math.round(minPrice * 0.75)
-          const displayName = repair.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-          result.push({ repair, displayName, originalPrice: minPrice, discountPrice, hasDiscount: !screen, saving: minPrice - discountPrice })
-        })
-
-        result.sort((a, b) => {
-          if (a.hasDiscount !== b.hasDiscount) return a.hasDiscount ? -1 : 1
-          return a.discountPrice - b.discountPrice
-        })
-
-        setAddOns(result)
-        if (requestedAddOn && result.some(item => item.repair === requestedAddOn)) {
-          setSelectedAddOns(prev => new Set([...prev, requestedAddOn]))
-        }
-      })
-      .catch(() => {})
   }, [job, requestedAddOn])
 
   const toggleAddOn = (repair: string) => {
@@ -122,12 +80,8 @@ function QuoteApprovalContent() {
     ? Number(job.quoted_price)
     : Math.max(0, rawPriceTotal - existingRepairTotal - existingAccessoryTotal)
 
-  const screenRepair = /screen|display|lcd|oled|digitis|digitiz|touch/i.test(String(job?.issue || ''))
-  const isIPhone = String(job?.device_make || '').toLowerCase() === 'apple' && String(job?.device_category || '').toLowerCase() === 'phone'
-  const accessoryChoices = [
-    ...(screenRepair ? [{ name: 'Free battery health check', price: 0 }] : []),
-    ...(screenRepair && isIPhone ? [{ name: 'Tempered glass screen protector', price: 15 }] : []),
-  ]
+  const accessoryChoices: Array<{ name: string; price: number }> =
+    Array.isArray(job?.available_accessories) ? job.available_accessories : []
   const existingAccessoryNames = new Set(existingAccessories.map((item: any) => String(item?.name || '')))
   const selectedAccessoryList = accessoryChoices.filter(item => selectedAccessories.has(item.name))
   const selectedAccessoryTotal = selectedAccessoryList.reduce((sum, item) => sum + item.price, 0)
@@ -136,6 +90,8 @@ function QuoteApprovalContent() {
 
   const acceptedStatuses = new Set(['approved', 'converted', 'QUOTE_APPROVED', 'AWAITING_DEVICE', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'RECEIVED'])
   const alreadyAccepted = acceptedStatuses.has(String(job?.status || ''))
+  const customerUpdate = job?.customer_update || null
+  const showProcessGuide = customerUpdate && !['complete', 'cancelled'].includes(String(customerUpdate.key || ''))
 
   const preferredDropoffLabel = (() => {
     if (!job) return null
@@ -181,11 +137,20 @@ function QuoteApprovalContent() {
     })
     if (!response.ok) throw new Error('Failed to save options')
     const data = await response.json()
-    setJob((current: any) => current ? {
-      ...current,
-      additional_repairs: data.additional_repairs || current.additional_repairs,
-      accessories: data.accessories || current.accessories,
-    } : current)
+    setJob((current: any) => {
+      if (!current) return current
+      const savedRepairs = new Set(
+        (data.additional_repairs || []).map((item: any) => String(item?.repair || '').toLowerCase())
+      )
+      return {
+        ...current,
+        additional_repairs: data.additional_repairs || current.additional_repairs,
+        accessories: data.accessories || current.accessories,
+        available_addons: (current.available_addons || []).filter(
+          (item: any) => !savedRepairs.has(String(item?.repair || '').toLowerCase())
+        ),
+      }
+    })
     setSelectedAddOns(new Set())
     setSelectedAccessories(new Set())
     return data
@@ -252,6 +217,19 @@ function QuoteApprovalContent() {
           {alreadyAccepted && <p className="text-sm text-green-700 font-semibold mt-2">Your repair request is already saved. You can add options below.</p>}
         </div>
 
+        {customerUpdate && (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <Package className="h-6 w-6 text-blue-700 mt-0.5 flex-shrink-0" />
+              <div>
+                <h2 className="font-bold text-blue-950 text-lg">{customerUpdate.title}</h2>
+                <p className="text-blue-900 mt-1">{customerUpdate.message}</p>
+                {customerUpdate.detail && <p className="text-sm text-blue-800 mt-2">{customerUpdate.detail}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-50 rounded-xl p-6 mb-6">
           <h2 className="font-bold mb-4">Device Details</h2>
           <div className="space-y-2 text-sm">
@@ -259,10 +237,22 @@ function QuoteApprovalContent() {
               <span className="text-gray-600">Device:</span>
               <span className="font-semibold">{job.device_make} {job.device_model}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-gray-600">Issue:</span>
-              <span className="font-semibold">{job.issue}</span>
+              <span className="font-semibold text-right">{job.issue}</span>
             </div>
+            {job.part_option && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Selected option:</span>
+                <span className="font-semibold text-right">{job.part_option}</span>
+              </div>
+            )}
+            {job.estimated_time && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Typical turnaround:</span>
+                <span className="font-semibold text-right">{job.estimated_time}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -292,7 +282,7 @@ function QuoteApprovalContent() {
 
         <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-green-900 text-xl">Quote Price</h2>
+            <h2 className="font-bold text-green-900 text-xl">{alreadyAccepted ? 'Current repair total' : 'Quote price'}</h2>
             <span className="text-3xl font-bold text-green-600">
               £{currentTotal.toFixed(2)}
             </span>
@@ -308,6 +298,38 @@ function QuoteApprovalContent() {
             </div>
           )}
         </div>
+
+        {showProcessGuide && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+            <h3 className="font-bold text-lg mb-4">What happens next</h3>
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div>
+                <div>
+                  <p className="font-semibold">We check the part</p>
+                  <p className="text-sm text-gray-600">We confirm whether the part is in stock or needs ordering before you make the trip.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div>
+                <div>
+                  <p className="font-semibold">We message you with the next step</p>
+                  <p className="text-sm text-gray-600">If it is in stock, we’ll tell you it is ready to bring in. If it needs ordering, we’ll send the £20 deposit request first.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div>
+                <div>
+                  <p className="font-semibold">Bring it in when ready</p>
+                  <p className="text-sm text-gray-600">
+                    No fixed appointment is needed unless we tell you otherwise.
+                    {job.estimated_time ? ` Typical turnaround after drop-off: ${job.estimated_time}.` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {existingAccessories.length > 0 && (
           <div className="bg-emerald-50 rounded-xl p-4 mb-6">
@@ -401,8 +423,17 @@ function QuoteApprovalContent() {
                   Added options: {selectedAddOns.size + selectedAccessories.size} item{(selectedAddOns.size + selectedAccessories.size) > 1 ? 's' : ''}
                 </span>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">New total: £{totalPrice.toFixed(2)}</div>
+                  {(addOnTotal + selectedAccessoryTotal) > 0 ? (
+                    <>
+                      <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">New repair total: £{totalPrice.toFixed(2)}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg font-bold text-green-600">No extra charge</div>
+                      <div className="text-xs text-gray-500">Repair total stays £{currentTotal.toFixed(2)}</div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -419,8 +450,8 @@ function QuoteApprovalContent() {
             <span>{approving
               ? (alreadyAccepted ? 'Saving...' : 'Approving...')
               : alreadyAccepted
-                ? ((selectedAddOns.size + selectedAccessories.size) > 0 ? `Save Added Options — £${totalPrice.toFixed(2)}` : 'Repair Request Saved')
-                : `Approve & Book Repair${(selectedAddOns.size + selectedAccessories.size) > 0 ? ` — £${totalPrice.toFixed(2)}` : ''}`}</span>
+                ? ((selectedAddOns.size + selectedAccessories.size) > 0 ? 'Save selected extras' : 'Repair Request Saved')
+                : `Approve Repair${(selectedAddOns.size + selectedAccessories.size) > 0 ? ` — £${totalPrice.toFixed(2)} total` : ''}`}</span>
           </button>
 
           {!alreadyAccepted && (

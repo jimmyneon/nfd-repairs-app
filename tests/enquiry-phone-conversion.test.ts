@@ -53,7 +53,7 @@ describe('secure quote return path', () => {
     )
     expect(page).toContain('useParams')
     expect(page).toContain('Your repair request is already saved')
-    expect(page).toContain('Save Added Options')
+    expect(page).toContain('Save selected extras')
     expect(page).toContain('/options?t=')
   })
 
@@ -98,5 +98,53 @@ describe('public quote live-schema regression', () => {
     expect(route).not.toContain('quoted_price_high')
     expect(route).toContain('dropoff_preference')
     expect(route).toContain('dropoff_date')
+  })
+})
+
+
+describe('secure quote customer messaging and live status', () => {
+  it('restores the parts-check process messaging on the secure quote page', () => {
+    const page = fs.readFileSync(
+      path.join(process.cwd(), 'app/quote/approve/[jobId]/page.tsx'),
+      'utf-8'
+    )
+    expect(page).toContain('What happens next')
+    expect(page).toContain('We check the part')
+    expect(page).toContain('We message you with the next step')
+    expect(page).toContain('No fixed appointment is needed unless we tell you otherwise.')
+    expect(page).toContain('No extra charge')
+    expect(page).toContain('Repair total stays')
+  })
+
+  it('returns live parts and job status through the same secure quote link', () => {
+    const route = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/public/quote/[ref]/route.ts'),
+      'utf-8'
+    )
+    expect(route).toContain('converted_job_id')
+    expect(route).toContain('customer_update: buildCustomerUpdate(linkedJob)')
+    expect(route).toContain('We’re checking the part')
+    expect(route).toContain('Parts confirmed — ready to bring it in')
+    expect(route).toContain('We need to order the part')
+    expect(route).toContain('Your part has been ordered')
+    expect(route).toContain('Your part has arrived')
+  })
+
+  it('stores the staff-entered expected parts date when converting an enquiry', () => {
+    const conversion = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/enquiries/convert-to-job/route.ts'),
+      'utf-8'
+    )
+    expect(conversion).toContain('parts_expected_at: requiresParts && earliest_date')
+  })
+
+  it('keeps later customer-selected options synced to an already-created job', () => {
+    const optionsRoute = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/public/quote/[ref]/options/route.ts'),
+      'utf-8'
+    )
+    expect(optionsRoute).toContain('converted_job_id')
+    expect(optionsRoute).toContain('linkedJob.additional_issues')
+    expect(optionsRoute).toContain('price_total: basePrice + additionsTotal')
   })
 })
