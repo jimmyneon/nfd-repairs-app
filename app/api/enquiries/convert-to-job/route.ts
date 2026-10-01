@@ -203,6 +203,9 @@ export async function POST(request: NextRequest) {
       deposit_received: depositAlreadyPaid,
       deposit_received_at: depositAlreadyPaid ? now : null,
       deposit_requested_at: requiresParts && !depositAlreadyPaid ? now : null,
+      parts_expected_at: requiresParts && earliest_date
+        ? new Date(earliest_date + 'T12:00:00Z').toISOString()
+        : null,
 
       // Device possession — customer has device, needs to drop off
       // (unless they've already dropped it off in the shop)
