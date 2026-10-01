@@ -273,7 +273,7 @@ function QuoteApprovalContent() {
 
         <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-green-900 text-xl">Quote Price</h2>
+            <h2 className="font-bold text-green-900 text-xl">{alreadyAccepted ? 'Current repair total' : 'Quote price'}</h2>
             <span className="text-3xl font-bold text-green-600">
               £{currentTotal.toFixed(2)}
             </span>
@@ -414,8 +414,17 @@ function QuoteApprovalContent() {
                   Added options: {selectedAddOns.size + selectedAccessories.size} item{(selectedAddOns.size + selectedAccessories.size) > 1 ? 's' : ''}
                 </span>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
-                  <div className="text-xs text-gray-500">New total: £{totalPrice.toFixed(2)}</div>
+                  {(addOnTotal + selectedAccessoryTotal) > 0 ? (
+                    <>
+                      <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">New repair total: £{totalPrice.toFixed(2)}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg font-bold text-green-600">No extra charge</div>
+                      <div className="text-xs text-gray-500">Repair total stays £{currentTotal.toFixed(2)}</div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -432,8 +441,8 @@ function QuoteApprovalContent() {
             <span>{approving
               ? (alreadyAccepted ? 'Saving...' : 'Approving...')
               : alreadyAccepted
-                ? ((selectedAddOns.size + selectedAccessories.size) > 0 ? `Save Added Options — £${totalPrice.toFixed(2)}` : 'Repair Request Saved')
-                : `Approve & Book Repair${(selectedAddOns.size + selectedAccessories.size) > 0 ? ` — £${totalPrice.toFixed(2)}` : ''}`}</span>
+                ? ((selectedAddOns.size + selectedAccessories.size) > 0 ? 'Save selected extras' : 'Repair Request Saved')
+                : `Approve Repair${(selectedAddOns.size + selectedAccessories.size) > 0 ? ` — £${totalPrice.toFixed(2)} total` : ''}`}</span>
           </button>
 
           {!alreadyAccepted && (
