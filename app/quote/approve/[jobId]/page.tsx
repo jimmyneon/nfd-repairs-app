@@ -90,6 +90,8 @@ function QuoteApprovalContent() {
 
   const acceptedStatuses = new Set(['approved', 'converted', 'QUOTE_APPROVED', 'AWAITING_DEVICE', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'RECEIVED'])
   const alreadyAccepted = acceptedStatuses.has(String(job?.status || ''))
+  const customerUpdate = job?.customer_update || null
+  const showProcessGuide = customerUpdate && !['complete', 'cancelled'].includes(String(customerUpdate.key || ''))
 
   const preferredDropoffLabel = (() => {
     if (!job) return null
@@ -206,6 +208,19 @@ function QuoteApprovalContent() {
           {alreadyAccepted && <p className="text-sm text-green-700 font-semibold mt-2">Your repair request is already saved. You can add options below.</p>}
         </div>
 
+        {customerUpdate && (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 mb-6">
+            <div className="flex items-start gap-3">
+              <Package className="h-6 w-6 text-blue-700 mt-0.5 flex-shrink-0" />
+              <div>
+                <h2 className="font-bold text-blue-950 text-lg">{customerUpdate.title}</h2>
+                <p className="text-blue-900 mt-1">{customerUpdate.message}</p>
+                {customerUpdate.detail && <p className="text-sm text-blue-800 mt-2">{customerUpdate.detail}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-50 rounded-xl p-6 mb-6">
           <h2 className="font-bold mb-4">Device Details</h2>
           <div className="space-y-2 text-sm">
@@ -213,10 +228,22 @@ function QuoteApprovalContent() {
               <span className="text-gray-600">Device:</span>
               <span className="font-semibold">{job.device_make} {job.device_model}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-4">
               <span className="text-gray-600">Issue:</span>
-              <span className="font-semibold">{job.issue}</span>
+              <span className="font-semibold text-right">{job.issue}</span>
             </div>
+            {job.part_option && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Selected option:</span>
+                <span className="font-semibold text-right">{job.part_option}</span>
+              </div>
+            )}
+            {job.estimated_time && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Typical turnaround:</span>
+                <span className="font-semibold text-right">{job.estimated_time}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -262,6 +289,38 @@ function QuoteApprovalContent() {
             </div>
           )}
         </div>
+
+        {showProcessGuide && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+            <h3 className="font-bold text-lg mb-4">What happens next</h3>
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</div>
+                <div>
+                  <p className="font-semibold">We check the part</p>
+                  <p className="text-sm text-gray-600">We confirm whether the part is in stock or needs ordering before you make the trip.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</div>
+                <div>
+                  <p className="font-semibold">We message you with the next step</p>
+                  <p className="text-sm text-gray-600">If it is in stock, we’ll tell you it is ready to bring in. If it needs ordering, we’ll send the £20 deposit request first.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-7 h-7 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">3</div>
+                <div>
+                  <p className="font-semibold">Bring it in when ready</p>
+                  <p className="text-sm text-gray-600">
+                    No fixed appointment is needed unless we tell you otherwise.
+                    {job.estimated_time ? ` Typical turnaround after drop-off: ${job.estimated_time}.` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {existingAccessories.length > 0 && (
           <div className="bg-emerald-50 rounded-xl p-4 mb-6">
