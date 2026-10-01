@@ -96,3 +96,6 @@ jobs:
 
       - name: Type-check application
         run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
