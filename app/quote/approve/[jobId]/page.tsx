@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { Loader2, CheckCircle, XCircle, AlertCircle, Smartphone, Package, Plus } from 'lucide-react'
 
 interface AddOnRepair {
@@ -15,9 +15,12 @@ interface AddOnRepair {
 
 function QuoteApprovalContent() {
   const searchParams = useSearchParams()
+  const routeParams = useParams<{ jobId: string }>()
   const router = useRouter()
-  const jobId = searchParams.get('jobId')
+  const routeJobId = Array.isArray(routeParams?.jobId) ? routeParams.jobId[0] : routeParams?.jobId
+  const jobId = searchParams.get('jobId') || routeJobId
   const quoteToken = searchParams.get('t')
+  const requestedAddOn = searchParams.get('add')
   const [loading, setLoading] = useState(true)
   const [approving, setApproving] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -25,6 +28,8 @@ function QuoteApprovalContent() {
   const [error, setError] = useState('')
   const [addOns, setAddOns] = useState<AddOnRepair[]>([])
   const [selectedAddOns, setSelectedAddOns] = useState<Set<string>>(new Set())
+  const [selectedAccessories, setSelectedAccessories] = useState<Set<string>>(new Set())
+  const [savedMessage, setSavedMessage] = useState('')
 
   useEffect(() => {
     if (jobId) {
@@ -87,9 +92,12 @@ function QuoteApprovalContent() {
         })
 
         setAddOns(result)
+        if (requestedAddOn && result.some(item => item.repair === requestedAddOn)) {
+          setSelectedAddOns(prev => new Set([...prev, requestedAddOn]))
+        }
       })
       .catch(() => {})
-  }, [job])
+  }, [job, requestedAddOn])
 
   const toggleAddOn = (repair: string) => {
     setSelectedAddOns(prev => {
@@ -102,29 +110,76 @@ function QuoteApprovalContent() {
 
   const selectedAddOnList = addOns.filter(a => selectedAddOns.has(a.repair))
   const addOnTotal = selectedAddOnList.reduce((s, a) => s + a.discountPrice, 0)
-  const basePrice = job?.quoted_price || job?.price_total || 0
-  const totalPrice = basePrice + addOnTotal
+
+  const existingRepairs = Array.isArray(job?.additional_repairs) ? job.additional_repairs : []
+  const existingAccessories = Array.isArray(job?.accessories) ? job.accessories : []
+  const existingRepairTotal = existingRepairs.reduce((sum: number, item: any) => sum + Number(item?.price || 0), 0)
+  const existingAccessoryTotal = existingAccessories.reduce((sum: number, item: any) => sum + Number(item?.price || 0), 0)
+  const rawPriceTotal = Number(job?.price_total || 0)
+  const basePrice = job?.quoted_price != null
+    ? Number(job.quoted_price)
+    : Math.max(0, rawPriceTotal - existingRepairTotal - existingAccessoryTotal)
+
+  const screenRepair = /screen|display|lcd|oled|digitis|digitiz|touch/i.test(String(job?.issue || ''))
+  const isIPhone = String(job?.device_make || '').toLowerCase() === 'apple' && String(job?.device_category || '').toLowerCase() === 'phone'
+  const accessoryChoices = [
+    ...(screenRepair ? [{ name: 'Free battery health check', price: 0 }] : []),
+    ...(screenRepair && isIPhone ? [{ name: 'Tempered glass screen protector', price: 15 }] : []),
+  ]
+  const existingAccessoryNames = new Set(existingAccessories.map((item: any) => String(item?.name || '')))
+  const selectedAccessoryList = accessoryChoices.filter(item => selectedAccessories.has(item.name))
+  const selectedAccessoryTotal = selectedAccessoryList.reduce((sum, item) => sum + item.price, 0)
+  const currentTotal = basePrice + existingRepairTotal + existingAccessoryTotal
+  const totalPrice = currentTotal + addOnTotal + selectedAccessoryTotal
+
+  const acceptedStatuses = new Set(['approved', 'converted', 'QUOTE_APPROVED', 'AWAITING_DEVICE', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'RECEIVED'])
+  const alreadyAccepted = acceptedStatuses.has(String(job?.status || ''))
+
+  const saveSelectedOptions = async () => {
+    if (!jobId || !quoteToken) throw new Error('Secure quote token missing')
+    if (selectedAddOnList.length === 0 && selectedAccessoryList.length === 0) return null
+
+    const response = await fetch(`/api/public/quote/${jobId}/options?t=${encodeURIComponent(quoteToken)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        additional_repairs: selectedAddOnList.map(item => ({ repair: item.repair })),
+        accessories: selectedAccessoryList.map(item => ({ name: item.name })),
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to save options')
+    const data = await response.json()
+    setJob((current: any) => current ? {
+      ...current,
+      additional_repairs: data.additional_repairs || current.additional_repairs,
+      accessories: data.accessories || current.accessories,
+    } : current)
+    setSelectedAddOns(new Set())
+    setSelectedAccessories(new Set())
+    return data
+  }
 
   const handleApprove = async () => {
     setApproving(true)
+    setSavedMessage('')
     try {
-      const payload: any = {}
-      if (selectedAddOnList.length > 0) {
-        payload.additional_repairs = selectedAddOnList.map(a => ({
-          repair: a.repair,
-          displayName: a.displayName,
-          price: a.discountPrice,
-        }))
+      await saveSelectedOptions()
+
+      if (alreadyAccepted) {
+        setSavedMessage('Your repair options have been saved.')
+        setApproving(false)
+        return
       }
+
       const response = await fetch(`/api/public/quote/${jobId}/approve${quoteToken ? `?t=${encodeURIComponent(quoteToken)}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({}),
       })
       if (!response.ok) throw new Error('Failed to approve quote')
       router.push(`/quote/approved?jobId=${jobId}`)
     } catch (err) {
-      setError('Failed to approve quote')
+      setError(alreadyAccepted ? 'Failed to save repair options' : 'Failed to approve quote')
       setApproving(false)
     }
   }
@@ -160,8 +215,9 @@ function QuoteApprovalContent() {
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
         <div className="text-center mb-8">
           <Smartphone className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Repair Quote</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">{alreadyAccepted ? 'Your Repair Request' : 'Repair Quote'}</h1>
           <p className="text-gray-600">Reference: {job.job_ref}</p>
+          {alreadyAccepted && <p className="text-sm text-green-700 font-semibold mt-2">Your repair request is already saved. You can add options below.</p>}
         </div>
 
         <div className="bg-gray-50 rounded-xl p-6 mb-6">
@@ -180,7 +236,7 @@ function QuoteApprovalContent() {
 
         {job.additional_repairs && job.additional_repairs.length > 0 && (
           <div className="bg-blue-50 rounded-xl p-4 mb-6">
-            <h3 className="font-semibold text-sm text-blue-900 mb-2">Also Included:</h3>
+            <h3 className="font-semibold text-sm text-blue-900 mb-2">Already added:</h3>
             {job.additional_repairs.map((r: any, i: number) => (
               <div key={i} className="flex justify-between text-sm py-1">
                 <span className="text-blue-800">{r.display_name || r.repair}</span>
@@ -194,7 +250,7 @@ function QuoteApprovalContent() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-green-900 text-xl">Quote Price</h2>
             <span className="text-3xl font-bold text-green-600">
-              £{basePrice.toFixed(2)}
+              £{currentTotal.toFixed(2)}
             </span>
           </div>
           
@@ -208,6 +264,51 @@ function QuoteApprovalContent() {
             </div>
           )}
         </div>
+
+        {existingAccessories.length > 0 && (
+          <div className="bg-emerald-50 rounded-xl p-4 mb-6">
+            <h3 className="font-semibold text-sm text-emerald-900 mb-2">Extras already added:</h3>
+            {existingAccessories.map((item: any, index: number) => (
+              <div key={index} className="flex justify-between text-sm py-1">
+                <span className="text-emerald-800">{item.name}</span>
+                <span className="font-semibold text-emerald-900">{Number(item.price || 0) > 0 ? `£${Number(item.price).toFixed(2)}` : 'Free'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {accessoryChoices.some(item => !existingAccessoryNames.has(item.name)) && (
+          <div className="mb-6">
+            <h3 className="font-bold text-lg mb-2">Useful extras</h3>
+            <p className="text-sm text-gray-500 mb-4">These are optional and can be added to your existing repair request.</p>
+            <div className="space-y-2">
+              {accessoryChoices.filter(item => !existingAccessoryNames.has(item.name)).map(item => (
+                <label
+                  key={item.name}
+                  className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    selectedAccessories.has(item.name) ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white hover:border-green-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 accent-green-600"
+                    checked={selectedAccessories.has(item.name)}
+                    onChange={() => setSelectedAccessories(prev => {
+                      const next = new Set(prev)
+                      if (next.has(item.name)) next.delete(item.name)
+                      else next.add(item.name)
+                      return next
+                    })}
+                  />
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">{item.name}</div>
+                    <div className="text-green-600 font-bold">{item.price > 0 ? `£${item.price}` : 'Free'}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Upsell section — add-on repairs */}
         {addOns.length > 0 && (
@@ -250,13 +351,13 @@ function QuoteApprovalContent() {
                 </label>
               ))}
             </div>
-            {selectedAddOns.size > 0 && (
+            {(selectedAddOns.size + selectedAccessories.size) > 0 && (
               <div className="mt-4 p-4 bg-green-50 rounded-xl flex justify-between items-center">
                 <span className="text-sm text-gray-600">
-                  Additional repairs: {selectedAddOns.size} item{selectedAddOns.size > 1 ? 's' : ''}
+                  Added options: {selectedAddOns.size + selectedAccessories.size} item{(selectedAddOns.size + selectedAccessories.size) > 1 ? 's' : ''}
                 </span>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-green-600">+£{addOnTotal}</div>
+                  <div className="text-lg font-bold text-green-600">+£{(addOnTotal + selectedAccessoryTotal).toFixed(2)}</div>
                   <div className="text-xs text-gray-500">New total: £{totalPrice.toFixed(2)}</div>
                 </div>
               </div>
@@ -267,21 +368,28 @@ function QuoteApprovalContent() {
         <div className="space-y-3">
           <button
             onClick={handleApprove}
-            disabled={approving || rejecting}
+            disabled={approving || rejecting || (alreadyAccepted && selectedAddOns.size === 0 && selectedAccessories.size === 0)}
             className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 text-lg"
           >
             {approving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
-            <span>{approving ? 'Approving...' : `Approve & Book Repair${selectedAddOns.size > 0 ? ` — £${totalPrice.toFixed(2)}` : ''}`}</span>
+            <span>{approving
+              ? (alreadyAccepted ? 'Saving...' : 'Approving...')
+              : alreadyAccepted
+                ? ((selectedAddOns.size + selectedAccessories.size) > 0 ? `Save Added Options — £${totalPrice.toFixed(2)}` : 'Repair Request Saved')
+                : `Approve & Book Repair${(selectedAddOns.size + selectedAccessories.size) > 0 ? ` — £${totalPrice.toFixed(2)}` : ''}`}</span>
           </button>
 
-          <button
-            onClick={handleReject}
-            disabled={approving || rejecting}
-            className="w-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-900 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2"
-          >
-            {rejecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <XCircle className="h-5 w-5" />}
-            <span>{rejecting ? 'Rejecting...' : 'Reject Quote'}</span>
-          </button>
+          {!alreadyAccepted && (
+            <button
+              onClick={handleReject}
+              disabled={approving || rejecting}
+              className="w-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-900 font-semibold py-3 px-6 rounded-xl flex items-center justify-center gap-2"
+            >
+              {rejecting ? <Loader2 className="h-5 w-5 animate-spin" /> : <XCircle className="h-5 w-5" />}
+              <span>{rejecting ? 'Rejecting...' : 'Reject Quote'}</span>
+            </button>
+          )}
+          {savedMessage && <p className="text-center text-sm font-semibold text-green-700">{savedMessage}</p>}
         </div>
       </div>
     </div>
