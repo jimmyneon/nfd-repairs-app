@@ -191,7 +191,7 @@ export function getAvailableAddOns(
     a.priority - b.priority ||
     Number(b.hasDiscount) - Number(a.hasDiscount) ||
     a.discountPrice - b.discountPrice
-  )
+  ).slice(0, 4)
 }
 
 export function mergeNamedItems(existing: unknown, additions: any[], key: 'repair' | 'name') {
