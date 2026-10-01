@@ -22,7 +22,12 @@ on:
       - 'lib/constants.ts'
       - 'lib/email-templates-embedded.ts'
       - 'lib/utils.ts'
+      - 'lib/types-v3.ts'
+      - 'lib/awaiting-device-followup.ts'
+      - 'vercel.json'
+      - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
+      - 'tests/awaiting-device-followup.test.ts'
       - '.github/workflows/repair-flow-check.yml'
   pull_request:
     paths:
@@ -43,7 +48,12 @@ on:
       - 'lib/constants.ts'
       - 'lib/email-templates-embedded.ts'
       - 'lib/utils.ts'
+      - 'lib/types-v3.ts'
+      - 'lib/awaiting-device-followup.ts'
+      - 'vercel.json'
+      - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
+      - 'tests/awaiting-device-followup.test.ts'
       - '.github/workflows/repair-flow-check.yml'
 
 jobs:
@@ -63,7 +73,7 @@ jobs:
         run: npm ci
 
       - name: Run repair-flow tests
-        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts
 
       - name: Verify progressive quote commitment safeguards
         run: |
@@ -76,6 +86,13 @@ jobs:
           grep -Fq "await sendEmail" app/api/enquiries/submit/route.ts
           grep -Fq "post_capture_timing_selected" app/api/analytics/quote-ux/route.ts
           grep -Fq "Timing supplied after capture" app/app/analytics/quote-ux/page.tsx
+          grep -Fq "LEGACY_QUOTE_APPROVAL_RETIRED" app/api/enquiries/update/route.ts
+          grep -Fq "awaiting_device_followup_at" app/api/jobs/send-awaiting-device-followups/route.ts
+          grep -Fq "AWAITING_DEVICE_FOLLOWUP" app/api/jobs/send-awaiting-device-followups/route.ts
+          grep -Fq "isAwaitingDeviceFollowupDue" app/api/jobs/send-awaiting-device-followups/route.ts
+          grep -Fq "/api/jobs/send-awaiting-device-followups" vercel.json
+          grep -Fq "Awaiting device" app/app/jobs/page.tsx
+          grep -Fq "Overdue / followed up" app/app/jobs/page.tsx
 
       - name: Type-check application
         run: npx tsc --noEmit
