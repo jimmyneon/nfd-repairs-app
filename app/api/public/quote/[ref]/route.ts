@@ -46,7 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
     // Try enquiries table first (ref is enquiry_ref for quote approvals)
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('enquiry_ref,created_at,device_make,device_model,repair_type,device_category,quoted_price,quoted_price_high,quote_type,part_option,screen_option,display_price,warranty,estimated_time,additional_repairs,accessories,status,dropoff_preference,dropoff_date,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('enquiry_ref,created_at,device_make,device_model,repair_type,device_category,quoted_price,quote_type,part_option,screen_option,display_price,warranty,estimated_time,additional_repairs,accessories,status,dropoff_preference,dropoff_date,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_ref', ref)
       .maybeSingle()
 
@@ -66,7 +66,6 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
         issue: enquiry.repair_type,
         device_category: enquiry.device_category,
         quoted_price: enquiry.quoted_price,
-        quoted_price_high: enquiry.quoted_price_high,
         price_total: enquiry.quoted_price,
         quote_type: enquiry.quote_type,
         part_option: enquiry.part_option || enquiry.screen_option,
