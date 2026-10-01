@@ -6,10 +6,45 @@ export type QuoteCatalogueRow = {
   priceType?: string
   customerPriceGbp?: number | null
   enabled?: boolean
+  priority?: number | null
 }
 
 export type SavedAddOn = { repair: string; display_name: string; price: number }
 export type SavedAccessory = { name: string; price: number }
+
+export type AvailableAddOn = {
+  repair: string
+  displayName: string
+  originalPrice: number
+  discountPrice: number
+  hasDiscount: boolean
+  saving: number
+  priority: number
+}
+
+export type AvailableAccessory = {
+  name: string
+  price: number
+}
+
+function normaliseText(value: unknown): string {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function normaliseCategory(value: unknown): string {
+  const raw = normaliseText(value)
+  if (raw.endsWith('ies')) return raw.slice(0, -3) + 'y'
+  if (raw.endsWith('s')) return raw.slice(0, -1)
+  return raw
+}
+
+function sameCategory(a: unknown, b: unknown): boolean {
+  return normaliseCategory(a) === normaliseCategory(b)
+}
+
+function sameText(a: unknown, b: unknown): boolean {
+  return normaliseText(a) === normaliseText(b)
+}
 
 const SCREEN_WORDS = ['screen','display','lcd','oled','digitiser','digitizer','touch-glass','touch glass','touchscreen','inner screen','outer screen']
 
@@ -32,10 +67,10 @@ export function verifyRequestedAddOns(
 
     const matches = catalogue.filter(row =>
       row.enabled !== false &&
-      row.category === context.category &&
-      row.brand === context.brand &&
-      row.model === context.model &&
-      row.repair === repair &&
+      sameCategory(row.category, context.category) &&
+      sameText(row.brand, context.brand) &&
+      sameText(row.model, context.model) &&
+      sameText(row.repair, repair) &&
       row.priceType === 'fixed' &&
       typeof row.customerPriceGbp === 'number'
     )
@@ -60,8 +95,8 @@ export function verifyRequestedAccessories(
 ): SavedAccessory[] {
   const allowed: Record<string, number> = {}
   const screen = isScreenRepair(context.primaryRepair)
-  const iphone = String(context.brand || '').toLowerCase() === 'apple' &&
-    String(context.category || '').toLowerCase() === 'phone'
+  const iphone = sameText(context.brand, 'Apple') &&
+    sameCategory(context.category, 'Phone')
 
   if (screen) allowed['Free battery health check'] = 0
   if (screen && iphone) allowed['Tempered glass screen protector'] = 15
@@ -75,6 +110,88 @@ export function verifyRequestedAccessories(
     seen.add(name)
   }
   return output
+}
+
+export function getAvailableAccessories(context: {
+  category?: string | null
+  brand?: string | null
+  primaryRepair?: string | null
+}): AvailableAccessory[] {
+  const screen = isScreenRepair(context.primaryRepair)
+  if (!screen) return []
+
+  const output: AvailableAccessory[] = [
+    { name: 'Free battery health check', price: 0 },
+  ]
+
+  if (sameText(context.brand, 'Apple') && sameCategory(context.category, 'Phone')) {
+    output.push({ name: 'Tempered glass screen protector', price: 15 })
+  }
+
+  return output
+}
+
+export function getAvailableAddOns(
+  catalogue: QuoteCatalogueRow[],
+  context: {
+    category?: string | null
+    brand?: string | null
+    model?: string | null
+    primaryRepair?: string | null
+  },
+  existing: Array<{ repair?: string }> = []
+): AvailableAddOn[] {
+  const excluded = new Set(
+    [context.primaryRepair, ...(existing || []).map(item => item?.repair)]
+      .map(normaliseText)
+      .filter(Boolean)
+  )
+
+  const matches = catalogue.filter(row =>
+    row.enabled !== false &&
+    sameCategory(row.category, context.category) &&
+    sameText(row.brand, context.brand) &&
+    sameText(row.model, context.model) &&
+    row.priceType === 'fixed' &&
+    typeof row.customerPriceGbp === 'number' &&
+    !excluded.has(normaliseText(row.repair))
+  )
+
+  const grouped = new Map<string, QuoteCatalogueRow[]>()
+  for (const row of matches) {
+    const key = normaliseText(row.repair)
+    if (!key) continue
+    const list = grouped.get(key) || []
+    list.push(row)
+    grouped.set(key, list)
+  }
+
+  const output: AvailableAddOn[] = []
+  for (const rows of grouped.values()) {
+    const repair = String(rows[0]?.repair || '').trim()
+    if (!repair) continue
+
+    const originalPrice = Math.min(...rows.map(row => Number(row.customerPriceGbp)))
+    const screen = isScreenRepair(repair)
+    const discountPrice = screen ? originalPrice : Math.round(originalPrice * 0.75)
+    const priority = Math.min(...rows.map(row => Number(row.priority ?? 999)))
+
+    output.push({
+      repair,
+      displayName: repair.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
+      originalPrice,
+      discountPrice,
+      hasDiscount: !screen && discountPrice < originalPrice,
+      saving: originalPrice - discountPrice,
+      priority,
+    })
+  }
+
+  return output.sort((a, b) =>
+    a.priority - b.priority ||
+    Number(b.hasDiscount) - Number(a.hasDiscount) ||
+    a.discountPrice - b.discountPrice
+  )
 }
 
 export function mergeNamedItems(existing: unknown, additions: any[], key: 'repair' | 'name') {
