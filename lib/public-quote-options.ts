@@ -77,8 +77,8 @@ export function verifyRequestedAccessories(
   return output
 }
 
-export function mergeNamedItems(existing: unknown, additions: Array<Record<string, unknown>>, key: 'repair' | 'name') {
-  const result: Array<Record<string, unknown>> = []
+export function mergeNamedItems(existing: unknown, additions: any[], key: 'repair' | 'name') {
+  const result: any[] = []
   const seen = new Set<string>()
 
   for (const item of Array.isArray(existing) ? existing : []) {
