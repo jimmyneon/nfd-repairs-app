@@ -17,6 +17,48 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
   const showPrice = hasValidPrice && data.includePrice !== false
   const isReadyForDropoff = type === 'JOB_CREATED' && job.status === 'AWAITING_DEVICE' && !job.device_in_shop
 
+  const jobCreatedJourneyHtml = type !== 'JOB_CREATED'
+    ? ''
+    : job.device_in_shop
+      ? `
+              <div style="background-color: #F0FDF4; border-left: 4px solid #009B4D; border-radius: 8px; padding: 25px; margin: 25px 0;">
+                <h3 style="color: #009B4D; margin: 0 0 18px 0; font-size: 20px; font-weight: bold;">📋 What Happens Next?</h3>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>1. Your device is already with us</strong><br><span style="color:#4B5563;">It has been checked into the workshop and is linked to this job.</span></p>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>2. Track the repair</strong><br><span style="color:#4B5563;">Use your tracking link at any time to see the latest status.</span></p>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>3. We keep you updated</strong><br><span style="color:#4B5563;">We’ll send updates as the repair moves through the workshop.</span></p>
+                <p style="color: #111827; margin: 0; font-size: 15px; line-height: 1.6;"><strong>4. Collect when it’s ready</strong><br><span style="color:#4B5563;">We’ll let you know as soon as the repair is complete and ready to collect.</span></p>
+              </div>
+        `
+      : `
+              <div style="background-color: #F0FDF4; border-left: 4px solid #009B4D; border-radius: 8px; padding: 25px; margin: 25px 0;">
+                <h3 style="color: #009B4D; margin: 0 0 18px 0; font-size: 20px; font-weight: bold;">📋 What Happens Next?</h3>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>1. ${isReadyForDropoff ? 'Parts confirmed' : 'We confirm the part'}</strong><br><span style="color:#4B5563;">${isReadyForDropoff ? 'Everything is ready for you to bring the device in.' : 'We’ll check stock first. If a part needs ordering, we’ll arrange that and let you know when it is ready before you bring the device in.'}</span></p>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>2. Bring your device to our Lymington shop</strong><br><span style="color:#4B5563;">Once we confirm the part is ready, bring your device to New Forest Device Repairs, 5A New Street, Lymington. No appointment is needed. All repairs are carried out at our shop; online repair requests do not book a home visit.</span></p>
+                <p style="color: #111827; margin: 0 0 14px 0; font-size: 15px; line-height: 1.6;"><strong>3. We repair it and you can track progress</strong><br><span style="color:#4B5563;">Use the tracking link in this email at any time. We’ll also send updates as the repair moves through the workshop.</span></p>
+                <p style="color: #111827; margin: 0; font-size: 15px; line-height: 1.6;"><strong>4. Collect when it’s ready</strong><br><span style="color:#4B5563;">We’ll let you know as soon as the repair is complete and ready to collect.</span></p>
+              </div>
+        `
+
+  const jobCreatedJourneyText = type !== 'JOB_CREATED'
+    ? ''
+    : job.device_in_shop
+      ? `
+WHAT HAPPENS NEXT
+1. Your device is already with us and checked into the workshop.
+2. Use your tracking link at any time to see the latest status.
+3. We’ll keep you updated as the repair progresses.
+4. We’ll let you know when it is ready to collect.
+`
+      : `
+WHAT HAPPENS NEXT
+1. ${isReadyForDropoff ? 'Parts confirmed — everything is ready for you to bring the device in.' : 'We confirm the part first. If a part needs ordering, we’ll arrange that and tell you when it is ready before you bring the device in.'}
+2. Bring your device to our Lymington shop once we confirm the part is ready:
+   New Forest Device Repairs, 5A New Street, Lymington.
+   No appointment is needed. All repairs are carried out at our shop; online repair requests do not book a home visit.
+3. We repair it and you can follow progress using your tracking link.
+4. We’ll let you know when it is ready to collect.
+`
+
   // Generate QR code for READY_TO_COLLECT status
   const qrCodeUrl = job.status === 'READY_TO_COLLECT' 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(trackingUrl)}`
@@ -145,7 +187,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           <tr>
             <td style="background: linear-gradient(135deg, #009B4D 0%, #007A3D 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
               <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">New Forest Device Repairs</h1>
-              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? (isReadyForDropoff ? 'Your repair is ready for drop-off' : 'We\'ve got your repair') : 'Quick update on your repair'}</p>
+              <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">${type === 'JOB_CREATED' ? (job.device_in_shop ? 'Your repair is booked in' : (isReadyForDropoff ? 'Your repair is ready for drop-off' : 'Your repair request is set up')) : 'Quick update on your repair'}</p>
             </td>
           </tr>
 
@@ -153,7 +195,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
           <tr>
             <td style="padding: 30px;">
               <h2 style="color: #111827; margin: 0 0 20px 0; font-size: 24px;">
-                ${type === 'JOB_CREATED' ? (isReadyForDropoff ? 'You’re all set — just bring it in' : 'Thanks for choosing us!') : 'Here\'s what\'s happening'}
+                ${type === 'JOB_CREATED' ? (job.device_in_shop ? 'Your device is booked in' : (isReadyForDropoff ? 'You’re all set — just bring it in' : 'Your repair request is set up')) : 'Here\'s what\'s happening'}
               </h2>
               
               ${statusMessage ? `
@@ -177,82 +219,7 @@ export function generateEmbeddedJobEmail(data: EmbeddedEmailData, type: 'JOB_CRE
               </div>
               ` : ''}
 
-              ${type === 'JOB_CREATED' ? `
-              <!-- What Happens Next Section -->
-              <div style="background-color: #F0FDF4; border-left: 4px solid #009B4D; border-radius: 8px; padding: 25px; margin: 25px 0;">
-                <h3 style="color: #009B4D; margin: 0 0 20px 0; font-size: 20px; font-weight: bold;">📋 What Happens Next?</h3>
-                
-                <!-- Step 1: Tracking Link -->
-                <div style="margin-bottom: 20px;">
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="40" valign="top">
-                        <div style="width: 36px; height: 36px; background-color: #DBEAFE; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">💬</div>
-                      </td>
-                      <td style="padding-left: 15px;">
-                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">1. You Have a Tracking Link</h4>
-                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          ${job.customer_phone
-                            ? "We've sent you a text message with a link to track your repair. You can check the status anytime, 24/7."
-                            : "Your tracking link is in this email — tap View Full Tracking Page below. You can check the status anytime, 24/7."}
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-
-                <!-- Step 2: Updates -->
-                <div style="margin-bottom: 20px;">
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="40" valign="top">
-                        <div style="width: 36px; height: 36px; background-color: #E9D5FF; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">🔔</div>
-                      </td>
-                      <td style="padding-left: 15px;">
-                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">2. We'll Keep You Updated</h4>
-                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          Use the tracking link to check progress anytime. We'll send you detailed ${job.customer_phone ? 'email updates at each stage of the repair. You\'ll also get a text when your repair is ready for collection' : 'updates at each stage of the repair by email'}.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-
-                <!-- Step 3: Timescale -->
-                <div style="margin-bottom: 20px;">
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="40" valign="top">
-                        <div style="width: 36px; height: 36px; background-color: #FED7AA; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">⏰</div>
-                      </td>
-                      <td style="padding-left: 15px;">
-                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">3. We'll Work to Your Timescale</h4>
-                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          We'll complete your repair based on the timescales discussed. If anything changes, we'll let you know immediately.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-
-                <!-- Step 4: Collection -->
-                <div>
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="40" valign="top">
-                        <div style="width: 36px; height: 36px; background-color: #BBF7D0; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 36px; font-size: 18px;">📍</div>
-                      </td>
-                      <td style="padding-left: 15px;">
-                        <h4 style="color: #111827; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">4. Collection Time</h4>
-                        <p style="color: #4B5563; margin: 0; font-size: 14px; line-height: 1.5;">
-                          When your repair is complete, we'll send you a notification. You can then collect your device at your convenience.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-              ` : ''}
+              ${jobCreatedJourneyHtml}
 
               ${embeddedTracking}
 
@@ -352,9 +319,11 @@ ${type === 'JOB_CREATED'
 
 ${statusMessage ? `\n${statusMessage}\n` : ''}
 
+${jobCreatedJourneyText}
+
 ${isReadyForDropoff ? `
-NEXT STEP — BRING YOUR DEVICE IN
-No appointment needed. Pop into New Forest Device Repairs whenever convenient during opening hours.
+NEXT STEP — BRING YOUR DEVICE TO OUR LYMINGTON SHOP
+No appointment needed. Pop into New Forest Device Repairs whenever convenient during opening hours. This is a shop drop-off, not a home visit.
 
 5A New Street, Lymington, Hampshire
 Normal hours: Mon 10am–5pm, Tue closed, Wed–Fri 10am–5pm, Sat 10am–3pm, Sun closed.
