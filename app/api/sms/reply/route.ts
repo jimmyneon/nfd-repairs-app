@@ -387,20 +387,31 @@ export async function POST(request: NextRequest) {
 
       const autoReply = await detectAutoReply(message, job, statusSmsCount, supabase)
       if (autoReply) {
-        // Suppress if staff are in active conversation
-        if (staffInConversation) {
+        // Hours/location are safe factual replies and should ALWAYS be answered,
+        // even while staff are actively texting the customer. This mirrors the
+        // AI responder's simple-query rule and avoids making John answer routine
+        // "when are you open?" / "where are you?" questions manually.
+        const alwaysAnswerBusinessInfo =
+          autoReply.templateKey === 'AUTO_OPENING_HOURS_REPLY' ||
+          autoReply.templateKey === 'AUTO_LOCATION_REPLY'
+
+        // Suppress contextual auto-replies if staff are in active conversation,
+        // but never suppress opening-hours or location/directions replies.
+        if (staffInConversation && !alwaysAnswerBusinessInfo) {
           console.log(`[sms/reply] Auto-reply suppressed for job ${job.job_ref} — staff in conversation`)
           return NextResponse.json({
             success: true,
             routed_to: 'staff_in_conversation',
             job_ref: job.job_ref,
             sms_sent: false,
-            reason: 'Staff sent SMS in last 30 min — message logged, no auto-reply',
+            reason: 'Staff sent SMS in last 30 min — message logged, no contextual auto-reply',
           })
         }
 
-        // Rate limit: skip sending if we just sent an auto-reply in the last 2 minutes
-        if (autoReplyRateLimited) {
+        // Rate limit contextual auto-replies to stop flooding. Hours/location
+        // bypass this because inbound deduplication already prevents duplicate
+        // delivery, and customers should always get the factual answer.
+        if (autoReplyRateLimited && !alwaysAnswerBusinessInfo) {
           console.log(`[sms/reply] Auto-reply rate limited for job ${job.job_ref} — sent one in last 2 min`)
           return NextResponse.json({
             success: true,
@@ -493,16 +504,18 @@ export async function POST(request: NextRequest) {
 
     // Check if this looks like a status/update query
     const orphanIntent = detectSmsIntent(message)
-    if (orphanIntent === 'opening_hours') {
-      // Customer is asking about opening hours/directions — send a helpful
-      // reply with hours + directions, not the "cannot find a repair job" message.
+    if (orphanIntent === 'opening_hours' || orphanIntent === 'location') {
+      // Hours/location are always-answer factual queries. Do not route these
+      // through the once-per-day welcome limiter: a repeat customer who asks
+      // "where are you?" or "when are you open?" still needs an immediate reply.
       if (isSmsConfigured()) {
         const hoursStatus = await computeHoursStatus(supabase)
         const hoursBody = buildHoursReply(hoursStatus)
         const result = await sendSms(phone, hoursBody)
-        await logSms(supabase, 'OPENING_HOURS_REPLY', hoursBody, result.ok, undefined, phone)
+        const templateKey = orphanIntent === 'location' ? 'LOCATION_REPLY' : 'OPENING_HOURS_REPLY'
+        await logSms(supabase, templateKey, hoursBody, result.ok, undefined, phone)
         orphanSmsSent = result.ok
-        console.log(`[sms/reply] Sent opening hours reply to ${phone}`)
+        console.log(`[sms/reply] Sent ${orphanIntent} reply to ${phone}`)
       }
     } else if (orphanIntent === 'update' || orphanIntent === 'done_check' || orphanIntent === 'collection' || orphanIntent === 'turnaround') {
       // These are clearly about an existing repair — send the "cannot find your
@@ -1273,8 +1286,8 @@ function detectSmsIntent(message: string): SmsIntent | null {
   const excludeRegex = /\b(yes|no|book|proceed|go\s+ahead|accept|decline|cancel|paid|deposit|quote|price|how\s+much|cost)\b/i
   if (excludeRegex.test(msg)) return null
 
-  // --- Location intent ("Where are you?", "What's your address?") ---
-  if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store)\b/i.test(msg)) {
+  // --- Location/directions intent ("Where are you?", "How do I get there?") ---
+  if (/\b(where.*you|your.*address|find you|directions|location|where.*shop|where.*store|how.*get.*there|how.*get.*to.*you|where.*do.*i.*go)\b/i.test(msg)) {
     return 'location'
   }
 
@@ -1301,7 +1314,7 @@ function detectSmsIntent(message: string): SmsIntent | null {
   // --- Opening hours intent ("What time do you open?", "When do you close?", "Opening times?") ---
   // Must be checked BEFORE turnaround, because "what time do you open" contains
   // "what time" which would otherwise match the turnaround pattern.
-  if (/\b(what\s+time.*open|what\s+time.*close|when\s+(do|are).*open|when\s+(do|are).*close|opening\s+(times?|hours?)|closing\s+(times?|hours?)|what\s+are.*hours?|your\s+hours?|open\s+and\s+close)\b/i.test(msg)) {
+  if (/\b(what\s+time.*open|what\s+time.*close|when\s+(do|are).*open|when\s+(do|are).*close|opening\s+(times?|hours?)|closing\s+(times?|hours?)|what\s+are.*hours?|your\s+hours?|open\s+and\s+close|are\s+you\s+open|you\s+open\s+(today|tomorrow|now)|is\s+(the\s+)?(shop|store)\s+open|what\s+days.*(open|closed|shut))\b/i.test(msg)) {
     return 'opening_hours'
   }
 
