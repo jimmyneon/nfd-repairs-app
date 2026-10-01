@@ -87,3 +87,16 @@ describe('preferred drop-off on secure quote', () => {
     expect(route).toContain('dropoff_date')
   })
 })
+
+
+describe('public quote live-schema regression', () => {
+  it('does not select the removed quoted_price_high enquiry column', () => {
+    const route = fs.readFileSync(
+      path.join(process.cwd(), 'app/api/public/quote/[ref]/route.ts'),
+      'utf-8'
+    )
+    expect(route).not.toContain('quoted_price_high')
+    expect(route).toContain('dropoff_preference')
+    expect(route).toContain('dropoff_date')
+  })
+})
