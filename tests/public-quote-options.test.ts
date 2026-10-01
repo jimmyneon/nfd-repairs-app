@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isScreenRepair,
   mergeNamedItems,
+  normalizePublicQuoteRef,
   verifyRequestedAccessories,
   verifyRequestedAddOns,
 } from '../lib/public-quote-options'
@@ -80,5 +81,17 @@ describe('public quote option verification', () => {
       { repair: 'battery', price: 60 },
       { repair: 'screen', price: 100 },
     ])
+  })
+})
+
+
+describe('public quote reference normalization', () => {
+  it('keeps a clean enquiry ref unchanged', () => {
+    expect(normalizePublicQuoteRef('ENQ-QLPGARZ6')).toBe('ENQ-QLPGARZ6')
+  })
+
+  it('extracts the enquiry ref from legacy redirect noise', () => {
+    expect(normalizePublicQuoteRef('ENQ-QLPGARZ6/?t=abc123')).toBe('ENQ-QLPGARZ6')
+    expect(normalizePublicQuoteRef('quote/accept/ENQ-qlpgarz6')).toBe('ENQ-QLPGARZ6')
   })
 })

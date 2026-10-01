@@ -97,3 +97,18 @@ export function mergeNamedItems(existing: unknown, additions: any[], key: 'repai
 
   return result
 }
+
+export function normalizePublicQuoteRef(value: unknown): string {
+  let ref = String(value || '').trim()
+  if (!ref) return ''
+
+  try {
+    ref = decodeURIComponent(ref)
+  } catch {}
+
+  const enquiryMatch = ref.match(/ENQ-[A-Z0-9]+/i)
+  if (enquiryMatch) return enquiryMatch[0].toUpperCase()
+
+  ref = ref.split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '')
+  return ref
+}

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { Loader2, CheckCircle, XCircle, AlertCircle, Smartphone, Package, Plus } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, AlertCircle, Smartphone, Package, Plus, CalendarDays } from 'lucide-react'
+import { normalizePublicQuoteRef } from '@/lib/public-quote-options'
 
 interface AddOnRepair {
   repair: string
@@ -18,7 +19,8 @@ function QuoteApprovalContent() {
   const routeParams = useParams<{ jobId: string }>()
   const router = useRouter()
   const routeJobId = Array.isArray(routeParams?.jobId) ? routeParams.jobId[0] : routeParams?.jobId
-  const jobId = searchParams.get('jobId') || routeJobId
+  const rawJobId = searchParams.get('jobId') || routeJobId
+  const jobId = normalizePublicQuoteRef(rawJobId)
   const quoteToken = searchParams.get('t')
   const requestedAddOn = searchParams.get('add')
   const [loading, setLoading] = useState(true)
@@ -135,6 +137,36 @@ function QuoteApprovalContent() {
   const acceptedStatuses = new Set(['approved', 'converted', 'QUOTE_APPROVED', 'AWAITING_DEVICE', 'AWAITING_DEPOSIT', 'PARTS_ORDERED', 'PARTS_ARRIVED', 'RECEIVED'])
   const alreadyAccepted = acceptedStatuses.has(String(job?.status || ''))
 
+  const preferredDropoffLabel = (() => {
+    if (!job) return null
+    if (job.dropoff_date) {
+      const date = new Date(`${job.dropoff_date}T12:00:00Z`)
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          timeZone: 'Europe/London',
+        })
+      }
+    }
+
+    if ((job.dropoff_preference === 'today' || job.dropoff_preference === 'tomorrow') && job.created_at) {
+      const date = new Date(job.created_at)
+      if (!Number.isNaN(date.getTime())) {
+        if (job.dropoff_preference === 'tomorrow') date.setUTCDate(date.getUTCDate() + 1)
+        return date.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          timeZone: 'Europe/London',
+        })
+      }
+    }
+
+    return null
+  })()
+
   const saveSelectedOptions = async () => {
     if (!jobId || !quoteToken) throw new Error('Secure quote token missing')
     if (selectedAddOnList.length === 0 && selectedAccessoryList.length === 0) return null
@@ -233,6 +265,18 @@ function QuoteApprovalContent() {
             </div>
           </div>
         </div>
+
+        {preferredDropoffLabel && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <CalendarDays className="h-5 w-5 text-amber-700 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-amber-900">Preferred drop-off: {preferredDropoffLabel}</p>
+                <p className="text-sm text-amber-800 mt-1">Preference only — not a fixed appointment.</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {job.additional_repairs && job.additional_repairs.length > 0 && (
           <div className="bg-blue-50 rounded-xl p-4 mb-6">
