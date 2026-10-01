@@ -46,59 +46,17 @@ function QuoteApprovalContent() {
     }
   }, [jobId, quoteToken])
 
-  // Fetch add-on repairs from catalogue once job is loaded
+  // The server resolves add-ons against the catalogue. Keeping this server-side
+  // avoids cross-origin browser failures and ensures the price shown here is the
+  // same price the secure save endpoint will accept.
   useEffect(() => {
-    if (!job || !job.device_category || !job.device_make || !job.device_model) return
+    if (!job) return
+    const result: AddOnRepair[] = Array.isArray(job.available_addons) ? job.available_addons : []
+    setAddOns(result)
 
-    const existingRepairs = new Set<string>([job.issue?.toLowerCase()].filter(Boolean) as string[])
-    if (job.additional_repairs) {
-      job.additional_repairs.forEach((r: any) => existingRepairs.add((r.repair || '').toLowerCase()))
+    if (requestedAddOn && result.some(item => item.repair === requestedAddOn)) {
+      setSelectedAddOns(prev => new Set([...prev, requestedAddOn]))
     }
-
-    fetch('https://newforestdevicerepairs.co.uk/data/quote-catalogue.json')
-      .then(res => res.json())
-      .then(catalogue => {
-        const quotes = catalogue.quotes || []
-        const matching = quotes.filter((q: any) =>
-          q.category === job.device_category &&
-          q.brand === job.device_make &&
-          q.model === job.device_model &&
-          q.priceType === 'fixed' &&
-          q.customerPriceGbp !== null &&
-          q.enabled !== false
-        )
-
-        const byRepair: Record<string, any[]> = {}
-        matching.forEach((q: any) => {
-          if (!byRepair[q.repair]) byRepair[q.repair] = []
-          byRepair[q.repair].push(q)
-        })
-
-        const SCREEN_KEYWORDS = ['screen', 'display', 'lcd', 'oled', 'digitiser', 'digitizer', 'touch-glass', 'touch glass', 'touchscreen', 'inner screen', 'outer screen']
-        const isScreen = (r: string) => SCREEN_KEYWORDS.some(kw => r.toLowerCase().includes(kw))
-
-        const result: AddOnRepair[] = []
-        Object.keys(byRepair).forEach(repair => {
-          if (existingRepairs.has(repair.toLowerCase())) return
-          const opts = byRepair[repair]
-          const minPrice = Math.min(...opts.map((o: any) => o.customerPriceGbp))
-          const screen = isScreen(repair)
-          const discountPrice = screen ? minPrice : Math.round(minPrice * 0.75)
-          const displayName = repair.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-          result.push({ repair, displayName, originalPrice: minPrice, discountPrice, hasDiscount: !screen, saving: minPrice - discountPrice })
-        })
-
-        result.sort((a, b) => {
-          if (a.hasDiscount !== b.hasDiscount) return a.hasDiscount ? -1 : 1
-          return a.discountPrice - b.discountPrice
-        })
-
-        setAddOns(result)
-        if (requestedAddOn && result.some(item => item.repair === requestedAddOn)) {
-          setSelectedAddOns(prev => new Set([...prev, requestedAddOn]))
-        }
-      })
-      .catch(() => {})
   }, [job, requestedAddOn])
 
   const toggleAddOn = (repair: string) => {
@@ -122,12 +80,8 @@ function QuoteApprovalContent() {
     ? Number(job.quoted_price)
     : Math.max(0, rawPriceTotal - existingRepairTotal - existingAccessoryTotal)
 
-  const screenRepair = /screen|display|lcd|oled|digitis|digitiz|touch/i.test(String(job?.issue || ''))
-  const isIPhone = String(job?.device_make || '').toLowerCase() === 'apple' && String(job?.device_category || '').toLowerCase() === 'phone'
-  const accessoryChoices = [
-    ...(screenRepair ? [{ name: 'Free battery health check', price: 0 }] : []),
-    ...(screenRepair && isIPhone ? [{ name: 'Tempered glass screen protector', price: 15 }] : []),
-  ]
+  const accessoryChoices: Array<{ name: string; price: number }> =
+    Array.isArray(job?.available_accessories) ? job.available_accessories : []
   const existingAccessoryNames = new Set(existingAccessories.map((item: any) => String(item?.name || '')))
   const selectedAccessoryList = accessoryChoices.filter(item => selectedAccessories.has(item.name))
   const selectedAccessoryTotal = selectedAccessoryList.reduce((sum, item) => sum + item.price, 0)
