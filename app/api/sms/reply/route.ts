@@ -619,13 +619,20 @@ async function handleEnquiryReply({
 
   console.log(`[sms/reply] Enquiry ${enquiry.enquiry_ref} → ${detection.classification} (conf ${detection.confidence})`)
 
-  // Log the customer's reply as a note on the enquiry
+  // Log the customer's reply as a note on the enquiry. If this came after
+  // the one-off quote follow-up, capture the first reply for recovery analytics.
   try {
+    const followupReplyFields =
+      enquiry.quote_followup_at && !enquiry.quote_followup_reply_at
+        ? { quote_followup_reply_at: now }
+        : {}
+
     await supabase.from('enquiries').update({
       customer_notes: [
         ...(enquiry.customer_notes ? (typeof enquiry.customer_notes === 'string' ? JSON.parse(enquiry.customer_notes) : enquiry.customer_notes) : []),
         { type: 'customer_sms', message: message.substring(0, 500), timestamp: timestamp || now, classification: detection.classification },
       ],
+      ...followupReplyFields,
       updated_at: now,
     }).eq('id', enquiry.id)
   } catch (e) {
