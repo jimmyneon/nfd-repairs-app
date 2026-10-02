@@ -22,7 +22,10 @@ import {
   ProfitabilitySettings,
   dailyOverhead,
   dateOffsetKey,
+  entryCashAdvanceRepayment,
+  entryCashAfterAdvance,
   entryNetProfit,
+  entrySumUpFee,
   missingProfitabilityFields,
   monthlyOverhead,
 } from '@/lib/profitability'
@@ -99,7 +102,11 @@ function summarise(entries: ProfitabilityEntry[]) {
   const petty = entries.reduce((sum, entry) => sum + entry.petty_cash_cost, 0)
   const overhead = entries.reduce((sum, entry) => sum + entry.daily_overhead, 0)
   const jobs = entries.reduce((sum, entry) => sum + entry.job_count, 0)
-  const net = revenue - parts - petty - overhead
+  const sumupTakings = entries.reduce((sum, entry) => sum + entry.sumup_takings, 0)
+  const sumupFees = entries.reduce((sum, entry) => sum + entrySumUpFee(entry), 0)
+  const cashAdvance = entries.reduce((sum, entry) => sum + entryCashAdvanceRepayment(entry), 0)
+  const net = entries.reduce((sum, entry) => sum + entryNetProfit(entry), 0)
+  const cashAfterAdvance = entries.reduce((sum, entry) => sum + entryCashAfterAdvance(entry), 0)
   const activeDays = entries.length
 
   return {
@@ -108,6 +115,10 @@ function summarise(entries: ProfitabilityEntry[]) {
     petty,
     overhead,
     jobs,
+    sumupTakings,
+    sumupFees,
+    cashAdvance,
+    cashAfterAdvance,
     net,
     activeDays,
     avgRevenue: activeDays ? revenue / activeDays : 0,
@@ -159,11 +170,14 @@ export default function ProfitabilityPage() {
   const [partsCost, setPartsCost] = useState('')
   const [pettyCashCost, setPettyCashCost] = useState('')
   const [jobCount, setJobCount] = useState('')
+  const [sumupTakings, setSumupTakings] = useState('')
 
   const [rent, setRent] = useState('')
   const [internet, setInternet] = useState('')
   const [water, setWater] = useState('')
   const [electricity, setElectricity] = useState('')
+  const [sumupFeePercent, setSumupFeePercent] = useState('0.99')
+  const [cashAdvancePercent, setCashAdvancePercent] = useState('15')
 
   const load = async () => {
     setLoading(true)
@@ -178,6 +192,8 @@ export default function ProfitabilityPage() {
       setInternet(toInput(json.settings.internet_monthly))
       setWater(toInput(json.settings.water_monthly))
       setElectricity(toInput(json.settings.electricity_monthly))
+      setSumupFeePercent(toInput(json.settings.sumup_fee_percent))
+      setCashAdvancePercent(toInput(json.settings.cash_advance_percent))
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to load profitability')
     } finally {
@@ -196,6 +212,7 @@ export default function ProfitabilityPage() {
     setPartsCost(existing ? toInput(existing.parts_cost) : '')
     setPettyCashCost(existing ? toInput(existing.petty_cash_cost) : '')
     setJobCount(existing ? toInput(existing.job_count) : '')
+    setSumupTakings(existing ? toInput(existing.sumup_takings) : '')
     setMessage(null)
 
     if (existing) {
@@ -353,6 +370,7 @@ export default function ProfitabilityPage() {
           parts_cost: Number(partsCost),
           petty_cash_cost: Number(pettyCashCost),
           job_count: Number(jobCount),
+          sumup_takings: Number(sumupTakings || 0),
         }),
       })
       const json = await response.json()
@@ -380,6 +398,8 @@ export default function ProfitabilityPage() {
           internet_monthly: Number(internet || 0),
           water_monthly: Number(water || 0),
           electricity_monthly: Number(electricity || 0),
+          sumup_fee_percent: Number(sumupFeePercent || 0),
+          cash_advance_percent: Number(cashAdvancePercent || 0),
         }),
       })
       const json = await response.json()
@@ -394,23 +414,30 @@ export default function ProfitabilityPage() {
   }
 
   const formPreview = useMemo(() => {
-    if (!data) return { gross: 0, overhead: 0, net: 0, averageJob: 0 }
+    if (!data) return { gross: 0, overhead: 0, sumupFee: 0, cashAdvance: 0, net: 0, cashAfterAdvance: 0, averageJob: 0 }
     const rev = Number(revenue || 0)
     const parts = Number(partsCost || 0)
     const petty = Number(pettyCashCost || 0)
     const jobs = Number(jobCount || 0)
+    const cardTakings = Number(sumupTakings || 0)
     const overhead = dailyOverhead(
       data.settings,
       entryDate || data.today,
       new Set(data.overhead.trading_weekdays)
     )
+    const sumupFee = cardTakings * Number(data.settings.sumup_fee_percent || 0) / 100
+    const cashAdvance = cardTakings * Number(data.settings.cash_advance_percent || 0) / 100
+    const net = rev - parts - petty - overhead - sumupFee
     return {
       gross: rev - parts - petty,
       overhead,
-      net: rev - parts - petty - overhead,
+      sumupFee,
+      cashAdvance,
+      net,
+      cashAfterAdvance: net - cashAdvance,
       averageJob: jobs > 0 ? rev / jobs : 0,
     }
-  }, [data, entryDate, revenue, partsCost, pettyCashCost, jobCount])
+  }, [data, entryDate, revenue, partsCost, pettyCashCost, jobCount, sumupTakings])
 
   if (loading && !data) {
     return (
@@ -519,6 +546,41 @@ export default function ProfitabilityPage() {
                 </label>
               ))}
             </div>
+            <div className="mt-4 rounded-xl border border-gray-100 p-3 dark:border-gray-700">
+              <p className="mb-2 text-xs font-bold text-gray-700 dark:text-gray-200">SumUp deductions</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Card fee %</span>
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={sumupFeePercent}
+                    onChange={event => setSumupFeePercent(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Cash advance %</span>
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={cashAdvancePercent}
+                    onChange={event => setCashAdvancePercent(event.target.value)}
+                    className="h-11 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                </label>
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+                The card fee reduces operating profit. The cash-advance repayment is shown separately as a cashflow deduction.
+              </p>
+            </div>
+
             <div className="mt-4 flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Monthly fixed overhead</p>
@@ -528,6 +590,8 @@ export default function ProfitabilityPage() {
                     internet_monthly: Number(internet || 0),
                     water_monthly: Number(water || 0),
                     electricity_monthly: Number(electricity || 0),
+                    sumup_fee_percent: Number(sumupFeePercent || 0),
+                    cash_advance_percent: Number(cashAdvancePercent || 0),
                   }), 2)}
                 </p>
               </div>
@@ -689,6 +753,27 @@ export default function ProfitabilityPage() {
                 </label>
               </div>
 
+              <label className="mt-3 block">
+                <span className="mb-1 flex items-center justify-between text-xs font-semibold text-gray-600 dark:text-gray-300">
+                  <span>SumUp card takings</span>
+                  <span className="font-normal text-gray-400">optional</span>
+                </span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">£</span>
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={sumupTakings}
+                    onChange={event => setSumupTakings(event.target.value)}
+                    placeholder="0.00"
+                    className="h-12 w-full rounded-xl border border-gray-300 bg-white pl-7 pr-3 text-base font-semibold text-gray-900 outline-none focus:ring-2 focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">Enter the daily SumUp total; the fees are calculated automatically.</p>
+              </label>
+
               <button
                 type="button"
                 onClick={() => setShowProfitPreview(value => !value)}
@@ -699,18 +784,34 @@ export default function ProfitabilityPage() {
               </button>
 
               {showProfitPreview && (
-                <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Gross</p>
-                    <p className="font-black text-gray-900 dark:text-white">{money(formPreview.gross)}</p>
+                <div className="mt-2 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Gross</p>
+                      <p className="font-black text-gray-900 dark:text-white">{money(formPreview.gross)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Overhead</p>
+                      <p className="font-black text-gray-900 dark:text-white">{money(formPreview.overhead)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">SumUp fee</p>
+                      <p className="font-black text-gray-900 dark:text-white">-{money(formPreview.sumupFee)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Overhead</p>
-                    <p className="font-black text-gray-900 dark:text-white">{money(formPreview.overhead)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Net</p>
-                    <p className={`font-black ${formPreview.net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.net)}</p>
+                  <div className="border-t border-gray-200 pt-2 dark:border-gray-600">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Operating profit</span>
+                      <span className={`font-black ${formPreview.net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.net)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">15% cash advance repayment</span>
+                      <span className="font-bold text-amber-700 dark:text-amber-400">-{money(formPreview.cashAdvance)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-600">
+                      <span className="text-xs font-black text-gray-700 dark:text-gray-200">Cash left after SumUp</span>
+                      <span className={`text-lg font-black ${formPreview.cashAfterAdvance >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.cashAfterAdvance)}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -751,6 +852,25 @@ export default function ProfitabilityPage() {
                 <Stat icon={<Wrench className="h-4 w-4" />} label="Jobs" value={String(current.jobs)} note={`${current.avgJobs.toFixed(1)} / entered day`} />
                 <Stat icon={<TrendingUp className="h-4 w-4" />} label="Avg job" value={money(current.avgJobValue)} note={`Parts ${current.partsPct.toFixed(1)}% of revenue`} />
               </div>
+
+              {current.sumupTakings > 0 && (
+                <div className="mt-3 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">SumUp fees</p>
+                      <p className="text-sm font-black text-gray-900 dark:text-white">-{money(current.sumupFees)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Advance repaid</p>
+                      <p className="text-sm font-black text-amber-700 dark:text-amber-400">-{money(current.cashAdvance)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Cash after both</p>
+                      <p className="text-sm font-black text-gray-900 dark:text-white">{money(current.cashAfterAdvance)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <button
                 type="button"
