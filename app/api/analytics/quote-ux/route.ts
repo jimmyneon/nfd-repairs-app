@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
-import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived } from '@/lib/quote-analytics'
+import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived, quoteFollowupRecovery } from '@/lib/quote-analytics'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -84,6 +84,33 @@ export async function GET(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
+    // Follow-up recovery is a cohort report: select the quotes followed up
+    // during this range, then let their reply/accept/arrival outcomes continue
+    // to update as customers move through the repair journey.
+    const followupEnquiries = await readAllPages<any>((from, to) => supabase
+      .from('enquiries')
+      .select('id,enquiry_ref,quote_followup_at,quote_followup_reply_at,proceed_with_repair,converted_to_job,converted_job_id,quoted_price')
+      .gte('quote_followup_at', range.startISO)
+      .lt('quote_followup_at', range.endISO)
+      .order('quote_followup_at')
+      .order('id')
+      .range(from, to))
+
+    const followupIds = followupEnquiries.map(enquiry => enquiry.id).filter(Boolean)
+    const followupJobs: any[] = []
+    for (let offset = 0; offset < followupIds.length; offset += 100) {
+      const ids = followupIds.slice(offset, offset + 100)
+      const rows = await readAllPages<any>((from, to) => supabase
+        .from('jobs')
+        .select('id,quote_request_id,status,device_in_shop,price_total')
+        .in('quote_request_id', ids)
+        .order('created_at')
+        .order('id')
+        .range(from, to))
+      followupJobs.push(...rows)
+    }
+    const followupRecovery = quoteFollowupRecovery(followupEnquiries, followupJobs)
+
     const lookback = new Date(Date.parse(range.startISO) - VISIT_GAP_MS).toISOString()
     const events = await readAllPages<EventRow>((from, to) => supabase
       .from('quote_analytics_events')
@@ -104,6 +131,7 @@ export async function GET(request: NextRequest) {
         range: { start: range.start, end: range.end, timezone: range.timezone },
         instrumentation_active: false,
         instrumentation_started_at: null,
+        followup_recovery: followupRecovery,
         visits: null,
         catalogue: null,
         help: null,
@@ -238,6 +266,7 @@ export async function GET(request: NextRequest) {
         category_selected_while_loading: beforeReadyVisits.length,
         category_loading_then_progressed: beforeReadyProgressed.length,
       },
+      followup_recovery: followupRecovery,
       conversion: {
         quote_reached: quoteReached.length,
         repair_start_clicked: repairStartClicked.length,
