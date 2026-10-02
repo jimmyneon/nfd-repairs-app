@@ -17,6 +17,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import {
+  PROFITABILITY_TRACKING_START,
   ProfitabilityEntry,
   ProfitabilitySettings,
   dailyOverhead,
@@ -149,6 +150,8 @@ export default function ProfitabilityPage() {
   const [periodIndex, setPeriodIndex] = useState(0)
   const [insightIndex, setInsightIndex] = useState(0)
   const [showCosts, setShowCosts] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showProfitPreview, setShowProfitPreview] = useState(false)
 
   const [entryDate, setEntryDate] = useState('')
   const [suggestion, setSuggestion] = useState<ApiData['suggestion'] | null>(null)
@@ -165,7 +168,7 @@ export default function ProfitabilityPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/profitability?days=120', { cache: 'no-store' })
+      const response = await fetch('/api/profitability?days=400', { cache: 'no-store' })
       const json = await response.json()
       if (!response.ok) throw new Error(json.details || json.error || 'Failed to load profitability')
       setData(json)
@@ -212,6 +215,32 @@ export default function ProfitabilityPage() {
   }, [entryDate, data])
 
   const period = PERIODS[periodIndex]
+
+  const existingEntry = useMemo(
+    () => data?.entries.find(entry => entry.entry_date === entryDate) || null,
+    [data, entryDate]
+  )
+
+  const enteredDates = useMemo(
+    () => new Set(data?.entries.map(entry => entry.entry_date) || []),
+    [data]
+  )
+
+  const historyDates = useMemo(() => {
+    if (!data) return []
+
+    const tradingWeekdays = new Set(data.overhead.trading_weekdays)
+    const dates: string[] = []
+
+    for (let offset = 0; offset >= -399; offset--) {
+      const date = dateOffsetKey(data.today, offset)
+      if (date < PROFITABILITY_TRACKING_START) break
+      const weekday = new Date(`${date}T12:00:00.000Z`).getUTCDay()
+      if (tradingWeekdays.has(weekday)) dates.push(date)
+    }
+
+    return dates
+  }, [data])
 
   const { currentEntries, previousEntries, current, previous } = useMemo(() => {
     if (!data) {
@@ -312,6 +341,7 @@ export default function ProfitabilityPage() {
       return
     }
 
+    const wasEditing = Boolean(existingEntry)
     setSaving(true)
     try {
       const response = await fetch('/api/profitability', {
@@ -327,7 +357,7 @@ export default function ProfitabilityPage() {
       })
       const json = await response.json()
       if (!response.ok) throw new Error(json.error || 'Failed to save')
-      setMessage('Saved')
+      setMessage(wasEditing ? 'Updated' : 'Saved')
       await load()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Failed to save')
@@ -421,7 +451,7 @@ export default function ProfitabilityPage() {
 
       <main className="mx-auto max-w-3xl space-y-4 p-4 pb-20">
         {message && (
-          <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${message === 'Saved' || message.includes('updated') ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
+          <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${message === 'Saved' || message === 'Updated' || message.includes('updated') ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300' : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
             {message}
           </div>
         )}
@@ -516,19 +546,69 @@ export default function ProfitabilityPage() {
         {data && (
           <>
             <form onSubmit={saveEntry} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-black text-gray-900 dark:text-white">Daily entry</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Four numbers. Use 0 when there is nothing to enter.</p>
+                  <h2 className="font-black text-gray-900 dark:text-white">
+                    {existingEntry ? 'Edit day' : 'Daily entry'}
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {existingEntry ? 'This date already has figures saved.' : 'Four numbers. Use 0 when there is nothing to enter.'}
+                  </p>
                 </div>
-                <input
-                  type="date"
-                  value={entryDate}
-                  max={data.today}
-                  onChange={event => setEntryDate(event.target.value)}
-                  className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
+                <div className="flex flex-col items-end gap-1">
+                  <input
+                    type="date"
+                    value={entryDate}
+                    min={PROFITABILITY_TRACKING_START}
+                    max={data.today}
+                    onChange={event => setEntryDate(event.target.value)}
+                    className="h-11 rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(value => !value)}
+                    className="px-1 text-[11px] font-semibold text-gray-400 hover:text-primary dark:text-gray-500"
+                  >
+                    {showHistory ? 'Hide previous days' : 'Previous days'}
+                  </button>
+                </div>
               </div>
+
+              {showHistory && (
+                <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/30">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200">Entry history</p>
+                    <p className="text-[10px] text-gray-400">Tap a day to open it</p>
+                  </div>
+                  <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                    {historyDates.map(date => {
+                      const entered = enteredDates.has(date)
+                      const selected = entryDate === date
+                      return (
+                        <button
+                          type="button"
+                          key={date}
+                          onClick={() => {
+                            setEntryDate(date)
+                            setShowHistory(false)
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition ${selected
+                            ? 'bg-primary text-white'
+                            : entered
+                              ? 'bg-white text-gray-800 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+                              : 'text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/20'
+                          }`}
+                        >
+                          <span className="font-semibold">{prettyDate(date)}</span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wide ${selected ? 'text-white/80' : entered ? 'text-green-600 dark:text-green-400' : 'text-amber-500'}`}>
+                            {entered ? 'Entered' : 'Missing'}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {suggestion && suggestion.date === entryDate && suggestion.job_count > 0 && (
                 <button
@@ -609,20 +689,31 @@ export default function ProfitabilityPage() {
                 </label>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Gross</p>
-                  <p className="font-black text-gray-900 dark:text-white">{money(formPreview.gross)}</p>
+              <button
+                type="button"
+                onClick={() => setShowProfitPreview(value => !value)}
+                className="mt-3 flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-xs font-semibold text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              >
+                <span>Profit preview</span>
+                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showProfitPreview ? 'rotate-90' : ''}`} />
+              </button>
+
+              {showProfitPreview && (
+                <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 dark:bg-gray-700/50">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Gross</p>
+                    <p className="font-black text-gray-900 dark:text-white">{money(formPreview.gross)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Overhead</p>
+                    <p className="font-black text-gray-900 dark:text-white">{money(formPreview.overhead)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Net</p>
+                    <p className={`font-black ${formPreview.net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.net)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Overhead</p>
-                  <p className="font-black text-gray-900 dark:text-white">{money(formPreview.overhead)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Net</p>
-                  <p className={`font-black ${formPreview.net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.net)}</p>
-                </div>
-              </div>
+              )}
 
               <button
                 type="submit"
@@ -630,7 +721,7 @@ export default function ProfitabilityPage() {
                 className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-black text-white transition active:scale-[0.99] disabled:opacity-50"
               >
                 {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                Save day
+                {existingEntry ? 'Update day' : 'Save day'}
               </button>
             </form>
 
@@ -696,7 +787,7 @@ export default function ProfitabilityPage() {
             </section>
 
             <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-3 text-sm font-black text-gray-900 dark:text-white">Recent days</h2>
+              <h2 className="mb-3 text-sm font-black text-gray-900 dark:text-white">Recent entries</h2>
               <div className="space-y-2">
                 {data.entries.slice(0, 10).map(entry => (
                   <button
