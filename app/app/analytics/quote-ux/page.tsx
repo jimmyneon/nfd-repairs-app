@@ -9,6 +9,13 @@ type Data = {
   range: { start: string; end: string; timezone: string }
   instrumentation_active: boolean
   instrumentation_started_at: string | null
+  followup_recovery?: {
+    sent: number
+    replies: number
+    accepted: number
+    arrived: number
+    recovered_value: number
+  }
   visits: null | {
     started: number
     category_selected: number
@@ -70,6 +77,15 @@ function bytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
+function gbp(value: number) {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value || 0)
+}
+
 export default function QuoteUxPage() {
   const [days, setDays] = useState('7')
   const [data, setData] = useState<Data | null>(null)
@@ -119,6 +135,20 @@ export default function QuoteUxPage() {
             <button key={value} onClick={() => setDays(value)} className={`px-3 py-2 rounded-lg text-sm font-medium ${days === value ? 'bg-green-700 text-white' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'}`}>{label}</button>
           ))}
         </div>
+
+        {data?.followup_recovery && (
+          <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+            <h2 className="font-semibold mb-1">Quote follow-up recovery</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Cohort = follow-ups sent in the selected range. Replies, acceptances and arrivals keep updating as those customers move through the repair journey.</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <RecoveryStat label="Follow-ups sent" value={String(data.followup_recovery.sent)} sub="One-off messages" />
+              <RecoveryStat label="Replies" value={String(data.followup_recovery.replies)} sub={pct(data.followup_recovery.replies, data.followup_recovery.sent)} />
+              <RecoveryStat label="Accepted" value={String(data.followup_recovery.accepted)} sub={pct(data.followup_recovery.accepted, data.followup_recovery.sent)} />
+              <RecoveryStat label="Device arrived" value={String(data.followup_recovery.arrived)} sub={pct(data.followup_recovery.arrived, data.followup_recovery.sent)} />
+              <RecoveryStat label="Recovered job value" value={gbp(data.followup_recovery.recovered_value)} sub="Arrived jobs" />
+            </div>
+          </section>
+        )}
 
         {error && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">{error}</div>}
 
@@ -243,4 +273,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function RouteStat({ label, value }: { label: string; value: number }) {
   return <div><div className="text-gray-500 dark:text-gray-400">{label}</div><div className="font-semibold text-sm mt-0.5">{value}</div></div>
+}
+
+function RecoveryStat({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-4"><div className="text-xs text-gray-500 dark:text-gray-400">{label}</div><div className="text-2xl font-bold mt-1">{value}</div><div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</div></div>
 }
