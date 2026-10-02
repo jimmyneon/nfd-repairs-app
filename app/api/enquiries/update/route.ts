@@ -663,6 +663,8 @@ export async function POST(request: NextRequest) {
       }
 
       // --- Quote SMS/email (instant or personalised with price) ---
+      let quoteDelivered = false
+
       if (method === 'sms' || method === 'both') {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (!webhookUrl) {
@@ -679,6 +681,7 @@ export async function POST(request: NextRequest) {
             : `Hi ${enquiry.customer_name}! 👋\n\nThanks for your enquiry about your ${deviceName}. We will get back to you with a personalised quote within working hours.\n\nOpening hours & directions: nfdr.uk/h\n\nQuestions? Reply to this text.\n\nNFD Repairs`
           try {
             const smsResponse = await sendViaMacroDroid(webhookUrl, enquiry.customer_phone, smsMessage)
+            if (smsResponse.ok) quoteDelivered = true
             try {
               await supabase.from('sms_logs').insert({
                 template_key: personalisedMessage ? 'PERSONALISED_QUOTE' : 'QUOTE_SENT',
@@ -755,7 +758,8 @@ ${personalisedHtml}
             ? `Hi ${enquiry.customer_name},\n\nYour quote: ${deviceName} ${repairName} — ${priceText}${enquiry.additional_repairs && enquiry.additional_repairs.length > 0 ? '\n\nAlso booked:\n' + enquiry.additional_repairs.map((r: any) => `${r.display_name || r.repair} — £${r.price}`).join('\n') + '\nTotal: £' + ((enquiry.quoted_price || 0) + enquiry.additional_repairs.reduce((s: number, r: any) => s + r.price, 0)) : ''}${personalisedText}\n\nTo proceed, click here:\n${quoteUrl}\n\nNew Forest Device Repairs\nnfdr.uk/h`
             : `Hi ${enquiry.customer_name},\n\nThanks for your enquiry about your ${deviceName}. We'll get back to you with a personalised quote.\n\nNew Forest Device Repairs\nnfdr.uk/h`
           try {
-            await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
+            const emailResult = await sendEmail(enquiry.customer_email, emailSubject, emailHtml, emailText)
+            if (emailResult.success) quoteDelivered = true
             try {
               await supabase.from('email_logs').insert({
                 subject: emailSubject,
@@ -764,6 +768,20 @@ ${personalisedHtml}
               } as any)
             } catch (e) { console.error('Email log failed:', e) }
           } catch (e) { console.error('Quote email failed:', e) }
+        }
+      }
+
+      // Start the automatic follow-up clock only when a real priced quote was
+      // successfully delivered. Generic "we'll get back to you" acknowledgements
+      // do not count as a sent quote.
+      if (quoteDelivered && isInstant) {
+        const { error: quoteSentAtError } = await supabase
+          .from('enquiries')
+          .update({ quote_sent_at: now, updated_at: now } as any)
+          .eq('id', enquiry.id)
+
+        if (quoteSentAtError) {
+          console.error('[quote-send] Failed to record quote_sent_at:', quoteSentAtError)
         }
       }
     }
