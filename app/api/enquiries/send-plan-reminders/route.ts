@@ -7,24 +7,6 @@ import { generateQuoteActionToken, quoteActionTokenExpiry, isQuoteActionTokenVal
 
 export const maxDuration = 300
 
-async function runOneOffQuoteFollowupBridge(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader) return
-
-  try {
-    const response = await fetch('https://nfd-repairs-app.vercel.app/api/enquiries/send-quote-followups', {
-      method: 'GET',
-      headers: { Authorization: authHeader },
-      cache: 'no-store',
-    })
-    if (!response.ok) {
-      console.error('[quote-reminders] One-off quote follow-up bridge failed:', response.status, await response.text())
-    }
-  } catch (error) {
-    console.error('[quote-reminders] One-off quote follow-up bridge error:', error)
-  }
-}
-
 
 function repairLabel(value: string | null): string {
   if (!value) return 'repair'
@@ -55,9 +37,6 @@ export async function GET(request: NextRequest) {
   const authResponse = requireCronSecret(request)
   if (authResponse) return authResponse
 
-  // Temporary authenticated bridge for the first production quote-follow-up pilot.
-  // Removed immediately after the pilot is verified.
-  await runOneOffQuoteFollowupBridge(request)
 
   try {
     if (!isWithinUKSendingHours()) {
