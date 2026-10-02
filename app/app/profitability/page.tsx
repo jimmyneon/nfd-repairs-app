@@ -616,7 +616,7 @@ export default function ProfitabilityPage() {
                     {existingEntry ? 'Edit day' : 'Daily entry'}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {existingEntry ? 'This date already has figures saved.' : 'Four numbers. Use 0 when there is nothing to enter.'}
+                    {existingEntry ? 'This date already has figures saved.' : 'Four core numbers. SumUp is optional and calculated automatically.'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -805,7 +805,7 @@ export default function ProfitabilityPage() {
                       <span className={`font-black ${formPreview.net >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{money(formPreview.net)}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">15% cash advance repayment</span>
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{data.settings.cash_advance_percent}% cash advance repayment</span>
                       <span className="font-bold text-amber-700 dark:text-amber-400">-{money(formPreview.cashAdvance)}</span>
                     </div>
                     <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-600">
