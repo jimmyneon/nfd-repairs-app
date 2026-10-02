@@ -133,6 +133,63 @@ export function quoteJobIsCompleted(job: { status?: string | null } | null | und
   return job.status === 'COLLECTED' || job.status === 'COMPLETED'
 }
 
+export type QuoteFollowupAnalyticsEnquiry = {
+  id: string
+  quote_followup_reply_at?: string | null
+  proceed_with_repair?: boolean | null
+  converted_to_job?: boolean | null
+  converted_job_id?: string | null
+  quoted_price?: number | string | null
+}
+
+export type QuoteFollowupAnalyticsJob = {
+  id?: string
+  quote_request_id?: string | null
+  status?: string | null
+  device_in_shop?: boolean | null
+  price_total?: number | string | null
+}
+
+export function quoteFollowupRecovery(
+  enquiries: QuoteFollowupAnalyticsEnquiry[],
+  jobs: QuoteFollowupAnalyticsJob[]
+) {
+  const jobByEnquiry = new Map<string, QuoteFollowupAnalyticsJob>()
+  for (const job of jobs) {
+    if (job.quote_request_id && !jobByEnquiry.has(job.quote_request_id)) {
+      jobByEnquiry.set(job.quote_request_id, job)
+    }
+  }
+
+  let replies = 0
+  let accepted = 0
+  let arrived = 0
+  let recoveredValue = 0
+
+  for (const enquiry of enquiries) {
+    if (enquiry.quote_followup_reply_at) replies++
+    if (enquiry.proceed_with_repair || enquiry.converted_to_job || enquiry.converted_job_id) accepted++
+
+    const job = jobByEnquiry.get(enquiry.id)
+    if (quoteJobHasDeviceArrived(job)) {
+      arrived++
+      const jobValue = Number(job?.price_total)
+      const quoteValue = Number(enquiry.quoted_price)
+      recoveredValue += Number.isFinite(jobValue) && jobValue > 0
+        ? jobValue
+        : Number.isFinite(quoteValue) && quoteValue > 0 ? quoteValue : 0
+    }
+  }
+
+  return {
+    sent: enquiries.length,
+    replies,
+    accepted,
+    arrived,
+    recovered_value: Math.round(recoveredValue * 100) / 100,
+  }
+}
+
 /** Read every page; Supabase otherwise silently limits analytics totals. */
 export async function readAllPages<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const all: T[] = []
