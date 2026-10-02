@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       .is('quote_followup_at', null)
       .not('quoted_price', 'is', null)
       .not('customer_phone', 'is', null)
-      .gt('created_at', oldestAllowed)
+      .or(`quote_sent_at.gte.${oldestAllowed},and(quote_sent_at.is.null,created_at.gte.${oldestAllowed})`)
       .order('created_at', { ascending: true })
       .limit(50)
 
