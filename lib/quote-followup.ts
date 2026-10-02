@@ -8,6 +8,7 @@ export type QuoteFollowupEnquiry = {
   customer_email?: string | null
   quoted_price?: number | string | null
   quote_sent_method?: string | null
+  quote_sent_at?: string | null
   proceed_with_repair?: boolean | null
   converted_to_job?: boolean | null
   quote_followup_at?: string | null
@@ -29,11 +30,24 @@ export function isKnownTestEnquiry(enquiry: QuoteFollowupEnquiry): boolean {
   return name === 'test' || name.startsWith('test ')
 }
 
+export function isShopOpenOnDate(
+  openingHours: OpeningHoursMap,
+  now = new Date()
+): boolean {
+  const weekday = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    weekday: 'long',
+  }).format(now)
+
+  return openingHours[weekday]?.isOpen === true
+}
+
 export function isQuoteFollowupDue(
   enquiry: QuoteFollowupEnquiry,
   openingHours: OpeningHoursMap,
   now = new Date()
 ): boolean {
+  if (!isShopOpenOnDate(openingHours, now)) return false
   if (enquiry.enquiry_type !== 'repair_quote') return false
   if (enquiry.status !== 'pending') return false
   if (enquiry.proceed_with_repair || enquiry.converted_to_job) return false
@@ -45,7 +59,9 @@ export function isQuoteFollowupDue(
   if (!Number.isFinite(quotedPrice) || quotedPrice <= 0) return false
   if (isKnownTestEnquiry(enquiry)) return false
 
-  const anchor = enquiry.created_at
+  // New quotes use the real delivery time. Older quotes created before this
+  // tracking field existed retain the original created_at fallback.
+  const anchor = enquiry.quote_sent_at || enquiry.created_at
   if (!anchor) return false
   const anchorDate = new Date(anchor)
   if (Number.isNaN(anchorDate.getTime())) return false
