@@ -3,7 +3,10 @@ import {
   DEFAULT_PROFITABILITY_SETTINGS,
   dailyOverhead,
   dateOffsetKey,
+  entryCashAdvanceRepayment,
+  entryCashAfterAdvance,
   entryNetProfit,
+  entrySumUpFee,
   isTradingDate,
   missingProfitabilityFields,
   monthlyOverhead,
@@ -49,13 +52,21 @@ describe('profitability helpers', () => {
     expect(dateOffsetKey('2026-09-26', -7)).toBe('2026-09-19')
   })
 
-  it('calculates practical daily net profit', () => {
-    expect(entryNetProfit({
+  it('calculates SumUp fee, operating profit and cash after the advance repayment', () => {
+    const entry = {
       revenue: 270,
       parts_cost: 65,
       petty_cash_cost: 10,
       daily_overhead: 70.62,
-    })).toBe(124.38)
+      sumup_takings: 200,
+      sumup_fee_percent: 0.99,
+      cash_advance_percent: 15,
+    }
+
+    expect(entrySumUpFee(entry)).toBe(1.98)
+    expect(entryCashAdvanceRepayment(entry)).toBe(30)
+    expect(entryNetProfit(entry)).toBe(122.4)
+    expect(entryCashAfterAdvance(entry)).toBe(92.4)
   })
 
   it('requires every daily field to be explicitly entered while allowing zero', () => {
