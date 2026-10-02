@@ -17,6 +17,8 @@ export type ProfitabilitySettings = {
   internet_monthly: number
   water_monthly: number
   electricity_monthly: number
+  sumup_fee_percent: number
+  cash_advance_percent: number
 }
 
 export type ProfitabilityEntry = {
@@ -27,6 +29,9 @@ export type ProfitabilityEntry = {
   petty_cash_cost: number
   job_count: number
   daily_overhead: number
+  sumup_takings: number
+  sumup_fee_percent: number
+  cash_advance_percent: number
   created_at?: string
   updated_at?: string
 }
@@ -56,6 +61,8 @@ export const DEFAULT_PROFITABILITY_SETTINGS: ProfitabilitySettings = {
   internet_monthly: 40,
   water_monthly: 40,
   electricity_monthly: 150,
+  sumup_fee_percent: 0.99,
+  cash_advance_percent: 15,
 }
 
 export function toMoneyNumber(value: unknown): number {
@@ -149,11 +156,24 @@ export function isTradingDate(
   return tradingWeekdays.has(date.getUTCDay())
 }
 
-export function entryNetProfit(entry: Pick<ProfitabilityEntry, 'revenue' | 'parts_cost' | 'petty_cash_cost' | 'daily_overhead'>): number {
+export function entrySumUpFee(entry: Pick<ProfitabilityEntry, 'sumup_takings' | 'sumup_fee_percent'>): number {
+  return roundMoney(toMoneyNumber(entry.sumup_takings) * toMoneyNumber(entry.sumup_fee_percent) / 100)
+}
+
+export function entryCashAdvanceRepayment(entry: Pick<ProfitabilityEntry, 'sumup_takings' | 'cash_advance_percent'>): number {
+  return roundMoney(toMoneyNumber(entry.sumup_takings) * toMoneyNumber(entry.cash_advance_percent) / 100)
+}
+
+export function entryNetProfit(entry: Pick<ProfitabilityEntry, 'revenue' | 'parts_cost' | 'petty_cash_cost' | 'daily_overhead' | 'sumup_takings' | 'sumup_fee_percent'>): number {
   return roundMoney(
     toMoneyNumber(entry.revenue) -
     toMoneyNumber(entry.parts_cost) -
     toMoneyNumber(entry.petty_cash_cost) -
-    toMoneyNumber(entry.daily_overhead)
+    toMoneyNumber(entry.daily_overhead) -
+    entrySumUpFee(entry)
   )
+}
+
+export function entryCashAfterAdvance(entry: Pick<ProfitabilityEntry, 'revenue' | 'parts_cost' | 'petty_cash_cost' | 'daily_overhead' | 'sumup_takings' | 'sumup_fee_percent' | 'cash_advance_percent'>): number {
+  return roundMoney(entryNetProfit(entry) - entryCashAdvanceRepayment(entry))
 }
