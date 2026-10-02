@@ -55,6 +55,8 @@ function normaliseSettings(row: any): ProfitabilitySettings {
     internet_monthly: toMoneyNumber(row?.internet_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.internet_monthly),
     water_monthly: toMoneyNumber(row?.water_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.water_monthly),
     electricity_monthly: toMoneyNumber(row?.electricity_monthly ?? DEFAULT_PROFITABILITY_SETTINGS.electricity_monthly),
+    sumup_fee_percent: toMoneyNumber(row?.sumup_fee_percent ?? DEFAULT_PROFITABILITY_SETTINGS.sumup_fee_percent),
+    cash_advance_percent: toMoneyNumber(row?.cash_advance_percent ?? DEFAULT_PROFITABILITY_SETTINGS.cash_advance_percent),
   }
 }
 
@@ -67,6 +69,9 @@ function normaliseEntry(row: any): ProfitabilityEntry {
     petty_cash_cost: toMoneyNumber(row.petty_cash_cost),
     job_count: Number(row.job_count || 0),
     daily_overhead: toMoneyNumber(row.daily_overhead),
+    sumup_takings: toMoneyNumber(row.sumup_takings),
+    sumup_fee_percent: toMoneyNumber(row.sumup_fee_percent ?? DEFAULT_PROFITABILITY_SETTINGS.sumup_fee_percent),
+    cash_advance_percent: toMoneyNumber(row.cash_advance_percent ?? DEFAULT_PROFITABILITY_SETTINGS.cash_advance_percent),
     created_at: row.created_at || undefined,
     updated_at: row.updated_at || undefined,
   }
@@ -107,6 +112,9 @@ async function loadFallback(supabase: any, from: string, today: string) {
         petty_cash_cost: parsed?.petty_cash_cost,
         job_count: parsed?.job_count,
         daily_overhead: parsed?.daily_overhead,
+        sumup_takings: parsed?.sumup_takings,
+        sumup_fee_percent: parsed?.sumup_fee_percent,
+        cash_advance_percent: parsed?.cash_advance_percent,
         updated_at: row.updated_at,
       })
     })
@@ -125,13 +133,13 @@ export async function loadProfitabilityStorage(supabase: any, from: string, toda
   const [entriesResult, settingsResult] = await Promise.all([
     supabase
       .from('daily_profitability')
-      .select('entry_date,revenue,parts_cost,petty_cash_cost,job_count,daily_overhead,created_at,updated_at')
+      .select('entry_date,revenue,parts_cost,petty_cash_cost,job_count,daily_overhead,sumup_takings,sumup_fee_percent,cash_advance_percent,created_at,updated_at')
       .gte('entry_date', from)
       .lte('entry_date', today)
       .order('entry_date', { ascending: false }),
     supabase
       .from('profitability_settings')
-      .select('id,rent_monthly,internet_monthly,water_monthly,electricity_monthly')
+      .select('id,rent_monthly,internet_monthly,water_monthly,electricity_monthly,sumup_fee_percent,cash_advance_percent')
       .eq('id', 1)
       .maybeSingle(),
   ])
@@ -166,6 +174,8 @@ export async function saveProfitabilitySettings(
     internet_monthly: settings.internet_monthly,
     water_monthly: settings.water_monthly,
     electricity_monthly: settings.electricity_monthly,
+    sumup_fee_percent: settings.sumup_fee_percent,
+    cash_advance_percent: settings.cash_advance_percent,
   }
 
   const { error } = await supabase
