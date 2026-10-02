@@ -4,7 +4,7 @@ import { createServiceClient, isWithinUKSendingHours, sendSms } from '@/lib/resi
 import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortQuoteApprovalLink } from '@/lib/utils'
 import { generateQuoteActionToken, isQuoteActionTokenValid, quoteActionTokenExpiry } from '@/lib/job-utils'
-import { isQuoteFollowupDue } from '@/lib/quote-followup'
+import { isQuoteFollowupDue, isShopOpenOnDate } from '@/lib/quote-followup'
 import { parseOpeningHours } from '@/lib/awaiting-device-followup'
 
 export const maxDuration = 300
@@ -32,11 +32,22 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     const openingHours = parseOpeningHours(hoursSetting?.value)
+    const now = new Date()
+
+    if (!isShopOpenOnDate(openingHours, now)) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        contacted: 0,
+        message: 'Shop is closed today; quote follow-ups will roll to the next open day.',
+      })
+    }
+
     const oldestAllowed = new Date(Date.now() - 21 * 86_400_000).toISOString()
 
     const { data: enquiries, error } = await supabase
       .from('enquiries')
-      .select('id,enquiry_ref,enquiry_type,status,customer_name,customer_phone,customer_email,device_make,device_model,quoted_price,display_price,quote_sent_method,proceed_with_repair,converted_to_job,quote_followup_at,quote_followup_suppressed,created_at,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('id,enquiry_ref,enquiry_type,status,customer_name,customer_phone,customer_email,device_make,device_model,quoted_price,display_price,quote_sent_method,quote_sent_at,proceed_with_repair,converted_to_job,quote_followup_at,quote_followup_suppressed,created_at,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_type', 'repair_quote')
       .eq('status', 'pending')
       .eq('quote_followup_suppressed', false)
@@ -52,7 +63,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to query quote follow-ups' }, { status: 500 })
     }
 
-    const now = new Date()
     const eligible = (enquiries || []).filter(enquiry => isQuoteFollowupDue(enquiry, openingHours, now))
 
     let contacted = 0
