@@ -33,6 +33,12 @@ function cleanJobCount(value: unknown): number | null {
   return parsed
 }
 
+function cleanPercent(value: unknown): number | null {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return null
+  return Math.round(parsed * 100) / 100
+}
+
 function getLondonHour(): number {
   return Number(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London',
@@ -172,9 +178,14 @@ export async function POST(request: NextRequest) {
       const internet = cleanMoney(body.internet_monthly)
       const water = cleanMoney(body.water_monthly)
       const electricity = cleanMoney(body.electricity_monthly)
+      const sumupFeePercent = cleanPercent(body.sumup_fee_percent)
+      const cashAdvancePercent = cleanPercent(body.cash_advance_percent)
 
       if ([rent, internet, water, electricity].some(value => value === null)) {
         return NextResponse.json({ error: 'Enter valid monthly costs' }, { status: 400 })
+      }
+      if (sumupFeePercent === null || cashAdvancePercent === null) {
+        return NextResponse.json({ error: 'Enter valid SumUp percentages' }, { status: 400 })
       }
 
       const settings = {
@@ -182,6 +193,8 @@ export async function POST(request: NextRequest) {
         internet_monthly: internet!,
         water_monthly: water!,
         electricity_monthly: electricity!,
+        sumup_fee_percent: sumupFeePercent,
+        cash_advance_percent: cashAdvancePercent,
       }
 
       const [storage, tradingWeekdays] = await Promise.all([
@@ -219,9 +232,13 @@ export async function POST(request: NextRequest) {
     const partsCost = cleanMoney(body.parts_cost)
     const pettyCashCost = cleanMoney(body.petty_cash_cost)
     const jobCount = cleanJobCount(body.job_count)
+    const sumupTakings = cleanMoney(body.sumup_takings ?? 0)
 
-    if (revenue === null || partsCost === null || pettyCashCost === null || jobCount === null) {
+    if (revenue === null || partsCost === null || pettyCashCost === null || jobCount === null || sumupTakings === null) {
       return NextResponse.json({ error: 'Enter valid non-negative figures' }, { status: 400 })
+    }
+    if (sumupTakings > revenue) {
+      return NextResponse.json({ error: 'SumUp takings cannot be higher than total revenue' }, { status: 400 })
     }
 
     const today = londonDateKey()
@@ -236,6 +253,9 @@ export async function POST(request: NextRequest) {
       petty_cash_cost: pettyCashCost,
       job_count: jobCount,
       daily_overhead: dailyOverhead(settings, entryDate, tradingWeekdays),
+      sumup_takings: sumupTakings,
+      sumup_fee_percent: settings.sumup_fee_percent,
+      cash_advance_percent: settings.cash_advance_percent,
     }
 
     const storage = await saveProfitabilityEntry(supabase, entry)
