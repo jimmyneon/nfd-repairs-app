@@ -25,11 +25,15 @@ on:
       - 'lib/utils.ts'
       - 'lib/types-v3.ts'
       - 'lib/awaiting-device-followup.ts'
+      - 'lib/quote-followup.ts'
+      - 'lib/quote-analytics.ts'
       - 'lib/public-quote-options.ts'
       - 'vercel.json'
       - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
       - 'tests/awaiting-device-followup.test.ts'
+      - 'tests/quote-followup.test.ts'
+      - 'tests/quote-followup-analytics.test.ts'
       - 'tests/public-quote-options.test.ts'
       - '.github/workflows/repair-flow-check.yml'
   pull_request:
@@ -54,11 +58,15 @@ on:
       - 'lib/utils.ts'
       - 'lib/types-v3.ts'
       - 'lib/awaiting-device-followup.ts'
+      - 'lib/quote-followup.ts'
+      - 'lib/quote-analytics.ts'
       - 'lib/public-quote-options.ts'
       - 'vercel.json'
       - 'supabase/migrations/**'
       - 'tests/fast-dropoff.test.ts'
       - 'tests/awaiting-device-followup.test.ts'
+      - 'tests/quote-followup.test.ts'
+      - 'tests/quote-followup-analytics.test.ts'
       - 'tests/public-quote-options.test.ts'
       - '.github/workflows/repair-flow-check.yml'
 
@@ -79,7 +87,7 @@ jobs:
         run: npm ci
 
       - name: Run repair-flow tests
-        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts
 
       - name: Verify progressive quote commitment safeguards
         run: |
@@ -99,6 +107,10 @@ jobs:
           grep -Fq "/api/jobs/send-awaiting-device-followups" vercel.json
           grep -Fq "Awaiting device" app/app/jobs/page.tsx
           grep -Fq "Overdue / followed up" app/app/jobs/page.tsx
+          grep -Fq "quote_sent_at" app/api/enquiries/update/route.ts
+          grep -Fq "quote_followup_reply_at" app/api/sms/reply/route.ts
+          grep -Fq "Quote follow-up recovery" app/app/analytics/quote-ux/page.tsx
+          grep -Fq "isShopOpenOnDate" app/api/enquiries/send-quote-followups/route.ts
           grep -Fq "available_addons" "app/api/public/quote/[ref]/route.ts"
           grep -Fq "customer_update: buildCustomerUpdate(linkedJob)" "app/api/public/quote/[ref]/route.ts"
           grep -Fq "Save selected extras" "app/quote/approve/[jobId]/page.tsx"
