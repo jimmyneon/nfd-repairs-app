@@ -113,6 +113,28 @@ export async function POST(request: NextRequest) {
       console.error('[missed-call] Failed to log call:', e)
     }
 
+    // Atomic dedup: MacroDroid's missed-call event and AI Desk's answered-call
+    // SMS fire this endpoint within ~1s of each other for the same call, and
+    // the old check-then-mark flow raced — both passed the "sent recently?"
+    // check before either recorded the send, so callers got two texts. A PK
+    // conflict on (phone, 30-min bucket) lets only the first claim through.
+    const bucket = Math.floor(Date.now() / 1000 / 1800)
+    try {
+      const { error: claimError } = await supabase
+        .from('missed_call_sms_claims')
+        .insert({ phone: normalisedFrom, bucket })
+      if (claimError?.code === '23505') {
+        console.log(`[missed-call] Dedup — SMS already claimed for ${normalisedFrom} in this window`)
+        return NextResponse.json(
+          { success: true, skipped: true, reason: 'SMS already sent/claimed in this window' },
+          { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        )
+      }
+    } catch (e) {
+      // Claims table missing/unreachable — fall through to the legacy checks
+      console.error('[missed-call] Dedup claim failed, falling back:', e)
+    }
+
     // Check: has this number been sent an SMS in the last 30 minutes?
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     const { data: recentSms } = await supabase
