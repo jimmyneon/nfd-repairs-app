@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
           // Send confirmation SMS
           const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
           if (isSmsConfigured()) {
-            const smsBody = `Hi ${getFirstName(jobData.data.customer_name)}! �\n\nGot your deposit — thanks! Parts are being ordered now 💳\n\nUsually next-day delivery during working days. We will text you when they arrive.\n\nNFD Repairs`
+            const smsBody = `Hi ${getFirstName(jobData.data.customer_name)}! 👋\n\nGot your deposit — thanks! Parts are being ordered now 💳\n\nUsually next-day delivery during working days. We will text you when they arrive.\n\nNFD Repairs`
             const result = await sendSms(phone, smsBody)
             await logSms(supabase, 'DEPOSIT_CONFIRMED', smsBody, result.ok, job.id, phone)
           }
