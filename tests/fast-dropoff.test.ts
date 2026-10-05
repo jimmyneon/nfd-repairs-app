@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), 'utf-8')
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.resetModules()
+})
 
 describe('Fast Drop-Off flow', () => {
   it('has a short public route that opens agreement-only completion', () => {
@@ -13,10 +18,20 @@ describe('Fast Drop-Off flow', () => {
     expect(content).toContain('?mode=agreement')
   })
 
-  it('uses a dedicated fast drop-off short-link helper', () => {
-    const content = read('lib/utils.ts')
-    expect(content).toContain('shortFastDropoffLink')
-    expect(content).toContain('/f/')
+  it('sends fast drop-off customers to the repair app instead of the website', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
+    vi.stubEnv('NEXT_PUBLIC_SHORT_LINK_BASE', 'https://nfdr.uk')
+    vi.resetModules()
+    const { shortFastDropoffLink } = await import('../lib/utils')
+    expect(shortFastDropoffLink('00000000-0000-0000-0000-000000000000'))
+      .toBe('https://nfd-repairs-app.vercel.app/f/00000000-0000-0000-0000-000000000000')
+  })
+
+  it('uses the configured app host and removes trailing slashes', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://repairs.example.com/')
+    vi.resetModules()
+    const { shortFastDropoffLink } = await import('../lib/utils')
+    expect(shortFastDropoffLink('test-token-123')).toBe('https://repairs.example.com/f/test-token-123')
   })
 
   it('offers fast drop-off only after an in-stock enquiry is converted', () => {
