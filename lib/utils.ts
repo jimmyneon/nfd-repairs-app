@@ -64,7 +64,8 @@ export function shortOnboardingLink(token: string): string {
 }
 
 export function shortFastDropoffLink(token: string): string {
-  return `${SHORT_LINK_BASE}/f/${token}`
+  // /f is served by the repair app; the website short-link host has no redirect for it.
+  return `${APP_URL.replace(/\/+$/, '')}/f/${encodeURIComponent(token)}`
 }
 
 export function shortPasswordLink(token: string): string {
