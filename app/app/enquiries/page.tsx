@@ -1565,6 +1565,7 @@ function EnquiriesContent() {
                     <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
                       <p className="text-base font-bold text-gray-900 dark:text-white">{selectedEnquiry.device_make} {selectedEnquiry.device_model}</p>
                       <p><span className="font-semibold">Repair:</span> {selectedEnquiry.repair_type}</p>
+                      {selectedEnquiry.device_colour && <p><span className="font-semibold">Colour:</span> {selectedEnquiry.device_colour}</p>}
                       {selectedEnquiry.screen_option && <p><span className="font-semibold">Option:</span> {selectedEnquiry.screen_option}</p>}
                       {selectedEnquiry.quoted_price != null && <p><span className="font-semibold">Price:</span> {selectedEnquiry.display_price || `£${selectedEnquiry.quoted_price}`}</p>}
                       {selectedEnquiry.additional_repairs && selectedEnquiry.additional_repairs.length > 0 && (
