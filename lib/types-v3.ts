@@ -43,6 +43,7 @@ export interface Job {
   // Device details
   device_make: string
   device_model: string
+  device_colour?: string | null
   issue: string
   description?: string | null
   additional_issues: AdditionalIssue[]

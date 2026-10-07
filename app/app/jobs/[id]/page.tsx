@@ -970,6 +970,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-black text-gray-900 dark:text-white leading-tight">{job!.device_make} {job!.device_model}</h1>
+              {job!.device_colour && <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-0.5">Colour: {job!.device_colour}</p>}
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{job!.issue}</p>
               <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-1">{job!.customer_name}</p>
             </div>
