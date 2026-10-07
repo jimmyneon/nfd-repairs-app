@@ -232,11 +232,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the job
-    const { data: job, error: jobError } = await supabase
+    let { data: job, error: jobError } = await supabase
       .from('jobs')
       .insert(jobData)
       .select()
       .single()
+
+    if (jobError || !job) {
+      // device_colour column may not exist yet (migration pending) —
+      // retry without it so conversion still works.
+      const { device_colour: _deviceColour, ...jobDataWithoutColour } = jobData
+      const retry = await supabase
+        .from('jobs')
+        .insert(jobDataWithoutColour)
+        .select()
+        .single()
+      job = retry.data
+      jobError = retry.error
+    }
 
     if (jobError || !job) {
       console.error('Failed to create job from enquiry:', jobError)
