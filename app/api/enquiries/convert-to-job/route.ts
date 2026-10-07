@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
       device_type: enquiry.device_category || null,
       device_make: enquiry.device_make || 'Unknown',
       device_model: enquiry.device_model || 'Unknown',
+      device_colour: enquiry.device_colour || null,
       issue: enquiry.repair_type || 'Repair needed',
       description: enquiry.issue_description || null,
       additional_issues: [...additionalRepairs, ...accessoryIssues],
