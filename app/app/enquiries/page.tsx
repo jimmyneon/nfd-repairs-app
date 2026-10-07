@@ -44,6 +44,7 @@ interface Enquiry {
   device_category?: string
   device_make?: string
   device_model?: string
+  device_colour?: string
   repair_type?: string
   screen_option?: string
   quoted_price?: number | null
