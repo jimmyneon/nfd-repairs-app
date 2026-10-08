@@ -9,6 +9,11 @@ type Data = {
   range: { start: string; end: string; timezone: string }
   instrumentation_active: boolean
   instrumentation_started_at: string | null
+  feedback_experiment?: {
+    prompted: number; answers: number; observed_exits: number
+    reasons: Array<{ reason: string; visitors: number }>
+    groups: Array<{ variant: string; visitors: number; price_concerns: number; offers_shown: number; offers_claimed: number; requests: number; arrived: number; completed: number; payment_marked: number; completed_value: number; completed_discount_cost: number }>
+  }
   followup_recovery?: {
     sent: number
     replies: number
@@ -130,6 +135,14 @@ export default function QuoteUxPage() {
       </header>
 
       <main className="max-w-5xl mx-auto p-4 pb-16 space-y-5">
+        {data?.feedback_experiment && <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <h2 className="font-bold">Why visitors hesitate · OCT5 test</h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{data.feedback_experiment.prompted} browsers prompted · {data.feedback_experiment.answers} answered · {data.feedback_experiment.observed_exits} observed exits. Leaving is not a reported reason.</p>
+          <div className="my-3 flex flex-wrap gap-2">{data.feedback_experiment.reasons.map(row => <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm dark:bg-gray-700" key={row.reason}>{({ price: 'Price', timing: 'Timing / getting here', research: 'Checking prices', compare: 'Comparing', replace: 'May replace device', model: 'Unsure of device / repair', ready: 'Ready to proceed' } as Record<string, string>)[row.reason] || row.reason}: {row.visitors}</span>)}</div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr>{['Group', 'Browsers', 'Price concerns', 'Offer claims', 'Requests', 'Arrived', 'Completed', 'Payment marked', 'Completed value', 'Discount cost'].map(label => <th className="whitespace-nowrap p-2" key={label}>{label}</th>)}</tr></thead><tbody>{data.feedback_experiment.groups.map(row => <tr className="border-t border-gray-100" key={row.variant}><td className="p-2">{row.variant === 'offer' ? '£5 offer' : 'Usual route'}</td>{[row.visitors, row.price_concerns, row.offers_claimed, row.requests, row.arrived, row.completed, row.payment_marked, gbp(row.completed_value), gbp(row.completed_discount_cost)].map((value, index) => <td className="p-2" key={index}>{value}</td>)}</tr>)}</tbody></table></div>
+          <p className="mt-3 text-xs text-gray-500">Stable 50/50 assignment for eligible browsers shown the prompt. The offer appears after a price concern; counts may include repeat enquiries. Job outcomes continue updating. Recorded job value already includes the discount; it is not profit or verified cash takings. Payment marked uses the existing payment flag. Small samples do not establish a winner.</p>
+        </section>}
+
         <div className="flex flex-wrap gap-2">
           {[['1', 'Today'], ['7', '7 days'], ['30', '30 days']].map(([value, label]) => (
             <button key={value} onClick={() => setDays(value)} className={`px-3 py-2 rounded-lg text-sm font-medium ${days === value ? 'bg-green-700 text-white' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'}`}>{label}</button>
@@ -278,3 +291,4 @@ function RouteStat({ label, value }: { label: string; value: number }) {
 function RecoveryStat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-4"><div className="text-xs text-gray-500 dark:text-gray-400">{label}</div><div className="text-2xl font-bold mt-1">{value}</div><div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sub}</div></div>
 }
+

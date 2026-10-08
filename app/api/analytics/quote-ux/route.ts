@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
 import { reportRange, readAllPages, VISIT_GAP_MS, quoteJobHasDeviceArrived, quoteFollowupRecovery } from '@/lib/quote-analytics'
 
+import { repairFeedbackAnalytics } from '@/lib/repair-feedback-analytics'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
@@ -170,7 +172,7 @@ export async function GET(request: NextRequest) {
     // funnel ends at the outcome that matters: the device reaching the workshop.
     const submittedRefs = [...new Set(
       relevantEvents
-        .filter(event => event.event_type === 'repair_request_submitted' && event.enquiry_ref)
+        .filter(event => ['repair_request_submitted', 'repair_experiment_request_saved'].includes(event.event_type) && event.enquiry_ref)
         .map(event => event.enquiry_ref as string)
     )]
     const submittedEnquiries: any[] = []
@@ -196,7 +198,7 @@ export async function GET(request: NextRequest) {
       const ids = enquiryIds.slice(offset, offset + 100)
       const rows = await readAllPages<any>((from, to) => supabase
         .from('jobs')
-        .select('id, quote_request_id, status, device_in_shop')
+        .select('id, quote_request_id, status, device_in_shop, price_total, payment_received')
         .in('quote_request_id', ids)
         .order('created_at')
         .order('id')
@@ -267,6 +269,7 @@ export async function GET(request: NextRequest) {
         category_loading_then_progressed: beforeReadyProgressed.length,
       },
       followup_recovery: followupRecovery,
+      feedback_experiment: repairFeedbackAnalytics(relevantEvents, submittedEnquiries, linkedJobs),
       conversion: {
         quote_reached: quoteReached.length,
         repair_start_clicked: repairStartClicked.length,
@@ -297,3 +300,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load quote UX analytics' }, { status: 500 })
   }
 }
+

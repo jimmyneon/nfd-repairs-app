@@ -6,6 +6,7 @@ import { corsHeaders } from '@/lib/api-auth'
 import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
 import { generateQuoteActionToken, quoteActionTokenExpiry } from '@/lib/job-utils'
 import { shortQuoteApprovalLink } from '@/lib/utils'
+import { verifyOffer, offerVariant, REPAIR_OFFER } from '@/lib/repair-offer'
 
 // Server-side price verification: fetch catalogue and look up the real price by quote_key
 async function verifyQuotePrice(quoteKey: string, clientPrice: number | null): Promise<{ verifiedPrice: number | null; displayPrice: string | null; partOption: string | null }> {
@@ -305,6 +306,7 @@ export async function POST(request: NextRequest) {
     let verifiedDisplayPrice = display_price
     let verifiedPartOption = part_option
     let priceTampered = false
+    let cataloguePriceVerified = false
     if (enquiry_type === 'repair_quote' && quote_key) {
       const verification = await verifyQuotePrice(quote_key, quoted_price)
       if (verification.verifiedPrice !== null) {
@@ -312,11 +314,28 @@ export async function POST(request: NextRequest) {
           console.warn(`[PRICE VERIFICATION] Tampered price detected for quote_key=${quote_key}: client sent ${quoted_price}, catalogue says ${verification.verifiedPrice}`)
           priceTampered = true
         }
+        cataloguePriceVerified = true
         verifiedQuotedPrice = verification.verifiedPrice
         verifiedDisplayPrice = verification.displayPrice
         verifiedPartOption = verification.partOption
       }
     }
+
+    // A code alone never changes a price. Only a signed allocation for this
+    // exact catalogue option can apply the authorised campaign discount.
+    const offerSecret = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    const offerClaims = body.repair_offer_token && cataloguePriceVerified
+      ? verifyOffer(body.repair_offer_token, quote_key, verifiedQuotedPrice, offerSecret) : null
+    if (body.repair_offer_token && (!offerClaims || enquiry_type !== 'repair_quote' || quote_source !== 'customer_wants_to_proceed' || !proceed_with_repair)) {
+      return NextResponse.json({ error: 'This offer has expired or the repair selection changed. Return to your quote to continue at the current price.' }, { status: 400, headers })
+    }
+    const offerNote = offerClaims ? `OCT5: £5 discount applied; original selected repair £${verifiedQuotedPrice}. Request received before 31 October deadline. Parts must be confirmed; discount applies to completed repair.` : null
+    if (offerClaims) {
+      verifiedQuotedPrice = Number(verifiedQuotedPrice) - REPAIR_OFFER.amount
+      verifiedDisplayPrice = `£${verifiedQuotedPrice}`
+    }
+    const persistedAdditionalInfo = offerNote ? [clampLength(additional_info, MAX_TEXT - 500), offerNote].filter(Boolean).join('\n') : additional_info || null
+    const persistedIssueDescription = offerNote ? [clampLength(issue_description, MAX_TEXT - 500), offerNote].filter(Boolean).join('\n') : issue_description || null
 
     // Issue a quote-action token up front for repair enquiries so callers
     // (e.g. AI Desk phone flow) can be texted a link to THEIR quote page
@@ -362,7 +381,7 @@ export async function POST(request: NextRequest) {
           screen_option: screen_option || null,
           quoted_price: verifiedQuotedPrice || null,
           quote_type: quote_type || null,
-          issue_description: issue_description || null,
+          issue_description: persistedIssueDescription,
           terms_accepted: terms_accepted || false,
           proceed_with_repair: proceed_with_repair || false,
           marketing_consent: marketing_consent || false,
@@ -381,7 +400,7 @@ export async function POST(request: NextRequest) {
           // Common
           additional_info: enquiry_type === 'remote_support'
             ? [additional_info, stripePaymentVerified ? `Stripe: PAID £${(stripePaymentAmount / 100).toFixed(0)} (session: ${stripe_session_id?.substring(0, 20)}...)` : 'Stripe: NOT VERIFIED'].filter(Boolean).join(' | ')
-            : additional_info || null,
+            : persistedAdditionalInfo,
           help_type: body.help_type || null,
           quote_action_token: quoteActionToken,
           quote_action_token_expires_at: quoteActionToken
@@ -423,16 +442,16 @@ export async function POST(request: NextRequest) {
             device_model: device_model || null,
             repair_type: repair_type || null,
             screen_option: screen_option || null,
-            quoted_price: quoted_price || null,
+            quoted_price: verifiedQuotedPrice || null,
             quote_type: quote_type || null,
-            issue_description: issue_description || null,
+            issue_description: persistedIssueDescription,
             terms_accepted: terms_accepted || false,
             proceed_with_repair: proceed_with_repair || false,
             marketing_consent: marketing_consent || false,
             quote_source: quote_source || null,
             payday_date: payday_date || null,
             accessories: accessories || null,
-            additional_info: additional_info || null,
+            additional_info: persistedAdditionalInfo,
             status: proceed_with_repair ? 'approved' : 'pending',
           })
           .select()
@@ -464,6 +483,23 @@ export async function POST(request: NextRequest) {
     const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
     const isPayday = quote_source === 'reserve_for_payday' && proceed_with_repair
     const isTimingLossRisk = quote_source === 'timing_loss_risk'
+    // Store conversion linkage server-side, even if the browser closes before
+    // its analytics batch flushes. Control requests are linked in the same way.
+    const offerSession = offerClaims?.session || body.repair_offer_session
+    if (enquiry_type === 'repair_quote' && quote_source === 'customer_wants_to_proceed'
+      && body.repair_offer_campaign === REPAIR_OFFER.id && typeof offerSession === 'string'
+      && /^[a-zA-Z0-9_-]{8,100}$/.test(offerSession)) {
+      try {
+        const { error: offerEventError } = await supabase.from('quote_analytics_events').insert({
+          session_id: offerSession, enquiry_ref: enquiryRef, event_type: 'repair_experiment_request_saved',
+          event_data: { campaign: REPAIR_OFFER.id, variant: offerVariant(offerSession, offerSecret),
+            discount_applied: Boolean(offerClaims), discount_amount: offerClaims ? REPAIR_OFFER.amount : 0,
+            quoted_price: verifiedQuotedPrice, quote_key },
+        })
+        if (offerEventError) console.error('Repair offer analytics linkage failed:', offerEventError.message)
+      } catch (error) { console.error('Repair offer analytics linkage failed:', error) }
+    }
+
     const isPriceOptionReview = quote_source === 'price_option_review'
     const isRecoveryReview = isTimingLossRisk || isPriceOptionReview
     const isRemoteSupport = enquiry_type === 'remote_support'
@@ -612,6 +648,8 @@ export async function POST(request: NextRequest) {
       enquiry_ref: enquiryRef,
       quote_url: quoteUrl,
       acknowledgement,
+      repair_offer_applied: Boolean(offerClaims),
+      quoted_price: verifiedQuotedPrice,
       message: isProceed
         ? 'Your repair request has been saved. We are checking the part now.'
         : 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
@@ -626,3 +664,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
