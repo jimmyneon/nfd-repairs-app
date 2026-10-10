@@ -102,15 +102,19 @@ export async function POST(request: NextRequest) {
     // Normalise phone for consistent storage/lookup (strip spaces, standardise format)
     const normalisedFrom = normaliseUkPhoneForLookup(from)
 
-    // Log this missed call (using normalised phone so rate limiting works across formats)
-    try {
-      await supabase.from('missed_call_log').insert({
-        phone: normalisedFrom,
-        sms_sent: false,
-        called_at: new Date().toISOString(),
-      })
-    } catch (e: any) {
-      console.error('[missed-call] Failed to log call:', e)
+    // Log this missed call (using normalised phone so rate limiting works across formats).
+    // AI Desk calls are answered calls, not missed ones — skip the log so they
+    // don't inflate the repeat-caller count.
+    if (!answeredByAiDesk) {
+      try {
+        await supabase.from('missed_call_log').insert({
+          phone: normalisedFrom,
+          sms_sent: false,
+          called_at: new Date().toISOString(),
+        })
+      } catch (e: any) {
+        console.error('[missed-call] Failed to log call:', e)
+      }
     }
 
     // Atomic dedup: MacroDroid's missed-call event and AI Desk's answered-call
@@ -176,7 +180,7 @@ export async function POST(request: NextRequest) {
       const hasResponded = (inboundCount || 0) > 0
 
       if (!hasResponded) {
-        console.log(`[missed-call] Repeat caller ${from} — ${missedCallCount} missed calls in 24h, no response, sending "use the form" message`)
+        console.log(`[missed-call] Repeat caller ${from} — ${missedCallCount} missed calls in 24h, no response — notifying staff`)
 
         // Notify staff about the repeat caller
         try {
@@ -190,33 +194,14 @@ export async function POST(request: NextRequest) {
           console.error('[missed-call] Failed to notify staff:', e)
         }
 
-        // Instead of going silent, send a one-off message asking them to use the form/links/reply
-        // (we can't take calls while working on devices)
-        if (isWithinUKSendingHours()) {
-          const repeatBody = `Hi, we can't take calls while working on devices but don't want to miss you! 👋\n\nGet an instant repair price in 60 seconds:\n${QUOTE_URL_MISSED}\n\nNo need to book — just pop in.\n\n📍 Find us & opening hours:\nnfdr.uk/contact-us/#hours\n\nExisting repair? Reply UPDATE.\nAnything else? Just reply here.\n\nJohn\nNFD Repairs`
-          try {
-            const { sendSms } = await import('@/lib/resilience')
-            const result = await sendSms(from, repeatBody)
-            await supabase.from('sms_logs').insert({
-              template_key: 'MISSED_CALL_REPEAT',
-              recipient_phone: from,
-              body_rendered: repeatBody,
-              status: result.ok ? (result.queued ? 'PENDING' : 'SENT') : 'FAILED',
-              sent_at: result.ok && !result.queued ? new Date().toISOString() : null,
-              error_message: result.ok && result.relayMessageId
-                ? `relay_message_id:${result.relayMessageId}`
-                : undefined,
-            } as any)
-          } catch (e) {
-            console.error('[missed-call] Failed to send repeat-caller message:', e)
-          }
-        }
-
+        // AI Desk answers calls now — the old "we can't take calls" repeat text
+        // is retired. Caller already received the answered-call SMS; staff get
+        // the notification above instead.
         return NextResponse.json(
           {
             success: true,
             skipped: true,
-            reason: 'Repeat caller — sent "use the form" message and notified staff',
+            reason: 'Repeat caller — staff notified',
             missed_call_count_24h: missedCallCount,
           },
           { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
