@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       const { data: job } = await supabase
         .from('jobs')
         .select(
-          'id, job_ref, status, device_summary, price_total, deposit_required, deposit_amount, deposit_received, payment_received, customer_name, customer_phone, customer_email'
+          'id, job_ref, status, device_make, device_model, price_total, deposit_required, deposit_amount, deposit_received, payment_received, customer_name, customer_phone, customer_email'
         )
         .or(`tracking_token.eq.${token},short_token.eq.${token}`)
         .single()
@@ -135,6 +135,9 @@ export async function POST(request: NextRequest) {
       if (!job) {
         return NextResponse.json({ error: 'Repair not found' }, { status: 404, headers })
       }
+
+      const jobDevice =
+        [job.device_make, job.device_model].filter(Boolean).join(' ') || 'device'
 
       // Sum what's already been paid through Stripe — for this job and
       // the enquiry it was converted from. A failed read must not
@@ -171,7 +174,7 @@ export async function POST(request: NextRequest) {
           )
         }
         amountPence = Math.round((job.deposit_amount ?? 20) * 100)
-        description = `Repair deposit — ${job.device_summary} (${job.job_ref})`
+        description = `Repair deposit — ${jobDevice} (${job.job_ref})`
       } else {
         if (job.payment_received) {
           return NextResponse.json(
@@ -187,7 +190,7 @@ export async function POST(request: NextRequest) {
             { status: 409, headers }
           )
         }
-        description = `Repair balance — ${job.device_summary} (${job.job_ref})`
+        description = `Repair balance — ${jobDevice} (${job.job_ref})`
       }
 
       const existing = await findOpenPayment(supabase, { jobId: job.id }, kind)

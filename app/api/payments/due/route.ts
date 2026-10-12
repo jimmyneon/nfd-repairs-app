@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const { data: job } = await supabase
     .from('jobs')
     .select(
-      'id, job_ref, status, device_summary, price_total, deposit_required, deposit_amount, deposit_received, payment_received'
+      'id, job_ref, status, device_make, device_model, price_total, deposit_required, deposit_amount, deposit_received, payment_received'
     )
     .or(`tracking_token.eq.${token},short_token.eq.${token}`)
     .single()
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       job_ref: job.job_ref,
-      device: job.device_summary,
+      device: [job.device_make, job.device_model].filter(Boolean).join(' ') || null,
       status: job.status,
       total_pence: totalPence,
       paid_pence: paidPence,

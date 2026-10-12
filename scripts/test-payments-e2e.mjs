@@ -283,6 +283,104 @@ async function main() {
 
   await supaDelete('enquiries', 'enquiry_ref', enqRef)
 
+  // ---- 8. Job deposit → balance lifecycle ----------------------------------
+  console.log('8. Job deposit + balance')
+  const insJob = await fetch(`${SUPA_URL}/rest/v1/jobs`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify({
+      customer_name: 'E2E Job', customer_phone: '07123456789',
+      device_make: 'TestPhone', device_model: 'X', issue: 'screen test',
+      price_total: 80, status: 'AWAITING_DEPOSIT',
+      deposit_required: true, deposit_amount: 20, type: 'repair',
+    }),
+  })
+  const jobRows = insJob.ok ? await insJob.json() : null
+  const job = Array.isArray(jobRows) ? jobRows[0] : null
+  check('test job created', !!job?.tracking_token, `status ${insJob.status}`)
+
+  if (job?.tracking_token) {
+    const due1 = await get(`/api/payments/due?token=${job.tracking_token}`)
+    check('due shows £20 deposit', due1.body.deposit_due_pence === 2000,
+      JSON.stringify(due1.body))
+
+    const depCheckout = await post('/api/payments/checkout', {
+      kind: 'job_deposit', token: job.tracking_token,
+      return_url: 'https://newforestdevicerepairs.co.uk/pay/thanks/',
+    })
+    const depSid = depCheckout.body?.url?.match(/cs_(test|live)_[\w]+/)?.[0]
+    check('deposit checkout created', !!depSid, JSON.stringify(depCheckout.body))
+
+    if (depSid) {
+      const depEvent = {
+        id: 'evt_e2e_dep', object: 'event', type: 'checkout.session.completed',
+        data: { object: {
+          id: depSid, object: 'checkout.session', amount_total: 2000, currency: 'gbp',
+          payment_status: 'paid', status: 'complete', payment_intent: 'pi_e2e_dep',
+          customer_details: {}, metadata: { kind: 'job_deposit' },
+        }},
+      }
+      const depPayload = JSON.stringify(depEvent)
+      const depWh = await fetch(`${BASE}/api/webhooks/stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'stripe-signature': stripeSignature(depPayload, webhookSecret) },
+        body: depPayload,
+      })
+      check('deposit webhook accepted', depWh.status === 200, `status ${depWh.status}`)
+
+      const jobAfter = await fetch(
+        `${SUPA_URL}/rest/v1/jobs?id=eq.${job.id}&select=deposit_received,payment_received`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
+      ).then(r => r.json())
+      check('job.deposit_received flipped', jobAfter[0]?.deposit_received === true,
+        JSON.stringify(jobAfter))
+
+      const due2 = await get(`/api/payments/due?token=${job.tracking_token}`)
+      check('due shows £60 balance after deposit', due2.body.balance_due_pence === 6000,
+        JSON.stringify(due2.body))
+
+      const balCheckout = await post('/api/payments/checkout', {
+        kind: 'job_payment', token: job.tracking_token,
+        return_url: 'https://newforestdevicerepairs.co.uk/pay/thanks/',
+      })
+      const balSid = balCheckout.body?.url?.match(/cs_(test|live)_[\w]+/)?.[0]
+      check('balance checkout created for £60', !!balSid, JSON.stringify(balCheckout.body))
+
+      if (balSid) {
+        const balEvent = {
+          id: 'evt_e2e_bal', object: 'event', type: 'checkout.session.completed',
+          data: { object: {
+            id: balSid, object: 'checkout.session', amount_total: 6000, currency: 'gbp',
+            payment_status: 'paid', status: 'complete', payment_intent: 'pi_e2e_bal',
+            customer_details: {}, metadata: { kind: 'job_payment' },
+          }},
+        }
+        const balPayload = JSON.stringify(balEvent)
+        await fetch(`${BASE}/api/webhooks/stripe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'stripe-signature': stripeSignature(balPayload, webhookSecret) },
+          body: balPayload,
+        })
+        const jobFinal = await fetch(
+          `${SUPA_URL}/rest/v1/jobs?id=eq.${job.id}&select=payment_received`,
+          { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
+        ).then(r => r.json())
+        check('job.payment_received flipped', jobFinal[0]?.payment_received === true,
+          JSON.stringify(jobFinal))
+        await supaDelete('payments', 'stripe_session_id', balSid)
+      }
+      await supaDelete('payments', 'stripe_session_id', depSid)
+    }
+    await supaDelete('payments', 'job_id', job.id)
+    await supaDelete('job_events', 'job_id', job.id)
+    await supaDelete('jobs', 'id', job.id)
+  }
+
   // ---- cleanup -------------------------------------------------------------
   console.log('cleanup: removing test rows')
   await supaDelete('payments', 'stripe_session_id', sessionId)
