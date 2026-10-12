@@ -65,6 +65,10 @@ export async function GET(request: NextRequest) {
       additional_repairs: enquiry.additional_repairs,
       status: enquiry.status,
       repair_reserved: enquiry.repair_reserved,
+      deposit_required: enquiry.deposit_required,
+      deposit_amount: enquiry.deposit_amount,
+      deposit_received: enquiry.deposit_received,
+      payment_received: enquiry.payment_received,
     }
 
     return NextResponse.json({ enquiry: safeEnquiry }, { headers })

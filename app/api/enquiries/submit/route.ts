@@ -133,6 +133,10 @@ export async function POST(request: NextRequest) {
       quote_key,
       payday_date,
       accessories,
+      // Deposit intent (payday reserve / quote-accept) — payment itself
+      // is verified separately via Stripe, never trusted from the client
+      deposit_required,
+      deposit_amount,
       // Repair Quote drop-off preference (when the customer hopes to bring it in)
       dropoff_preference,
       dropoff_date,
@@ -394,6 +398,10 @@ export async function POST(request: NextRequest) {
           quote_key: quote_key || null,
           payday_date: payday_date || null,
           accessories: accessories || null,
+          deposit_required: deposit_required === true,
+          deposit_amount: Number(deposit_amount) > 0 && Number(deposit_amount) <= 500
+            ? Number(deposit_amount)
+            : null,
           dropoff_preference: dropoff_preference || null,
           dropoff_date: dropoff_date || null,
           dropoff_note: dropoff_note ? clampLength(dropoff_note, MAX_TEXT) : null,

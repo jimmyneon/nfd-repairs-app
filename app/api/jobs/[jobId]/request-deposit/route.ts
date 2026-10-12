@@ -78,7 +78,15 @@ export async function POST(
     try {
       const firstName = getFirstName(job.customer_name)
       const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
-      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      // Per-job pay page — detects deposit vs balance and creates a
+      // Stripe Checkout session on demand (card + Klarna where eligible).
+      // Stable link, unlike a raw Stripe session URL which expires.
+      const siteBase = (
+        process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk'
+      ).replace(/\/+$/, '')
+      const depositUrl = `${siteBase}/pay/?t=${encodeURIComponent(
+        job.short_token || job.tracking_token
+      )}`
       const depositAmount = finalDepositAmount.toFixed(2)
 
       // Fetch template from database

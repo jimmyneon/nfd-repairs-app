@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || 'https://newforestdevicerepairs.co.uk'
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'klarna'],
       line_items: [
         {
           price_data: {
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}/remote-support/`,
       metadata: {
         product: 'remote_support_session',
+        kind: 'remote_support',
       },
     })
 

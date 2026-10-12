@@ -28,10 +28,25 @@ CRON_SECRET=your-random-secret-here
 ```
 Generate with: `openssl rand -hex 32`
 
-### Payment Integration (Optional)
+### Payment Integration (Stripe)
 ```
-NEXT_PUBLIC_DEPOSIT_URL=https://pay.sumup.com/b2c/YOUR_LINK
+STRIPE_SECRET_KEY=sk_live_...            # or sk_test_... for testing
+STRIPE_WEBHOOK_SECRET=whsec_...          # from Stripe Dashboard → Webhooks
+NEXT_PUBLIC_SITE_URL=https://newforestdevicerepairs.co.uk
 ```
+- `STRIPE_SECRET_KEY` — already required for remote-support checkout; now also powers
+  `/api/payments/checkout` (deposits, balances, enquiry payments, repair-fund top-ups).
+- `STRIPE_WEBHOOK_SECRET` — required for `/api/webhooks/stripe`. In the Stripe
+  Dashboard add an endpoint for `https://nfd-repairs-app.vercel.app/api/webhooks/stripe`
+  listening to: `checkout.session.completed`, `checkout.session.expired`,
+  `payment_intent.payment_failed`, `charge.refunded`.
+- `NEXT_PUBLIC_SITE_URL` — base for customer pay links sent by SMS
+  (`{SITE_URL}/pay/?t=...`). Defaults to newforestdevicerepairs.co.uk.
+- Klarna: enable in Stripe Dashboard → Settings → Payment methods. It appears at
+  checkout automatically on eligible amounts (card-only below Klarna's minimum).
+
+Deprecated: `NEXT_PUBLIC_DEPOSIT_URL` (SumUp) is no longer used — deposit SMS links
+now point at the per-job `/pay/` page which creates Stripe Checkout on demand.
 
 ---
 
