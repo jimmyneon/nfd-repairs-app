@@ -238,16 +238,26 @@ async function handleSessionCompleted(
   }
 
   if (ranTransition && (kind === 'job_payment' || kind === 'job_deposit') && jobId) {
-    // A job is fully paid when the running total covers the price.
+    // A job is fully paid when the running total covers the price —
+    // including anything paid earlier against its source enquiry.
     const { data: job } = await supabase
       .from('jobs')
       .select('price_total')
       .eq('id', jobId)
       .single()
+    const { data: srcEnquiry } = await supabase
+      .from('enquiries')
+      .select('enquiry_ref')
+      .eq('converted_job_id', jobId)
+      .maybeSingle()
     const { data: paidRows, error: paidErr } = await supabase
       .from('payments')
       .select('amount_pence')
-      .eq('job_id', jobId)
+      .or(
+        srcEnquiry
+          ? `job_id.eq.${jobId},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
+          : `job_id.eq.${jobId}`
+      )
       .eq('status', 'paid')
     if (paidErr) throw paidErr
     const totalPaid = (paidRows || []).reduce(

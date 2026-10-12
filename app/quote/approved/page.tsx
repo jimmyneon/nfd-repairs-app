@@ -10,8 +10,30 @@ function ApprovedContent() {
   const jobId = searchParams.get('jobId')
   const quoteToken = searchParams.get('t')
   const [hours, setHours] = useState<any>(null)
-  const [paying, setPaying] = useState<'deposit' | 'full' | null>(null)
+  const [paying, setPaying] = useState<'deposit' | 'full' | 'fund' | null>(null)
   const [payError, setPayError] = useState('')
+
+  const startFund = async () => {
+    if (!jobId || !quoteToken) return
+    setPaying('fund')
+    setPayError('')
+    try {
+      const res = await fetch('/api/repair-fund/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enquiry_ref: jobId, t: quoteToken }),
+      })
+      const data = await res.json()
+      if (data?.fund_url) {
+        window.location.href = data.fund_url
+        return
+      }
+      setPayError(data?.error || 'Could not set up a repair fund — text us and we will sort it.')
+    } catch {
+      setPayError('Could not set up a repair fund — text us and we will sort it.')
+    }
+    setPaying(null)
+  }
 
   const startCheckout = async (kind: 'enquiry_deposit' | 'enquiry_payment') => {
     if (!jobId || !quoteToken) return
@@ -117,6 +139,14 @@ function ApprovedContent() {
                   Pay in full
                 </button>
               </div>
+              <button
+                onClick={startFund}
+                disabled={paying !== null}
+                className="w-full mt-3 bg-white hover:bg-green-50 border-2 border-green-600 text-green-700 font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {paying === 'fund' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Can't pay yet? Start a repair fund for this quote
+              </button>
               {payError && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-3">{payError}</p>
               )}

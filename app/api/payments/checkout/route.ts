@@ -136,12 +136,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Repair not found' }, { status: 404, headers })
       }
 
-      // Sum what's already been paid through Stripe for this job —
-      // a failed read must not silently undercharge.
+      // Sum what's already been paid through Stripe — for this job and
+      // the enquiry it was converted from. A failed read must not
+      // silently undercharge.
+      const { data: srcEnquiry } = await supabase
+        .from('enquiries')
+        .select('enquiry_ref')
+        .eq('converted_job_id', job.id)
+        .maybeSingle()
       const { data: paidRows, error: paidErr } = await supabase
         .from('payments')
         .select('amount_pence')
-        .eq('job_id', job.id)
+        .or(
+          srcEnquiry
+            ? `job_id.eq.${job.id},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
+            : `job_id.eq.${job.id}`
+        )
         .eq('status', 'paid')
       if (paidErr) {
         throw new Error('Could not check payment history')

@@ -43,10 +43,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Repair not found' }, { status: 404, headers })
   }
 
+  // Payments tied to the job itself plus any made earlier against the
+  // enquiry it was converted from (payday deposits, fund redemptions).
+  const { data: srcEnquiry } = await supabase
+    .from('enquiries')
+    .select('enquiry_ref')
+    .eq('converted_job_id', job.id)
+    .maybeSingle()
+
   const { data: paidRows, error: paidErr } = await supabase
     .from('payments')
     .select('amount_pence')
-    .eq('job_id', job.id)
+    .or(
+      srcEnquiry
+        ? `job_id.eq.${job.id},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
+        : `job_id.eq.${job.id}`
+    )
     .eq('status', 'paid')
   if (paidErr) {
     console.error('[Payments] due paid lookup failed:', paidErr)

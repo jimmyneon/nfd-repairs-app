@@ -883,6 +883,32 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setDepositSending(false)
   }
 
+  const [fundApplying, setFundApplying] = useState(false)
+  const [fundApplyMsg, setFundApplyMsg] = useState('')
+  const applyRepairFund = async () => {
+    if (!job) return
+    setFundApplying(true)
+    setFundApplyMsg('')
+    try {
+      const response = await fetch('/api/jobs/apply-fund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: job.id }),
+      })
+      const data = await response.json()
+      if (data.ok) {
+        setFundApplyMsg(`Applied £${(data.applied_pence / 100).toFixed(2)} from the repair fund.`)
+        await loadJobData()
+      } else {
+        setFundApplyMsg(data.error || 'No usable fund found.')
+      }
+    } catch (error) {
+      console.error('Failed to apply repair fund:', error)
+      setFundApplyMsg('Could not apply fund.')
+    }
+    setFundApplying(false)
+  }
+
   const handleSendAftercare = async () => {
     if (!job) return
     setAftercareSending(true)
@@ -1405,6 +1431,29 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {/* Payment Status Toggle — moved to header under price button */}
+
+        {!job.payment_received && (
+          <div className="card bg-purple-50 border-2 border-purple-200">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-bold text-purple-900">Repair fund</p>
+                <p className="text-sm text-purple-700">
+                  If the customer has saved a repair fund, apply it toward this job.
+                </p>
+                {fundApplyMsg && (
+                  <p className="text-sm font-semibold text-purple-900 mt-1">{fundApplyMsg}</p>
+                )}
+              </div>
+              <button
+                onClick={applyRepairFund}
+                disabled={fundApplying || actionLoading}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-5 rounded-xl text-sm disabled:opacity-50 transition-all active:scale-95 flex-shrink-0"
+              >
+                {fundApplying ? 'Applying…' : 'Apply fund'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="card">
           <h2 className="text-xl font-black text-gray-900 mb-5">Update Status</h2>

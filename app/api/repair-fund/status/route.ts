@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const { data: fund } = await supabase
     .from('repair_funds')
     .select(
-      'customer_name, device_summary, repair_summary, target_amount_pence, balance_pence, status'
+      'customer_name, device_summary, repair_summary, target_amount_pence, balance_pence, status, enquiry_ref'
     )
     .eq('fund_token', token)
     .single()
@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         100
       ),
       status: fund.status,
+      has_quote: Boolean(fund.enquiry_ref),
     },
     { headers }
   )

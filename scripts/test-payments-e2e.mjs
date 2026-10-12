@@ -187,6 +187,102 @@ async function main() {
   const due = await get('/api/payments/due?token=deadbeef00')
   check('unknown token → 404', due.status === 404, `status ${due.status}`)
 
+  // ---- 7. Create-from-quote, redeem, recover -------------------------------
+  console.log('7. Quote-linked fund: create, fund, redeem')
+  const enqRef = 'ENQ-E2E' + Date.now().toString(36).toUpperCase()
+  const enqToken = 'e2e-quote-token'
+  const insEnq = await fetch(`${SUPA_URL}/rest/v1/enquiries`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({
+      enquiry_ref: enqRef,
+      enquiry_type: 'repair_quote',
+      customer_name: 'E2E Quote',
+      customer_phone: '07123456789',
+      quoted_price: 80,
+      device_make: 'TestPhone',
+      device_model: 'X',
+      repair_type: 'screen',
+      status: 'pending',
+      quote_action_token: enqToken,
+      quote_action_token_expires_at: new Date(Date.now() + 864e5).toISOString(),
+    }),
+  })
+  check('test enquiry inserted', insEnq.ok, `status ${insEnq.status}`)
+
+  const badToken = await post('/api/repair-fund/create', { enquiry_ref: enqRef, t: 'wrong' })
+  check('bad quote token → 403', badToken.status === 403, `status ${badToken.status}`)
+
+  const qFund = await post('/api/repair-fund/create', { enquiry_ref: enqRef, t: enqToken })
+  check('fund created from quote', qFund.status === 200 && !!qFund.body.fund_token,
+    JSON.stringify(qFund.body))
+  const qToken = qFund.body.fund_token
+
+  if (qToken) {
+    const qStatus = await get(`/api/repair-fund/status?token=${qToken}`)
+    check('target prefilled from quote (£80)', qStatus.body.target_pence === 8000,
+      JSON.stringify(qStatus.body))
+
+    const qCheckout = await post('/api/payments/checkout', {
+      kind: 'fund_topup', fund_token: qToken, amount: 80,
+      return_url: 'https://newforestdevicerepairs.co.uk/repair-fund/?f=x',
+    })
+    const qSid = qCheckout.body?.url?.match(/cs_(test|live)_[\w]+/)?.[0]
+    check('full-fund checkout created', !!qSid, JSON.stringify(qCheckout.body))
+
+    if (qSid) {
+      const qEvent = {
+        id: 'evt_e2e_fund2', object: 'event', type: 'checkout.session.completed',
+        data: { object: {
+          id: qSid, object: 'checkout.session', amount_total: 8000, currency: 'gbp',
+          payment_status: 'paid', status: 'complete', payment_intent: 'pi_e2e_2',
+          customer_details: {}, metadata: { kind: 'fund_topup' },
+        }},
+      }
+      const qPayload = JSON.stringify(qEvent)
+      const qWh = await fetch(`${BASE}/api/webhooks/stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'stripe-signature': stripeSignature(qPayload, webhookSecret) },
+        body: qPayload,
+      })
+      check('funding webhook accepted', qWh.status === 200, `status ${qWh.status}`)
+
+      const fundedStatus = await get(`/api/repair-fund/status?token=${qToken}`)
+      check('fund now funded', fundedStatus.body.status === 'funded',
+        JSON.stringify(fundedStatus.body))
+
+      const redeem = await post('/api/repair-fund/redeem', { token: qToken })
+      check('redeem applied £80', redeem.status === 200 && redeem.body.applied_pence === 8000,
+        JSON.stringify(redeem.body))
+
+      const redeem2 = await post('/api/repair-fund/redeem', { token: qToken })
+      check('second redeem is a no-op', redeem2.body.already_redeemed === true,
+        JSON.stringify(redeem2.body))
+
+      const enqCheck = await fetch(
+        `${SUPA_URL}/rest/v1/enquiries?enquiry_ref=eq.${enqRef}&select=payment_received`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
+      ).then(r => r.json())
+      check('enquiry flagged payment_received', enqCheck[0]?.payment_received === true,
+        JSON.stringify(enqCheck))
+
+      await supaDelete('payments', 'stripe_session_id', qSid)
+    }
+    await supaDelete('payments', 'enquiry_ref', enqRef)
+    await supaDelete('repair_funds', 'fund_token', qToken)
+  }
+
+  const recover = await post('/api/repair-fund/recover', { customer_phone: '07123456789' })
+  check('recover returns generic ok', recover.status === 200 && recover.body.ok === true,
+    JSON.stringify(recover.body))
+
+  await supaDelete('enquiries', 'enquiry_ref', enqRef)
+
   // ---- cleanup -------------------------------------------------------------
   console.log('cleanup: removing test rows')
   await supaDelete('payments', 'stripe_session_id', sessionId)
