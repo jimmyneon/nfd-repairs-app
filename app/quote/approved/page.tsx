@@ -2,13 +2,43 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Clock, MapPin } from 'lucide-react'
+import { CheckCircle, Clock, MapPin, CreditCard, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 function ApprovedContent() {
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
+  const quoteToken = searchParams.get('t')
   const [hours, setHours] = useState<any>(null)
+  const [paying, setPaying] = useState<'deposit' | 'full' | null>(null)
+  const [payError, setPayError] = useState('')
+
+  const startCheckout = async (kind: 'enquiry_deposit' | 'enquiry_payment') => {
+    if (!jobId || !quoteToken) return
+    setPaying(kind === 'enquiry_deposit' ? 'deposit' : 'full')
+    setPayError('')
+    try {
+      const res = await fetch('/api/payments/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind,
+          enquiry_ref: jobId,
+          t: quoteToken,
+          return_url: 'https://newforestdevicerepairs.co.uk/pay/thanks/',
+        }),
+      })
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+        return
+      }
+      setPayError(data?.error || 'Could not start checkout — please try again or wait for our payment link.')
+    } catch {
+      setPayError('Could not start checkout — please try again or wait for our payment link.')
+    }
+    setPaying(null)
+  }
 
   useEffect(() => {
     fetch('/api/public/opening-hours')
@@ -56,6 +86,43 @@ function ApprovedContent() {
                   <span>No payment needed until we've confirmed everything with you</span>
                 </li>
               </ul>
+            </div>
+          )}
+
+          {/* Optional: pay now — deposit or full payment via Stripe/Klarna */}
+          {jobId && quoteToken && (
+            <div className="bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-xl p-6 mb-6 text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <p className="text-sm font-bold text-gray-900 dark:text-white">Want to pay now? (optional)</p>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Skip the queue — pay a deposit or the full amount securely with Stripe. Klarna is offered on eligible payments.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => startCheckout('enquiry_deposit')}
+                  disabled={paying !== null}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {paying === 'deposit' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Pay deposit
+                </button>
+                <button
+                  onClick={() => startCheckout('enquiry_payment')}
+                  disabled={paying !== null}
+                  className="flex-1 bg-gray-900 hover:bg-black disabled:opacity-60 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {paying === 'full' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Pay in full
+                </button>
+              </div>
+              {payError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-3">{payError}</p>
+              )}
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+                Klarna's Pay in 3 / Pay in 30 days are unregulated credit agreements. Borrowing more than you can afford or paying late may negatively impact your financial status and credit score. 18+, UK residents only. T&Cs and late fees apply.
+              </p>
             </div>
           )}
 

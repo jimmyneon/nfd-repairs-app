@@ -174,7 +174,9 @@ function QuoteApprovalContent() {
         body: JSON.stringify({}),
       })
       if (!response.ok) throw new Error('Failed to approve quote')
-      router.push(`/quote/approved?jobId=${jobId}`)
+      const approvedUrl = `/quote/approved?jobId=${encodeURIComponent(jobId!)}` +
+        (quoteToken ? `&t=${encodeURIComponent(quoteToken)}` : '')
+      router.push(approvedUrl)
     } catch (err) {
       setError(alreadyAccepted ? 'Failed to save repair options' : 'Failed to approve quote')
       setApproving(false)

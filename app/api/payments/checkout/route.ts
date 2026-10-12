@@ -8,6 +8,7 @@ import {
   PaymentKind,
 } from '@/lib/payments'
 import { getStripe } from '@/lib/stripe'
+import { isQuoteActionTokenValid } from '@/lib/job-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,7 +75,7 @@ function withCancelledParam(base: string): string {
  * the client never dictates price.
  *
  *   { kind: 'job_deposit'|'job_payment', token }        — job by tracking token
- *   { kind: 'enquiry_deposit'|'enquiry_payment', enquiry_ref }
+ *   { kind: 'enquiry_deposit'|'enquiry_payment', enquiry_ref, t }
  *   { kind: 'fund_topup', fund_token, amount }          — amount in £, £5–£500
  *   optional return_url — page to come back to after paying
  */
@@ -210,13 +211,26 @@ export async function POST(request: NextRequest) {
       const { data: enquiry } = await supabase
         .from('enquiries')
         .select(
-          'enquiry_ref, customer_name, customer_email, customer_phone, quoted_price, display_price, device_make, device_model, repair_type, deposit_required, deposit_amount, deposit_received, payment_received, status'
+          'enquiry_ref, customer_name, customer_email, customer_phone, quoted_price, display_price, device_make, device_model, repair_type, deposit_required, deposit_amount, deposit_received, payment_received, status, quote_action_token, quote_action_token_expires_at, quote_action_token_revoked_at'
         )
         .eq('enquiry_ref', ref)
         .single()
 
       if (!enquiry) {
         return NextResponse.json({ error: 'Enquiry not found' }, { status: 404, headers })
+      }
+
+      // Enquiry refs are enumerable — the secure quote token is required so a
+      // guess can't start a checkout or reveal the quoted amount.
+      const token = String(body.t || '')
+      if (!enquiry.quote_action_token ||
+          !isQuoteActionTokenValid(
+            token,
+            enquiry.quote_action_token_expires_at,
+            enquiry.quote_action_token_revoked_at
+          ) ||
+          token !== enquiry.quote_action_token) {
+        return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403, headers })
       }
 
       const deviceLabel =
