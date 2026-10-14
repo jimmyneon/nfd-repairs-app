@@ -1,3 +1,5 @@
+import { jobPaymentState } from '@/lib/job-payment-state'
+import { shortTrackingLink } from '@/lib/utils'
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { createServiceClient, sendSms, isSmsConfigured } from '@/lib/resilience'
@@ -223,8 +225,9 @@ async function handleSessionCompleted(
   const amountPence = payment?.amount_pence ?? session.amount_total ?? 0
 
   // ---- Side effects per kind — only on the open→paid transition ----
-  if (ranTransition && kind === 'job_deposit' && jobId) {
-    await supabase
+  const settled = ranTransition || payment?.status === 'paid'
+  if (settled && kind === 'job_deposit' && jobId) {
+    const { error: depositError } = await supabase
       .from('jobs')
       .update({
         deposit_received: true,
@@ -232,30 +235,33 @@ async function handleSessionCompleted(
         updated_at: now,
       })
       .eq('id', jobId)
-    await supabase.from('job_events').insert({
+    if (depositError) throw depositError
+    if (ranTransition) await supabase.from('job_events').insert({
       job_id: jobId,
       type: 'SYSTEM',
       message: `Deposit of £${(amountPence / 100).toFixed(2)} paid via Stripe`,
     })
-    await sendDepositReceivedSms(supabase, jobId, amountPence)
+    if (ranTransition) await sendDepositReceivedSms(supabase, jobId, amountPence)
   }
 
-  if (ranTransition && (kind === 'job_payment' || kind === 'job_deposit') && jobId) {
+  if (settled && (kind === 'job_payment' || kind === 'job_deposit') && jobId) {
     // A job is fully paid when the running total covers the price —
     // including anything paid earlier against its source enquiry.
-    const { data: job } = await supabase
+    const { data: job, error: jobReadError } = await supabase
       .from('jobs')
-      .select('price_total, deposit_required')
+      .select('price_total, deposit_required, deposit_received, deposit_amount, payment_received')
       .eq('id', jobId)
       .single()
-    const { data: srcEnquiry } = await supabase
+    if (jobReadError || !job) throw jobReadError || new Error('Payment job not found')
+    const { data: srcEnquiry, error: enquiryReadError } = await supabase
       .from('enquiries')
       .select('enquiry_ref')
       .eq('converted_job_id', jobId)
       .maybeSingle()
+    if (enquiryReadError) throw enquiryReadError
     const { data: paidRows, error: paidErr } = await supabase
       .from('payments')
-      .select('amount_pence')
+      .select('amount_pence, kind')
       .or(
         srcEnquiry
           ? `job_id.eq.${jobId},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
@@ -263,16 +269,15 @@ async function handleSessionCompleted(
       )
       .eq('status', 'paid')
     if (paidErr) throw paidErr
-    const totalPaid = (paidRows || []).reduce(
-      (s, p) => s + (p.amount_pence || 0),
-      0
-    )
-    if (job && totalPaid >= Math.round((job.price_total ?? 0) * 100)) {
-      await supabase
+    const state = job ? jobPaymentState(job, paidRows || []) : null
+    const totalPaid = state?.paid || 0
+    if (job && state?.fullyPaid) {
+      const { error: paidUpdateError } = await supabase
         .from('jobs')
         .update({ payment_received: true, ...(job.deposit_required ? { deposit_received: true, deposit_received_at: now } : {}), updated_at: now })
         .eq('id', jobId)
-      await supabase.from('job_events').insert({
+      if (paidUpdateError) throw paidUpdateError
+      if (ranTransition) await supabase.from('job_events').insert({
         job_id: jobId,
         type: 'SYSTEM',
         message: `Repair paid in full via Stripe (£${(totalPaid / 100).toFixed(2)})`,
@@ -327,7 +332,7 @@ async function sendDepositReceivedSms(
   try {
     const { data: job } = await supabase
       .from('jobs')
-      .select('customer_name, customer_phone, device_make, device_model')
+      .select('customer_name, customer_phone, device_make, device_model, tracking_token, short_token')
       .eq('id', jobId)
       .single()
     if (!job?.customer_phone || !String(job.customer_phone).trim()) return
@@ -346,8 +351,9 @@ async function sendDepositReceivedSms(
           first_name: firstName,
           deposit_amount: amount,
           device_summary: safeDeviceLabel(job.device_make, job.device_model),
+          tracking_link: shortTrackingLink(job.short_token || job.tracking_token),
         })
-      : `Hi ${firstName}! Your £${amount} deposit is paid — we're ordering your part now and will text you when it lands.\n\nNFD Repairs`
+      : `Hi ${firstName}! Your £${amount} deposit is paid — we will arrange your parts order and text you when the parts arrive.\n\nNFD Repairs`
 
     await sendSms(job.customer_phone, message)
   } catch (err) {

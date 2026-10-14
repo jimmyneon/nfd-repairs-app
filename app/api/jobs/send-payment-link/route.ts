@@ -1,3 +1,4 @@
+import { jobPaymentState } from '@/lib/job-payment-state'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, sendSms, isSmsConfigured } from '@/lib/resilience'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
@@ -58,10 +59,13 @@ export async function POST(request: NextRequest) {
     )}`
 
     // What are we asking them to pay? Deposit takes precedence.
+    const { data: enquiry, error: enquiryError } = await supabase.from('enquiries')
+      .select('enquiry_ref').eq('converted_job_id', job.id).maybeSingle()
+    if (enquiryError) throw enquiryError
     const { data: paidRows, error: paidErr } = await supabase
       .from('payments')
-      .select('amount_pence')
-      .eq('job_id', job.id)
+      .select('amount_pence, kind')
+      .or(enquiry ? `job_id.eq.${job.id},enquiry_ref.eq.${enquiry.enquiry_ref}` : `job_id.eq.${job.id}`)
       .eq('status', 'paid')
     if (paidErr) {
       return NextResponse.json(
@@ -69,19 +73,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-    const paidPence = (paidRows || []).reduce(
-      (s, p) => s + (p.amount_pence || 0),
-      0
-    )
-    const depositDue =
-      job.deposit_required && !job.deposit_received
-        ? Math.round((job.deposit_amount ?? 20) * 100)
-        : 0
-    const balanceDue = Math.max(
-      Math.round((job.price_total ?? 0) * 100) - paidPence,
-      0
-    )
-    const amountDuePence = depositDue || balanceDue
+    const state = jobPaymentState(job, paidRows || [])
+    const amountDuePence = state.canPay ? state.depositDue || state.balance : 0
 
     if (amountDuePence <= 0) {
       return NextResponse.json(
@@ -131,3 +124,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

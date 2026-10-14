@@ -117,8 +117,8 @@ export async function POST(request: NextRequest) {
       {
         job,
         trackingUrl,
-        depositUrl: job.deposit_required ? depositUrl : undefined,
-        statusMessage: type === 'STATUS_UPDATE' ? statusMessages[job.status] : undefined,
+        depositUrl,
+        statusMessage: type === 'STATUS_UPDATE' ? job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received) ? 'Payment received. We are arranging your parts order and will text you when the parts arrive.' : statusMessages[job.status] : undefined,
         fastDropoffUrl,
         includePrice: sendPriceInSms !== false,
       },

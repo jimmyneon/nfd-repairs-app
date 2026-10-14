@@ -234,11 +234,11 @@ WHAT HAPPENS NEXT
               </div>
               ` : ''}
 
-              ${depositUrl && job.deposit_required && !job.deposit_received && !job.payment_received ? `
+              ${depositUrl && hasValidPrice && !job.payment_received && job.status !== 'CANCELLED' ? `
               <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px;">
                 <p style="color: #92400E; margin: 0 0 10px 0; font-weight: bold;">Quick heads up</p>
                 <p style="color: #78350F; margin: 0 0 15px 0; font-size: 14px;">
-                  Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.
+                  ${job.deposit_required && !job.deposit_received ? `Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.` : 'Prefer to pay online? Pay the remaining balance by card or eligible Klarna, or pay cash/card when you collect.'}
                 </p>
                 <a href="${depositUrl}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">
                   Choose Payment Option
@@ -340,9 +340,9 @@ ${showPrice ? `Total Price: £${job.price_total.toFixed(2)}
 ${job.deposit_required ? `Deposit Required: £${job.deposit_amount?.toFixed(2) || '20.00'} ${!job.deposit_received ? '(Not yet received)' : '(Received)'}` : ''}` : ''}
 Created: ${new Date(job.created_at).toLocaleDateString('en-GB')}
 
-${job.deposit_required && !job.deposit_received && !job.payment_received && depositUrl ? `
-DEPOSIT REQUIRED
-Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.
+${depositUrl && hasValidPrice && !job.payment_received && job.status !== 'CANCELLED' ? `
+PAYMENT OPTIONS
+${job.deposit_required && !job.deposit_received ? `Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.` : 'Prefer to pay online? Pay the remaining balance by card or eligible Klarna, or pay cash/card when you collect.'}
 Pay here: ${depositUrl}
 ` : ''}
 

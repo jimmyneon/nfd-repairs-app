@@ -35,7 +35,7 @@ describe('parts payment messages', () => {
     } })
   })
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
-  const convert = () => POST(new NextRequest('https://example.test/api/enquiries/convert-to-job', { method: 'POST', body: JSON.stringify({ enquiry_id: 'enquiry', stock_status: 'parts_needed' }) }))
+  const convert = (stock_status = 'parts_needed') => POST(new NextRequest('https://example.test/api/enquiries/convert-to-job', { method: 'POST', body: JSON.stringify({ enquiry_id: 'enquiry', stock_status }) }))
 
   it('sends a repair-specific payment link and both choices without the old env URL', async () => {
     expect((await convert()).status).toBe(200)
@@ -73,5 +73,19 @@ describe('parts payment messages', () => {
     const email = generateEmbeddedJobEmail({ job, trackingUrl: 'https://example.test/track', depositUrl: repairPaymentLink(job) }, 'STATUS_UPDATE')
     expect(email.html).not.toContain('Choose Payment Option')
     expect(email.text).not.toContain('Pay here:')
+  })
+  it('offers optional full online payment when parts are in stock', async () => {
+    await convert('in_stock')
+    const text = mocks.sendSms.mock.calls[0][2]
+    expect(text).toContain('Prefer to pay online? Card or eligible Klarna')
+    expect(text).toContain('/pay/?t=test123')
+  })
+  it('offers an in-stock full-payment link in email without demanding a deposit', () => {
+    job.deposit_required = false
+    job.status = 'AWAITING_DEVICE'
+    const email = generateEmbeddedJobEmail({job,trackingUrl:'https://example.test/track',depositUrl:repairPaymentLink(job)}, 'JOB_CREATED')
+    expect(email.text).toContain('Prefer to pay online?')
+    expect(email.text).toContain('/pay/?t=test123')
+    expect(email.text).not.toContain('deposit to order your parts')
   })
 })
