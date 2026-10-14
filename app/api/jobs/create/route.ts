@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
       if (template) {
         const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
-        const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.example.com'
+        const depositUrl = repairPaymentLink(job)
 
         const smsBody = renderSmsTemplate(template.body, {
           first_name: getFirstName(customer_name),
@@ -118,3 +118,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

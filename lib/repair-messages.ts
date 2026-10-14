@@ -101,7 +101,7 @@ export function confirmationText(job: any, enquiry: any) {
     job.quote_accepted_version !== job.quote_version
       ? "Please review and accept the updated repair details before we proceed."
       : job.requires_parts_order
-        ? `We need to order your part. Pay a £${Number(job.deposit_amount).toFixed(2)} deposit (deducted from your total), or pay the full outstanding amount online. If already paid, no further deposit is needed.`
-        : "Your part is in stock. Bring your device to 5A New Street during opening hours. Pay cash/card on collection, or pay online if you prefer.";
+        ? `We need to order your part. Pay a £${Number(job.deposit_amount).toFixed(2)} deposit (deducted from your total), or pay the full outstanding amount by card or Klarna where eligible. If already paid, no further deposit is needed.`
+        : "Your part is in stock. Bring your device to 5A New Street during opening hours. Pay cash/card on collection, or pay online by card or eligible Klarna if you prefer.";
   return `Hi ${String(job.customer_name || "").split(" ")[0]}! Your ${job.device_make} ${job.device_model} repair total is ${amount}.\n\n${action}\n\n${job.requires_parts_order ? "Ordered parts usually arrive the next working day after ordering, subject to supplier availability and cut-offs. We will confirm when ordered and when they arrive." : ""}${job.parts_expected_at ? `\nExpected part availability: ${new Date(job.parts_expected_at).toLocaleDateString("en-GB", { timeZone: "Europe/London" })}.` : ""}${enquiry.estimated_time ? `\nTypical repair time after drop-off and part arrival: ${enquiry.estimated_time}.` : ""}${job.confirmation_notes ? `\n${job.confirmation_notes}` : ""}\n\nContinue, view payment options or tell us if the timing does not suit you:\n${url}\n\nNFD Repairs`;
 }

@@ -40,8 +40,8 @@ export function snapshot(record: any) {
     part_option: record.part_option || record.screen_option || null,
     colour: record.device_colour || null,
     primary_price: record.quoted_price,
-    additional_repairs: record.additional_repairs || [],
-    accessories: record.accessories || [],
+    additional_repairs: record.additional_repairs || (record.additional_issues || []).filter((x: any) => x.option_type !== 'accessory'),
+    accessories: record.accessories || (record.additional_issues || []).filter((x: any) => x.option_type === 'accessory').map((x: any) => ({...x,name:x.name || x.display_name})),
     total_pence: completeTotal(record),
   };
 }

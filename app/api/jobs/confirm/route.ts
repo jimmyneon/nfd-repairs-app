@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireStaffUser } from "@/lib/api-auth";
 import { createServiceClient } from "@/lib/resilience";
 import { checked } from "@/lib/repair-journey";
-import { snapshot, completeTotal, pence } from "@/lib/quote-pricing";
+import { snapshot, completeTotal, pence, quoteFingerprint } from "@/lib/quote-pricing";
 import {
   generateQuoteActionToken,
   quoteActionTokenExpiry,
@@ -27,21 +27,24 @@ export async function POST(req: NextRequest) {
         : completeTotal(j);
     if (total <= 0) throw Error("Enter the complete repair total");
     const token = j.quote_action_token || generateQuoteActionToken();
-    const ver = j.quote_version + 1;
+    const original = snapshot(j)
+    const extras = [...original.additional_repairs, ...original.accessories].reduce((sum: number, line: any) => sum + pence(line.price), 0)
+    if (total < extras) throw Error('Total cannot be lower than extras')
+    const confirmed = {...j,price_total:total / 100,quoted_price:(total - extras) / 100,part_option:body.part_option || j.part_option}
+    const next = snapshot(confirmed)
+    const unchanged = Boolean(j.quote_confirmed_at && j.quote_snapshot && quoteFingerprint(original) === quoteFingerprint(next))
+    const ver = j.quote_version + (unchanged ? 0 : 1);
     const updated: any = await checked(
       db
         .from("jobs")
         .update({
           price_total: total / 100,
+          quoted_price: confirmed.quoted_price,
           part_option: body.part_option || j.part_option,
           quote_version: ver,
-          quote_accepted_version: null,
+          quote_accepted_version: unchanged ? j.quote_accepted_version : null,
           quote_confirmed_at: new Date().toISOString(),
-          quote_snapshot: {
-            ...snapshot(j),
-            total_pence: total,
-            part_option: body.part_option || j.part_option,
-          },
+          quote_snapshot: next,
           quote_action_token: token,
           quote_action_token_expires_at: quoteActionTokenExpiry(),
           quote_action_token_revoked_at: null,

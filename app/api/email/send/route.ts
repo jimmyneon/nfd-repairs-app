@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
-import { shortTrackingLink, shortFastDropoffLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
 
@@ -95,13 +95,14 @@ export async function POST(request: NextRequest) {
       (job.status === 'AWAITING_DEVICE' || job.status === 'PARTS_ARRIVED')
         ? shortFastDropoffLink(job.tracking_token)
         : undefined
-    const depositUrl = `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk').replace(/\/+$/, '')}/pay/?t=${encodeURIComponent(job.short_token || job.tracking_token)}`
+    const depositUrl = repairPaymentLink(job)
 
     const statusMessages: Record<string, string> = {
       'QUOTE_APPROVED': 'Your repair quote has been approved! Please use the booking link below to get started.',
       'AWAITING_DEVICE': 'Your repair is ready for drop-off. Bring the device in whenever suits you during opening hours — no appointment needed.',
       'DROPPED_OFF': 'We have received your device and will begin the repair process.',
       'RECEIVED': 'Your device is now booked in with us. We will keep you updated throughout the repair.',
+      'READY_TO_ORDER': 'Payment received. We are arranging your parts order and will text you when the parts arrive.',
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
       'PARTS_ORDERED': 'Parts have been ordered. We will let you know as soon as they arrive — usually the next working day after ordering, subject to supplier availability and cut-offs.',
       'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please bring your device in whenever suits you.',
@@ -117,8 +118,8 @@ export async function POST(request: NextRequest) {
       {
         job,
         trackingUrl,
-        depositUrl: job.deposit_required ? depositUrl : undefined,
-        statusMessage: type === 'STATUS_UPDATE' ? statusMessages[job.status] : undefined,
+        depositUrl,
+        statusMessage: type === 'STATUS_UPDATE' ? job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received) ? 'Payment received. We are arranging your parts order and will text you when the parts arrive.' : statusMessages[job.status] : undefined,
         fastDropoffUrl,
         includePrice: sendPriceInSms !== false,
       },

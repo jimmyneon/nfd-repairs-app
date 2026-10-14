@@ -46,6 +46,15 @@ const request = {
   accessories: [{ name: "Protector", price: 0 }],
 };
 describe("complete quote pricing", () => {
+  it("preserves existing job repair lines and accessories in its confirmation snapshot", () => {
+    const q = snapshot({quoted_price:100,price_total:165,additional_issues:[
+      {repair:'Battery replacement',price:50},
+      {option_type:'accessory',display_name:'Protector',price:15},
+    ]})
+    expect(q.additional_repairs).toEqual([{repair:'Battery replacement',price:50}])
+    expect(q.accessories).toMatchObject([{name:'Protector',price:15}])
+    expect(q.total_pence).toBe(16500)
+  })
   it("verifies all lines, keeps the selected quality and colour, and produces one complete total", () => {
     const r = resolveRequest(catalogue, request);
     expect(r).toMatchObject({

@@ -1,10 +1,10 @@
 {
   "repository": "jimmyneon/nfdr",
-  "commit": "fc319408cd6286ea4ad85b4aea9e40ebef4b78a9",
+  "commit": "b2a061981ef6769a28297b31b7765e67fe88276e",
   "files": {
-    "pay/index.html": "0f2bef3e9d0ec9a25f32e3868c6f1f392db62997",
-    "repair-fund/index.html": "bc86d2051f0098233db6cc6a75d69c28fe6314e8",
-    "repair-quote/index.html": "9143f0a7ee39f12a690b110daff3c782c86426cb",
+    "pay/index.html": "405066b3e16581f0835012d519276686ae6af038",
+    "repair-fund/index.html": "7f27c6868bfdebccae0e43d65c67e4bd75f41945",
+    "repair-quote/index.html": "60440cad5551a99210ed25dfd107968d678ce31e",
     "js/quote.js": "22819f0461065a82ba00dc945817eecb9ff58edf"
   }
 }

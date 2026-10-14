@@ -9,7 +9,7 @@ import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, Refr
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
-import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getFirstName } from '@/lib/sms-template'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
@@ -1590,8 +1590,8 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     try {
                       const deviceName = `${job!.device_make || ''} ${job!.device_model || ''}`.trim() || 'your device'
                       const firstName = job!.customer_name?.split(' ')[0] || 'there'
-                      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
-                      const smsMessage = `Hi ${firstName}, thanks for approving the quote for your ${deviceName}! I'm ordering the parts in now — they usually arrive next day. We just need a £20 deposit to get the order placed.\n\nPay online here: ${depositUrl}\n\nOr pop in to the shop to pay. Please check our live hours before setting off: ${shortHoursLink()}`
+                      const depositUrl = repairPaymentLink(job!)
+                      const smsMessage = `Hi ${firstName}, thanks for approving the quote for your ${deviceName}! We need to order your parts. Pay a £20 deposit (deducted from the total), or pay in full by card or Klarna where eligible.\n\nPay online here: ${depositUrl}\n\nOr pop in to the shop to pay. Please check our live hours before setting off: ${shortHoursLink()}`
                       await fetch('/api/sms/send-custom', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1659,7 +1659,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
               </button>
             )}
             
-            {job!.status === 'AWAITING_DEPOSIT' && job!.deposit_received && (
+            {['AWAITING_DEPOSIT', 'READY_TO_ORDER'].includes(job!.status) && job!.deposit_received && (
               <button
                 onClick={() => handleWorkflowStatusChange('PARTS_ORDERED')}
                 disabled={actionLoading}
