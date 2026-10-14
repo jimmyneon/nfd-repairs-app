@@ -38,7 +38,8 @@ SELECT cron.schedule(
   '*/10 * * * *',
   'SELECT public.reconcile_repair_payments_cron();'
 );
-UPDATE cron.job SET active = false WHERE jobname = 'nfdr-reconcile-payments';
+SELECT cron.alter_job(jobid, active := false)
+FROM cron.job WHERE jobname = 'nfdr-reconcile-payments';
 
 -- 4. Deploy the coordinated app and website, then verify:
 --    schema/function privileges, preserved deposits, authenticated staff APIs,
