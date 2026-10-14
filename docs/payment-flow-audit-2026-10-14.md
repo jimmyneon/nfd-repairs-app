@@ -11,6 +11,7 @@ message, card charge, Klarna purchase or refund was sent.
 | --- | --- |
 | Price catalogue | Live canonical JSON has 8,850 unique quote keys; retired overrides contain no rules or added rows. |
 | Need Parts SMS/email | Repair-specific website link and deposit/full card or eligible Klarna choices are present. |
+| In-stock repairs | Optional full online card/eligible Klarna payment is now linked from the in-stock SMS, email and public tracking, while cash/card collection remains available. |
 | Automatic status replies | Collection, turnaround, done-check and update replies still used SumUp. They now share repair-specific payment text and stop asking when payment is recorded. |
 | Public tracking | Legacy reassurance text contained SumUp. Tracking now links to this repair's payment page and recognises recorded payment. |
 | Deposit receipt | Template claimed parts were already ordered and its tracking variable was not populated by the webhook. Corrected wording and tracking URL. Ordering remains an explicit staff action. |

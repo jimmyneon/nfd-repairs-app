@@ -447,8 +447,8 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
               <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
                 {reassuranceMessage}
               </p>
-              {job.status === 'AWAITING_DEPOSIT' && !job.deposit_received && !job.payment_received && (
-                <a href={repairPaymentLink(job)} className="inline-block mt-3 font-semibold text-primary underline">Choose deposit or full payment</a>
+              {job.status !== 'CANCELLED' && Number(job.price_total) > 0 && !job.payment_received && (
+                <a href={repairPaymentLink(job)} className="inline-block mt-3 font-semibold text-primary underline">{job.deposit_required && !job.deposit_received ? 'Choose deposit or full payment' : 'Pay online with card or eligible Klarna'}</a>
               )}
             </div>
 
