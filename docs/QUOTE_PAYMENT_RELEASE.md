@@ -41,3 +41,5 @@ SQL financial functions are invoker/service-role only. The jobs guard is a SECUR
 ## Reconciled release — 14 October 2026
 
 Current-main payment-link fixes are preserved. Public tracking and staff ordering support READY_TO_ORDER without claiming a supplier order. Recovery/retry scheduling uses the existing authenticated Supabase database scheduler; no new high-frequency Vercel cron is required. The paired website fixture is pinned to b2a061981ef6769a28297b31b7765e67fe88276e. Reconciled targeted checks: 145 pass, including isolated Postgres transactions and rendered customer pages. Real customer messages, Klarna purchases and refunds have not been sent during validation.
+
+The production apply attempt was rejected by automatic approval review because explicit approval for the exact schema, permissions, triggers/functions and historical-deposit backfill was not present. No migration, account-role update or scheduler activation was performed. The additional staff-access and scheduler steps are reviewable in docs/PAYMENT_PRODUCTION_ROLLOUT.sql; the new scheduler stays inactive until coordinated deployment verification succeeds.
