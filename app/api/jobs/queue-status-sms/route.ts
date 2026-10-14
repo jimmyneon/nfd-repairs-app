@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, shortHoursLink, shortFastDropoffLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, shortHoursLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
 import { SHOP_INFO } from '@/lib/constants'
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     // Build tracking URL (use hardcoded URL since NEXT_PUBLIC_ vars not available in API routes)
     const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
-    const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+    const depositUrl = repairPaymentLink(job)
 
     // Fetch links from admin settings (never hardcode location or hours)
     const { data: mapsSettings } = await supabase
@@ -343,3 +343,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

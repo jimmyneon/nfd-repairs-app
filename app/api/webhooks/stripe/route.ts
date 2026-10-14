@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
         await handleSessionCompleted(
           supabase,
           event.data.object as Stripe.Checkout.Session
@@ -119,6 +120,8 @@ async function handleSessionCompleted(
   supabase: ReturnType<typeof createServiceClient>,
   session: Stripe.Checkout.Session
 ) {
+  // Klarna and other delayed methods can complete checkout before payment settles.
+  if (session.payment_status !== 'paid') return
   const now = new Date().toISOString()
   const metadataKind = (session.metadata?.kind || 'remote_support') as string
   const piId =
@@ -242,7 +245,7 @@ async function handleSessionCompleted(
     // including anything paid earlier against its source enquiry.
     const { data: job } = await supabase
       .from('jobs')
-      .select('price_total')
+      .select('price_total, deposit_required')
       .eq('id', jobId)
       .single()
     const { data: srcEnquiry } = await supabase
@@ -267,7 +270,7 @@ async function handleSessionCompleted(
     if (job && totalPaid >= Math.round((job.price_total ?? 0) * 100)) {
       await supabase
         .from('jobs')
-        .update({ payment_received: true, updated_at: now })
+        .update({ payment_received: true, ...(job.deposit_required ? { deposit_received: true, deposit_received_at: now } : {}), updated_at: now })
         .eq('id', jobId)
       await supabase.from('job_events').insert({
         job_id: jobId,

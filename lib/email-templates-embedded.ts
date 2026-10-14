@@ -234,14 +234,14 @@ WHAT HAPPENS NEXT
               </div>
               ` : ''}
 
-              ${depositUrl && job.deposit_required && !job.deposit_received ? `
+              ${depositUrl && job.deposit_required && !job.deposit_received && !job.payment_received ? `
               <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; margin: 20px 0; border-radius: 4px;">
                 <p style="color: #92400E; margin: 0 0 10px 0; font-weight: bold;">Quick heads up</p>
                 <p style="color: #78350F; margin: 0 0 15px 0; font-size: 14px;">
-                  We need a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order the parts for your repair.
+                  Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.
                 </p>
                 <a href="${depositUrl}" style="display: inline-block; background-color: #F59E0B; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px;">
-                  Pay Deposit
+                  Choose Payment Option
                 </a>
               </div>
               ` : ''}
@@ -340,9 +340,9 @@ ${showPrice ? `Total Price: £${job.price_total.toFixed(2)}
 ${job.deposit_required ? `Deposit Required: £${job.deposit_amount?.toFixed(2) || '20.00'} ${!job.deposit_received ? '(Not yet received)' : '(Received)'}` : ''}` : ''}
 Created: ${new Date(job.created_at).toLocaleDateString('en-GB')}
 
-${job.deposit_required && !job.deposit_received && depositUrl ? `
+${job.deposit_required && !job.deposit_received && !job.payment_received && depositUrl ? `
 DEPOSIT REQUIRED
-We need a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order the parts for your repair.
+Pay a £${job.deposit_amount?.toFixed(2) || '20.00'} deposit to order your parts (deducted from the total), or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.
 Pay here: ${depositUrl}
 ` : ''}
 

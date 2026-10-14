@@ -94,3 +94,8 @@ export function shortHoursLink(): string {
 export function getAppUrl(): string {
   return APP_URL
 }
+
+export function repairPaymentLink(job: { short_token?: string | null; tracking_token: string }): string {
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk').replace(/\/+$/, '')
+  return `${site}/pay/?t=${encodeURIComponent(job.short_token || job.tracking_token)}`
+}

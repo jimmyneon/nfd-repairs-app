@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       let amountPence: number
       let description: string
       if (kind === 'job_deposit') {
-        if (job.deposit_received) {
+        if (job.deposit_received || job.payment_received) {
           return NextResponse.json(
             { error: 'Deposit already paid', already_paid: true },
             { status: 409, headers }
@@ -384,3 +384,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

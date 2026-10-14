@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, shortHoursLink, shortFastDropoffLink, getAppUrl } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, shortHoursLink, shortFastDropoffLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 
@@ -331,7 +331,7 @@ export async function POST(request: NextRequest) {
       smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
     } else if (requiresParts) {
       // Parts needed — request the deposit before ordering
-      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      const depositUrl = repairPaymentLink(job)
       const trackingUrl = shortTrackingLink(job.short_token || trackingToken)
       const { data: templates } = await supabase
         .from('sms_templates')
@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
             tracking_link: trackingUrl,
             job_ref: job.job_ref,
           }))
-        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\n💳 To get the order started, we just need a £20 deposit.\n\nThis secures the part and your repair slot. The £20 comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.${getInfoBlock()}\n\nNFD Repairs`
+        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\nPay a £20 deposit (deducted from your total), or pay in full by card or Klarna where eligible.\n\nIf you choose the deposit, pay the remaining balance cash/card when you collect.\n\nPay online here:\n${depositUrl}\n\nWe will confirm payment automatically and arrange your parts order.${getInfoBlock()}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
@@ -458,3 +458,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
