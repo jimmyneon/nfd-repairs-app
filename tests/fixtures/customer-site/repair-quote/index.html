@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Your repair | NFD Repairs</title>
+    <link rel="stylesheet" href="/css/new/main.css?v=20260718-003" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      body {
+        background: #f5f7f5;
+        color: #17271d;
+        font-family: Poppins, Arial, sans-serif;
+      }
+      main {
+        max-width: 660px;
+        margin: 70px auto;
+        padding: 24px;
+      }
+      .card {
+        padding: 24px;
+        background: white;
+        border-radius: 18px;
+        margin-bottom: 18px;
+        border: 1px solid #dce5df;
+      }
+      h1 {
+        font-size: 32px;
+      }
+      h2 {
+        font-size: 22px;
+      }
+      .muted {
+        color: #53675a;
+        line-height: 1.6;
+      }
+      button,
+      .button {
+        display: inline-block;
+        border: 0;
+        background: #009b4d;
+        color: white;
+        padding: 14px 18px;
+        border-radius: 9px;
+        font-size: 16px;
+        text-decoration: none;
+        margin: 5px 5px 5px 0;
+        cursor: pointer;
+      }
+      button.secondary,
+      .secondary {
+        background: #e8f3ed;
+        color: #174c30;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      #error {
+        color: #a22;
+      }
+      li {
+        margin: 10px 0;
+      }
+      textarea {
+        width: 95%;
+        padding: 10px;
+      }
+      a {
+        color: #007f40;
+      }
+      .price {
+        font-size: 30px;
+        font-weight: bold;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">New Forest Device Repairs</a>
+      <h1>Your repair</h1>
+      <p id="loading">Loading your repair details…</p>
+      <p id="error" role="alert"></p>
+      <div id="content" class="hidden">
+        <section class="card">
+          <p id="reference" class="muted"></p>
+          <h2 id="device"></h2>
+          <p id="repair"></p>
+          <p id="selection" class="muted"></p>
+          <ul id="lines"></ul>
+          <p class="price" id="total"></p>
+          <p id="money" class="muted"></p>
+        </section>
+        <section class="card">
+          <h2 id="next-title"></h2>
+          <p id="next" class="muted"></p>
+          <p id="timing" class="muted"></p>
+          <p id="notes"></p>
+          <a id="dropoff" class="button hidden">Set up Fast Drop-Off</a>
+          <p id="preferred" class="muted"></p>
+          <button id="accept" class="hidden">
+            Accept updated repair details</button
+          ><button id="request" class="hidden">Get this repair started</button>
+          <div id="payments" class="hidden">
+            <p>
+              Pay cash/card when you collect unless an ordering deposit is
+              required. Online payment is optional.
+            </p>
+            <button id="deposit">Pay deposit</button
+            ><button id="full" class="secondary">
+              Pay full outstanding amount
+            </button>
+            <p class="muted">
+              Full payment satisfies the deposit. Pay with Klarna where offered
+              at checkout.
+            </p>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Add to this repair</h2>
+          <p class="muted">
+            Added options are checked by the shop before payment. Changes to a
+            confirmed repair need reconfirmation.
+          </p>
+          <div id="addons"></div>
+          <button id="add-options" class="secondary">
+            Save selected extras
+          </button>
+        </section>
+        <section class="card">
+          <h2>Not ready yet?</h2>
+          <p class="muted">
+            You can save towards this repair. Saving does not reserve stock or
+            freeze the price; we reconfirm parts and price before using your
+            savings.
+          </p>
+          <button id="save" class="secondary">Save towards this repair</button>
+          <p id="saving-note"></p>
+        </section>
+        <section class="card">
+          <h2>Does the timing suit you?</h2>
+          <p class="muted">
+            Tell us if you need another date, have a question or want to cancel
+            the request.
+          </p>
+          <textarea
+            id="note"
+            aria-label="Your message"
+            placeholder="Optional message"
+          ></textarea>
+          <div>
+            <button data-action="timing" class="secondary">
+              Timing doesn't suit me</button
+            ><button data-action="question" class="secondary">
+              Ask a question</button
+            ><button data-action="cancel" class="secondary">
+              Request cancellation
+            </button>
+          </div>
+          <p class="muted">
+            Cancellation requests are reviewed by the shop, including any
+            payment or parts already ordered.
+          </p>
+          <p id="response" role="status"></p>
+        </section>
+      </div>
+    </main>
+    <script>
+      (function () {
+        "use strict";
+        var API = "https://nfd-repairs-app.vercel.app",
+          q = new URLSearchParams(location.search),
+          ref = q.get("ref"),
+          token = q.get("t"),
+          data;
+        var $ = function (id) {
+            return document.getElementById(id);
+          },
+          fmt = function (p) {
+            return "£" + (p / 100).toFixed(2);
+          },
+          endpoint =
+            API +
+            "/api/repair-journey?ref=" +
+            encodeURIComponent(ref || "") +
+            "&t=" +
+            encodeURIComponent(token || "");
+        function set(id, text) {
+          $(id).textContent = text;
+        }
+        function show(id, on) {
+          $(id).classList.toggle("hidden", !on);
+        }
+        async function call(url, body) {
+          var r = await fetch(
+              url,
+              body
+                ? {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  }
+                : {},
+            ),
+            v = await r.json();
+          if (!r.ok) throw Error(v.error || "Please try again");
+          return v;
+        }
+        function render(v) {
+          data = v;
+          show("content", true);
+          show("loading", false);
+          var s = v.quote;
+          set("reference", v.reference);
+          set("device", s.device);
+          set("repair", s.repair);
+          set(
+            "selection",
+            [s.part_option, s.colour].filter(Boolean).join(" · "),
+          );
+          $("lines").replaceChildren();
+          []
+            .concat(s.additional_repairs || [], s.accessories || [])
+            .forEach(function (x) {
+              var li = document.createElement("li");
+              li.textContent =
+                (x.display_name || x.repair || x.name) +
+                " — " +
+                fmt(Math.round(x.price * 100));
+              $("lines").appendChild(li);
+            });
+          set(
+            "total",
+            v.price_available
+              ? fmt(v.total_pence) + " total"
+              : "Price to be confirmed",
+          );
+          set(
+            "money",
+            v.paid_pence
+              ? "Received " +
+                  fmt(v.paid_pence) +
+                  " · Outstanding " +
+                  fmt(v.balance_due_pence)
+              : "",
+          );
+          set("notes", v.notes);
+          show("dropoff", Boolean(v.fast_dropoff_url));
+          if (v.fast_dropoff_url) $("dropoff").href = v.fast_dropoff_url;
+          set(
+            "preferred",
+            v.preferred_dropoff
+              ? "Preferred drop-off: " +
+                  v.preferred_dropoff +
+                  " (preference only, not a booked appointment)."
+              : "",
+          );
+          $("addons").replaceChildren();
+          []
+            .concat(
+              (v.available_addons || []).map(function (x) {
+                return {
+                  label: x.displayName,
+                  repair: x.repair,
+                  price: x.discountPrice,
+                };
+              }),
+              (v.available_accessories || []).map(function (x) {
+                return { label: x.name, name: x.name, price: x.price };
+              }),
+            )
+            .forEach(function (x) {
+              var label = document.createElement("label"),
+                input = document.createElement("input");
+              input.type = "checkbox";
+              input.dataset.kind = x.repair ? "repair" : "accessory";
+              input.value = x.repair || x.name;
+              label.appendChild(input);
+              label.appendChild(
+                document.createTextNode(
+                  " " + x.label + " — " + fmt(Math.round(x.price * 100)),
+                ),
+              );
+              label.style.display = "block";
+              $("addons").appendChild(label);
+            });
+          show("accept", v.needs_acceptance);
+          show("request", !v.confirmed && !v.customer_response && !v.requested);
+          show("payments", v.can_pay && !v.fully_paid);
+          show("deposit", v.deposit_due_pence > 0);
+          set("deposit", "Pay " + fmt(v.deposit_due_pence) + " deposit");
+          set("full", "Pay " + fmt(v.balance_due_pence) + " in full");
+          var progress = {
+            READY_TO_ORDER: ['Ready to order your part', 'The required payment is received. We will confirm separately when the part has actually been ordered.'],
+            PARTS_ORDERED: ['Your part is on order', 'Your part has been ordered. We will let you know when it arrives.'],
+            PARTS_ARRIVED: ['Your part has arrived', 'Bring your device in during opening hours if it is not already with us.'],
+            RECEIVED: ['Your device is with us', 'We will update you as the repair progresses.'],
+            DROPPED_OFF: ['Your device is with us', 'We will update you as the repair progresses.'],
+            IN_REPAIR: ['Your repair is underway', 'We will let you know when it is ready to collect.'],
+            READY_TO_COLLECT: ['Ready to collect', 'Your repair is complete. Collect during opening hours.'],
+            IN_STORAGE: ['Ready to collect', 'Your device is waiting for collection. Contact us if you need to arrange a date.'],
+            COLLECTED: ['Repair collected', 'Thank you for choosing NFD Repairs.'],
+            COMPLETED: ['Repair completed', 'Thank you for choosing NFD Repairs.']
+          }[v.status];
+          set('next-title', v.needs_acceptance ? 'Please review the updated repair' :
+            !v.confirmed ? 'We’re checking your repair' : progress ? progress[0] : 'Your repair is confirmed');
+          set('next', v.needs_acceptance ? 'Please accept the current price, part and repair details before we proceed.' :
+            !v.confirmed ? 'No payment is required now. We will confirm the part, complete price and timing during opening hours.' :
+            progress ? progress[1] : v.requires_parts_order ?
+            'We need to order your part. Pay the deposit, deducted from your total, or pay in full. We do not order until the required payment is confirmed.' :
+            'Your part is in stock. Bring your device to 5A New Street during opening hours, with payment on collection.');
+          if (v.fully_paid && v.confirmed && !v.needs_acceptance) {
+            set('next', $('next').textContent + ' No further payment is required for the agreed repair.');
+          }
+          var closed = ['COLLECTED', 'COMPLETED', 'CANCELLED', 'cancelled', 'rejected'].includes(v.status);
+          show('add-options', !closed && Boolean((v.available_addons || []).length + (v.available_accessories || []).length));
+          set(
+            "timing",
+            (v.requires_parts_order
+              ? "Ordered parts usually arrive the next working day after ordering, subject to supplier availability and cut-offs. "
+              : "") +
+              (v.part_arrival
+                ? "Expected part availability: " +
+                  new Date(v.part_arrival).toLocaleDateString("en-GB") +
+                  ". "
+                : "") +
+              (v.repair_time
+                ? "Typical repair time after drop-off and part arrival: " +
+                  v.repair_time +
+                  "."
+                : ""),
+          );
+          $("save").disabled = !v.fund_allowed || closed;
+          set(
+            "saving-note",
+            v.fund_allowed
+              ? ""
+              : "A personalised price is needed before saving. Use Ask a question below to request one.",
+          );
+          if (v.customer_response)
+            set(
+              "response",
+              "Your response has been saved: " + v.customer_response + ".",
+            );
+          if (v.overpaid_pence > 0) set('money', 'Received ' + fmt(v.paid_pence) + '. Surplus ' + fmt(v.overpaid_pence) + ' needs refund review by the shop.');
+          if (v.customer_response === 'cancel' || v.status === 'CANCELLED' || v.status === 'cancelled') {
+            set('next-title', v.status === 'CANCELLED' || v.status === 'cancelled' ? 'Repair cancelled' : 'Cancellation requested');
+            set('next', 'The shop will confirm any parts-order and refund arrangements. No further payment is requested.');
+            show('payments', false); show('accept', false); show('request', false); $('save').disabled = true;
+          }
+        }
+        async function load() {
+          try {
+            render(await call(endpoint));
+          } catch (e) {
+            set("error", e.message);
+            show("loading", false);
+          }
+        }
+        async function action(name) {
+          set("error", "");
+          try {
+            await call(endpoint, {
+              action: name,
+              version: data.quote_version,
+              note: $("note").value,
+            });
+            set("response", "Thanks — your response is saved.");
+            await load();
+          } catch (e) {
+            set("error", e.message);
+          }
+        }
+        $("add-options").onclick = async function () {
+          try {
+            var repairs = [],
+              accessories = [];
+            $("addons")
+              .querySelectorAll("input:checked")
+              .forEach(function (x) {
+                if (x.dataset.kind === "repair")
+                  repairs.push({ repair: x.value });
+                else accessories.push({ name: x.value });
+              });
+            await call(
+              API +
+                "/api/public/quote/" +
+                encodeURIComponent(ref) +
+                "/options?t=" +
+                encodeURIComponent(token),
+              { additional_repairs: repairs, accessories: accessories },
+            );
+            await load();
+          } catch (e) {
+            set("error", e.message);
+          }
+        };
+        $("accept").onclick = function () {
+          action("accept");
+        };
+        $("request").onclick = function () {
+          action("request");
+        };
+        document.querySelectorAll("[data-action]").forEach(function (b) {
+          b.onclick = function () {
+            action(b.dataset.action);
+          };
+        });
+        async function pay(deposit) {
+          document.querySelectorAll("button").forEach(function (b) {
+            b.disabled = true;
+          });
+          try {
+            var v = await call(API + "/api/payments/checkout", {
+              kind: deposit ? "job_deposit" : "job_payment",
+              token: data.pay_token,
+            });
+            location.assign(v.url);
+          } catch (e) {
+            set("error", e.message);
+            document.querySelectorAll("button").forEach(function (b) {
+              b.disabled = false;
+            });
+            await load();
+          }
+        }
+        $("deposit").onclick = function () {
+          pay(true);
+        };
+        $("full").onclick = function () {
+          pay(false);
+        };
+        $("save").onclick = async function () {
+          try {
+            var v = await call(API + "/api/repair-fund/create", {
+              enquiry_ref: ref,
+              t: token,
+            });
+            location.assign(v.fund_url);
+          } catch (e) {
+            set("error", e.message);
+          }
+        };
+        load();
+      })();
+    </script>
+  </body>
+</html>

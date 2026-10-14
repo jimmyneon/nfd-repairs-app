@@ -41,6 +41,7 @@ export default function StatusSelectorModal({
       DIAGNOSTIC: 'bg-indigo-600 hover:bg-indigo-700',
       AWAITING_CUSTOMER: 'bg-amber-600 hover:bg-amber-700',
       AWAITING_DEPOSIT: 'bg-yellow-500 hover:bg-yellow-600',
+      READY_TO_ORDER: 'bg-purple-600 hover:bg-purple-700',
       PARTS_ORDERED: 'bg-purple-600 hover:bg-purple-700',
       PARTS_ARRIVED: 'bg-purple-700 hover:bg-purple-800',
       IN_REPAIR: 'bg-orange-600 hover:bg-orange-700',

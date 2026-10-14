@@ -387,13 +387,13 @@ describe('Quote link generation — token embedded', () => {
   it('shortQuoteApprovalLink appends ?t= when a token is provided', async () => {
     const { shortQuoteApprovalLink } = await import('@/lib/utils')
     const link = shortQuoteApprovalLink('NF-12345', 'abc123token')
-    expect(link).toMatch(/\/q\/NF-12345\?t=abc123token/)
+    expect(link).toMatch(/\/repair-quote\/\?ref=NF-12345&t=abc123token/)
   })
 
   it('shortQuoteApprovalLink omits ?t= when no token is provided (legacy)', async () => {
     const { shortQuoteApprovalLink } = await import('@/lib/utils')
     const link = shortQuoteApprovalLink('NF-12345')
-    expect(link).toMatch(/\/q\/NF-12345$/)
+    expect(link).toMatch(/\/repair-quote\/\?ref=NF-12345$/)
     expect(link).not.toMatch(/\?t=/)
   })
 

@@ -15,6 +15,7 @@ export async function sendEmail(
   text?: string
 ) {
   try {
+    if (process.env.DISABLE_CUSTOMER_MESSAGES === 'true') return { success: false, error: 'Messages disabled for testing' }
     // Check if API key is configured
     if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 'dummy_key_for_build') {
       console.warn('RESEND_API_KEY not configured - email not sent')

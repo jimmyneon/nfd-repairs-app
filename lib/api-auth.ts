@@ -25,6 +25,9 @@ export async function requireStaffUser(request: NextRequest) {
 
   // Check for staff role via app_metadata
   const staffEmails = process.env.STAFF_EMAILS
+  if (!staffEmails && !['staff','admin','owner'].includes(String(user.app_metadata?.role || ''))) {
+    return { user: null, response: NextResponse.json({ error: 'Staff access must be configured' }, { status: 403 }) }
+  }
   if (staffEmails) {
     const allowed = staffEmails.split(',').map(e => e.trim().toLowerCase())
     if (!allowed.includes((user.email || '').toLowerCase())) {

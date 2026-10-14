@@ -242,6 +242,9 @@ export async function POST(request: NextRequest) {
         // Update enquiry with the latest quote state from the client
         // (user may have selected an option after initial submit)
         if (data?.quoted_price !== undefined) {
+          updateFields.price_verified = Number(data.quoted_price) > 0 && !data.quoted_price_high
+          updateFields.quote_confirmed_at = null
+          updateFields.quote_accepted_version = null
           updateFields.quoted_price = data.quoted_price
           enquiry.quoted_price = data.quoted_price
         }
@@ -798,3 +801,4 @@ ${personalisedHtml}
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers })
   }
 }
+

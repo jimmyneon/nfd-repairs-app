@@ -15,6 +15,9 @@ const catalogue = [
   { category: 'phone', brand: 'Apple', model: 'iPhone 13', repair: 'screen', priceType: 'fixed', customerPriceGbp: 120, enabled: true },
 ]
 
+const policy = { policy: { combinedRepairDiscountPercent: 25 }, accessories: [{ name: 'Free battery health check', customerPriceGbp: 0, screenOnly: true }, { name: 'Tempered glass screen protector', customerPriceGbp: 15, brand: 'Apple', screenOnly: true }] }
+Object.assign(catalogue, policy)
+
 describe('public quote option verification', () => {
   it('detects screen-style repairs', () => {
     expect(isScreenRepair('oled screen')).toBe(true)
@@ -54,7 +57,7 @@ describe('public quote option verification', () => {
       category: 'phone',
       brand: 'Apple',
       primaryRepair: 'screen',
-    })).toEqual([
+    }, catalogue)).toEqual([
       { name: 'Free battery health check', price: 0 },
       { name: 'Tempered glass screen protector', price: 15 },
     ])
@@ -63,7 +66,7 @@ describe('public quote option verification', () => {
       category: 'phone',
       brand: 'Samsung',
       primaryRepair: 'screen',
-    })).toEqual([
+    }, catalogue)).toEqual([
       { name: 'Free battery health check', price: 0 },
     ])
 
@@ -71,7 +74,7 @@ describe('public quote option verification', () => {
       category: 'phone',
       brand: 'Apple',
       primaryRepair: 'battery',
-    })).toEqual([])
+    }, catalogue)).toEqual([])
   })
 
   it('merges saved options without duplicates', () => {
@@ -108,10 +111,12 @@ describe('secure quote upsells', () => {
     { category: 'Phones', brand: 'Apple', model: 'iPhone 15 Pro', repair: 'Charging port service', priceType: 'fixed', customerPriceGbp: 39, enabled: true, priority: 3 },
   ]
 
+  Object.assign(iphone15Catalogue, policy)
+
   it('treats Phones and Phone as the same category', () => {
     expect(verifyRequestedAccessories(
       [{ name: 'Tempered glass screen protector' }],
-      { category: 'Phones', brand: 'Apple', primaryRepair: 'Screen replacement' }
+      { category: 'Phones', brand: 'Apple', primaryRepair: 'Screen replacement' }, catalogue
     )).toEqual([{ name: 'Tempered glass screen protector', price: 15 }])
   })
 
@@ -120,7 +125,7 @@ describe('secure quote upsells', () => {
       category: 'Phones',
       brand: 'Apple',
       primaryRepair: 'Screen replacement',
-    })).toEqual([
+    }, catalogue)).toEqual([
       { name: 'Free battery health check', price: 0 },
       { name: 'Tempered glass screen protector', price: 15 },
     ])

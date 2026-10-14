@@ -1,461 +1,146 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { repairPaymentLink, shortTrackingLink, shortHoursLink, shortFastDropoffLink, getAppUrl } from '@/lib/utils'
-import { requireStaffUser } from '@/lib/api-auth'
-import { sendViaMacroDroid } from '@/lib/resilience'
-
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  })
-}
-
-export async function POST(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
-
+import { NextRequest, NextResponse } from "next/server";
+import { requireStaffUser } from "@/lib/api-auth";
+import { createServiceClient } from "@/lib/resilience";
+import { checked, journeyUrl } from "@/lib/repair-journey";
+import {
+  completeTotal,
+  pence,
+  snapshot,
+  quoteFingerprint,
+} from "@/lib/quote-pricing";
+import {
+  confirmationText,
+  enqueueRepairMessage,
+  deliverRepairMessages,
+} from "@/lib/repair-messages";
+export async function POST(req: NextRequest) {
+  const auth = await requireStaffUser(req);
+  if (auth.response) return auth.response;
+  const db = createServiceClient();
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
+    const body = await req.json();
+    const e: any = await checked(
+      db.from("enquiries").select("*").eq("id", body.enquiry_id).single(),
+    );
+    if (
+      ![
+        "in_stock",
+        "parts_needed",
+        "parts_deposit_paid",
+        "device_in_shop",
+      ].includes(body.stock_status)
     )
-
-    const { enquiry_id, stock_status, earliest_date, staff_notes } = await request.json()
-
-    if (!enquiry_id || !stock_status) {
-      return NextResponse.json(
-        { error: 'enquiry_id and stock_status are required' },
-        { status: 400 }
-      )
-    }
-
-    // Format earliest date for SMS (e.g. "Wed 17 Sep") if provided
-    const earliestDateStr = earliest_date
-      ? new Date(earliest_date + 'T00:00:00').toLocaleDateString('en-GB', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-        })
-      : null
-    const staffNotes = (staff_notes || '').trim()
-    const earliestDateLabel = (stock_status === 'parts_needed' || stock_status === 'parts_deposit_paid')
-      ? 'Expected part availability'
-      : 'Earliest repair start'
-    // Build optional staff-entered suffix appended to SMS body.
-    // An exact date is a start/availability date, not a completion promise.
-    const extraInfo = [
-      earliestDateStr ? `${earliestDateLabel}: ${earliestDateStr}` : null,
-      staffNotes || null,
-    ].filter(Boolean).join('\n')
-    const extraInfoBlock = extraInfo ? `\n\n${extraInfo}` : ''
-    let turnaroundInfoBlock = ''
-
-    function getInfoBlock(): string {
-      return `${turnaroundInfoBlock}${extraInfoBlock}`
-    }
-
-    // Helper: insert timing/staff info before the trailing "NFD Repairs" signature
-    function withExtraInfo(templateBody: string): string {
-      const infoBlock = getInfoBlock()
-      if (!infoBlock) return templateBody
-      // Strip trailing "NFD Repairs" (with optional whitespace/newlines before it)
-      const sig = 'NFD Repairs'
-      if (templateBody.trimEnd().endsWith(sig)) {
-        const trimmed = templateBody.trimEnd()
-        return trimmed.slice(0, trimmed.length - sig.length).trimEnd() + `${infoBlock}\n\n${sig}`
-      }
-      // No signature found — just append
-      return templateBody + infoBlock
-    }
-
-    const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
-    if (!validStatuses.includes(stock_status)) {
-      return NextResponse.json(
-        { error: 'stock_status must be "in_stock", "parts_needed", "parts_deposit_paid", or "device_in_shop"' },
-        { status: 400 }
-      )
-    }
-
-    // Fetch the enquiry
-    const { data: enquiry, error: fetchError } = await supabase
-      .from('enquiries')
-      .select('*')
-      .eq('id', enquiry_id)
-      .single()
-
-    if (fetchError || !enquiry) {
-      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
-    }
-
-    // Carry the repair-specific estimate from the quote catalogue into the customer message.
-    // "Varies" is omitted because it does not set a useful expectation.
-    const estimatedTime = String(enquiry.estimated_time || '').trim()
-    if (estimatedTime && !/^varies$/i.test(estimatedTime)) {
-      turnaroundInfoBlock = `\n\nTypical turnaround after drop-off: ${estimatedTime}`
-    }
-
-    // Check if already converted
-    if (enquiry.converted_job_id) {
-      return NextResponse.json({
-        success: true,
-        already_converted: true,
-        job_id: enquiry.converted_job_id,
-      })
-    }
-
-    const customerPhone = String(enquiry.customer_phone || '').trim()
-    const customerEmail = String(enquiry.customer_email || '').trim()
-    if (!customerPhone && !customerEmail) {
-      return NextResponse.json(
-        {
-          error: 'Customer contact details required',
-          code: 'CUSTOMER_CONTACT_REQUIRED',
-          details: 'Add either a phone number or an email address to this enquiry, then try creating the job again.',
-        },
-        { status: 400 }
-      )
-    }
-
-    const now = new Date().toISOString()
-    const isDeviceInShop = stock_status === 'device_in_shop'
-    const requiresParts = stock_status !== 'in_stock' && !isDeviceInShop
-    const depositAlreadyPaid = stock_status === 'parts_deposit_paid'
-    const partsRequired = requiresParts
-    const depositRequired = requiresParts
-    const depositAmount = requiresParts ? 20.00 : null
-
-    // Calculate total price including additional repairs
-    // The enquiry stores quoted_price (primary repair only) and additional_repairs
-    // (array of { repair, display_name, price }). The job's price_total must
-    // include all repairs.
-    const primaryPrice = enquiry.quoted_price || 0
-    const additionalRepairs = Array.isArray(enquiry.additional_repairs) ? enquiry.additional_repairs : []
-    const accessories = Array.isArray(enquiry.accessories) ? enquiry.accessories : []
-    const additionalRepairsTotal = additionalRepairs.reduce((sum: number, r: any) => {
-      return sum + (typeof r.price === 'number' ? r.price : 0)
-    }, 0)
-    const accessoriesTotal = accessories.reduce((sum: number, item: any) => {
-      return sum + (typeof item.price === 'number' ? item.price : 0)
-    }, 0)
-    const accessoryIssues = accessories.map((item: any) => ({
-      repair: 'accessory_' + String(item.name || 'extra').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
-      display_name: item.name || 'Extra',
-      price: typeof item.price === 'number' ? item.price : 0,
-      option_type: 'accessory',
-    }))
-    const totalPrice = primaryPrice + additionalRepairsTotal + accessoriesTotal
-
-    // Determine job status
-    const jobStatus = isDeviceInShop
-      ? 'RECEIVED'
-      : requiresParts
-        ? (depositAlreadyPaid ? 'PARTS_ORDERED' : 'AWAITING_DEPOSIT')
-        : 'AWAITING_DEVICE'
-
-    // Generate job ref
-    const { count: jobCount } = await supabase
-      .from('jobs')
-      .select('id', { count: 'exact', head: true })
-
-    const jobRef = `NF-${String((jobCount || 0) + 1).padStart(5, '0')}`
-    const trackingToken = crypto.randomUUID()
-
-    // Build job data
-    const jobData: Record<string, any> = {
-      job_ref: jobRef,
-      tracking_token: trackingToken,
-
-      // Customer details
-      customer_name: enquiry.customer_name,
-      customer_phone: customerPhone || null,
-      customer_email: customerEmail || null,
-
-      // Device details
-      device_type: enquiry.device_category || null,
-      device_make: enquiry.device_make || 'Unknown',
-      device_model: enquiry.device_model || 'Unknown',
-      device_colour: enquiry.device_colour || null,
-      issue: enquiry.repair_type || 'Repair needed',
-      description: enquiry.issue_description || null,
-      additional_issues: [...additionalRepairs, ...accessoryIssues],
-
-      // Type & source
-      type: 'repair',
-      source: 'enquiry_conversion',
-      page: enquiry.quote_source || null,
-
-      // Pricing — includes additional repairs in the total
-      quoted_price: primaryPrice,
-      price_total: totalPrice,
-      quoted_at: enquiry.quoted_price ? now : null,
-
-      // Parts & deposit
-      requires_parts_order: partsRequired,
-      parts_required: partsRequired,
-      deposit_required: depositRequired,
-      deposit_amount: depositAmount,
-      deposit_received: depositAlreadyPaid,
-      deposit_received_at: depositAlreadyPaid ? now : null,
-      deposit_requested_at: requiresParts && !depositAlreadyPaid ? now : null,
-      parts_expected_at: requiresParts && earliest_date
-        ? new Date(earliest_date + 'T12:00:00Z').toISOString()
-        : null,
-
-      // Device possession — customer has device, needs to drop off
-      // (unless they've already dropped it off in the shop)
-      device_in_shop: isDeviceInShop,
-
-      // Status
-      status: jobStatus,
-      status_changed_at: now,
-
-      // Onboarding
-      terms_accepted: enquiry.terms_accepted || false,
-      terms_accepted_at: enquiry.terms_accepted ? now : null,
-      marketing_opt_in: enquiry.marketing_consent || false,
-      marketing_opt_in_at: enquiry.marketing_consent ? now : null,
-
-      // Link back to enquiry
-      quote_request_id: enquiry.id,
-    }
-
-    // For parts ordered, set parts_ordered_at
-    if (depositAlreadyPaid) {
-      jobData.parts_ordered_at = now
-    }
-
-    // Insert the job
-    let { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .insert(jobData)
-      .select()
-      .single()
-
-    if (jobError || !job) {
-      // device_colour column may not exist yet (migration pending) —
-      // retry without it so conversion still works.
-      const { device_colour: _deviceColour, ...jobDataWithoutColour } = jobData
-      const retry = await supabase
-        .from('jobs')
-        .insert(jobDataWithoutColour)
-        .select()
-        .single()
-      job = retry.data
-      jobError = retry.error
-    }
-
-    if (jobError || !job) {
-      console.error('Failed to create job from enquiry:', jobError)
-      return NextResponse.json(
-        { error: 'Failed to create job', details: jobError?.message },
-        { status: 500 }
-      )
-    }
-
-    const fastDropoffUrl = stock_status === 'in_stock' && !enquiry.terms_accepted
-      ? shortFastDropoffLink(job.tracking_token)
-      : null
-
-    // Update enquiry as converted
-    const { error: enquiryUpdateError } = await supabase
-      .from('enquiries')
-      .update({
-        status: 'converted',
-        converted_job_id: job.id,
-        converted_to_job: true,
-        converted_at: now,
-        updated_at: now,
-      })
-      .eq('id', enquiry_id)
-
-    if (enquiryUpdateError) {
-      console.error('Failed to mark enquiry as converted:', enquiryUpdateError)
-      await supabase.from('jobs').delete().eq('id', job.id)
-      return NextResponse.json(
-        { error: 'Failed to save stock decision', details: enquiryUpdateError.message },
-        { status: 500 }
-      )
-    }
-
-    // Log job creation event
-    await supabase.from('job_events').insert({
-      job_id: job.id,
-      type: 'SYSTEM',
-      message: `Job created from enquiry ${enquiry.enquiry_ref} (${isDeviceInShop ? 'Device dropped off - booked in' : depositAlreadyPaid ? 'Parts needed - deposit paid' : requiresParts ? 'Parts needed - awaiting deposit' : 'In stock'})`,
-    })
-
-    // Create staff notification
-    await supabase.from('notifications').insert({
-      type: 'NEW_JOB',
-      title: 'New job from enquiry',
-      body: `${enquiry.device_make || ''} ${enquiry.device_model || ''} - ${enquiry.repair_type || ''}`,
-      job_id: job.id,
-      is_read: false,
-    })
-
-    // Send SMS to customer
-    const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
-
-    let smsBody = ''
-    if (isDeviceInShop) {
-      // Device already dropped off in the shop — send the normal "booked in" message
-      const trackingUrl = shortTrackingLink(job.short_token || trackingToken)
-      const { data: templates } = await supabase
-        .from('sms_templates')
-        .select('key, body')
-        .eq('key', 'RECEIVED')
-        .eq('is_active', true)
-        .single()
-
-      const deviceSummary = safeDeviceLabel(enquiry.device_make, enquiry.device_model)
-      smsBody = templates?.body
-        ? withExtraInfo(renderSmsTemplate(templates.body, {
-            first_name: getFirstName(enquiry.customer_name),
-            customer_name: enquiry.customer_name || '',
-            device_make: enquiry.device_make || '',
-            device_model: enquiry.device_model || '',
-            device_summary: deviceSummary,
-            tracking_link: trackingUrl,
-            job_ref: job.job_ref,
-          }))
-        : `Hi ${getFirstName(enquiry.customer_name)}! 👋\n\nYour ${deviceSummary} is now booked in with us 🔧\n\n🔗 Track your repair here:\n${trackingUrl}\n\nWe will text you with updates as it progresses.${getInfoBlock()}\n\nNFD Repairs`
-    } else if (depositAlreadyPaid) {
-      // Parts needed + deposit paid
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}!\n\nThanks for your deposit!\n\nWe have ordered the part for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} — it is usually next-day delivery, but can occasionally take a little longer.\n\nWe will text you as soon as it arrives.\n\nTrack your repair: ${shortTrackingLink(trackingToken)}${getInfoBlock()}\n\nNFD Repairs`
-    } else if (requiresParts) {
-      // Parts needed — request the deposit before ordering
-      const depositUrl = repairPaymentLink(job)
-      const trackingUrl = shortTrackingLink(job.short_token || trackingToken)
-      const { data: templates } = await supabase
-        .from('sms_templates')
-        .select('key, body')
-        .in('key', ['DEPOSIT_REQUEST', 'DEPOSIT_REQUIRED'])
-        .eq('is_active', true)
-
-      const template = templates?.find((item: any) => item.key === 'DEPOSIT_REQUEST') || templates?.[0]
-      smsBody = template?.body
-        ? withExtraInfo(renderSmsTemplate(template.body, {
-            first_name: getFirstName(enquiry.customer_name),
-            customer_name: enquiry.customer_name || '',
-            device_make: enquiry.device_make || '',
-            device_model: safeDeviceLabel(enquiry.device_make, enquiry.device_model),
-            device_summary: safeDeviceLabel(enquiry.device_make, enquiry.device_model),
-            deposit_amount: '20.00',
-            deposit_link: depositUrl,
-            tracking_link: trackingUrl,
-            job_ref: job.job_ref,
-          }))
-        : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\nPay a £20 deposit (deducted from your total), or pay in full by card or Klarna where eligible.\n\nIf you choose the deposit, pay the remaining balance cash/card when you collect.\n\nPay online here:\n${depositUrl}\n\nWe will confirm payment automatically and arrange your parts order.${getInfoBlock()}\n\nNFD Repairs`
-    } else {
-      // In stock — parts ready, customer needs to bring device in
-      const { data: hoursSetting } = await supabase
-        .from('admin_settings')
-        .select('value')
-        .eq('key', 'opening_hours_link')
-        .single()
-
-      const hoursLink = hoursSetting?.value || shortHoursLink()
-
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
-    }
-
-    let smsSent = false
-    let smsError: string | null = null
-    if (smsBody && customerPhone && webhookUrl) {
-      try {
-        const smsResponse = await sendViaMacroDroid(webhookUrl, customerPhone, smsBody)
-
-        const deliveryStatus = smsResponse.ok ? 'SENT' : 'FAILED'
-        smsSent = smsResponse.ok
-        smsError = smsResponse.ok ? null : (smsResponse.body || 'MacroDroid rejected the message')
-
-        await supabase.from('sms_logs').insert({
-          job_id: job.id,
-          template_key: depositAlreadyPaid ? 'DEPOSIT_RECEIVED' : requiresParts ? 'DEPOSIT_REQUIRED' : 'AWAITING_DEVICE',
-          body_rendered: smsBody,
-          status: deliveryStatus,
-          sent_at: deliveryStatus === 'SENT' ? now : null,
-        })
-
-        if (!smsResponse.ok) {
-          console.error('SMS send failed for enquiry conversion')
-        }
-      } catch (smsException) {
-        console.error('Failed to send SMS:', smsException)
-        smsError = smsException instanceof Error ? smsException.message : 'SMS request failed'
-      }
-    } else if (!customerPhone) {
-      smsError = 'No customer phone number'
-    } else if (!webhookUrl) {
-      smsError = 'MacroDroid webhook is not configured'
-    }
-
-    // Send email if customer has email, and report the result independently
-    // from SMS so email-only customers are not shown as "message not sent".
-    let emailSent = false
-    let emailError: string | null = null
-    if (customerEmail) {
-      try {
-        const appUrl = getAppUrl()
-        const emailResponse = await fetch(`${appUrl}/api/email/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-          },
-          body: JSON.stringify({
-            jobId: job.id,
-            type: 'JOB_CREATED',
-          }),
-        })
-
-        let emailResult: any = null
-        try {
-          emailResult = await emailResponse.json()
-        } catch {
-          // A non-JSON response is still a failure if the HTTP request failed.
-        }
-
-        emailSent = emailResponse.ok && emailResult?.success !== false
-        if (!emailSent) {
-          emailError = emailResult?.error || emailResult?.details || `Email send failed (HTTP ${emailResponse.status})`
-          console.error('Failed to send email:', emailError)
-        }
-      } catch (error) {
-        emailError = error instanceof Error ? error.message : 'Email request failed'
-        console.error('Failed to send email:', error)
-      }
-    } else {
-      emailError = 'No customer email address'
-    }
-
+      throw Error("Choose stock availability");
+    if (!e.customer_phone && !e.customer_email)
+      throw Error("Add a mobile number or email");
+    if (!e.quote_action_token)
+      throw Error("Send a secure quote link before confirmation");
+    const original = snapshot(e),
+      total =
+        body.confirmed_total != null
+          ? pence(body.confirmed_total)
+          : completeTotal(e);
+    if (total <= 0)
+      throw Error("Enter the complete confirmed repair price first");
+    const extras = [
+      ...(e.additional_repairs || []),
+      ...(e.accessories || []),
+    ].reduce((s: number, x: any) => s + pence(x.price), 0);
+    if (total < extras) throw Error("Total cannot be lower than extras");
+    const confirmed = {
+      ...e,
+      quoted_price: (total - extras) / 100,
+      part_option: body.part_option || e.part_option,
+      device_colour: body.device_colour || e.device_colour,
+    };
+    const confirmedSnapshot = snapshot(confirmed),
+      changed =
+        Boolean(e.price_confirmation_required) || quoteFingerprint(original) !== quoteFingerprint(confirmedSnapshot);
+    const parts =
+      body.stock_status === "parts_needed" ||
+      body.stock_status === "parts_deposit_paid";
+    const deposit = parts
+      ? Math.min(pence(body.deposit_amount ?? 20), total) / 100
+      : null;
+    if (parts && (!deposit || deposit < 0))
+      throw Error("Enter a valid ordering deposit");
+    const data = {
+      customer_name: e.customer_name,
+      customer_phone: e.customer_phone,
+      customer_email: e.customer_email,
+      tracking_token: crypto.randomUUID(),
+      device_type: e.device_category,
+      device_make: e.device_make,
+      device_model: e.device_model,
+      device_colour: confirmed.device_colour,
+      part_option: confirmed.part_option,
+      issue: e.repair_type,
+      description: e.issue_description,
+      type: "repair",
+      source: "enquiry_conversion",
+      quoted_price: confirmed.quoted_price,
+      price_total: total / 100,
+      additional_issues: [
+        ...(e.additional_repairs || []),
+        ...(e.accessories || []).map((a: any) => ({
+          repair:
+            "accessory_" + a.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+          display_name: a.name,
+          price: a.price,
+          option_type: "accessory",
+        })),
+      ],
+      requires_parts_order: parts,
+      parts_required: parts,
+      deposit_required: parts,
+      deposit_amount: deposit,
+      deposit_received: false,
+      payment_received: false,
+      parts_expected_at:
+        parts && body.earliest_date
+          ? new Date(body.earliest_date + "T12:00:00Z").toISOString()
+          : null,
+      confirmation_notes: String(body.staff_notes || "").slice(0, 2000),
+      device_in_shop: body.stock_status === "device_in_shop",
+      status: changed
+        ? "AWAITING_CUSTOMER"
+        : parts
+          ? "AWAITING_DEPOSIT"
+          : body.stock_status === "device_in_shop"
+            ? "RECEIVED"
+            : "AWAITING_DEVICE",
+      terms_accepted: e.terms_accepted || false,
+      quote_request_id: e.id,
+    };
+    const job: any = await checked(
+      db.rpc("confirm_repair_enquiry", {
+        p_enquiry: e.id,
+        p_job: data,
+        p_snapshot: confirmedSnapshot,
+        p_changed: changed,
+      }),
+    );
+    await enqueueRepairMessage(
+      db,
+      job,
+      "confirmed:" +
+        quoteFingerprint({
+          parts: job.requires_parts_order,
+          arrival: job.parts_expected_at,
+          notes: job.confirmation_notes,
+        }),
+      confirmationText(job, e),
+    );
+    const messages = await deliverRepairMessages(db, job.id);
     return NextResponse.json({
       success: true,
       job_id: job.id,
       job_ref: job.job_ref,
-      tracking_token: job.tracking_token,
-      tracking_url: shortTrackingLink(job.short_token || job.tracking_token),
-      fast_dropoff_url: fastDropoffUrl,
       status: job.status,
-      sms_sent: smsSent,
-      sms_error: smsError,
-      email_sent: emailSent,
-      email_error: emailError,
-      customer_notified: smsSent || emailSent,
-    })
-  } catch (error) {
-    console.error('Error converting enquiry to job:', error)
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+      tracking_url: journeyUrl(e.enquiry_ref, e.quote_action_token),
+      ...messages,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 409 });
   }
 }
-

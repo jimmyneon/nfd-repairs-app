@@ -1475,6 +1475,7 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "We're repairing your device as we speak. Getting it sorted for you — we'll text the moment it's done.",
     "Your repair is underway! We're working on it now and will text you the moment it's finished.",
   ],
+  READY_TO_ORDER: ["Your payment has been received. We are arranging your parts order and will text you when the parts arrive."],
   PARTS_ORDERED: [
     "We've ordered the parts for your device. They usually take 2-3 working days to arrive — we'll text you when they turn up.",
     "Parts are on order for your repair. Typically a 2-3 day wait, then we'll crack on with it. We'll let you know when they arrive.",

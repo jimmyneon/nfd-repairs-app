@@ -226,6 +226,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
       AWAITING_DEVICE: 'We have the parts in stock — just bring your device in whenever you are ready.',
       RECEIVED: 'We received your device and added it to our workshop queue.',
       DIAGNOSTIC: 'We examined your device to identify exactly what needs fixing.',
+      READY_TO_ORDER: 'Payment received. We are arranging your parts order.',
       AWAITING_DEPOSIT: 'We need a deposit to order the parts for your repair.',
       PARTS_ORDERED: 'Parts have been ordered and are on their way to us.',
       PARTS_ARRIVED: 'Parts have arrived — bring your device in or we will start if you have already dropped it off.',
@@ -304,7 +305,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
     estimate,
     repairAgreed
   )
-  if (job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received)) {
+  if (job.status === 'READY_TO_ORDER' || (job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received))) {
     reassuranceMessage = 'Payment received. We are arranging your parts order and will text you when the parts arrive.'
   }
   // Override PARTS_ARRIVED message if device is already in shop
@@ -332,10 +333,10 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
     if (journeyBaseStatus === 'DIAGNOSTIC' || (statusTimestamps && statusTimestamps.DIAGNOSTIC)) {
       steps.push('DIAGNOSTIC')
     }
-    const needsDepositStep = job.deposit_required || journeyBaseStatus === 'AWAITING_DEPOSIT'
-    const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(journeyBaseStatus)
+    const needsDepositStep = job.deposit_required || ['AWAITING_DEPOSIT', 'READY_TO_ORDER'].includes(journeyBaseStatus)
+    const needsPartsSteps = job.parts_required || ['READY_TO_ORDER', 'PARTS_ORDERED', 'PARTS_ARRIVED'].includes(journeyBaseStatus)
     if (needsDepositStep) steps.push('AWAITING_DEPOSIT')
-    if (needsPartsSteps) { steps.push('PARTS_ORDERED'); steps.push('PARTS_ARRIVED') }
+    if (needsPartsSteps) { steps.push('READY_TO_ORDER'); steps.push('PARTS_ORDERED'); steps.push('PARTS_ARRIVED') }
     steps.push('IN_REPAIR')
     steps.push('READY_TO_COLLECT')
     steps.push('COLLECTED')
@@ -414,7 +415,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
                   ? 'Starting Soon'
                   : job.status === 'AWAITING_CUSTOMER'
                     ? 'Waiting for your reply'
-                    : JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
+                    : job.status === 'READY_TO_ORDER' ? 'Arranging parts' : JOB_STATUS_LABELS[job.status as keyof typeof JOB_STATUS_LABELS]}
               </div>
             </div>
 
@@ -598,7 +599,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
                         isUpNext ? 'text-orange-600 dark:text-orange-400' :
                         'text-gray-400 dark:text-gray-500'
                       }`}>
-                        {JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
+                        {step === 'READY_TO_ORDER' ? 'Arranging parts' : JOB_STATUS_LABELS[step as keyof typeof JOB_STATUS_LABELS]}
                       </p>
                       {isCurrent && (
                         <p className={`text-xs mt-0.5 ${isAwaitingCustomerPause ? 'text-amber-600 dark:text-amber-400' : 'text-primary'}`}>

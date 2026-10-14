@@ -1,3 +1,4 @@
+import { loadQuoteCatalogue, resolveRequest, completeTotal } from '@/lib/quote-pricing'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
@@ -303,25 +304,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Server-side price verification for repair quotes
-    // If a quote_key is provided, look up the real price from the catalogue
-    // and override the client-sent price to prevent tampering
     let verifiedQuotedPrice = quoted_price
     let verifiedDisplayPrice = display_price
     let verifiedPartOption = part_option
+    let verifiedAdditionalRepairs = additional_repairs || []
+    let verifiedAccessories = accessories || []
     let priceTampered = false
     let cataloguePriceVerified = false
-    if (enquiry_type === 'repair_quote' && quote_key) {
-      const verification = await verifyQuotePrice(quote_key, quoted_price)
-      if (verification.verifiedPrice !== null) {
-        if (quoted_price != null && quoted_price !== verification.verifiedPrice) {
-          console.warn(`[PRICE VERIFICATION] Tampered price detected for quote_key=${quote_key}: client sent ${quoted_price}, catalogue says ${verification.verifiedPrice}`)
-          priceTampered = true
-        }
+    if (enquiry_type === 'repair_quote') {
+      try {
+        const resolved = resolveRequest(await loadQuoteCatalogue(), body)
+        verifiedQuotedPrice = resolved.quoted_price
+        verifiedDisplayPrice = resolved.display_price
+        verifiedPartOption = resolved.part_option
+        verifiedAdditionalRepairs = resolved.additional_repairs
+        verifiedAccessories = resolved.accessories
         cataloguePriceVerified = true
-        verifiedQuotedPrice = verification.verifiedPrice
-        verifiedDisplayPrice = verification.displayPrice
-        verifiedPartOption = verification.partOption
+        priceTampered = quoted_price != null && quoted_price !== verifiedQuotedPrice
+      } catch {
+        // A provisional request is useful, but no client price can become payable.
+        verifiedQuotedPrice = null
+        verifiedDisplayPrice = 'Price to be confirmed'
+        verifiedAdditionalRepairs = (additional_repairs || []).map((r: any) => ({ ...r, price: 0 }))
+        verifiedAccessories = []
       }
     }
 
@@ -390,15 +395,17 @@ export async function POST(request: NextRequest) {
           proceed_with_repair: proceed_with_repair || false,
           marketing_consent: marketing_consent || false,
           quote_source: quote_source || null,
-          additional_repairs: additional_repairs || null,
+          additional_repairs: verifiedAdditionalRepairs,
           part_option: verifiedPartOption || null,
           display_price: verifiedDisplayPrice || null,
           warranty: warranty || null,
           estimated_time: estimated_time || null,
           quote_key: quote_key || null,
           payday_date: payday_date || null,
-          accessories: accessories || null,
-          deposit_required: deposit_required === true,
+          accessories: verifiedAccessories,
+          price_verified: cataloguePriceVerified,
+          price_confirmation_required: !offerClaims && (priceTampered || JSON.stringify((additional_repairs || []).map((x: any) => x.price)) !== JSON.stringify(verifiedAdditionalRepairs.map((x: any) => x.price)) || JSON.stringify((accessories || []).map((x: any) => x.price)) !== JSON.stringify(verifiedAccessories.map((x: any) => x.price))),
+          deposit_required: false,
           deposit_amount: Number(deposit_amount) > 0 && Number(deposit_amount) <= 500
             ? Number(deposit_amount)
             : null,
@@ -420,6 +427,7 @@ export async function POST(request: NextRequest) {
         .single() as any
 
       if (enquiryError) {
+        if (enquiry_type === 'repair_quote') return NextResponse.json({ error: 'Unable to save your repair details. Please try again or contact us.' }, { status: 503, headers })
         console.error('Failed to create enquiry:', enquiryError)
         // Try again without the new columns that may not exist in DB yet
         const { data: enquiry2, error: enquiryError2 } = await supabase
@@ -458,7 +466,7 @@ export async function POST(request: NextRequest) {
             marketing_consent: marketing_consent || false,
             quote_source: quote_source || null,
             payday_date: payday_date || null,
-            accessories: accessories || null,
+            accessories: verifiedAccessories,
             additional_info: persistedAdditionalInfo,
             status: proceed_with_repair ? 'approved' : 'pending',
           })
@@ -597,7 +605,7 @@ export async function POST(request: NextRequest) {
     if (isProceed) {
       const deviceLabel = [device_make, device_model].filter(Boolean).join(' ').trim() || 'device'
       const repairLabel = humaniseRepair(repair_type)
-      const priceLabel = verifiedDisplayPrice || (verifiedQuotedPrice ? `£${verifiedQuotedPrice}` : '')
+      const priceLabel = verifiedQuotedPrice ? `£${(completeTotal({ quoted_price: verifiedQuotedPrice, additional_repairs: verifiedAdditionalRepairs, accessories: verifiedAccessories }) / 100).toFixed(2)} total` : 'Price to be confirmed'
       const priceText = priceLabel ? ` at ${priceLabel}` : ''
       const secureQuoteUrl = quoteUrl || ''
       const firstName = sanitizedName.split(/\s+/)[0] || sanitizedName || 'there'
@@ -672,4 +680,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
 

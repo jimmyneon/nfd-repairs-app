@@ -77,7 +77,7 @@ export function verifyRequestedAddOns(
     if (!matches.length) continue
 
     const minPrice = Math.min(...matches.map(row => Number(row.customerPriceGbp)))
-    const price = isScreenRepair(repair) ? minPrice : Math.round(minPrice * 0.75)
+    const price = isScreenRepair(repair) ? minPrice : Math.round(minPrice * (100 - Number((catalogue as any).policy?.combinedRepairDiscountPercent || 0)) / 100)
     output.push({
       repair,
       display_name: repair.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
@@ -91,15 +91,14 @@ export function verifyRequestedAddOns(
 
 export function verifyRequestedAccessories(
   requested: Array<{ name?: string }>,
-  context: { category?: string | null; brand?: string | null; primaryRepair?: string | null }
+  context: { category?: string | null; brand?: string | null; primaryRepair?: string | null }, catalogue: any = []
 ): SavedAccessory[] {
   const allowed: Record<string, number> = {}
   const screen = isScreenRepair(context.primaryRepair)
   const iphone = sameText(context.brand, 'Apple') &&
     sameCategory(context.category, 'Phone')
 
-  if (screen) allowed['Free battery health check'] = 0
-  if (screen && iphone) allowed['Tempered glass screen protector'] = 15
+  for (const item of catalogue.accessories || []) { if ((!item.screenOnly || screen) && (!item.brand || sameText(item.brand, context.brand))) allowed[item.name] = item.customerPriceGbp }
 
   const output: SavedAccessory[] = []
   const seen = new Set<string>()
@@ -116,17 +115,11 @@ export function getAvailableAccessories(context: {
   category?: string | null
   brand?: string | null
   primaryRepair?: string | null
-}): AvailableAccessory[] {
+}, catalogue: any = []): AvailableAccessory[] {
   const screen = isScreenRepair(context.primaryRepair)
   if (!screen) return []
 
-  const output: AvailableAccessory[] = [
-    { name: 'Free battery health check', price: 0 },
-  ]
-
-  if (sameText(context.brand, 'Apple') && sameCategory(context.category, 'Phone')) {
-    output.push({ name: 'Tempered glass screen protector', price: 15 })
-  }
+  const output: AvailableAccessory[] = (catalogue.accessories || []).filter((item: any) => (!item.screenOnly || screen) && (!item.brand || sameText(item.brand, context.brand))).map((item: any) => ({ name: item.name, price: item.customerPriceGbp }))
 
   return output
 }
@@ -173,7 +166,7 @@ export function getAvailableAddOns(
 
     const originalPrice = Math.min(...rows.map(row => Number(row.customerPriceGbp)))
     const screen = isScreenRepair(repair)
-    const discountPrice = screen ? originalPrice : Math.round(originalPrice * 0.75)
+    const discountPrice = screen ? originalPrice : Math.round(originalPrice * (100 - Number((catalogue as any).policy?.combinedRepairDiscountPercent || 0)) / 100)
     const priority = Math.min(...rows.map(row => Number(row.priority ?? 999)))
 
     output.push({

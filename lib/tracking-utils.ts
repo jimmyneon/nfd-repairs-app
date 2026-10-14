@@ -912,6 +912,8 @@ export function getReassuranceMessage(
     return "We've sent you a message about your repair and just need your reply before we can continue. Please check your messages and get back to us when you can."
   }
 
+  if (status === 'READY_TO_ORDER') return 'Payment received. We are arranging your parts order and will text you when the parts arrive.'
+
   // Payment options are linked by the tracking page using this repair's token.
   if (status === 'AWAITING_DEPOSIT') {
     return 'We need to order your parts. Choose a deposit (deducted from the total), or full payment with card or eligible Klarna.'
