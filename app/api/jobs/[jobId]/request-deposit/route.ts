@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, getAppUrl } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, getAppUrl } from '@/lib/utils'
 import { requireStaffUser } from '@/lib/api-auth'
 import { sendSms, isSmsConfigured } from '@/lib/resilience'
 
@@ -31,7 +31,7 @@ export async function POST(
     }
 
     // Idempotency: don't send a deposit request if it's already been received
-    if (job.deposit_received) {
+    if (job.deposit_received || job.payment_received) {
       return NextResponse.json({
         error: 'Deposit has already been received — no need to request again',
         deposit_received: true,
@@ -81,12 +81,7 @@ export async function POST(
       // Per-job pay page — detects deposit vs balance and creates a
       // Stripe Checkout session on demand (card + Klarna where eligible).
       // Stable link, unlike a raw Stripe session URL which expires.
-      const siteBase = (
-        process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk'
-      ).replace(/\/+$/, '')
-      const depositUrl = `${siteBase}/pay/?t=${encodeURIComponent(
-        job.short_token || job.tracking_token
-      )}`
+      const depositUrl = repairPaymentLink(job)
       const depositAmount = finalDepositAmount.toFixed(2)
 
       // Fetch template from database
@@ -112,7 +107,7 @@ export async function POST(
         })
       } else {
         // Fallback if template not in database — concise, explains why deposit is needed
-        smsMessage = `Hi ${firstName}!\n\nWe need to order parts for your ${job.device_model || 'device'} repair.\n\nTo get the order started, we just need a £${depositAmount} deposit.\n\nThis secures the part and your repair slot. The £${depositAmount} comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
+        smsMessage = `Hi ${firstName}!\n\nWe need to order parts for your ${job.device_model || 'device'} repair.\n\nTo get the order started, we just need a £${depositAmount} deposit.\n\nThe deposit comes off your total. Or pay in full by card or Klarna where eligible. If you choose the deposit, pay the remaining balance cash/card on collection.\n\nPay online here:\n${depositUrl}\n\nPayment is confirmed automatically.\n\nNFD Repairs`
       }
 
       if (job.customer_phone && String(job.customer_phone).trim()) {
@@ -164,3 +159,4 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

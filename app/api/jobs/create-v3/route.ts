@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 import { requireStaffUser } from '@/lib/api-auth'
 
@@ -436,7 +436,7 @@ export async function POST(request: NextRequest) {
       
       const appUrl = getAppUrl()
       const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
-      const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+      const depositUrl = repairPaymentLink(job)
       // The onboarding_token column was never added to production, so the
       // completion/intake form reuses the tracking token. The /onboard/[token]
       // page looks up by tracking_token and redirects to /walk-in/complete/[token].
@@ -601,3 +601,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

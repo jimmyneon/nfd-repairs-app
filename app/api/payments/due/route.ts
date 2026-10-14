@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
   const totalPence = Math.round((job.price_total ?? 0) * 100)
 
   const depositDuePence =
-    !job.deposit_received && job.deposit_required
+    !job.payment_received && !job.payment_received && !job.deposit_received && job.deposit_required
       ? Math.round((job.deposit_amount ?? 20) * 100)
       : 0
   const balanceDuePence = job.payment_received
@@ -96,3 +96,4 @@ export async function GET(request: NextRequest) {
     { headers }
   )
 }
+
