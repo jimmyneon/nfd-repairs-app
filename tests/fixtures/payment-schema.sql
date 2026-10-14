@@ -15,5 +15,7 @@ CREATE TABLE public.enquiries (
  converted_at timestamptz,quoted_price numeric,additional_repairs jsonb,accessories jsonb,quote_action_token text,
  part_option text,device_colour text
 );
+ALTER TABLE public.jobs ADD CONSTRAINT jobs_status_check CHECK (status IN ('QUOTE_REQUESTED','QUOTE_APPROVED','AWAITING_DEVICE','DROPPED_OFF','RECEIVED','DIAGNOSTIC','AWAITING_CUSTOMER','AWAITING_DEPOSIT','PARTS_ORDERED','PARTS_ARRIVED','IN_REPAIR','DELAYED','READY_TO_COLLECT','IN_STORAGE','COLLECTED','COMPLETED','CANCELLED'));
+ALTER TABLE public.jobs ADD CONSTRAINT valid_status CHECK (status IN ('QUOTE_REQUESTED','QUOTE_APPROVED','AWAITING_DEVICE','DROPPED_OFF','RECEIVED','DIAGNOSTIC','AWAITING_CUSTOMER','AWAITING_DEPOSIT','PARTS_ORDERED','PARTS_ARRIVED','IN_REPAIR','DELAYED','READY_TO_COLLECT','IN_STORAGE','COLLECTED','COMPLETED','CANCELLED'));
 CREATE TABLE public.sms_templates(key text UNIQUE,body text,is_active boolean);
 GRANT ALL ON public.jobs,public.enquiries,public.sms_templates TO service_role;

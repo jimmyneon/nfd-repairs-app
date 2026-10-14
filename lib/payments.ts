@@ -144,14 +144,12 @@ export async function checkoutRepair(db: SupabaseClient, body: any) {
     const returnUrl = fund
       ? `${siteBase()}/repair-fund/?token=${encodeURIComponent(body.fund_token)}`
       : `${siteBase()}/pay/?t=${encodeURIComponent(repair.job?.short_token || repair.job?.tracking_token || "")}`;
-    // Klarna advance capture must be explicitly approved for this business before enabling it.
-    const ready =
-      repair &&
-      ["READY_TO_COLLECT", "IN_STORAGE"].includes(repair.record.status);
+    // Offer the agreed full-payment choice after confirmed scope and customer acceptance.
+    // Stripe Checkout applies account/customer eligibility; deposits and savings stay card-only.
     const klarna =
       kind !== "fund_topup" &&
       !kind.endsWith("deposit") &&
-      (ready || process.env.KLARNA_ADVANCE_CAPTURE_APPROVED === "true");
+      process.env.KLARNA_ENABLED !== "false";
     const created = await stripe.checkout.sessions.create(
       {
         mode: "payment",

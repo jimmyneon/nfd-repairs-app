@@ -1,4 +1,8 @@
 -- Review/apply only as part of the coordinated release. No production data is changed by the PR.
+-- Production has two status checks; both must admit the payment-secured ordering state.
+ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_status_check;
+ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS valid_status;
+ALTER TABLE public.jobs ADD CONSTRAINT jobs_status_check CHECK (status IN ('QUOTE_REQUESTED','QUOTE_APPROVED','AWAITING_DEVICE','DROPPED_OFF','RECEIVED','DIAGNOSTIC','AWAITING_CUSTOMER','AWAITING_DEPOSIT','READY_TO_ORDER','PARTS_ORDERED','PARTS_ARRIVED','IN_REPAIR','DELAYED','READY_TO_COLLECT','IN_STORAGE','COLLECTED','COMPLETED','CANCELLED'));
 ALTER TABLE public.jobs ADD COLUMN IF NOT EXISTS quote_version integer NOT NULL DEFAULT 1,
  ADD COLUMN IF NOT EXISTS quote_accepted_version integer, ADD COLUMN IF NOT EXISTS quote_confirmed_at timestamptz,
  ADD COLUMN IF NOT EXISTS quote_snapshot jsonb, ADD COLUMN IF NOT EXISTS part_option text,
@@ -213,6 +217,9 @@ CREATE OR REPLACE FUNCTION public.guard_repair_money() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE m jsonb;
 BEGIN
+ -- Postal repairs and device sales have their own receipt/workflow controls.
+ -- Do not reinterpret those receipts using the local repair ledger.
+ IF (OLD.source='hdmi_repair_uk' AND NEW.source=OLD.source) OR (OLD.type='sell' AND NEW.type='sell') THEN RETURN NEW; END IF;
  IF (NEW.price_total IS DISTINCT FROM OLD.price_total OR NEW.part_option IS DISTINCT FROM OLD.part_option OR NEW.device_colour IS DISTINCT FROM OLD.device_colour OR NEW.additional_issues IS DISTINCT FROM OLD.additional_issues)
  AND NEW.quote_confirmed_at IS NOT DISTINCT FROM OLD.quote_confirmed_at AND OLD.quote_snapshot IS NOT NULL THEN
  NEW.quote_version=OLD.quote_version+1;NEW.quote_accepted_version=NULL;NEW.quote_confirmed_at=NULL;
@@ -271,3 +278,16 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.add_repair_options(text,jsonb,jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.add_repair_options(text,jsonb,jsonb) TO service_role;
+
+-- Preserve the explicit reference allocated atomically by confirm_repair_enquiry.
+-- The existing trigger otherwise overwrites it using a concurrent MAX lookup.
+CREATE OR REPLACE FUNCTION public.generate_job_ref() RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE today_date text; max_num integer;
+BEGIN
+ IF nullif(NEW.job_ref,'') IS NOT NULL THEN RETURN NEW; END IF;
+ today_date=to_char(now(),'YYYYMMDD');
+ SELECT COALESCE(max(substring(job_ref FROM 'NFD-[0-9]{8}-([0-9]+)')::integer),0) INTO max_num FROM public.jobs WHERE job_ref LIKE 'NFD-'||today_date||'-%';
+ NEW.job_ref='NFD-'||today_date||'-'||lpad((max_num+1)::text,3,'0');
+ RETURN NEW;
+END $$;

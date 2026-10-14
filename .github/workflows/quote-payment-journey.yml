@@ -25,7 +25,7 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci --ignore-scripts
       - run: npx tsc --noEmit
-      - run: npx vitest run tests/payment-ledger.test.ts tests/quote-pricing.test.ts tests/payment-checkout.test.ts tests/payment-reconciliation.test.ts tests/enquiry-phone-conversion.test.ts tests/public-quote-options.test.ts tests/public-route-security.test.ts tests/customer-pages.test.ts
+      - run: npx vitest run tests/payment-ledger.test.ts tests/quote-pricing.test.ts tests/payment-checkout.test.ts tests/payment-reconciliation.test.ts tests/enquiry-phone-conversion.test.ts tests/public-quote-options.test.ts tests/public-route-security.test.ts tests/customer-pages.test.ts tests/quote-price-payment.test.ts
       - name: Production build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co

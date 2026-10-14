@@ -51,6 +51,7 @@ const db: any = {
 };
 beforeEach(() => {
   delete process.env.KLARNA_ADVANCE_CAPTURE_APPROVED;
+  delete process.env.KLARNA_ENABLED;
   state.row = {
     id: "reserved-id",
     amount_pence: 16500,
@@ -83,7 +84,7 @@ describe("provider checkout contract with mocked Stripe", () => {
     await checkoutRepair(db, { kind: "job_payment", token: "track" });
     expect(state.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        payment_method_types: ["card"],
+        payment_method_types: ["card", "klarna"],
         line_items: [
           expect.objectContaining({
             price_data: expect.objectContaining({ unit_amount: 16500 }),
@@ -94,7 +95,7 @@ describe("provider checkout contract with mocked Stripe", () => {
       { idempotencyKey: "nfd-checkout:reserved-id" },
     );
   });
-  it("does not offer Klarna on deposits or unapproved advance payments", async () => {
+  it("does not offer Klarna on ordering deposits", async () => {
     state.row.kind = "job_deposit";
     state.row.amount_pence = 2000;
     process.env.KLARNA_ADVANCE_CAPTURE_APPROVED = "true";
@@ -102,6 +103,11 @@ describe("provider checkout contract with mocked Stripe", () => {
     expect(state.create.mock.calls[0][0].payment_method_types).toEqual([
       "card",
     ]);
+  });
+  it("can explicitly disable Klarna without blocking card payments", async () => {
+    process.env.KLARNA_ENABLED = "false";
+    await checkoutRepair(db, { kind: "job_payment", token: "track" });
+    expect(state.create.mock.calls[0][0].payment_method_types).toEqual(["card"]);
   });
   it("offers eligible Klarna at completion without manual capture", async () => {
     state.repair.record.status = "READY_TO_COLLECT";

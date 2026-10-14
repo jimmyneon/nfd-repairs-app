@@ -47,6 +47,7 @@ beforeAll(async () => {
       ),
     );
   }
+  await db.exec("create trigger generate_jobs_ref before insert on jobs for each row execute function generate_job_ref()");
   legacyCoverage = (await db.query<any>("select job_ref,repair_money(id,null)->>'paid_pence' paid from jobs order by job_ref")).rows;
 }, 30000);
 afterAll(async () => db?.close());
@@ -96,6 +97,7 @@ describe("real isolated Postgres payment transactions", () => {
       ])
     ).rows[0];
     expect(a.id).toBe(b.id);
+    expect(a.job_ref).toMatch(/^NF-\d{5}$/);
     expect(a.payment_received).toBe(true);
     expect(a.deposit_received).toBe(true);
     expect(a.part_option).toBe("Premium OLED");
@@ -297,6 +299,16 @@ describe("real isolated Postgres payment transactions", () => {
     } finally {
       await db.exec("reset role");
     }
+  });
+  it("does not replace postal-repair and sales receipts with the local repair ledger", async () => {
+    await reset();
+    await db.exec("update jobs set source='hdmi_repair_uk'");
+    await db.exec("update jobs set status='COLLECTED',payment_received=true");
+    expect((await db.query<any>("select payment_received from jobs")).rows[0].payment_received).toBe(true);
+    await reset();
+    await db.exec("update jobs set type='sell'");
+    await db.exec("update jobs set status='COLLECTED',payment_received=true");
+    expect((await db.query<any>("select payment_received from jobs")).rows[0].payment_received).toBe(true);
   });
   it("keeps savings top-ups separate from repair payment and blocks them after cancellation", async () => {
     await reset();
