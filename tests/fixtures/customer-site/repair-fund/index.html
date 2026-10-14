@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Save towards your repair | NFD Repairs</title>
+    <style>
+      body {
+        font-family: Arial;
+        background: #f5f7f5;
+        color: #203b2b;
+      }
+      main {
+        max-width: 600px;
+        margin: 60px auto;
+        padding: 25px;
+        background: white;
+        border-radius: 18px;
+      }
+      p {
+        line-height: 1.6;
+      }
+      button,
+      .button {
+        display: inline-block;
+        background: #009b4d;
+        color: white;
+        padding: 14px;
+        border: 0;
+        border-radius: 8px;
+        margin: 5px 0;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 16px;
+      }
+      input {
+        padding: 12px;
+        font-size: 16px;
+        width: 120px;
+      }
+      .hidden {
+        display: none;
+      }
+      #error {
+        color: #a22;
+      }
+      progress {
+        width: 100%;
+        height: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">NFD Repairs</a>
+      <h1>Save towards your repair</h1>
+      <p>
+        Saving is optional. It does not reserve stock or freeze the repair
+        price. We reconfirm the price and parts before applying your savings.
+      </p>
+      <p id="error" role="alert"></p>
+      <div id="start" class="hidden">
+        <h2>Start with your repair quote</h2>
+        <p>
+          Choose your device and repair first. If no price is available, request
+          a personalised quote before saving.
+        </p>
+        <a href="/quote/" class="button">See my repair price</a>
+        <p>
+          Already saving? Open your personal link from the text or email we sent
+          you.
+        </p>
+      </div>
+      <div id="fund" class="hidden">
+        <h2 id="device"></h2>
+        <p id="balance"></p>
+        <progress id="progress" max="100" value="0"></progress>
+        <p id="remaining"></p>
+        <div id="topup">
+          <label for="amount">Add to your savings (£)</label><br /><input
+            type="number"
+            id="amount"
+            min="5"
+            max="500"
+            step="0.01"
+            value="20"
+          /><button id="pay">Top up by card</button>
+        </div>
+        <p id="payment-status" role="status"></p>
+        <a id="quote" class="button">Continue with this repair</a
+        ><button id="redeem">Apply available savings</button>
+        <p id="explanation"></p>
+        <button id="refund">Request a savings refund</button>
+        <p id="response" role="status"></p>
+      </div>
+    </main>
+    <script>
+      (function () {
+        "use strict";
+        var API = "https://nfd-repairs-app.vercel.app",
+          q = new URLSearchParams(location.search),
+          token = q.get("token") || q.get("f"),
+          $ = function (id) {
+            return document.getElementById(id);
+          },
+          fmt = function (p) {
+            return "£" + (p / 100).toFixed(2);
+          };
+        async function call(path, body) {
+          var r = await fetch(
+              API + path,
+              body
+                ? {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  }
+                : {},
+            ),
+            v = await r.json();
+          if (!r.ok) throw Error(v.error || "Please try again");
+          return v;
+        }
+        async function load() {
+          if (!token) {
+            $("start").classList.remove("hidden");
+            return;
+          }
+          try {
+            var v = await call(
+              "/api/repair-fund/status?token=" + encodeURIComponent(token),
+            );
+            $("fund").classList.remove("hidden");
+            $("device").textContent = v.device + " · " + v.repair;
+            $("balance").textContent =
+              "Available savings: " +
+              fmt(v.balance_pence) +
+              (v.allocated_pence
+                ? " · Already applied: " + fmt(v.allocated_pence)
+                : "");
+            $("progress").value = v.percent;
+            $("remaining").textContent =
+              "Current target " +
+              fmt(v.target_pence) +
+              " · Remaining to save " +
+              fmt(v.remaining_pence);
+            $("topup").classList.toggle("hidden", v.status !== "open");
+            $("redeem").disabled = !v.can_redeem;
+            $("quote").classList.toggle("hidden", !v.quote_url);
+            if (v.quote_url) $("quote").href = v.quote_url;
+            $("explanation").textContent = v.can_redeem
+              ? "Parts and price are confirmed. Apply your savings towards the deposit or full repair balance."
+              : "Continue with your repair so we can confirm the current parts and price before applying savings.";
+            if (q.get("session_id")) {
+              var s = await call(
+                "/api/payments/session-status?session_id=" +
+                  encodeURIComponent(q.get("session_id")),
+              );
+              $("payment-status").textContent = s.paid
+                ? "Top-up received. The balance will update when verified."
+                : "Top-up has not completed.";
+            }
+          } catch (e) {
+            $("error").textContent = e.message;
+          }
+        }
+        $("pay").onclick = async function () {
+          this.disabled = true;
+          try {
+            var v = await call("/api/payments/checkout", {
+              kind: "fund_topup",
+              fund_token: token,
+              amount: Number($("amount").value),
+            });
+            location.assign(v.url);
+          } catch (e) {
+            $("error").textContent = e.message;
+            this.disabled = false;
+          }
+        };
+        $("redeem").onclick = async function () {
+          try {
+            await call("/api/repair-fund/redeem", { token: token });
+            $("response").textContent = "Your savings have been applied.";
+            await load();
+          } catch (e) {
+            $("error").textContent = e.message;
+          }
+        };
+        $("refund").onclick = async function () {
+          try {
+            await call("/api/repair-fund/refund-request", { token: token });
+            $("response").textContent =
+              "Refund request saved. We will review your payments and contact you.";
+          } catch (e) {
+            $("error").textContent = e.message;
+          }
+        };
+        load();
+      })();
+    </script>
+  </body>
+</html>

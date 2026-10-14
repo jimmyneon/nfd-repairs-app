@@ -12,17 +12,12 @@ jobs:
       run:
         working-directory: app
     env:
-      NFD_SITE_TEST_ROOT: ../site
+      NFD_SITE_TEST_ROOT: tests/fixtures/customer-site
       DISABLE_CUSTOMER_MESSAGES: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
           path: app
-      - uses: actions/checkout@v4
-        with:
-          repository: jimmyneon/nfdr
-          ref: fix/quote-payment-journey
-          path: site
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

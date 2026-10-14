@@ -1,8 +1,11 @@
 import { JSDOM } from "jsdom";
 import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
-const site = process.env.NFD_SITE_TEST_ROOT || "../site";
-if (process.env.NFD_SITE_TEST_ROOT && !fs.existsSync(`${site}/repair-quote/index.html`)) {
+const fixture = path.join(__dirname, "fixtures/customer-site");
+const site = process.env.NFD_SITE_TEST_ROOT || (fs.existsSync("../site/repair-quote/index.html") ? "../site" : fixture);
+if (!fs.existsSync(`${site}/repair-quote/index.html`)) {
   throw new Error("The paired website checkout is required for customer-page verification");
 }
 function render(file: string, payload: any) {
@@ -20,9 +23,19 @@ function render(file: string, payload: any) {
   return dom;
 }
 const tick = () => new Promise((r) => setTimeout(r, 20));
-describe.skipIf(!fs.existsSync(`${site}/repair-quote/index.html`))(
+describe(
   "customer page rendering with mocked API responses",
   () => {
+    it("uses exact customer HTML from the recorded paired website commit", () => {
+      const source = JSON.parse(fs.readFileSync(`${fixture}/source.json`, 'utf8'));
+      for (const [file, expected] of Object.entries(source.files)) {
+        for (const root of new Set([site, fixture])) {
+          const bytes = fs.readFileSync(`${root}/${file}`);
+          const sha = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+          expect(sha, `${root}/${file} must match the coordinated website fixture`).toBe(expected);
+        }
+      }
+    });
     it("shows selected quality, colour, extras, complete price and both ordering payment choices", async () => {
       const dom = render("repair-quote/index.html", {
         reference: "NF-1",
