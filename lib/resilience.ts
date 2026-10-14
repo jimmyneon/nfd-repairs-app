@@ -258,6 +258,7 @@ export async function sendViaRelay(
   message: string,
   timeoutMs = 15000
 ): Promise<SmsSendResult> {
+  if (process.env.DISABLE_CUSTOMER_MESSAGES === 'true') return { ok: false, status: 503, body: 'Messages disabled for testing' }
   // Same safety guards as sendViaMacroDroid
   if (!phone || !phone.trim() || !message || !message.trim()) {
     console.warn('[sms-safety] Blocked empty phone or message to relay')
@@ -271,6 +272,7 @@ export async function sendViaRelay(
     return { ok: false, status: 422, body }
   }
 
+  if (process.env.DISABLE_CUSTOMER_MESSAGES === 'true') return { ok: false, status: 503, body: 'Messages disabled for testing' }
   const relayUrl = process.env.RELAY_URL
   const relayAnonKey = process.env.RELAY_ANON_KEY
   const relayApiKey = process.env.RELAY_API_KEY
@@ -350,6 +352,7 @@ export async function sendSms(
   message: string,
   timeoutMs = 15000
 ): Promise<SmsSendResult> {
+  if (process.env.DISABLE_CUSTOMER_MESSAGES === 'true') return { ok: false, status: 503, body: 'Messages disabled for testing' }
   const relayUrl = process.env.RELAY_URL
   const relayApiKey = process.env.RELAY_API_KEY
 

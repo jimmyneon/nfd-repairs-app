@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const { data: fund } = await supabase
     .from('repair_funds')
     .select(
-      'customer_name, device_summary, repair_summary, target_amount_pence, balance_pence, status, enquiry_ref'
+      'customer_name, device_summary, repair_summary, target_amount_pence, balance_pence, allocated_pence, status, enquiry_ref'
     )
     .eq('fund_token', token)
     .single()
@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Fund not found' }, { status: 404, headers })
   }
 
+  const { data: enquiry } = await supabase.from('enquiries').select('quote_action_token,converted_job_id').eq('enquiry_ref', fund.enquiry_ref).maybeSingle()
+  const { data: job } = enquiry?.converted_job_id ? await supabase.from('jobs').select('quote_confirmed_at,quote_version,quote_accepted_version,status').eq('id', enquiry.converted_job_id).maybeSingle() : { data: null }
   const remaining = Math.max(fund.target_amount_pence - fund.balance_pence, 0)
   return NextResponse.json(
     {
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
       repair: fund.repair_summary,
       target_pence: fund.target_amount_pence,
       balance_pence: fund.balance_pence,
+      allocated_pence: fund.allocated_pence,
       remaining_pence: remaining,
       percent: Math.min(
         Math.round((fund.balance_pence / fund.target_amount_pence) * 100),
@@ -58,7 +61,10 @@ export async function GET(request: NextRequest) {
       ),
       status: fund.status,
       has_quote: Boolean(fund.enquiry_ref),
+      can_redeem: Boolean(job?.quote_confirmed_at && job.quote_version === job.quote_accepted_version && job.status !== 'CANCELLED' && fund.balance_pence > 0),
+      quote_url: enquiry?.quote_action_token ? `https://newforestdevicerepairs.co.uk/repair-quote/?ref=${encodeURIComponent(fund.enquiry_ref)}&t=${encodeURIComponent(enquiry.quote_action_token)}` : null,
     },
     { headers }
   )
 }
+

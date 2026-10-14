@@ -35,11 +35,10 @@ describe('Fast Drop-Off flow', () => {
   })
 
   it('offers fast drop-off only after an in-stock enquiry is converted', () => {
-    const content = read('app/api/enquiries/convert-to-job/route.ts')
-    expect(content).toContain("stock_status === 'in_stock'")
+    const content = read('app/api/repair-journey/route.ts')
+    expect(content).toMatch(/AWAITING_DEVICE.*PARTS_ARRIVED/)
     expect(content).toContain('shortFastDropoffLink')
-    expect(content).toContain('Want a quicker drop-off?')
-    expect(content).toContain('Or ignore this and we’ll do it with you when you arrive.')
+    expect(content).toContain('!j.terms_accepted')
   })
 
   it('offers fast drop-off again when ordered parts arrive', () => {

@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       (job.status === 'AWAITING_DEVICE' || job.status === 'PARTS_ARRIVED')
         ? shortFastDropoffLink(job.tracking_token)
         : undefined
-    const depositUrl = process.env.NEXT_PUBLIC_DEPOSIT_URL || 'https://pay.sumup.com/b2c/Q9OZOAJT'
+    const depositUrl = `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk').replace(/\/+$/, '')}/pay/?t=${encodeURIComponent(job.short_token || job.tracking_token)}`
 
     const statusMessages: Record<string, string> = {
       'QUOTE_APPROVED': 'Your repair quote has been approved! Please use the booking link below to get started.',
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       'DROPPED_OFF': 'We have received your device and will begin the repair process.',
       'RECEIVED': 'Your device is now booked in with us. We will keep you updated throughout the repair.',
       'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
-      'PARTS_ORDERED': 'Parts have been ordered. We will let you know as soon as they arrive — usually 2-3 working days.',
+      'PARTS_ORDERED': 'Parts have been ordered. We will let you know as soon as they arrive — usually the next working day after ordering, subject to supplier availability and cut-offs.',
       'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please bring your device in whenever suits you.',
       'IN_REPAIR': 'Your device is now being repaired. We will update you as soon as it is ready to collect.',
       'READY_TO_COLLECT': 'Your repair is complete! Your device is ready to collect.',
@@ -210,3 +210,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

@@ -48,6 +48,7 @@ export default function NavDropdown({ unreadCount = 0, warrantyCount = 0, sendIn
     { href: '/app/warranty', label: 'Warranty', icon: Shield, badge: warrantyCount },
     { href: '/app/notifications', label: 'Notifications', icon: Bell, badge: unreadCount },
     { href: '/app/history', label: 'Job History', icon: Clock },
+    { href: '/app/payments', label: 'Payments & Savings', icon: PoundSterling },
     { href: '/app/profitability', label: 'Profitability', icon: PoundSterling },
     { href: '/app/email-templates', label: 'Email Templates', icon: Mail },
     { href: '/app/qr-display', label: 'Walk-In QR', icon: Smartphone },

@@ -9,6 +9,7 @@ export type JobStatus =
   | 'DIAGNOSTIC'
   | 'AWAITING_CUSTOMER'
   | 'AWAITING_DEPOSIT'
+  | 'READY_TO_ORDER'
   | 'PARTS_ORDERED'
   | 'PARTS_ARRIVED'
   | 'IN_REPAIR'

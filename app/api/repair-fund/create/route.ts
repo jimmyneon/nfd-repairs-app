@@ -1,191 +1,110 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { randomBytes } from 'crypto'
-import { createServiceClient, sendSms, isSmsConfigured } from '@/lib/resilience'
-import { corsHeaders } from '@/lib/api-auth'
-import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
-import { isQuoteActionTokenValid } from '@/lib/job-utils'
-import { getFirstName, renderSmsTemplate } from '@/lib/sms-template'
-
-export const dynamic = 'force-dynamic'
-
-const SITE_BASE = (
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk'
-).replace(/\/+$/, '')
-
-const MIN_TARGET_POUNDS = 10
-const MAX_TARGET_POUNDS = 2000
-
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 200, headers: corsHeaders(request) })
+import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
+import { createServiceClient, sendSms } from "@/lib/resilience";
+import { sendEmail } from "@/lib/email";
+import { corsHeaders } from "@/lib/api-auth";
+import { checked, resolveRepair, siteBase } from "@/lib/repair-journey";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { headers: corsHeaders(req) });
 }
-
-function isValidUkPhone(phone: string): boolean {
-  const c = phone.replace(/[\s\-()]/g, '')
-  return /^(07|\+447|447)\d{9}$/.test(c)
-}
-
-/** Text the customer their personal fund link — it IS their access token. */
-async function sendFundLinkSms(
-  supabase: ReturnType<typeof createServiceClient>,
-  fund: { customer_name: string | null; customer_phone: string; device_summary: string | null },
-  fundUrl: string
-) {
-  if (!isSmsConfigured()) return
+export async function POST(req: NextRequest) {
+  const headers = corsHeaders(req);
   try {
-    const { data: template } = await supabase
-      .from('sms_templates')
-      .select('body')
-      .eq('key', 'FUND_LINK')
-      .eq('is_active', true)
-      .single()
-
-    const vars = {
-      first_name: getFirstName(fund.customer_name),
-      device_summary: fund.device_summary || 'device',
-      fund_link: fundUrl,
-    }
-    const message = template
-      ? renderSmsTemplate(template.body, vars)
-      : `Hi ${vars.first_name}! Your repair fund link: ${fundUrl}\n\nNFD Repairs`
-    await sendSms(fund.customer_phone, message)
-  } catch (err) {
-    console.error('[RepairFund] Fund-link SMS failed:', err)
-  }
-}
-
-/**
- * POST /api/repair-fund/create
- *
- * Two modes:
- *  - { enquiry_ref, t }               — create from a quote: customer/device/
- *    target are pulled from the enquiry (quote-token authorised, nothing is
- *    typed by the customer beyond what's already on file)
- *  - { customer_name, customer_phone, target_amount, ... } — manual fund
- *
- * Customers get a personal link they can top up whenever; the link is
- * texted to them because it IS the access credential.
- */
-export async function POST(request: NextRequest) {
-  const headers = corsHeaders(request)
-
-  const ip = getClientIP(request)
-  const rl = await checkRateLimit(ip, 'repair-fund-create', 5)
-  if (!rl.allowed) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers })
-  }
-
-  const body = await request.json().catch(() => null)
-  if (!body || typeof body !== 'object') {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400, headers })
-  }
-
-  const supabase = createServiceClient()
-
-  let name = String(body.customer_name || '').trim()
-  let phone = String(body.customer_phone || '').trim()
-  let email = String(body.customer_email || '').trim() || null
-  let device = String(body.device_summary || '').trim() || null
-  let repair = String(body.repair_summary || '').trim() || null
-  let enquiryRef = String(body.enquiry_ref || '').trim().toUpperCase() || null
-  let targetPounds = Number(body.target_amount)
-
-  // ---- Create-from-quote mode --------------------------------------------
-  if (enquiryRef || body.t) {
-    if (!enquiryRef) {
-      return NextResponse.json({ error: 'Missing enquiry_ref' }, { status: 400, headers })
-    }
-    const { data: enquiry } = await supabase
-      .from('enquiries')
-      .select(
-        'enquiry_ref, customer_name, customer_phone, customer_email, device_make, device_model, repair_type, quoted_price, quote_action_token, quote_action_token_expires_at, quote_action_token_revoked_at'
-      )
-      .eq('enquiry_ref', enquiryRef)
-      .maybeSingle()
-
-    if (!enquiry) {
-      return NextResponse.json({ error: 'Quote not found' }, { status: 404, headers })
-    }
-    const token = String(body.t || '')
-    if (!enquiry.quote_action_token ||
-        !isQuoteActionTokenValid(
-          token,
-          enquiry.quote_action_token_expires_at,
-          enquiry.quote_action_token_revoked_at
-        ) ||
-        token !== enquiry.quote_action_token) {
-      return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403, headers })
-    }
-
-    name = enquiry.customer_name || name
-    phone = enquiry.customer_phone || phone
-    email = enquiry.customer_email || email
-    device = device || [enquiry.device_make, enquiry.device_model].filter(Boolean).join(' ') || null
-    repair = repair || enquiry.repair_type || null
-    if (!Number.isFinite(targetPounds) || targetPounds <= 0) {
-      targetPounds = Number(enquiry.quoted_price) || 0
-    }
-  }
-
-  if (!name) {
-    return NextResponse.json({ error: 'Name is required' }, { status: 400, headers })
-  }
-  if (!isValidUkPhone(phone)) {
-    return NextResponse.json(
-      { error: 'A valid UK mobile number is required' },
-      { status: 400, headers }
+    if (
+      !(await checkRateLimit(getClientIP(req), "repair-fund-create", 5)).allowed
     )
-  }
-  if (
-    !Number.isFinite(targetPounds) ||
-    targetPounds < MIN_TARGET_POUNDS ||
-    targetPounds > MAX_TARGET_POUNDS
-  ) {
-    return NextResponse.json(
-      { error: `Target must be between £${MIN_TARGET_POUNDS} and £${MAX_TARGET_POUNDS}` },
-      { status: 400, headers }
+      throw Error("Too many requests");
+    const body = await req.json(),
+      db = createServiceClient(),
+      r = await resolveRepair(
+        db,
+        String(body.enquiry_ref || ""),
+        String(body.t || ""),
+      );
+    const e = r.enquiry;
+    if (
+      !e?.quoted_price ||
+      !(e.price_verified || e.quote_confirmed_at) ||
+      r.total <= 0
     )
+      throw Error(
+        "Request a personalised price first; saving starts after we confirm a price",
+      );
+    if (!e.customer_phone && !e.customer_email)
+      throw Error("A mobile number or email is required");
+    if (["CANCELLED", "cancelled", "rejected", "COLLECTED", "COMPLETED"].includes(r.record.status) || e.customer_response === "cancel")
+      throw Error("This repair needs staff review");
+    let fund: any = await checked(
+      db
+        .from("repair_funds")
+        .select("*")
+        .eq("enquiry_ref", e.enquiry_ref)
+        .in("status", ["open", "funded"])
+        .maybeSingle(),
+    );
+    if (!fund) {
+      const created = await db
+        .from("repair_funds")
+        .insert({
+          fund_token: randomBytes(24).toString("hex"),
+          customer_name: e.customer_name,
+          customer_phone: e.customer_phone,
+          customer_email: e.customer_email,
+          device_summary: [e.device_make, e.device_model].join(" "),
+          repair_summary: e.repair_type,
+          enquiry_ref: e.enquiry_ref,
+          target_amount_pence: r.total,
+          quote_version: e.quote_version,
+        })
+        .select("*")
+        .single();
+      if (created.error?.code === "23505")
+        fund = await checked(
+          db
+            .from("repair_funds")
+            .select("*")
+            .eq("enquiry_ref", e.enquiry_ref)
+            .in("status", ["open", "funded"])
+            .single(),
+        );
+      else if (created.error) throw Error(created.error.message);
+      else fund = created.data;
+    }
+    if (
+      fund.quote_version !== e.quote_version ||
+      fund.target_amount_pence !== r.total
+    ) {
+      if (!r.record.quote_confirmed_at)
+        throw Error("Ask us to reconfirm the changed price before saving more");
+      fund = await checked(
+        db
+          .from("repair_funds")
+          .update({
+            target_amount_pence: r.total,
+            quote_version: e.quote_version,
+            status: fund.balance_pence >= r.total ? "funded" : "open",
+          })
+          .eq("id", fund.id)
+          .select("*")
+          .single(),
+      );
+    }
+    const url = `${siteBase()}/repair-fund/?token=${encodeURIComponent(fund.fund_token)}`;
+    const text = `Your savings link for your NFD repair: ${url}\n\nSaving is optional, does not reserve stock or freeze the price. We will reconfirm parts and price before applying your savings. Contact us if you want a refund.`;
+    if (process.env.DISABLE_CUSTOMER_MESSAGES !== "true") {
+      if (e.customer_phone)
+        await sendSms(e.customer_phone, text).catch(() => {});
+      if (e.customer_email)
+        await sendEmail(
+          e.customer_email,
+          "Your repair savings link",
+          `<p>Your personal repair savings link:</p><p><a href="${url}">View savings</a></p><p>Saving does not reserve stock or freeze prices. We will reconfirm before applying savings.</p>`,
+          text,
+        );
+    }
+    return NextResponse.json({ fund_url: url }, { headers });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 409, headers });
   }
-
-  // Reuse an existing open fund for the same phone (or same quote) instead
-  // of letting repeat taps create duplicate pots.
-  let existingQuery = supabase
-    .from('repair_funds')
-    .select('fund_token')
-    .eq('status', 'open')
-    .order('created_at', { ascending: false })
-    .limit(1)
-  existingQuery = enquiryRef
-    ? existingQuery.eq('enquiry_ref', enquiryRef)
-    : existingQuery.eq('customer_phone', phone)
-  const { data: existing } = await existingQuery
-
-  if (existing && existing.length > 0) {
-    const token = existing[0].fund_token
-    return NextResponse.json(
-      { fund_token: token, fund_url: `${SITE_BASE}/repair-fund/?f=${token}`, reused: true },
-      { headers }
-    )
-  }
-
-  const fundToken = randomBytes(18).toString('base64url')
-  const { error } = await supabase.from('repair_funds').insert({
-    fund_token: fundToken,
-    customer_name: name,
-    customer_phone: phone,
-    customer_email: email,
-    device_summary: device,
-    repair_summary: repair,
-    enquiry_ref: enquiryRef,
-    target_amount_pence: Math.round(targetPounds * 100),
-  })
-
-  if (error) {
-    console.error('[RepairFund] Create error:', error)
-    return NextResponse.json({ error: 'Could not create fund' }, { status: 500, headers })
-  }
-
-  const fundUrl = `${SITE_BASE}/repair-fund/?f=${fundToken}`
-  await sendFundLinkSms(supabase, { customer_name: name, customer_phone: phone, device_summary: device }, fundUrl)
-
-  return NextResponse.json({ fund_token: fundToken, fund_url: fundUrl }, { headers })
 }

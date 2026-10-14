@@ -1,166 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/resilience'
-import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
-import { shortTrackingLink, getAppUrl } from '@/lib/utils'
-import { requireStaffUser } from '@/lib/api-auth'
-import { sendSms, isSmsConfigured } from '@/lib/resilience'
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { jobId: string } }
-) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
-
-  const supabase = createServiceClient()
-
+import { NextRequest, NextResponse } from "next/server";
+import { requireStaffUser } from "@/lib/api-auth";
+import { createServiceClient } from "@/lib/resilience";
+import { checked, journeyUrl } from "@/lib/repair-journey";
+import {
+  enqueueRepairMessage,
+  deliverRepairMessages,
+} from "@/lib/repair-messages";
+export async function POST(req: NextRequest, context: any) {
+  const auth = await requireStaffUser(req);
+  if (auth.response) return auth.response;
   try {
-    const { jobId } = params
-    const body = await request.json().catch(() => ({}))
-    const depositAmount = body.deposit_amount ? parseFloat(body.deposit_amount) : null
-
-    // Get the job
-    const { data: job, error: jobError } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', jobId)
-      .single()
-
-    if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    }
-
-    // Idempotency: don't send a deposit request if it's already been received
-    if (job.deposit_received) {
-      return NextResponse.json({
-        error: 'Deposit has already been received — no need to request again',
-        deposit_received: true,
-      }, { status: 409 })
-    }
-
-    // Use provided amount, or existing job amount, or default
-    const finalDepositAmount = depositAmount || job.deposit_amount || 20.00
-
-    // Update job status to AWAITING_DEPOSIT and save deposit amount
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update({
-        status: 'AWAITING_DEPOSIT',
-        status_changed_at: new Date().toISOString(),
-        deposit_requested_at: new Date().toISOString(),
-        deposit_required: true,
-        deposit_amount: finalDepositAmount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', jobId)
-
-    if (updateError) {
-      return NextResponse.json({ error: 'Failed to request deposit' }, { status: 500 })
-    }
-
-    // Create synthetic event for deposit request
-    const { error: eventError } = await supabase
-      .from('job_events')
-      .insert({
-        job_id: jobId,
-        event_type: 'DEPOSIT_REQUESTED',
-        event_data: {
-          deposit_amount: finalDepositAmount,
-        },
-        created_at: new Date().toISOString(),
-      })
-
-    if (eventError) {
-      console.error('Failed to create deposit request event:', eventError)
-    }
-
-    // Send SMS using DEPOSIT_REQUEST template from database
-    try {
-      const firstName = getFirstName(job.customer_name)
-      const trackingUrl = shortTrackingLink(job.short_token || job.tracking_token)
-      // Per-job pay page — detects deposit vs balance and creates a
-      // Stripe Checkout session on demand (card + Klarna where eligible).
-      // Stable link, unlike a raw Stripe session URL which expires.
-      const siteBase = (
-        process.env.NEXT_PUBLIC_SITE_URL || 'https://newforestdevicerepairs.co.uk'
-      ).replace(/\/+$/, '')
-      const depositUrl = `${siteBase}/pay/?t=${encodeURIComponent(
-        job.short_token || job.tracking_token
-      )}`
-      const depositAmount = finalDepositAmount.toFixed(2)
-
-      // Fetch template from database
-      const { data: template } = await supabase
-        .from('sms_templates')
-        .select('*')
-        .eq('key', 'DEPOSIT_REQUEST')
-        .eq('is_active', true)
-        .single()
-
-      let smsMessage: string
-      if (template) {
-        smsMessage = renderSmsTemplate(template.body, {
-          first_name: firstName,
-          customer_name: job.customer_name || '',
-          device_make: job.device_make || '',
-          device_model: safeDeviceLabel(job.device_make, job.device_model),
-          device_summary: safeDeviceLabel(job.device_make, job.device_model),
-          deposit_amount: depositAmount,
-          deposit_link: depositUrl,
-          tracking_link: trackingUrl,
-          job_ref: job.job_ref,
-        })
-      } else {
-        // Fallback if template not in database — concise, explains why deposit is needed
-        smsMessage = `Hi ${firstName}!\n\nWe need to order parts for your ${job.device_model || 'device'} repair.\n\nTo get the order started, we just need a £${depositAmount} deposit.\n\nThis secures the part and your repair slot. The £${depositAmount} comes off your total repair price — you pay the balance when you collect.\n\nPay online here:\n${depositUrl}\n\nReply PAID once done and we will get them ordered straight away.\n\nNFD Repairs`
-      }
-
-      if (job.customer_phone && String(job.customer_phone).trim()) {
-        if (isSmsConfigured()) {
-          await sendSms(job.customer_phone, smsMessage)
-          await supabase.from('job_events').insert({
-            job_id: jobId,
-            type: 'SYSTEM',
-            message: 'Deposit request SMS sent to customer',
-          })
-        } else {
-          console.error('MACRODROID_WEBHOOK_URL not configured')
-        }
-      } else {
-        console.log(`Job ${job.job_ref} has no phone number — deposit SMS skipped`)
-      }
-    } catch (smsError) {
-      console.error('Failed to send deposit SMS:', smsError)
-    }
-
-    // Email-only customers still need the deposit request and payment link.
-    // STATUS_UPDATE uses the same AWAITING_DEPOSIT job data and now falls
-    // back to email when SMS is the configured channel but no phone exists.
-    if (job.customer_email && !String(job.customer_phone || '').trim()) {
-      try {
-        const appUrl = getAppUrl()
-        const emailResponse = await fetch(`${appUrl}/api/email/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-          },
-          body: JSON.stringify({
-            jobId,
-            type: 'STATUS_UPDATE',
-          }),
-        })
-        if (!emailResponse.ok) {
-          console.error('Failed to send deposit email:', await emailResponse.text())
-        }
-      } catch (emailError) {
-        console.error('Failed to send deposit email:', emailError)
-      }
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error requesting deposit:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const body = await req.json().catch(() => ({})),
+      id = context?.params?.jobId || body.jobId,
+      db = createServiceClient();
+    const job: any = await checked(
+      db.from("jobs").select("*").eq("id", id).single(),
+    );
+    const e: any = await checked(
+      db.from("enquiries").select("*").eq("converted_job_id", id).maybeSingle(),
+    );
+    if (!e?.quote_action_token)
+      throw Error("Send a secure confirmed quote first");
+    const money: any = await checked(
+      db.rpc("repair_money", { p_job: id, p_ref: null }),
+    );
+    if (money.fully_paid)
+      throw Error("Already paid in full; no deposit is needed");
+    const url = journeyUrl(e.enquiry_ref, e.quote_action_token);
+    await enqueueRepairMessage(
+      db,
+      job,
+      "payment-link",
+      `Your NFD repair total is £${(money.total_pence / 100).toFixed(2)}. ${money.deposit_due_pence > 0 ? `Pay a £${(money.deposit_due_pence / 100).toFixed(2)} deposit, deducted from your total, or pay the full outstanding amount.` : "Pay cash/card on collection, or pay online if you prefer."}\n\nView the confirmed timing and payment options:\n${url}`,
+    );
+    return NextResponse.json({
+      success: true,
+      pay_url: url,
+      ...(await deliverRepairMessages(db, id)),
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 409 });
   }
 }

@@ -26,7 +26,7 @@ async function loadCatalogue(): Promise<QuoteCatalogueRow[]> {
     })
     if (!response.ok) return []
     const payload = await response.json()
-    return Array.isArray(payload?.quotes) ? payload.quotes : []
+    return Object.assign(Array.isArray(payload?.quotes) ? payload.quotes : [], { policy: payload.serviceGuidance, accessories: payload.accessories || [] })
   } catch {
     return []
   }
@@ -220,7 +220,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
         category: enquiry.device_category,
         brand: enquiry.device_make,
         primaryRepair: enquiry.repair_type,
-      })
+      }, catalogue)
 
       return NextResponse.json({
         job_ref: enquiry.enquiry_ref,
@@ -279,7 +279,7 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
       category: job.device_type,
       brand: job.device_make,
       primaryRepair: job.issue,
-    })
+    }, catalogue)
 
     // Return only customer-facing fields from the job
     return NextResponse.json({
@@ -310,3 +310,4 @@ export async function GET(request: NextRequest, { params }: { params: { ref: str
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

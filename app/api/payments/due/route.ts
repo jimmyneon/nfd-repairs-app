@@ -1,98 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/resilience'
-import { corsHeaders } from '@/lib/api-auth'
-import { checkRateLimit, getClientIP } from '@/lib/rate-limit'
-
-export const dynamic = 'force-dynamic'
-
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 200, headers: corsHeaders(request) })
+import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/resilience";
+import { corsHeaders } from "@/lib/api-auth";
+import { resolveRepair, paymentAllowed } from "@/lib/repair-journey";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
+export const dynamic = "force-dynamic";
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { headers: corsHeaders(req) });
 }
-
-/**
- * GET /api/payments/due?token=<tracking-or-short-token>
- *
- * Backs the customer-facing /pay page: given a job's tracking token,
- * return what's still owed (deposit first, then balance) without
- * exposing any more customer detail than needed.
- */
-export async function GET(request: NextRequest) {
-  const headers = corsHeaders(request)
-
-  const ip = getClientIP(request)
-  const rl = await checkRateLimit(ip, 'payments-due', 30)
-  if (!rl.allowed) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers })
-  }
-
-  const token = request.nextUrl.searchParams.get('token')?.trim() || ''
-  if (!/^[\w-]{4,80}$/.test(token)) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 400, headers })
-  }
-
-  const supabase = createServiceClient()
-  const { data: job } = await supabase
-    .from('jobs')
-    .select(
-      'id, job_ref, status, device_make, device_model, price_total, deposit_required, deposit_amount, deposit_received, payment_received'
-    )
-    .or(`tracking_token.eq.${token},short_token.eq.${token}`)
-    .single()
-
-  if (!job) {
-    return NextResponse.json({ error: 'Repair not found' }, { status: 404, headers })
-  }
-
-  // Payments tied to the job itself plus any made earlier against the
-  // enquiry it was converted from (payday deposits, fund redemptions).
-  const { data: srcEnquiry } = await supabase
-    .from('enquiries')
-    .select('enquiry_ref')
-    .eq('converted_job_id', job.id)
-    .maybeSingle()
-
-  const { data: paidRows, error: paidErr } = await supabase
-    .from('payments')
-    .select('amount_pence')
-    .or(
-      srcEnquiry
-        ? `job_id.eq.${job.id},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
-        : `job_id.eq.${job.id}`
-    )
-    .eq('status', 'paid')
-  if (paidErr) {
-    console.error('[Payments] due paid lookup failed:', paidErr)
+export async function GET(req: NextRequest) {
+  const headers = corsHeaders(req);
+  if (!(await checkRateLimit(getClientIP(req), "payments-due", 30)).allowed)
     return NextResponse.json(
-      { error: 'Could not load payment status' },
-      { status: 500, headers }
-    )
+      { error: "Too many requests" },
+      { status: 429, headers },
+    );
+  try {
+    const r = await resolveRepair(
+      createServiceClient(),
+      req.nextUrl.searchParams.get("token") || "",
+      "",
+      true,
+    );
+    return NextResponse.json(
+      {
+        ...r.money,
+        job_ref: r.job.job_ref,
+        device: [r.job.device_make, r.job.device_model].join(" "),
+        status: r.job.status,
+        can_pay: paymentAllowed(r.record),
+        currency: "gbp",
+      },
+      { headers },
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "Repair payment link unavailable" },
+      { status: 404, headers },
+    );
   }
-  const paidPence = (paidRows || []).reduce(
-    (sum, p) => sum + (p.amount_pence || 0),
-    0
-  )
-  const totalPence = Math.round((job.price_total ?? 0) * 100)
-
-  const depositDuePence =
-    !job.deposit_received && job.deposit_required
-      ? Math.round((job.deposit_amount ?? 20) * 100)
-      : 0
-  const balanceDuePence = job.payment_received
-    ? 0
-    : Math.max(totalPence - paidPence, 0)
-
-  return NextResponse.json(
-    {
-      job_ref: job.job_ref,
-      device: [job.device_make, job.device_model].filter(Boolean).join(' ') || null,
-      status: job.status,
-      total_pence: totalPence,
-      paid_pence: paidPence,
-      deposit_due_pence: depositDuePence,
-      balance_due_pence: balanceDuePence,
-      fully_paid: job.payment_received || balanceDuePence === 0,
-      currency: 'gbp',
-    },
-    { headers }
-  )
 }

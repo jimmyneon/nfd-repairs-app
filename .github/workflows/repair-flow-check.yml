@@ -80,7 +80,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - name: Install dependencies
@@ -113,10 +113,10 @@ jobs:
           grep -Fq "isShopOpenOnDate" app/api/enquiries/send-quote-followups/route.ts
           grep -Fq "available_addons" "app/api/public/quote/[ref]/route.ts"
           grep -Fq "customer_update: buildCustomerUpdate(linkedJob)" "app/api/public/quote/[ref]/route.ts"
-          grep -Fq "Save selected extras" "app/quote/approve/[jobId]/page.tsx"
-          grep -Fq "What happens next" "app/quote/approve/[jobId]/page.tsx"
-          grep -Fq "parts_expected_at: requiresParts && earliest_date" app/api/enquiries/convert-to-job/route.ts
-          grep -Fq "converted_job_id" "app/api/public/quote/[ref]/options/route.ts"
+          grep -Fq "/repair-quote/?ref=" "app/quote/approve/[jobId]/page.tsx"
+          grep -Fq "Opening your repair details" "app/quote/approve/[jobId]/page.tsx"
+          grep -Fq "body.earliest_date" app/api/enquiries/convert-to-job/route.ts
+          grep -Fq "add_repair_options" "app/api/public/quote/[ref]/options/route.ts"
 
       - name: Type-check application
         run: npx tsc --noEmit
@@ -127,3 +127,4 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder
           SUPABASE_SERVICE_ROLE_KEY: ci-build-placeholder
         run: npm run build
+

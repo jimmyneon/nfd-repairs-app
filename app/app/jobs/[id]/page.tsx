@@ -1,4 +1,5 @@
 'use client'
+import RepairPayments from '@/components/RepairPayments'
 
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
@@ -734,10 +735,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setActionLoading(true)
     setShowStatusModal(false)
 
+    if (newStatus === 'PARTS_ORDERED' && !window.confirm('Confirm you have actually placed the supplier order?')) { setActionLoading(false); actionLoadingRef.current = false; return }
     const message = `Status changed to ${JOB_STATUS_LABELS[newStatus]}`
 
     // Prepare update object with status and device_in_shop
-    const updateData: any = { status: newStatus, status_changed_at: new Date().toISOString() }
+    const updateData: any = { status: newStatus, status_changed_at: new Date().toISOString(), ...(newStatus === 'PARTS_ORDERED' ? { parts_ordered_at: new Date().toISOString() } : {}) }
     
     // Set device_in_shop based on status transition
     if (['RECEIVED', 'DIAGNOSTIC', 'IN_REPAIR', 'READY_TO_COLLECT', 'IN_STORAGE', 'DELAYED'].includes(newStatus)) {
@@ -828,31 +830,13 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const markDepositReceived = async () => {
     if (!job) return
     setActionLoading(true)
-
-    const depositAmount = 20.00
-    const now = new Date().toISOString()
-
-    await supabase
-      .from('jobs')
-      .update({
-        deposit_received: true,
-        deposit_received_at: now,
-        deposit_amount: depositAmount,
-        status: 'PARTS_ORDERED',
-        status_changed_at: now,
-        parts_ordered_at: now,
-      } as any)
-      .eq('id', job!.id)
-
-    await supabase.from('job_events').insert({
-      job_id: job!.id,
-      type: 'DEPOSIT_PAID',
-      message: `Deposit of £${depositAmount.toFixed(2)} received (marked by staff)`,
-      metadata: { amount: depositAmount, source: 'staff_manual' },
-    } as any)
-
-    await loadJobData()
-    setActionLoading(false)
+    try {
+      const r = await fetch('/api/payments/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: job.id, amount: job.deposit_amount || 20, deposit: true, reference: crypto.randomUUID() }) })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error)
+      await loadJobData()
+    } catch (error: any) { window.alert(error.message) }
+    finally { setActionLoading(false) }
   }
 
   const [depositSending, setDepositSending] = useState(false)
@@ -1432,6 +1416,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
         {/* Payment Status Toggle — moved to header under price button */}
 
+        <RepairPayments jobId={job.id} onChange={loadJobData} />
         {!job.payment_received && (
           <div className="card bg-purple-50 border-2 border-purple-200">
             <div className="flex items-center justify-between gap-3">

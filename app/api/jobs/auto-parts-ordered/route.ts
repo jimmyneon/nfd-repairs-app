@@ -46,90 +46,8 @@ export async function GET(request: NextRequest) {
     let autoChangedCount = 0
     let reassuranceSentCount = 0
 
-    // ============================================
-    // 1. AUTO-CHANGE: RECEIVED → PARTS_ORDERED
-    // ============================================
-    // Find jobs where parts_ordered_at has passed and status is still RECEIVED or AWAITING_DEPOSIT
-    // IMPORTANT: For AWAITING_DEPOSIT jobs, only auto-change if the deposit has been paid.
-    //   Without this check, parts would be ordered before the customer has paid the deposit.
-    const { data: pendingPartsJobs, error: pendingError } = await supabase
-      .from('jobs')
-      .select('*')
-      .in('status', ['RECEIVED', 'AWAITING_DEPOSIT'])
-      .not('parts_ordered_at', 'is', null)
-      .lte('parts_ordered_at', now.toISOString())
+    // Only staff can record a supplier order. This cron never converts payments into orders.
 
-    if (pendingError) {
-      console.error('Error fetching pending parts jobs:', pendingError)
-    }
-
-    if (pendingPartsJobs && pendingPartsJobs.length > 0) {
-      for (const job of pendingPartsJobs) {
-        // Skip AWAITING_DEPOSIT jobs where the deposit hasn't been paid yet.
-        // Parts should not be ordered until the customer has paid the deposit.
-        if (job.status === 'AWAITING_DEPOSIT' && !job.deposit_received) {
-          console.log(`Skipping ${job.job_ref}: still AWAITING_DEPOSIT and deposit not paid`)
-          continue
-        }
-
-        // Update status to PARTS_ORDERED
-        await supabase
-          .from('jobs')
-          .update({
-            status: 'PARTS_ORDERED',
-            status_changed_at: now.toISOString(),
-            parts_required: true,
-          })
-          .eq('id', job.id)
-
-        // Log the status change event
-        await supabase.from('job_events').insert({
-          job_id: job.id,
-          type: 'STATUS_CHANGE',
-          message: 'Status changed to Parts Ordered (auto)',
-        })
-
-        // Queue SMS notification
-        try {
-          await fetch(`${appUrl}/api/jobs/queue-status-sms`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-            },
-            body: JSON.stringify({ jobId: job.id, status: 'PARTS_ORDERED' }),
-          })
-        } catch (smsError) {
-          console.error(`Failed to queue PARTS_ORDERED SMS for ${job.job_ref}:`, smsError)
-        }
-
-        // Send email if customer has email
-        if (job.customer_email) {
-          try {
-            await fetch(`${appUrl}/api/email/send`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-              },
-              body: JSON.stringify({ jobId: job.id, type: 'STATUS_UPDATE' }),
-            })
-          } catch (emailError) {
-            console.error(`Failed to send PARTS_ORDERED email for ${job.job_ref}:`, emailError)
-          }
-        }
-
-        autoChangedCount++
-        results.push({
-          jobRef: job.job_ref,
-          action: 'auto_parts_ordered',
-        })
-
-        console.log(`Auto-changed ${job.job_ref} to PARTS_ORDERED`)
-      }
-    }
-
-    // ============================================
     // 2. REASSURANCE SMS: 3+ days in PARTS_ORDERED
     // ============================================
     // Check sending hours (8am-8pm) for reassurance SMS
@@ -314,3 +232,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

@@ -1,3 +1,4 @@
+import { createServiceClient } from '@/lib/resilience'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    const { error: recordError } = await createServiceClient().from('payments').insert({ stripe_session_id: session.id, kind: 'remote_support', amount_pence: 6000, status: 'open', checkout_url: session.url })
+    if (recordError) { await stripe.checkout.sessions.expire(session.id); throw new Error('Could not record payment') }
     return NextResponse.json({ url: session.url }, { headers: corsHeaders })
   } catch (error: any) {
     console.error('[Remote Support] Checkout error:', error)
@@ -58,3 +61,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

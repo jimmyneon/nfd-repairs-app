@@ -137,6 +137,10 @@ function EnquiriesContent() {
   const [convertFormOpen, setConvertFormOpen] = useState<'in_stock' | 'parts_needed' | 'device_in_shop' | null>(null)
   const [convertEarliestDate, setConvertEarliestDate] = useState('')
   const [convertNotes, setConvertNotes] = useState('')
+  const [confirmTotal, setConfirmTotal] = useState('')
+  const [confirmDeposit, setConfirmDeposit] = useState('20')
+  const [confirmPart, setConfirmPart] = useState('')
+  const [confirmColour, setConfirmColour] = useState('')
   // Personalised quote response panel state
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const [quotePrice, setQuotePrice] = useState('')
@@ -440,6 +444,10 @@ function EnquiriesContent() {
         body: JSON.stringify({
           enquiry_id: selectedEnquiry.id,
           stock_status: stockStatus,
+          confirmed_total: confirmTotal ? Number(confirmTotal) : undefined,
+          deposit_amount: Number(confirmDeposit),
+          part_option: confirmPart || (selectedEnquiry as any).part_option,
+          device_colour: confirmColour || (selectedEnquiry as any).device_colour,
           earliest_date: convertEarliestDate || null,
           staff_notes: convertNotes.trim() || null,
         }),
@@ -1759,7 +1767,7 @@ function EnquiriesContent() {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <button
-                            onClick={() => setConvertFormOpen('in_stock')}
+                            onClick={() => (setConfirmTotal(''), setConfirmPart(''), setConfirmColour(''), setConvertFormOpen('in_stock'))}
                             disabled={converting}
                             className="flex flex-col items-center justify-center gap-2 py-6 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors active:scale-95 disabled:opacity-50"
                           >
@@ -1768,7 +1776,7 @@ function EnquiriesContent() {
                             <span className="text-xs opacity-80">Book in & message →</span>
                           </button>
                           <button
-                            onClick={() => setConvertFormOpen('parts_needed')}
+                            onClick={() => (setConfirmTotal(''), setConfirmPart(''), setConfirmColour(''), setConvertFormOpen('parts_needed'))}
                             disabled={converting}
                             className="flex flex-col items-center justify-center gap-2 py-6 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors active:scale-95 disabled:opacity-50"
                           >
@@ -1785,8 +1793,8 @@ function EnquiriesContent() {
                       <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 space-y-4 border-2 border-gray-200 dark:border-gray-600">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                            {convertFormOpen === 'in_stock' && '✅ In Stock — Book in & message'}
-                            {convertFormOpen === 'parts_needed' && '⏳ Need Parts — Send deposit request'}
+                            {convertFormOpen === 'in_stock' && '✅ In Stock — Confirm & send'}
+                            {convertFormOpen === 'parts_needed' && '⏳ Need Parts — Confirm & send payment choices'}
                             {convertFormOpen === 'device_in_shop' && '🏪 Device Dropped Off — Book in'}
                           </p>
                           <button
@@ -1796,6 +1804,16 @@ function EnquiriesContent() {
                           >
                             <X className="h-5 w-5" />
                           </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold">Confirm complete price and selected part</p>
+                          <p className="text-xs">Current total: £{((selectedEnquiry.quoted_price || 0) + [...(selectedEnquiry.additional_repairs || []), ...((selectedEnquiry as any).accessories || [])].reduce((sum, item) => sum + Number(item.price || 0), 0)).toFixed(2)} including extras.</p>
+                          <input aria-label="Confirmed total" type="number" min="0" step="0.01" placeholder="Complete total if changed (£)" value={confirmTotal} onChange={e => setConfirmTotal(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
+                          <input aria-label="Confirmed part" placeholder={(selectedEnquiry as any).part_option || 'Part quality / option'} value={confirmPart} onChange={e => setConfirmPart(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
+                          <input aria-label="Confirmed colour" placeholder={(selectedEnquiry as any).device_colour || 'Part / device colour'} value={confirmColour} onChange={e => setConfirmColour(e.target.value)} className="w-full p-2 border rounded text-gray-900" />
+                          {convertFormOpen === 'parts_needed' && <label className="block text-xs">Ordering deposit (£), deducted from total<input type="number" min="1" step="0.01" value={confirmDeposit} onChange={e => setConfirmDeposit(e.target.value)} className="w-full p-2 border rounded text-gray-900" /></label>}
+                          <p className="text-xs">Changes to price or part require customer approval. Payment does not mean a supplier order has been placed.</p>
                         </div>
 
                         {/* Earliest date — most useful for Need Parts, but available for all */}
@@ -1842,7 +1860,7 @@ function EnquiriesContent() {
                             {converting ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                                Converting...
+                                Confirming...
                               </>
                             ) : (
                               <>

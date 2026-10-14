@@ -30,12 +30,13 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
     const ref = normalizePublicQuoteRef(params.ref)
     const token = new URL(request.url).searchParams.get('t')
     const body = await request.json().catch(() => ({}))
-    const newAddOns: Array<{ repair: string; displayName: string; price: number }> = body.additional_repairs || []
+    if (body.additional_repairs?.length) return NextResponse.json({ error: 'Save options using the verified options endpoint first' }, { status: 400 })
+    const newAddOns: Array<{ repair: string; displayName: string; price: number }> = []
 
     // Try enquiries table first
     const { data: enquiry, error: enquiryError } = await supabase
       .from('enquiries')
-      .select('enquiry_ref,device_make,device_model,quoted_price,additional_repairs,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
+      .select('enquiry_ref,status,converted_job_id,quote_confirmed_at,device_make,device_model,quoted_price,additional_repairs,quote_action_token,quote_action_token_expires_at,quote_action_token_revoked_at')
       .eq('enquiry_ref', ref)
       .maybeSingle()
 
@@ -48,6 +49,11 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
         return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403 })
       }
 
+      // Cached approval pages cannot accept or downgrade a current confirmed job.
+      if (enquiry.converted_job_id || enquiry.quote_confirmed_at || ['cancelled', 'rejected'].includes(enquiry.status)) {
+        return NextResponse.json({ error: 'Open your current repair link to review the latest details.' }, { status: 409 })
+      }
+      if (enquiry.status === 'approved') return NextResponse.json({ success: true })
       const existingAddOns = enquiry.additional_repairs || []
       const allAddOns = [...existingAddOns, ...newAddOns]
 
@@ -124,77 +130,10 @@ export async function POST(request: NextRequest, { params }: { params: { ref: st
       return NextResponse.json({ error: 'Invalid or expired quote link' }, { status: 403 })
     }
 
-    const updateFields: Record<string, any> = {
-      status: 'QUOTE_APPROVED',
-      status_changed_at: new Date().toISOString(),
-      quote_approved_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    if (newAddOns.length > 0) {
-      const existingAddOns = job.additional_issues || []
-      updateFields.additional_issues = [...existingAddOns, ...newAddOns]
-      updateFields.price_total = (job.quoted_price || job.price_total || 0) + newAddOns.reduce((s, r) => s + r.price, 0)
-    }
-
-    const { error: updateError } = await supabase
-      .from('jobs')
-      .update(updateFields)
-      .eq('id', ref)
-
-    if (updateError) {
-      return NextResponse.json({ error: 'Failed to approve quote' }, { status: 500 })
-    }
-
-    await supabase.from('job_events').insert({
-      job_id: ref,
-      event_type: 'QUOTE_APPROVED',
-      event_data: {
-        quoted_price: job.quoted_price || job.price_total,
-        approved_by: 'customer',
-        additional_repairs: newAddOns,
-      },
-      created_at: new Date().toISOString(),
-    } as any)
-
-    const jobNotifBody = `${job.job_ref}: ${job.device_make} ${job.device_model} - Customer approved the quote (£${job.quoted_price || job.price_total})${newAddOns.length > 0 ? ` (+${newAddOns.length} add-on${newAddOns.length > 1 ? 's' : ''})` : ''}`
-    await supabase.from('notifications').insert({
-      type: 'QUOTE_APPROVED',
-      title: 'Quote Approved',
-      body: jobNotifBody,
-      job_id: ref,
-      is_read: false,
-    })
-
-    try {
-      await fetch('https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
-        method: 'POST',
-        body: `https://nfd-repairs-app.vercel.app/app/enquiries?ref=${job.job_ref}`,
-      })
-    } catch (e) {
-      console.error('[MacroDroid] Failed to send webhook:', e)
-    }
-
-    try {
-      await fetch('https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          app_id: 'nfd-repairs',
-          title: 'Quote Approved',
-          body: jobNotifBody,
-          category: 'status_update',
-          priority: 'high',
-          deep_link: 'https://nfd-repairs-app.vercel.app/admin',
-        }),
-      })
-    } catch (e) {
-      console.error('[Notify] Failed to send push:', e)
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ error: 'Open your current repair link to review and accept the latest details.' }, { status: 409 })
   } catch (error) {
     console.error('Error approving quote:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
