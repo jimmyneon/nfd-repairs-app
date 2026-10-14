@@ -1,3 +1,4 @@
+import { partsPaymentMessage } from '@/lib/parts-payment-message'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { detectQuoteAcceptance } from '@/lib/quote-acceptance-detector'
@@ -1485,11 +1486,6 @@ const STATUS_SMS_VARIANTS: Record<string, string[]> = {
     "Parts are here! Whenever you're ready, just drop your device in during opening hours and we'll crack on with the repair.",
     "Your parts have landed! Bring your device in during opening hours and we'll get the repair done.",
   ],
-  AWAITING_DEPOSIT: [
-    "We need a £20 deposit to order your parts — they're special order. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done and we'll order them straight away.",
-    "£20 deposit needed to order your parts. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nReply PAID once done — usually next-day delivery.",
-    "Your parts need ordering — £20 deposit to get started. Pay here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nText PAID once done and we'll crack on.",
-  ],
   READY_TO_COLLECT: [
     "Great news — your device is repaired and ready to collect! Pop in during opening hours: nfdr.uk/h",
     "Your device is all fixed and waiting for you! Come and grab it during our opening hours: nfdr.uk/h",
@@ -1596,7 +1592,11 @@ function buildCollectionReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName} 👋\n\nNot yet — we need a £20 deposit to order parts before we can start the repair. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNFD Repairs`
+    return `Hi ${firstName} 👋
+
+${partsPaymentMessage(job)}
+
+NFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
@@ -1680,7 +1680,11 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
 
   // Awaiting deposit
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName} 👋\n\nWe need a £20 deposit to order parts first. Once that's paid, parts take 2-3 days to arrive and then the repair is about ${cleanEta}.\n\nPay the deposit here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nGive us a text if you have any questions.\n\nNFD Repairs`
+    return `Hi ${firstName} 👋
+
+${partsPaymentMessage(job)}
+
+NFD Repairs`
   }
 
   // Diagnostic
@@ -1762,7 +1766,11 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEPOSIT') {
-    return `Hi ${firstName} 👋\n\nNot yet — we need a £20 deposit to order parts before we can start. You can pay it here:\nhttps://pay.sumup.com/b2c/Q9OZOAJT\n\nOnce it's paid we'll get parts ordered straight away. Give us a text if you have any questions.\n\nNFD Repairs`
+    return `Hi ${firstName} 👋
+
+${partsPaymentMessage(job)}
+
+NFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
@@ -1780,7 +1788,7 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
 function buildUpdateReply(job: any, smsCount: number): AutoReply {
   const firstName = getFirstName(job.customer_name)
   const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
-  const statusInfo = pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
+  const statusInfo = job.status === 'AWAITING_DEPOSIT' ? partsPaymentMessage(job) : pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
   return {
     templateKey: 'AUTO_STATUS_REPLY',
     body: `Hi ${firstName} 👋\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNFD Repairs`,
@@ -1839,3 +1847,4 @@ async function detectAutoReply(message: string, job: any, smsCount: number = 0, 
   // --- Update intent (default) ---
   return buildUpdateReply(job, smsCount)
 }
+

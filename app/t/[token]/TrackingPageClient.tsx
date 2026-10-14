@@ -5,7 +5,7 @@ import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants
 import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
-import { shortTrackingLink } from '@/lib/utils'
+import { repairPaymentLink, shortTrackingLink } from '@/lib/utils'
 import {
   getDeviceType,
   getTurnaroundEstimate,
@@ -304,6 +304,9 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
     estimate,
     repairAgreed
   )
+  if (job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received)) {
+    reassuranceMessage = 'Payment received. We are arranging your parts order and will text you when the parts arrive.'
+  }
   // Override PARTS_ARRIVED message if device is already in shop
   if (job.status === 'PARTS_ARRIVED' && job.device_in_shop) {
     reassuranceMessage = `Good news — your parts have arrived and we're getting started. ${estimate.display} from this point.`
@@ -444,6 +447,9 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
               <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
                 {reassuranceMessage}
               </p>
+              {job.status === 'AWAITING_DEPOSIT' && !job.deposit_received && !job.payment_received && (
+                <a href={repairPaymentLink(job)} className="inline-block mt-3 font-semibold text-primary underline">Choose deposit or full payment</a>
+              )}
             </div>
 
             {/* Customer-facing update — only shown when staff have published

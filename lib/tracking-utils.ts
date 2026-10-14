@@ -912,12 +912,9 @@ export function getReassuranceMessage(
     return "We've sent you a message about your repair and just need your reply before we can continue. Please check your messages and get back to us when you can."
   }
 
-  // AWAITING_DEPOSIT
+  // Payment options are linked by the tracking page using this repair's token.
   if (status === 'AWAITING_DEPOSIT') {
-    if (tier === 'first') {
-      return "We need a £20 deposit to order parts for your repair. You can pay it here: https://pay.sumup.com/b2c/Q9OZOAJT — once it's paid we'll get parts ordered straight away."
-    }
-    return "Still waiting for the £20 deposit to order parts. Pay here: https://pay.sumup.com/b2c/Q9OZOAJT — we can start as soon as we receive it."
+    return 'We need to order your parts. Choose a deposit (deducted from the total), or full payment with card or eligible Klarna.'
   }
 
   // AWAITING_DEVICE — parts in stock, waiting for customer to bring device

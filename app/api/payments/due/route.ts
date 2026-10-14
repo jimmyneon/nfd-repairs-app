@@ -1,3 +1,4 @@
+import { jobPaymentState } from '@/lib/job-payment-state'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
 import { corsHeaders } from '@/lib/api-auth'
@@ -45,15 +46,16 @@ export async function GET(request: NextRequest) {
 
   // Payments tied to the job itself plus any made earlier against the
   // enquiry it was converted from (payday deposits, fund redemptions).
-  const { data: srcEnquiry } = await supabase
+  const { data: srcEnquiry, error: enquiryReadError } = await supabase
     .from('enquiries')
     .select('enquiry_ref')
     .eq('converted_job_id', job.id)
     .maybeSingle()
 
+  if (enquiryReadError) return NextResponse.json({ error: 'Could not load payment history' }, { status: 500, headers })
   const { data: paidRows, error: paidErr } = await supabase
     .from('payments')
-    .select('amount_pence')
+    .select('amount_pence, kind')
     .or(
       srcEnquiry
         ? `job_id.eq.${job.id},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
@@ -67,30 +69,20 @@ export async function GET(request: NextRequest) {
       { status: 500, headers }
     )
   }
-  const paidPence = (paidRows || []).reduce(
-    (sum, p) => sum + (p.amount_pence || 0),
-    0
-  )
-  const totalPence = Math.round((job.price_total ?? 0) * 100)
-
-  const depositDuePence =
-    !job.payment_received && !job.payment_received && !job.deposit_received && job.deposit_required
-      ? Math.round((job.deposit_amount ?? 20) * 100)
-      : 0
-  const balanceDuePence = job.payment_received
-    ? 0
-    : Math.max(totalPence - paidPence, 0)
+  const state = jobPaymentState(job, paidRows || [])
 
   return NextResponse.json(
     {
       job_ref: job.job_ref,
       device: [job.device_make, job.device_model].filter(Boolean).join(' ') || null,
       status: job.status,
-      total_pence: totalPence,
-      paid_pence: paidPence,
-      deposit_due_pence: depositDuePence,
-      balance_due_pence: balanceDuePence,
-      fully_paid: job.payment_received || balanceDuePence === 0,
+      total_pence: state.total,
+      paid_pence: state.paid,
+      deposit_due_pence: state.depositDue,
+      balance_due_pence: state.balance,
+      fully_paid: state.fullyPaid,
+      can_pay: state.canPay,
+      payment_message: !state.canPay ? job.status === 'CANCELLED' ? 'This repair is cancelled. Contact us if you need help.' : 'We will confirm the repair price before taking payment.' : null,
       currency: 'gbp',
     },
     { headers }

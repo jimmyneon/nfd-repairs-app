@@ -1,3 +1,4 @@
+import { jobPaymentState } from '@/lib/job-payment-state'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/resilience'
 import { corsHeaders } from '@/lib/api-auth'
@@ -142,14 +143,15 @@ export async function POST(request: NextRequest) {
       // Sum what's already been paid through Stripe — for this job and
       // the enquiry it was converted from. A failed read must not
       // silently undercharge.
-      const { data: srcEnquiry } = await supabase
+      const { data: srcEnquiry, error: enquiryReadError } = await supabase
         .from('enquiries')
         .select('enquiry_ref')
         .eq('converted_job_id', job.id)
         .maybeSingle()
+      if (enquiryReadError) throw enquiryReadError
       const { data: paidRows, error: paidErr } = await supabase
         .from('payments')
-        .select('amount_pence')
+        .select('amount_pence, kind')
         .or(
           srcEnquiry
             ? `job_id.eq.${job.id},enquiry_ref.eq.${srcEnquiry.enquiry_ref}`
@@ -159,21 +161,21 @@ export async function POST(request: NextRequest) {
       if (paidErr) {
         throw new Error('Could not check payment history')
       }
-      const alreadyPaidPence = (paidRows || []).reduce(
-        (sum, p) => sum + (p.amount_pence || 0),
-        0
-      )
+      const state = jobPaymentState(job, paidRows || [])
+      if (!state.canPay) {
+        return NextResponse.json({ error: job.status === 'CANCELLED' ? 'This repair is cancelled' : 'We must confirm the price before taking payment' }, { status: 409, headers })
+      }
 
       let amountPence: number
       let description: string
       if (kind === 'job_deposit') {
-        if (job.deposit_received || job.payment_received) {
+        if (state.depositDue <= 0) {
           return NextResponse.json(
             { error: 'Deposit already paid', already_paid: true },
             { status: 409, headers }
           )
         }
-        amountPence = Math.round((job.deposit_amount ?? 20) * 100)
+        amountPence = state.depositDue
         description = `Repair deposit — ${jobDevice} (${job.job_ref})`
       } else {
         if (job.payment_received) {
@@ -183,7 +185,7 @@ export async function POST(request: NextRequest) {
           )
         }
         const totalPence = Math.round((job.price_total ?? 0) * 100)
-        amountPence = totalPence - alreadyPaidPence
+        amountPence = state.balance
         if (amountPence <= 0) {
           return NextResponse.json(
             { error: 'Nothing left to pay', already_paid: true },
@@ -279,7 +281,7 @@ export async function POST(request: NextRequest) {
         }
         const { data: paidRows, error: paidErr } = await supabase
           .from('payments')
-          .select('amount_pence')
+          .select('amount_pence, kind')
           .eq('enquiry_ref', ref)
           .eq('status', 'paid')
         if (paidErr) {
