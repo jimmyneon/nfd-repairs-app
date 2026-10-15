@@ -76,8 +76,22 @@ export default function HdmiPostalPanel({ jobId }: { jobId: string }) {
   const [confirming, setConfirming] = useState(false)
   const [dispatching, setDispatching] = useState(false)
   const [manual, setManual] = useState<{ carrier: string; tracking: string; url: string } | null>(null)
+  const [collectDay, setCollectDay] = useState('')
 
   const gbp = (pence: number) => `£${(pence / 100).toFixed(2)}`
+
+  // Working days the courier can collect the return on — tomorrow onwards.
+  const collectionDays = () => {
+    const days: string[] = []
+    const d = new Date()
+    while (days.length < 10) {
+      d.setDate(d.getDate() + 1)
+      if (d.getDay() !== 0 && d.getDay() !== 6) days.push(d.toISOString().slice(0, 10))
+    }
+    return days
+  }
+  const dayLabel = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
   const load = async () => {
     try {
@@ -124,7 +138,7 @@ export default function HdmiPostalPanel({ jobId }: { jobId: string }) {
       const res = await fetch(`/api/jobs/${jobId}/hdmi-dispatch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(manual && manual.carrier && manual.tracking && manual.url ? manual : {}),
+        body: JSON.stringify(manual && manual.carrier && manual.tracking && manual.url ? manual : { collectionDate: collectDay || undefined }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -247,6 +261,16 @@ export default function HdmiPostalPanel({ jobId }: { jobId: string }) {
 
       {canDispatch && (
         <div className="space-y-2">
+          <label className="flex items-center justify-between gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+            Courier collects on
+            <select
+              value={collectDay || collectionDays()[0]}
+              onChange={(e) => setCollectDay(e.target.value)}
+              className="flex-1 ml-2 px-2 py-1.5 rounded-lg border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm font-semibold"
+            >
+              {collectionDays().map((d) => <option key={d} value={d}>{dayLabel(d)}</option>)}
+            </select>
+          </label>
           <button
             onClick={dispatch}
             disabled={dispatching}

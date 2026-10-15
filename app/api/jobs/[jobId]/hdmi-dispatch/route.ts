@@ -37,11 +37,16 @@ export async function POST(
     typeof body.carrier === 'string' && typeof body.tracking === 'string' && typeof body.url === 'string'
       ? { carrier: body.carrier.trim(), tracking: body.tracking.trim(), url: body.url.trim() }
       : {}
+  // Optional courier collection day for the return leg (YYYY-MM-DD).
+  const collectionDate =
+    typeof body.collectionDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.collectionDate)
+      ? { collectionDate: body.collectionDate }
+      : {}
 
   const result = await fetch(`${HDMI_FUNCTIONS_BASE}/hdmi-dispatch`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bookingId: booking.id, ...manual }),
+    body: JSON.stringify({ bookingId: booking.id, ...manual, ...collectionDate }),
   })
   const payload = await result.json().catch(() => ({}))
   return NextResponse.json(payload, { status: result.status })
