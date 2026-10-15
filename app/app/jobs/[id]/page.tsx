@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
-import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
+import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, jobStatusLabel } from '@/lib/constants'
 import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -28,6 +28,7 @@ import RepairOutcomeSelector from '@/components/RepairOutcomeSelector'
 import PriceSetterModal from '@/components/PriceSetterModal'
 import QuickActionsModal from '@/components/QuickActionsModal'
 import ConversationThread from '@/components/ConversationThread'
+import HdmiPostalPanel from '@/components/HdmiPostalPanel'
 
 const isIncompleteIntakeValue = (value?: string | null) =>
   !value || ['unknown', 'to be added', 'to be assessed', 'repair needed'].includes(value.trim().toLowerCase())
@@ -1034,7 +1035,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
           <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
             <span className={`inline-block px-3 py-1 rounded-lg font-bold text-sm ${JOB_STATUS_COLORS[job!.status]}`}>
-              {JOB_STATUS_SHORT_LABELS[job!.status]}
+              {jobStatusLabel(job!.status, job!.source, true)}
             </span>
             {job.repair_outcome && (
               <span className={`text-xs px-2.5 py-1 rounded-lg font-bold ${
@@ -1086,6 +1087,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         </div>
+
+        {/* HDMI postal booking — address, postage and refund controls */}
+        {job!.source === 'hdmi_repair_uk' && <HdmiPostalPanel jobId={job!.id} />}
 
         {/* Mini Action Buttons Row 1 - info panels (square) */}
         <div className="grid grid-cols-5 gap-2">

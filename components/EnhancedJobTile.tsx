@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import { JOB_STATUS_LABELS, JOB_STATUS_SHORT_LABELS, JOB_STATUS_COLORS } from '@/lib/constants'
+import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, jobStatusLabel } from '@/lib/constants'
 import { JobWithMetrics } from '@/lib/job-utils'
 import {
   formatTimeInStatus,
@@ -145,10 +145,15 @@ export default function EnhancedJobTile({ job }: EnhancedJobTileProps) {
                 <span className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
               )}
               <p className="font-black text-xs leading-tight uppercase tracking-wide">
-                {JOB_STATUS_SHORT_LABELS[job.status as JobStatus] || job.status}
+                {jobStatusLabel(job.status as JobStatus, job.source, true) || job.status}
               </p>
             </div>
             <div className="flex items-center gap-1">
+              {job.source === 'hdmi_repair_uk' && (
+                <span className="bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full" title="Postal repair — customer posts the console in">
+                  POSTAL
+                </span>
+              )}
               {job.is_warranty && (
                 <span className="bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5" title="Warranty repair">
                   <Shield className="h-3 w-3" />

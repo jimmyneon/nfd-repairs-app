@@ -114,3 +114,22 @@ export const SMS_TEMPLATE_VARIABLES = [
   '{opening_times}',
   '{password_link}',
 ]
+
+// Postal (ps5hdmirepair.co.uk) jobs never get collected in person — the
+// same statuses read differently for staff.
+export const POSTAL_STATUS_OVERRIDES: Partial<Record<JobStatus, string>> = {
+  AWAITING_DEVICE: 'Being posted in',
+  READY_TO_COLLECT: 'Tested — awaiting balance / dispatch',
+  COLLECTED: 'Dispatched',
+  COMPLETED: 'Dispatched',
+}
+export const POSTAL_STATUS_SHORT_OVERRIDES: Partial<Record<JobStatus, string>> = {
+  AWAITING_DEVICE: 'Posting in',
+  READY_TO_COLLECT: 'Dispatch',
+  COLLECTED: 'Sent',
+  COMPLETED: 'Sent',
+}
+export const jobStatusLabel = (status: JobStatus, source?: string | null, short = false) =>
+  source === 'hdmi_repair_uk'
+    ? (short ? POSTAL_STATUS_SHORT_OVERRIDES : POSTAL_STATUS_OVERRIDES)[status] ?? (short ? JOB_STATUS_SHORT_LABELS : JOB_STATUS_LABELS)[status]
+    : (short ? JOB_STATUS_SHORT_LABELS : JOB_STATUS_LABELS)[status]

@@ -321,6 +321,9 @@ export default function JobsListPageV2() {
   const awaitingDeviceJobs = jobs.filter(job =>
     ['AWAITING_DEVICE', 'QUOTE_APPROVED', 'PARTS_ARRIVED'].includes(job.status) && !job.device_in_shop
   )
+  const postalAwaitingJobs = jobs.filter(job =>
+    job.source === 'hdmi_repair_uk' && job.status === 'AWAITING_DEVICE' && !job.device_in_shop
+  )
   const followedUpWaitingJobs = awaitingDeviceJobs.filter(job => Boolean(job.awaiting_device_followup_at))
   const staleApprovedCount = approvedEnquiries.filter(enquiry =>
     getHoursInStatus(enquiry.updated_at || enquiry.created_at, enquiry.created_at) > 24
@@ -476,7 +479,40 @@ export default function JobsListPageV2() {
           </div>
         </div>
       )}
-      
+
+      {/* Postal HDMI banner - a PS5 HDMI customer has booked and paid; console in the post */}
+      {postalAwaitingJobs.length > 0 && (
+        <div className="bg-blue-700 text-white px-4 py-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <Package className="h-6 w-6 animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">
+                {postalAwaitingJobs.length === 1
+                  ? 'PS5 POSTAL REPAIR - CONSOLE BEING POSTED IN'
+                  : `${postalAwaitingJobs.length} PS5 POSTAL REPAIRS - CONSOLES BEING POSTED IN`}
+              </p>
+              <div className="flex gap-2 mt-1 overflow-x-auto pb-1">
+                {postalAwaitingJobs.slice(0, 4).map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/app/jobs/${job.id}`}
+                    className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <span className="text-xs font-bold">{job.customer_name}</span>
+                    <span className="text-xs ml-2 opacity-90">{job.job_ref}</span>
+                  </Link>
+                ))}
+                {postalAwaitingJobs.length > 4 && (
+                  <span className="flex-shrink-0 bg-white/20 rounded-lg px-3 py-1.5 text-xs font-bold">
+                    +{postalAwaitingJobs.length - 4} more...
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-3">
