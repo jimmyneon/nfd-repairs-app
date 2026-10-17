@@ -37,3 +37,6 @@ next-env.d.ts
 
 # Supabase CLI temp files (may contain credentials)
 supabase/.temp/
+
+# Generated report verification files
+/tmp/

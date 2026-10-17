@@ -1,5 +1,4 @@
 import { createServiceClient } from '@/lib/resilience'
-import { isTrackingLinkExpired } from '@/lib/job-utils'
 import TrackingPageClient from './TrackingPageClient'
 
 /**
@@ -13,6 +12,8 @@ import TrackingPageClient from './TrackingPageClient'
  * component. The client and the /api/tracking/[token] endpoint only ever
  * use the long token as the authority — never the short token.
  */
+export const dynamic = 'force-dynamic'
+
 export default async function TrackingPage({ params }: { params: { token: string } }) {
   const rawToken = params.token
   if (!rawToken || rawToken.length < 4 || rawToken.length > 64) {
@@ -46,10 +47,6 @@ export default async function TrackingPage({ params }: { params: { token: string
     return <InvalidLink />
   }
 
-  if (isTrackingLinkExpired(job.tracking_link_expires_at)) {
-    return <ExpiredLink />
-  }
-
   // Pass the LONG tracking_token as the authority; the short_token is only
   // used for cosmetic QR code display.
   return (
@@ -66,17 +63,6 @@ function InvalidLink() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tracking link not found</h1>
         <p className="text-gray-600 dark:text-gray-400">This tracking link is invalid or has been removed.</p>
-      </div>
-    </div>
-  )
-}
-
-function ExpiredLink() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Tracking link expired</h1>
-        <p className="text-gray-600 dark:text-gray-400">This tracking link has expired. Please contact us for an updated link.</p>
       </div>
     </div>
   )

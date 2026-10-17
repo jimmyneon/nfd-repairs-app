@@ -87,7 +87,7 @@ jobs:
         run: npm ci
 
       - name: Run repair-flow tests
-        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts tests/diagnostic-reports.test.ts
 
       - name: Verify progressive quote commitment safeguards
         run: |

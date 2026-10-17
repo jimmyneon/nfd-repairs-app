@@ -3,6 +3,12 @@ const path = require('path')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/tracking/*/diagnostic-reports': ['./assets/fonts/*'],
+      '/api/repair/*/diagnostic-reports': ['./assets/fonts/*'],
+    },
+  },
   typescript: {
     ignoreBuildErrors: false,
   },

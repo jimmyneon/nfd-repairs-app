@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createServiceClient } from '@/lib/resilience'
 import RepairDashboard from '@/components/RepairDashboard'
 
 export default async function RepairPage({ params }: { params: { id: string } }) {
-  const db = supabase as any
+  const db = createServiceClient()
   const cookieStore = cookies()
   const token = cookieStore.get('repair_token')?.value
 
@@ -14,12 +14,12 @@ export default async function RepairPage({ params }: { params: { id: string } })
 
   const { data: magicLink } = await db
     .from('magic_links')
-    .select('repair_id')
+    .select('repair_id,expires_at')
     .eq('token', token)
     .eq('used', true)
     .single()
 
-  if (!magicLink || magicLink.repair_id !== params.id) {
+  if (!magicLink || magicLink.repair_id !== params.id || (magicLink.expires_at && new Date(magicLink.expires_at).getTime() < Date.now())) {
     redirect('/auth/login')
   }
 
@@ -33,14 +33,14 @@ export default async function RepairPage({ params }: { params: { id: string } })
     redirect('/auth/login')
   }
 
-  const { data: updates } = await supabase
+  const { data: updates } = await db
     .from('repair_updates')
     .select('*')
     .eq('repair_id', params.id)
     .eq('is_customer_visible', true)
     .order('created_at', { ascending: false })
 
-  const { data: issues } = await supabase
+  const { data: issues } = await db
     .from('issues')
     .select('*')
     .eq('repair_id', params.id)

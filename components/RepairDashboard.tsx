@@ -1,5 +1,6 @@
 'use client'
 
+import CustomerDiagnosticReports from '@/components/CustomerDiagnosticReports'
 import { useState } from 'react'
 import { 
   Smartphone, 
@@ -93,6 +94,7 @@ export default function RepairDashboard({
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
+            <CustomerDiagnosticReports endpoint={`/api/repair/${repair.id}/diagnostic-reports`} />
             <div className="card">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center space-x-3">
