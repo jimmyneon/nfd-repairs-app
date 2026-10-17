@@ -29,7 +29,7 @@ export default function DiagnosticReportEditor({ job, onUpdate, onSendMessage }:
         setPublished(data.published)
       }).catch(e => { if (active) { setError(e.message); setLoadFailed(true) } }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [job.id]) // Existing private report is imported only if no versioned report exists.
+  }, [job.id, job.diagnostic_report]) // Existing private report is imported only if no versioned report exists.
 
   async function save(action: 'draft' | 'publish') {
     setSaving(true); setError(''); setMessage('')

@@ -1,3 +1,4 @@
+import React from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/resilience'
@@ -25,7 +26,7 @@ export default async function RepairPage({ params }: { params: { id: string } })
 
   const { data: repair, error } = await db
     .from('repairs')
-    .select('*')
+    .select('id,created_at,customer_name,device_type,device_model,issue_description,status,estimated_completion,actual_completion,cost_estimate,final_cost,warranty_expiry')
     .eq('id', params.id)
     .single()
 
@@ -35,14 +36,14 @@ export default async function RepairPage({ params }: { params: { id: string } })
 
   const { data: updates } = await db
     .from('repair_updates')
-    .select('*')
+    .select('id,created_at,status,message')
     .eq('repair_id', params.id)
     .eq('is_customer_visible', true)
     .order('created_at', { ascending: false })
 
   const { data: issues } = await db
     .from('issues')
-    .select('*')
+    .select('id,created_at,issue_type,description,status,resolution,resolved_at')
     .eq('repair_id', params.id)
     .order('created_at', { ascending: false })
 

@@ -27,6 +27,8 @@ Legacy published reports remain readable, now with real PDF downloads. Legacy
 magic-link authentication still expires and must be renewed; report visibility
 is independent of the legacy repair's status. The legacy dashboard now validates
 expiry and performs server-side reads only after checking repair ownership.
+Only explicit customer-safe fields are passed to the dashboard; legacy internal
+repair notes are excluded.
 
 ## Required database migration
 

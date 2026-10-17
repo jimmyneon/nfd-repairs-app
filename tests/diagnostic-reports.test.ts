@@ -12,9 +12,12 @@ vi.mock('@/lib/api-auth', () => ({ requireStaffUser: async () => state.authentic
   ? { user: { email: 'staff@example.com' }, response: null }
   : { response: new Response('{}', { status: 401 }) } }))
 vi.mock('@/lib/rate-limit', () => ({ getClientIP: () => 'test', checkRateLimit: async () => ({ allowed: state.allowed }) }))
+vi.mock('next/headers', () => ({ cookies: () => ({ get: () => ({ value: 'legacy-token' }) }) }))
+vi.mock('next/navigation', () => ({ redirect: () => { throw Error('Redirect to login') } }))
 import { POST, GET as staffGet } from '@/app/api/jobs/diagnostic-reports/route'
 import { GET } from '@/app/api/tracking/[token]/diagnostic-reports/route'
 import { GET as legacyGet } from '@/app/api/repair/[id]/diagnostic-reports/route'
+import LegacyPage from '@/app/repair/[id]/page'
 
 const jobId = '10000000-0000-4000-8000-000000000001'
 const otherId = '10000000-0000-4000-8000-000000000002'
@@ -36,6 +39,7 @@ function table(name: string) {
     order(key: string, opts: { ascending: boolean }) { order.push(`${quote(key)} ${opts.ascending ? 'ASC' : 'DESC'}`); return q },
     limit(n: number) { limit = ` LIMIT ${n}`; return q },
     maybeSingle() { single = true; return q },
+    single() { single = true; return q },
     async then(resolve: any, reject: any) {
       try {
         const sql = `${updating ? `UPDATE ${quote(name)} SET ${updating}` : `SELECT ${fields} FROM ${quote(name)}`}${clauses.length ? ' WHERE ' + clauses.join(' AND ') : ''}${order.length ? ' ORDER BY ' + order.join(',') : ''}${limit}`
@@ -57,7 +61,10 @@ beforeAll(async () => {
     CREATE TABLE staff_allowlist(email text);
     INSERT INTO staff_allowlist VALUES ('staff@example.com');
     CREATE TABLE magic_links(token text, repair_id uuid, expires_at timestamptz, used boolean);
-    CREATE TABLE repairs(id uuid, customer_name text, device_type text, device_model text);
+    CREATE TABLE repairs(id uuid, customer_name text, device_type text, device_model text, notes text,
+      created_at timestamptz,issue_description text,status text,estimated_completion timestamptz,actual_completion timestamptz,cost_estimate numeric,final_cost numeric,warranty_expiry timestamptz);
+    CREATE TABLE repair_updates(id uuid,repair_id uuid,created_at timestamptz,status text,message text,is_customer_visible boolean);
+    CREATE TABLE issues(id uuid,repair_id uuid,created_at timestamptz,issue_type text,description text,status text,resolution text,resolved_at timestamptz);
     CREATE TABLE repair_diagnostic_reports(id uuid, repair_id uuid, title text, report_text text, published_at timestamptz);`)
   await pg.exec(readFileSync('supabase/migrations/20261017094717_published_job_diagnostic_reports.sql', 'utf8'))
   state.db = { from: table, rpc: async (_: string, args: any) => {
@@ -169,11 +176,14 @@ describe('legacy reports', () => {
   const req = (id = jobId, query = '', cookie = 'legacy-token') => legacyGet(new NextRequest(`https://test/api/repair/${id}/diagnostic-reports${query}`, { headers: { cookie: `repair_token=${cookie}` } }), { params: { id } })
   it('preserves published legacy text, hides drafts, and provides real PDF', async () => {
     await pg.query("INSERT INTO magic_links VALUES ('legacy-token',$1,now()+interval '1 day',true)", [jobId])
-    await pg.query("INSERT INTO repairs VALUES ($1,'Test Customer','Console','Steam Deck OLED')", [jobId])
+    await pg.query("INSERT INTO repairs(id,customer_name,device_type,device_model,notes) VALUES ($1,'Test Customer','Console','Steam Deck OLED','INTERNAL SECRET')", [jobId])
     await pg.query("INSERT INTO repair_diagnostic_reports VALUES ($1,$2,'Legacy Report','Existing published text',now()),($3,$2,'Draft','Private notes',NULL)", [jobId, jobId, otherId])
     expect((await (await req()).json()).reports).toHaveLength(1)
     const pdf = await req(jobId, '?download=1')
     expect(pdf.headers.get('Content-Type')).toBe('application/pdf')
+    const page = await LegacyPage({ params: { id: jobId } })
+    expect(page.props.repair).not.toHaveProperty('notes')
+    expect(JSON.stringify(page.props)).not.toContain('INTERNAL SECRET')
     expect((await req(otherId, '?download=1')).status).toBe(401)
     await pg.exec("UPDATE magic_links SET expires_at=now()-interval '1 second'")
     expect((await req()).status).toBe(401)

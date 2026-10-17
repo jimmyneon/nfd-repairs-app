@@ -28,7 +28,6 @@ interface Repair {
   cost_estimate: number | null
   final_cost: number | null
   warranty_expiry: string | null
-  notes: string | null
 }
 
 interface Update {
@@ -115,12 +114,6 @@ export default function RepairDashboard({
                   <p className="text-gray-600">{repair.issue_description}</p>
                 </div>
 
-                {repair.notes && (
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
-                    <p className="text-gray-600">{repair.notes}</p>
-                  </div>
-                )}
               </div>
             </div>
 
