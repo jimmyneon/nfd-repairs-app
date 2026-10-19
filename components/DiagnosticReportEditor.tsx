@@ -44,7 +44,7 @@ export default function DiagnosticReportEditor({ job, onUpdate, onSendMessage }:
     finally { setSaving(false) }
   }
   if (loading) return <p>Loading diagnostic report…</p>
-  const fields = [['title', 'Report title'], ['report_text', 'Diagnostic findings'], ['conclusion', 'Technician’s conclusion'], ['recommendations', 'Recommendations'], ['outcome', 'Repair outcome']] as const
+  const fields = [['title', 'Report title'], ['report_text', 'Diagnostic findings'], ['conclusion', 'Technician’s conclusion (optional)'], ['recommendations', 'Recommendations (optional)'], ['outcome', 'Repair outcome (optional)']] as const
   return <div className="space-y-4">
     <p className="text-sm text-gray-600 dark:text-gray-300">Drafts are private. Publish only customer-facing findings. Internal technician notes are kept separately.</p>
     <p className="text-sm font-semibold">{versions ? `${versions} published version(s) retained` : 'No published report yet'}</p>

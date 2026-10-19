@@ -48,9 +48,6 @@ export async function POST(request: NextRequest) {
     if (!report || typeof body.jobId !== 'string' || !['draft', 'publish'].includes(body.action)) {
       return NextResponse.json({ error: 'Enter a title and diagnostic findings.' }, { status: 400 })
     }
-    if (body.action === 'publish' && (!report.conclusion || !report.recommendations || !report.outcome)) {
-      return NextResponse.json({ error: 'Add a conclusion, recommendations and outcome before publishing.' }, { status: 400 })
-    }
     const db = auth.db!
     const { data: job, error: jobError } = await db.from('jobs')
       .select('id,job_ref,device_make,device_model,customer_name').eq('id', body.jobId).maybeSingle()

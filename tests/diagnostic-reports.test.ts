@@ -132,7 +132,9 @@ describe('diagnostic report publication workflow', () => {
     await pg.exec("DELETE FROM staff_allowlist")
     expect((await POST(staffRequest('publish'))).status).toBe(403)
     await pg.exec("INSERT INTO staff_allowlist VALUES ('staff@example.com')")
-    expect((await POST(staffRequest('publish', { ...report, conclusion: '' }))).status).toBe(400)
+    // Only title + findings are required to publish; the optional sections are
+    // stored empty and hidden from the customer view.
+    expect((await POST(staffRequest('publish', { ...report, conclusion: '', recommendations: '', outcome: '' }))).status).toBe(200)
     expect(validateReport({ ...report, title: 123 })).toBeNull()
   })
   it('denies direct customer reads/writes/RPC execution at the database', async () => {
