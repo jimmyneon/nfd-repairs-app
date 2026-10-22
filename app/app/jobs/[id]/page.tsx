@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-browser'
 import { Job, JobEvent, SMSLog, EmailLog, JobStatus } from '@/lib/types-v3'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, jobStatusLabel } from '@/lib/constants'
-import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign, XCircle } from 'lucide-react'
+import { ArrowLeft, Home, Clock, Package, CheckCircle, Wrench, AlertCircle, RefreshCw, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, Edit, MessageSquare, Eye, EyeOff, Lock, ShieldCheck, Coins, FileText, Send, User, Star, StickyNote, Link2, PoundSterling, Plus, Shield, MessageCircle, Stethoscope, Truck, ExternalLink, DollarSign, XCircle, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
@@ -910,6 +910,50 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     setFundApplying(false)
   }
 
+  const [aiCalling, setAiCalling] = useState(false)
+  const [aiCallFeedback, setAiCallFeedback] = useState<string | null>(null)
+  const triggerAiOutboundCall = async (
+    purpose: 'personalised_quote' | 'diagnostic_results' | 'collection_chase' | 'quote_followup',
+    overridePrice?: number | null
+  ) => {
+    if (!job || !job.customer_phone) {
+      alert('No customer phone number on this job.')
+      return
+    }
+    setAiCalling(true)
+    setAiCallFeedback(null)
+    try {
+      const priceVal = overridePrice ?? job.quoted_price ?? job.price_total ?? null
+      const priceText = priceVal && priceVal > 0 ? `£${Number(priceVal).toFixed(2).replace(/\.00$/, '')}` : undefined
+      const diagSummary = [job.diagnosis_notes, job.diagnostic_report].filter(Boolean).join(' — ') || undefined
+      const res = await fetch('/api/ai-desk/outbound-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: job.customer_phone,
+          purpose,
+          customerName: job.customer_name,
+          device: `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'your device',
+          repair: job.issue || 'repair',
+          priceText,
+          diagnosticSummary: diagSummary,
+          notes: job.customer_notes || undefined,
+          jobId: job.id,
+          jobRef: job.job_ref,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.ok) {
+        setAiCallFeedback(`Alex is calling ${job.customer_name || 'the customer'} now...`)
+      } else {
+        setAiCallFeedback(data.error || 'Could not start AI call.')
+      }
+    } catch {
+      setAiCallFeedback('Could not reach AI Desk.')
+    }
+    setAiCalling(false)
+  }
+
   const handleSendAftercare = async () => {
     if (!job) return
     setAftercareSending(true)
@@ -1557,6 +1601,21 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                     )}
                     <span>Send Quote to Customer</span>
                   </button>
+                  <button
+                    onClick={() => {
+                      const priceInput = document.getElementById('quotePrice') as HTMLInputElement
+                      const price = parseFloat(priceInput?.value || '') || job!.quoted_price || null
+                      void triggerAiOutboundCall('personalised_quote', price)
+                    }}
+                    disabled={actionLoading || aiCalling}
+                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    <Phone className="h-5 w-5" />
+                    <span>{aiCalling ? 'Starting AI Call...' : 'Have Alex Call with Quote'}</span>
+                  </button>
+                  {aiCallFeedback && (
+                    <p className="text-xs font-semibold text-center text-purple-700 dark:text-purple-300">{aiCallFeedback}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -1776,6 +1835,19 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                         <CheckCircle className="h-5 w-5" />
                         <span>Customer Responded</span>
                       </button>
+                      {(job!.diagnosis_notes || job.diagnostic_report) && (
+                        <button
+                          onClick={() => void triggerAiOutboundCall('diagnostic_results')}
+                          disabled={aiCalling || actionLoading}
+                          className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-xl text-base transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Phone className="h-5 w-5" />
+                          <span>{aiCalling ? 'Starting AI Call...' : 'Have Alex Call & Explain Diagnostics'}</span>
+                        </button>
+                      )}
+                      {aiCallFeedback && (
+                        <p className="text-xs font-semibold text-center text-purple-700 dark:text-purple-300">{aiCallFeedback}</p>
+                      )}
                     </>
                   )}
 
@@ -1828,14 +1900,27 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {job!.status === 'READY_TO_COLLECT' && (
-              <button
-                onClick={() => handleWorkflowStatusChange('COLLECTED')}
-                disabled={actionLoading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
-              >
-                <CheckCircle className="h-8 w-8" />
-                <span>Customer Collected Device</span>
-              </button>
+              <>
+                <button
+                  onClick={() => handleWorkflowStatusChange('COLLECTED')}
+                  disabled={actionLoading}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-6 px-6 rounded-2xl text-xl disabled:opacity-50 transition-all shadow-lg active:scale-95 flex items-center justify-center space-x-3"
+                >
+                  <CheckCircle className="h-8 w-8" />
+                  <span>Customer Collected Device</span>
+                </button>
+                <button
+                  onClick={() => void triggerAiOutboundCall('collection_chase')}
+                  disabled={aiCalling || actionLoading}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-2xl text-base disabled:opacity-50 transition-all shadow-md active:scale-95 flex items-center justify-center space-x-2"
+                >
+                  <Phone className="h-5 w-5" />
+                  <span>{aiCalling ? 'Starting AI Call...' : 'Have Alex Call to Chase Collection'}</span>
+                </button>
+                {aiCallFeedback && (
+                  <p className="text-xs font-semibold text-center text-purple-700 dark:text-purple-300">{aiCallFeedback}</p>
+                )}
+              </>
             )}
             
             {job!.status === 'COLLECTED' && (

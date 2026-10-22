@@ -142,8 +142,10 @@ function EnquiriesContent() {
   const [quotePrice, setQuotePrice] = useState('')
   const [quotePriceHigh, setQuotePriceHigh] = useState('')
   const [quotePersonalisedMsg, setQuotePersonalisedMsg] = useState('')
-  const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both'>('sms')
+  const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both' | 'call' | 'sms_and_call'>('sms')
   const [sendingQuote, setSendingQuote] = useState(false)
+  const [callingAiFollowup, setCallingAiFollowup] = useState(false)
+  const [aiFollowupMsg, setAiFollowupMsg] = useState<string | null>(null)
   const [sendingInspection, setSendingInspection] = useState(false)
   const [sendingDropoff, setSendingDropoff] = useState(false)
   const [quoteResult, setQuoteResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -1414,10 +1416,19 @@ function EnquiriesContent() {
                   <div className="space-y-3 pt-2">
                     <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 border-2 border-purple-500">
                       <p className="text-center text-sm font-bold text-purple-700 dark:text-purple-400">This needs a personalised quote</p>
-                      <p className="text-center text-xs text-purple-600 dark:text-purple-500 mt-0.5">Enter a price and send, or ask the customer to bring it in</p>
+                      <p className="text-center text-xs text-purple-600 dark:text-purple-500 mt-0.5">
+                        {selectedEnquiry.preferred_contact_method === 'call'
+                          ? '📞 Customer asked for a phone callback with their quote'
+                          : 'Enter a price and send by text, email, or AI phone call'}
+                      </p>
                     </div>
                     <button
-                      onClick={() => setShowQuoteForm(true)}
+                      onClick={() => {
+                        if (selectedEnquiry.preferred_contact_method === 'call') {
+                          setQuoteMethod('call')
+                        }
+                        setShowQuoteForm(true)
+                      }}
                       className="w-full flex items-center justify-center gap-2 py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors active:scale-95"
                     >
                       <PoundSterling className="h-5 w-5" />
@@ -1517,17 +1528,23 @@ function EnquiriesContent() {
                     <div>
                       <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Send via</p>
                       <div className="grid grid-cols-3 gap-2">
-                        {(['sms', 'email', 'both'] as const).map((method) => (
+                        {([
+                          { key: 'sms', label: 'Text' },
+                          { key: 'call', label: '📞 AI Call' },
+                          { key: 'sms_and_call', label: 'Text + AI Call' },
+                          { key: 'email', label: 'Email' },
+                          { key: 'both', label: 'Text + Email' },
+                        ] as const).map((m) => (
                           <button
-                            key={method}
-                            onClick={() => setQuoteMethod(method)}
-                            className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                              quoteMethod === method
+                            key={m.key}
+                            onClick={() => setQuoteMethod(m.key)}
+                            className={`py-2.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                              quoteMethod === m.key
                                 ? 'bg-purple-600 text-white'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                             }`}
                           >
-                            {method === 'sms' ? 'Text' : method === 'email' ? 'Email' : 'Both'}
+                            {m.label}
                           </button>
                         ))}
                       </div>
@@ -1538,8 +1555,12 @@ function EnquiriesContent() {
                       disabled={sendingQuote || !quotePrice}
                       className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors active:scale-95 disabled:opacity-50"
                     >
-                      <Send className="h-4 w-4" />
-                      {sendingQuote ? 'Sending Quote...' : `Send £${quotePrice || '0'}${quotePriceHigh ? '-£' + quotePriceHigh : ''} Quote`}
+                      {quoteMethod === 'call' ? <Phone className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                      {sendingQuote
+                        ? 'Sending Quote...'
+                        : quoteMethod === 'call'
+                          ? `AI Call with £${quotePrice || '0'}${quotePriceHigh ? '-£' + quotePriceHigh : ''} Quote`
+                          : `Send £${quotePrice || '0'}${quotePriceHigh ? '-£' + quotePriceHigh : ''} Quote`}
                     </button>
                   </div>
                 )}
@@ -1866,12 +1887,56 @@ function EnquiriesContent() {
 
                 {/* Message button — hidden when quote form/result is open */}
                 {!showQuoteForm && !quoteResult && (
-                <button
-                  onClick={() => setShowMessageComposer(true)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
-                >
-                  <MessageSquare className="h-4 w-4" /> Message Customer
-                </button>
+                <div className="space-y-2">
+                  {selectedEnquiry.customer_phone && selectedEnquiry.enquiry_type === 'repair_quote' && !isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry) && (
+                    <button
+                      onClick={async () => {
+                        if (!selectedEnquiry.customer_phone) return
+                        setCallingAiFollowup(true)
+                        setAiFollowupMsg(null)
+                        try {
+                          const res = await fetch('/api/ai-desk/outbound-call', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              to: selectedEnquiry.customer_phone,
+                              purpose: 'quote_followup',
+                              customerName: selectedEnquiry.customer_name,
+                              device: `${selectedEnquiry.device_make || ''} ${selectedEnquiry.device_model || ''}`.trim() || 'your device',
+                              repair: selectedEnquiry.repair_type || 'repair',
+                              priceText: selectedEnquiry.display_price || (selectedEnquiry.quoted_price ? `£${selectedEnquiry.quoted_price}` : undefined),
+                              notes: selectedEnquiry.staff_notes || undefined,
+                              enquiryRef: selectedEnquiry.enquiry_ref,
+                            }),
+                          })
+                          const data = await res.json()
+                          if (res.ok && data.ok) {
+                            setAiFollowupMsg(`Alex is calling ${selectedEnquiry.customer_name} now...`)
+                          } else {
+                            setAiFollowupMsg(data.error || 'Could not start AI call.')
+                          }
+                        } catch {
+                          setAiFollowupMsg('Could not reach AI Desk.')
+                        }
+                        setCallingAiFollowup(false)
+                      }}
+                      disabled={callingAiFollowup}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      <Phone className="h-4 w-4" />
+                      {callingAiFollowup ? 'Starting AI Call...' : 'Have Alex Call to Follow Up / Close Quote'}
+                    </button>
+                  )}
+                  {aiFollowupMsg && (
+                    <p className="text-xs font-semibold text-center text-indigo-700 dark:text-indigo-300">{aiFollowupMsg}</p>
+                  )}
+                  <button
+                    onClick={() => setShowMessageComposer(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors active:scale-95"
+                  >
+                    <MessageSquare className="h-4 w-4" /> Message Customer
+                  </button>
+                </div>
                 )}
 
                 {!isAccepted(selectedEnquiry) && !isConverted(selectedEnquiry) && !showQuoteForm && !quoteResult && (

@@ -662,10 +662,41 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, action, enquiry_ref: enquiry.enquiry_ref }, { headers })
       }
 
-      // --- Quote SMS/email (instant or personalised with price) ---
+      // --- Quote SMS/email/AI Call (instant or personalised with price) ---
       let quoteDelivered = false
 
-      if (method === 'sms' || method === 'both') {
+      if (method === 'call' || method === 'sms_and_call') {
+        const aiDeskBase = (process.env.AI_DESK_URL || 'https://ai-desk-theta.vercel.app').replace(/\/+$/, '')
+        const aiDeskKey = process.env.AI_DESK_API_KEY || process.env.CRON_SECRET
+        if (aiDeskKey && enquiry.customer_phone) {
+          try {
+            const callRes = await fetch(`${aiDeskBase}/api/outbound/call`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${aiDeskKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                to: enquiry.customer_phone,
+                purpose: 'personalised_quote',
+                customerName: enquiry.customer_name,
+                device: `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'your device',
+                repair: enquiry.repair_type || 'repair',
+                priceText,
+                notes: personalisedMessage || undefined,
+                quoteUrl,
+                enquiryRef: enquiry.enquiry_ref,
+              }),
+              signal: AbortSignal.timeout(15_000),
+            })
+            if (callRes.ok) quoteDelivered = true
+          } catch (e) {
+            console.error('AI outbound quote call failed:', e)
+          }
+        }
+      }
+
+      if (method === 'sms' || method === 'both' || method === 'sms_and_call') {
         const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
         if (!webhookUrl) {
           console.error('[SMS] MACRODROID_WEBHOOK_URL not set — SMS will not be sent')

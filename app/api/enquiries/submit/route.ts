@@ -41,7 +41,7 @@ function isValidEmail(email: string): boolean {
 
 function isValidUkPhone(phone: string): boolean {
   const c = phone.replace(/[\s\-()]/g, '')
-  return /^(07|\+447)[0-9]{9}$/.test(c)
+  return /^(0[127]|\+44[127])[0-9]{8,9}$/.test(c)
 }
 
 function clampLength(str: string, max: number): string {
@@ -159,13 +159,20 @@ export async function POST(request: NextRequest) {
     const sanitizedName = clampLength(customer_name, MAX_NAME)
     const sanitizedEmail = customer_email ? clampLength(customer_email, MAX_EMAIL) : null
     const sanitizedPhone = customer_phone ? clampLength(customer_phone, MAX_PHONE) : null
-    const preferredContactMethod = sanitizedPhone && sanitizedEmail
-      ? 'both'
-      : sanitizedEmail
-        ? 'email'
-        : sanitizedPhone
-          ? 'sms'
-          : null
+    const explicitPref =
+      typeof body.preferred_contact_method === 'string' &&
+      ['sms', 'call', 'email', 'both'].includes(body.preferred_contact_method)
+        ? body.preferred_contact_method
+        : null
+    const preferredContactMethod =
+      explicitPref ??
+      (sanitizedPhone && sanitizedEmail
+        ? 'both'
+        : sanitizedEmail
+          ? 'email'
+          : sanitizedPhone
+            ? 'sms'
+            : null)
 
     if (sanitizedEmail && !isValidEmail(sanitizedEmail)) {
       return NextResponse.json(
