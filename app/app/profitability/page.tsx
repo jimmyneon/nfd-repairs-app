@@ -267,11 +267,13 @@ export default function ProfitabilityPage() {
       return { currentEntries: [], previousEntries: [], current: empty, previous: empty }
     }
 
-    const currentFrom = dateOffsetKey(data.today, -(period.days - 1))
+    // Only include completed trading dates; today's entry is still in progress.
+    const currentTo = dateOffsetKey(data.today, -1)
+    const currentFrom = dateOffsetKey(currentTo, -(period.days - 1))
     const previousTo = dateOffsetKey(currentFrom, -1)
     const previousFrom = dateOffsetKey(previousTo, -(period.days - 1))
 
-    const currentRows = data.entries.filter(entry => entry.entry_date >= currentFrom && entry.entry_date <= data.today)
+    const currentRows = data.entries.filter(entry => entry.entry_date >= currentFrom && entry.entry_date <= currentTo)
     const previousRows = data.entries.filter(entry => entry.entry_date >= previousFrom && entry.entry_date <= previousTo)
 
     return {
