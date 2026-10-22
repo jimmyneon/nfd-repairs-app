@@ -57,7 +57,7 @@ type ApiData = {
 }
 
 type Period = {
-  key: 'week' | 'four_weeks' | 'three_months'
+  key: 'week' | 'four_weeks' | 'three_months' | 'rolling_seven' | 'rolling_thirty'
   label: string
   short: string
   days: number
@@ -67,6 +67,8 @@ const PERIODS: Period[] = [
   { key: 'week', label: '1 week', short: '1W', days: 7 },
   { key: 'four_weeks', label: '4 weeks', short: '4W', days: 28 },
   { key: 'three_months', label: '3 months', short: '3M', days: 90 },
+  { key: 'rolling_seven', label: 'Rolling 7 days', short: 'R7', days: 7 },
+  { key: 'rolling_thirty', label: 'Rolling 30 days', short: 'R30', days: 30 },
 ]
 
 function money(value: number, decimals = 0) {
