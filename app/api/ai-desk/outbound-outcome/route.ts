@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffOrCron } from '@/lib/api-auth'
+import { sendSms } from '@/lib/resilience'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,6 +63,24 @@ export async function POST(request: NextRequest) {
         }
 
         await supabase.from('enquiries').update(updateFields).eq('id', enquiry.id)
+
+        // Mirror the customer-facing link approval: a verbal "yes" on the AI
+        // call sends the same confirmation text (mobiles only — landlines
+        // can't receive SMS).
+        if (outcome === 'approved' && enquiry.customer_phone && /^\+?447|^07/.test(String(enquiry.customer_phone).replace(/\s/g, ''))) {
+          const smsMessage = `Hi ${enquiry.customer_name}! 👋\n\nGreat choice — we have got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ✅\n\nWe will be in touch ASAP to let you know what to do next.\n\nNFD Repairs`
+          try {
+            const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)
+            await supabase.from('sms_logs').insert({
+              template_key: 'QUOTE_ACCEPTED',
+              body_rendered: smsMessage,
+              status: smsResponse.ok ? 'SENT' : 'FAILED',
+              sent_at: smsResponse.ok ? new Date().toISOString() : null,
+            } as any)
+          } catch (e) {
+            console.error('AI call approval SMS failed:', e)
+          }
+        }
 
         const deviceLabel = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'device'
         const isUnreachable = outcome === 'unreachable'
