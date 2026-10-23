@@ -20,11 +20,14 @@ describe('API route authentication', () => {
   ]
 
   for (const route of staffRoutes) {
-    it(`${route} should import and call requireStaffUser`, () => {
+    it(`${route} should import and call staff auth`, () => {
       const filePath = path.join(process.cwd(), route)
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8')
-        expect(content).toContain('requireStaffUser')
+        // requireStaffOrCron still gates on staff auth (it falls back to
+        // requireStaffUser internally) while also allowing the trusted
+        // server-to-server CRON_SECRET path used by AI Desk.
+        expect(content).toMatch(/requireStaffUser|requireStaffOrCron/)
       }
     })
   }

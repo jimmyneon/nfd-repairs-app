@@ -5,7 +5,10 @@ import { repairPaymentLink } from '@/lib/utils'
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), sendSms: vi.fn() }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: mocks.createClient }))
-vi.mock('@/lib/api-auth', () => ({ requireStaffUser: async () => ({ response: null }) }))
+vi.mock('@/lib/api-auth', () => ({
+  requireStaffUser: async () => ({ response: null }),
+  requireStaffOrCron: async () => null,
+}))
 vi.mock('@/lib/resilience', () => ({ sendViaMacroDroid: mocks.sendSms }))
 import { POST } from '@/app/api/enquiries/convert-to-job/route'
 

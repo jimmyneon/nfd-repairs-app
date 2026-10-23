@@ -229,7 +229,8 @@ describe('New consolidation routes', () => {
         path.join(process.cwd(), 'app/app/enquiries/page.tsx'),
         'utf-8'
       )
-      expect(content).toContain("handleConvertToJob('parts_needed')")
+      expect(content).toContain("setConvertFormOpen('parts_needed')")
+      expect(content).toContain('handleConvertToJob(convertFormOpen)')
       expect(content).not.toContain("setConvertStep('deposit_confirm')")
     })
 
@@ -245,11 +246,13 @@ describe('New consolidation routes', () => {
     })
 
     it('keeps customer approval separate from conversion', () => {
-      const updateRoute = fs.readFileSync(
-        path.join(process.cwd(), 'app/api/enquiries/update/route.ts'),
+      // Customer approval moved to the token-secured public route; the legacy
+      // guessable-ref approval in enquiries/update was retired (410).
+      const approveRoute = fs.readFileSync(
+        path.join(process.cwd(), 'app/api/public/quote/[ref]/approve/route.ts'),
         'utf-8'
       )
-      expect(updateRoute).toContain("updateFields.status = 'approved'")
+      expect(approveRoute).toContain("status: 'approved'")
 
       const acceptRoute = fs.readFileSync(
         path.join(process.cwd(), 'app/api/enquiries/accept/route.ts'),

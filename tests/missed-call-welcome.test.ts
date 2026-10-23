@@ -4,7 +4,9 @@ import { NextRequest } from 'next/server'
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), sendSms: vi.fn() }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/resilience', () => ({
+  sendSms: mocks.sendSms,
   sendViaMacroDroid: mocks.sendSms,
+  isSmsConfigured: () => true,
   isWithinUKSendingHours: () => true,
 }))
 
@@ -31,7 +33,11 @@ describe('missed call followed by first text', () => {
     vi.setSystemTime(new Date(now))
     vi.stubEnv('MACRODROID_WEBHOOK_URL', 'https://example.test/sms')
     mocks.sendSms.mockResolvedValue({ ok: true })
-    tables = { missed_call_log: [], sms_logs: [], notifications: [], enquiries: [], jobs: [], admin_settings: [], job_events: [] }
+    tables = {
+      missed_call_log: [], missed_call_sms_claims: [], inbound_dedup: [], sms_logs: [],
+      notifications: [], enquiries: [], jobs: [], admin_settings: [], job_events: [],
+      warranty_tickets: [], warranty_ticket_events: [],
+    }
     failedTable = undefined
 
     // Exercise both real handlers against stored rows, applying their filters.
@@ -44,21 +50,49 @@ describe('missed call followed by first text', () => {
         let orderColumn: string | undefined
         let ascending = true
         let update: Record<string, any> | undefined
+        let wantSingle = false
+        let mode: 'read' | 'insert' | 'update' = 'read'
+        let writeResult: { rows: Record<string, any>[]; error: any } = { rows: [], error: null }
         const query: any = {
-          select: (_columns: string, options?: { head?: boolean }) => { countOnly = !!options?.head; return query },
+          select: (_columns?: string, options?: { head?: boolean }) => { countOnly = !!options?.head; return query },
           eq: (key: string, value: unknown) => { filters.push(row => row[key] === value); return query },
           in: (key: string, values: unknown[]) => { filters.push(row => values.includes(row[key])); return query },
           gte: (key: string, value: string) => { filters.push(row => row[key] >= value); return query },
           contains: () => query,
           order: (key: string, options: { ascending: boolean }) => { orderColumn = key; ascending = options.ascending; return query },
           limit: (limit: number) => { maxRows = limit; return query },
-          insert: async (values: Record<string, any>) => {
-            tables[table].push({ id: `${table}-${tables[table].length}`, created_at: now, ...values })
-            return { error: null }
+          single: () => { wantSingle = true; return query },
+          maybeSingle: () => { wantSingle = true; return query },
+          insert: (values: Record<string, any> | Record<string, any>[]) => {
+            mode = 'insert'
+            tables[table] ??= []
+            const inserted: Record<string, any>[] = []
+            let error: any = null
+            for (const v of Array.isArray(values) ? values : [values]) {
+              if (table === 'missed_call_sms_claims'
+                && tables[table].some(r => r.phone === v.phone && r.bucket === v.bucket)) {
+                error = { code: '23505', message: 'duplicate key value' }
+                break
+              }
+              if (table === 'inbound_dedup' && tables[table].length > 0) {
+                error = { code: '23505', message: 'duplicate key value' }
+                break
+              }
+              const row = { id: `${table}-${tables[table].length}`, created_at: now, ...v }
+              tables[table].push(row)
+              inserted.push(row)
+            }
+            writeResult = { rows: inserted, error }
+            return query
           },
-          update: (values: Record<string, any>) => { update = values; return query },
+          update: (values: Record<string, any>) => { mode = 'update'; update = values; return query },
           then: (resolve: (result: unknown) => unknown) => {
             if (table === failedTable) return Promise.resolve({ data: null, count: null, error: { message: 'Read failed' } }).then(resolve)
+            if (mode === 'insert') {
+              const data = countOnly === false && wantSingle ? (writeResult.rows[0] ?? null)
+                : writeResult.rows.length ? writeResult.rows : null
+              return Promise.resolve({ data: wantSingle ? (writeResult.rows[0] ?? null) : data, error: writeResult.error }).then(resolve)
+            }
             let rows = tables[table].filter(row => filters.every(filter => filter(row)))
             if (orderColumn) {
               const key = orderColumn
@@ -66,6 +100,12 @@ describe('missed call followed by first text', () => {
             }
             rows = rows.slice(0, maxRows)
             if (update) rows.forEach(row => Object.assign(row, update))
+            if (wantSingle) {
+              return Promise.resolve({
+                data: rows[0] ?? null,
+                error: rows.length ? null : { code: 'PGRST116', message: 'Results contain 0 rows' },
+              }).then(resolve)
+            }
             return Promise.resolve({ data: countOnly ? null : rows, count: rows.length, error: null }).then(resolve)
           },
         }
