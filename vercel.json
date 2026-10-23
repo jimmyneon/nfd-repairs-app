@@ -18,6 +18,10 @@
     {
       "path": "/api/enquiries/send-quote-followups",
       "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/enquiries/quote-callback-reminder",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
