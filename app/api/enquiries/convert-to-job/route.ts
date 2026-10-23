@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { repairPaymentLink, shortTrackingLink, shortHoursLink, shortFastDropoffLink, getAppUrl } from '@/lib/utils'
-import { requireStaffUser } from '@/lib/api-auth'
+import { requireStaffOrCron } from '@/lib/api-auth'
 import { sendViaMacroDroid } from '@/lib/resilience'
 
 export async function OPTIONS(request: NextRequest) {
@@ -17,7 +17,8 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
+  // Staff UI or trusted server-to-server (AI Desk outbound outcome handler).
+  const authResponse = await requireStaffOrCron(request)
   if (authResponse) return authResponse
 
   try {

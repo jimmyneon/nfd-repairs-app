@@ -354,10 +354,15 @@ export async function POST(request: NextRequest) {
         }
         const personalisedMessage = clampLength(data?.personalised_message || '', 2000)
         const method = data?.method || 'sms'
+        // Whether the part is on the shelf or must be ordered — drives what
+        // Alex tells the customer after they approve on an AI call, and
+        // whether a deposit link is texted automatically.
+        const partStatus = data?.part_status === 'parts_needed' ? 'parts_needed' : 'in_stock'
 
         updateFields.quoted_price = price
         updateFields.quote_type = 'personalised'
         updateFields.quote_sent_method = method
+        updateFields.part_status = partStatus
         updateFields.status = 'pending'
         // Store the display price (range or single) so the customer-facing
         // quote acceptance page can show it
@@ -390,6 +395,7 @@ export async function POST(request: NextRequest) {
         }
         // Stash the personalised message so the send block below can include it
         ;(pendingQuoteSend as any).personalisedMessage = personalisedMessage
+        ;(pendingQuoteSend as any).partStatus = partStatus
         break
       }
 
@@ -491,6 +497,7 @@ export async function POST(request: NextRequest) {
         quote_action_token_expires_at,
         quote_action_token_revoked_at,
         dropoff_status,
+        part_status,
         ...coreFields
       } = updateFields
       const { error: retryError } = await supabase
@@ -692,6 +699,7 @@ export async function POST(request: NextRequest) {
                 notes: personalisedMessage || undefined,
                 quoteUrl,
                 enquiryRef: enquiry.enquiry_ref,
+                partStatus: (pendingQuoteSend as any)?.partStatus || 'in_stock',
               }),
               signal: AbortSignal.timeout(15_000),
             })

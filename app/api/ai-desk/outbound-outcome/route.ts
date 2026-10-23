@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
     const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
     const jobRef = typeof body.jobRef === 'string' ? body.jobRef.trim() : ''
     const customerName = typeof body.customerName === 'string' ? body.customerName.trim() : 'Customer'
+    // 'parts_needed' was quoted on the call — an approval must go through
+    // convert-to-job so the £20 deposit link gets texted automatically.
+    const partStatus = body.partStatus === 'parts_needed' ? 'parts_needed' : 'in_stock'
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,10 +67,43 @@ export async function POST(request: NextRequest) {
 
         await supabase.from('enquiries').update(updateFields).eq('id', enquiry.id)
 
+        // Approved + parts need ordering → convert straight into a job via the
+        // same route staff use. That route creates the job (AWAITING_DEPOSIT)
+        // and texts the customer the £20 deposit payment link, so we skip the
+        // generic "great choice" SMS below to avoid double-texting.
+        if (outcome === 'approved' && partStatus === 'parts_needed' && !enquiry.converted_job_id) {
+          try {
+            const appUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin).replace(/\/+$/, '')
+            const convRes = await fetch(`${appUrl}/api/enquiries/convert-to-job`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.CRON_SECRET}`,
+              },
+              body: JSON.stringify({
+                enquiry_id: enquiry.id,
+                stock_status: 'parts_needed',
+                staff_notes: 'Converted automatically after approval on AI call — deposit link texted.',
+              }),
+              signal: AbortSignal.timeout(20_000),
+            })
+            const convData = await convRes.json().catch(() => ({}))
+            if (!convRes.ok) {
+              console.error('[ai-desk/outbound-outcome] convert-to-job failed:', convRes.status, convData)
+              await supabase.from('enquiries').update({
+                staff_notes: `${prevNotes}${noteLine}\n⚠️ AI approval but auto job-conversion failed (${(convData as any)?.error || convRes.status}) — convert manually with parts_needed.`,
+              }).eq('id', enquiry.id)
+            }
+          } catch (e) {
+            console.error('[ai-desk/outbound-outcome] convert-to-job threw:', e)
+          }
+        }
+
         // Mirror the customer-facing link approval: a verbal "yes" on the AI
         // call sends the same confirmation text (mobiles only — landlines
-        // can't receive SMS).
-        if (outcome === 'approved' && enquiry.customer_phone && /^\+?447|^07/.test(String(enquiry.customer_phone).replace(/\s/g, ''))) {
+        // can't receive SMS). Skipped when parts_needed handled it via the
+        // deposit text instead.
+        if (outcome === 'approved' && partStatus !== 'parts_needed' && enquiry.customer_phone && /^\+?447|^07/.test(String(enquiry.customer_phone).replace(/\s/g, ''))) {
           const smsMessage = `Hi ${enquiry.customer_name}! 👋\n\nGreat choice — we have got your repair request for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} ✅\n\nWe will be in touch ASAP to let you know what to do next.\n\nNFD Repairs`
           try {
             const smsResponse = await sendSms(enquiry.customer_phone, smsMessage)

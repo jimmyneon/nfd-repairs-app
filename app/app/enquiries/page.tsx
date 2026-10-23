@@ -61,6 +61,7 @@ interface Enquiry {
   quote_sent_method?: string | null
   repair_reserved?: boolean
   part_reserved?: boolean
+  part_status?: string | null
   converted_to_job?: boolean
   converted_job_id?: string | null
   preferred_contact_method?: string | null
@@ -144,6 +145,7 @@ function EnquiriesContent() {
   const [quotePriceHigh, setQuotePriceHigh] = useState('')
   const [quotePersonalisedMsg, setQuotePersonalisedMsg] = useState('')
   const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both' | 'call' | 'sms_and_call'>('sms')
+  const [quotePartStatus, setQuotePartStatus] = useState<'in_stock' | 'parts_needed'>('in_stock')
   const [sendingQuote, setSendingQuote] = useState(false)
   const [callingAiFollowup, setCallingAiFollowup] = useState(false)
   const [aiFollowupMsg, setAiFollowupMsg] = useState<string | null>(null)
@@ -551,6 +553,7 @@ function EnquiriesContent() {
             quoted_price_high: priceHigh,
             personalised_message: quotePersonalisedMsg.trim(),
             method: quoteMethod,
+            part_status: quotePartStatus,
           },
         }),
       })
@@ -1549,6 +1552,38 @@ function EnquiriesContent() {
                       />
                     </div>
 
+                    {/* Parts stock — drives what Alex says after approval and whether a deposit text goes out */}
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Parts</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setQuotePartStatus('in_stock')}
+                          className={`py-2.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                            quotePartStatus === 'in_stock'
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          ✓ In stock — pop in anytime
+                        </button>
+                        <button
+                          onClick={() => setQuotePartStatus('parts_needed')}
+                          className={`py-2.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                            quotePartStatus === 'parts_needed'
+                              ? 'bg-orange-600 text-white'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          📦 Order in — £20 deposit
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {quotePartStatus === 'parts_needed'
+                          ? 'If they approve on the call, Alex texts a £20 deposit link and the job is created awaiting deposit.'
+                          : 'If they approve on the call, Alex tells them to pop in during opening hours.'}
+                      </p>
+                    </div>
+
                     {/* Send method */}
                     <div>
                       <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Send via</p>
@@ -1932,6 +1967,7 @@ function EnquiriesContent() {
                               priceText: selectedEnquiry.display_price || (selectedEnquiry.quoted_price ? `£${selectedEnquiry.quoted_price}` : undefined),
                               notes: selectedEnquiry.staff_notes || undefined,
                               enquiryRef: selectedEnquiry.enquiry_ref,
+                              partStatus: selectedEnquiry.part_status || 'in_stock',
                             }),
                           })
                           const data = await res.json()
