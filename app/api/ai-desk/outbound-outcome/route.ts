@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       | 'thinking'
       | 'will_collect'
       | 'question'
+      | 'unreachable'
     const notes = typeof body.notes === 'string' ? body.notes.trim() : ''
     const enquiryRef = typeof body.enquiryRef === 'string' ? body.enquiryRef.trim() : ''
     const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
@@ -63,10 +64,13 @@ export async function POST(request: NextRequest) {
         await supabase.from('enquiries').update(updateFields).eq('id', enquiry.id)
 
         const deviceLabel = `${enquiry.device_make || ''} ${enquiry.device_model || ''}`.trim() || 'device'
+        const isUnreachable = outcome === 'unreachable'
         await supabase.from('notifications').insert({
           type: outcome === 'approved' ? 'QUOTE_ACCEPTED' : 'ENQUIRY_UPDATE',
-          title: `AI Call (${outcome.toUpperCase()}): ${deviceLabel}`,
-          body: `${enquiry.customer_name} (${enquiryRef}) — ${outcome}${notes ? `: ${notes}` : ''}`,
+          title: isUnreachable
+            ? `AI Call couldn't get through: ${deviceLabel}`
+            : `AI Call (${outcome.toUpperCase()}): ${deviceLabel}`,
+          body: `${enquiry.customer_name} (${enquiryRef}) — ${isUnreachable ? (notes || 'no answer') : outcome}${!isUnreachable && notes ? `: ${notes}` : ''}${isUnreachable ? ' — you can try again or send a text' : ''}`,
           is_read: false,
         } as any)
       }
@@ -108,10 +112,13 @@ export async function POST(request: NextRequest) {
         })
 
         const deviceLabel = `${job.device_make || ''} ${job.device_model || ''}`.trim() || 'device'
+        const isUnreachable = outcome === 'unreachable'
         await supabase.from('notifications').insert({
           type: outcome === 'approved' ? 'QUOTE_APPROVED' : 'JOB_UPDATE',
-          title: `AI Call (${outcome.toUpperCase()}): ${job.job_ref || deviceLabel}`,
-          body: `${job.customer_name || customerName} — ${outcome}${notes ? `: ${notes}` : ''}`,
+          title: isUnreachable
+            ? `AI Call couldn't get through: ${job.job_ref || deviceLabel}`
+            : `AI Call (${outcome.toUpperCase()}): ${job.job_ref || deviceLabel}`,
+          body: `${job.customer_name || customerName} — ${isUnreachable ? (notes || 'no answer') : outcome}${!isUnreachable && notes ? `: ${notes}` : ''}${isUnreachable ? ' — you can try again or send a text' : ''}`,
           job_id: job.id,
           is_read: false,
         } as any)

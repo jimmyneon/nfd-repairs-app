@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
 import { repairPaymentLink, shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getFirstName } from '@/lib/sms-template'
+import { pollAiCallStatus, describeAiCallStatus } from '@/lib/ai-call-status'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
 import OnboardingGate from '@/components/OnboardingGate'
@@ -944,7 +945,14 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       })
       const data = await res.json()
       if (res.ok && data.ok) {
-        setAiCallFeedback(`Alex is calling ${job.customer_name || 'the customer'} now...`)
+        const name = job.customer_name || 'the customer'
+        setAiCallFeedback(`Alex is calling ${name} now...`)
+        if (data.callSid) {
+          pollAiCallStatus(data.callSid, (d) => {
+            const label = describeAiCallStatus(d, name)
+            if (label) setAiCallFeedback(label)
+          })
+        }
       } else {
         setAiCallFeedback(data.error || 'Could not start AI call.')
       }

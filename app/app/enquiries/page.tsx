@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, CheckCircle, Clock, ChevronDown, Send, ArrowRight, Phone, X, Stethoscope, Eye, PoundSterling, Store, Monitor, Pencil, Trash2, CalendarCheck } from 'lucide-react'
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
+import { pollAiCallStatus, describeAiCallStatus } from '@/lib/ai-call-status'
 import SlideUpPanel from '@/components/SlideUpPanel'
 import ConversationThread from '@/components/ConversationThread'
 
@@ -556,7 +557,31 @@ function EnquiriesContent() {
       const data = await res.json()
       if (data.success) {
         const priceDisplay = priceHigh !== null ? `£${price}-£${priceHigh}` : `£${price}`
-        setQuoteResult({ success: true, message: `Quote of ${priceDisplay} sent to ${selectedEnquiry.customer_name} via ${quoteMethod}.` })
+        const callOnly = quoteMethod === 'call'
+        const callFailed = Boolean(data.aiCallError) && !data.aiCallSid
+        if (callOnly && callFailed) {
+          // Call was blocked (out of hours / attempt cap) — nothing was sent.
+          setQuoteResult({ success: false, message: data.aiCallError })
+        } else {
+          const viaLabel =
+            quoteMethod === 'call' ? 'AI call'
+            : quoteMethod === 'sms_and_call' ? 'text + AI call'
+            : quoteMethod === 'both' ? 'text + email'
+            : quoteMethod
+          const warn = data.aiCallError && quoteMethod === 'sms_and_call'
+            ? ` (AI call: ${data.aiCallError})`
+            : ''
+          setQuoteResult({
+            success: true,
+            message: `Quote of ${priceDisplay} sent to ${selectedEnquiry.customer_name} via ${viaLabel}.${warn}`,
+          })
+        }
+        if (data.aiCallSid) {
+          pollAiCallStatus(data.aiCallSid, (d) => {
+            const label = describeAiCallStatus(d, selectedEnquiry.customer_name || 'the customer')
+            if (label) setQuoteResult({ success: true, message: label })
+          })
+        }
         setQuotePrice('')
         setQuotePriceHigh('')
         setQuotePersonalisedMsg('')
@@ -1912,6 +1937,12 @@ function EnquiriesContent() {
                           const data = await res.json()
                           if (res.ok && data.ok) {
                             setAiFollowupMsg(`Alex is calling ${selectedEnquiry.customer_name} now...`)
+                            if (data.callSid) {
+                              pollAiCallStatus(data.callSid, (d) => {
+                                const label = describeAiCallStatus(d, selectedEnquiry.customer_name || 'the customer')
+                                if (label) setAiFollowupMsg(label)
+                              })
+                            }
                           } else {
                             setAiFollowupMsg(data.error || 'Could not start AI call.')
                           }

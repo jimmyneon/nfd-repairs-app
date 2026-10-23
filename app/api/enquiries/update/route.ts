@@ -193,6 +193,12 @@ export async function POST(request: NextRequest) {
     let updateFields: Record<string, any> = { updated_at: now }
     let notificationTitle = ''
     let notificationBody = ''
+    // Result of any AI outbound call placed by this update (e.g. a
+    // personalised-quote callback) — surfaced to staff so they can see
+    // whether it started, was blocked (out of hours / attempt cap), or poll
+    // its progress.
+    let aiCallSid: string | null = null
+    let aiCallError: string | null = null
     let pendingQuoteSend: { method: string; quoteUrl: string; isInstant: boolean; priceText: string; deviceName: string; repairName: string; customerName: string; partOption: string; additionalRepairs: string } | null = null
 
     switch (action) {
@@ -689,10 +695,24 @@ export async function POST(request: NextRequest) {
               }),
               signal: AbortSignal.timeout(15_000),
             })
-            if (callRes.ok) quoteDelivered = true
+            const callData = await callRes.json().catch(() => ({}))
+            if (callRes.ok && (callData as any)?.callSid) {
+              aiCallSid = (callData as any).callSid
+              quoteDelivered = true
+            } else {
+              // e.g. out of hours (422) or attempt cap (429) — surface it so
+              // staff know to try again later or send a text instead.
+              aiCallError = (callData as any)?.error || `AI call couldn't start (${callRes.status})`
+              console.error('AI outbound quote call blocked:', callRes.status, callData)
+            }
           } catch (e) {
             console.error('AI outbound quote call failed:', e)
+            aiCallError = 'Could not reach AI Desk to place the call'
           }
+        } else {
+          aiCallError = !enquiry.customer_phone
+            ? 'No customer phone number on this enquiry'
+            : 'AI Desk key not configured'
         }
       }
 
@@ -821,6 +841,8 @@ ${personalisedHtml}
       success: true,
       action,
       enquiry_ref: enquiry.enquiry_ref,
+      aiCallSid,
+      aiCallError,
     }, {
       headers,
     })
