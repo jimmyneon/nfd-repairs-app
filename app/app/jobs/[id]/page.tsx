@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ContactActions from '@/components/ContactActions'
 import { repairPaymentLink, shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getFirstName } from '@/lib/sms-template'
+import { buildStatusUpdateMessage } from '@/lib/status-messages'
 import { pollAiCallStatus, describeAiCallStatus } from '@/lib/ai-call-status'
 import StatusChangeModal from '@/components/StatusChangeModal'
 import StatusSelectorModal from '@/components/StatusSelectorModal'
@@ -87,6 +88,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [editingEmail, setEditingEmail] = useState(false)
   const [emailValue, setEmailValue] = useState('')
   const [diagnosticSmsMessage, setDiagnosticSmsMessage] = useState<string | null>(null)
+  const [statusUpdateSmsMessage, setStatusUpdateSmsMessage] = useState<string | null>(null)
   const [reviewToggling, setReviewToggling] = useState(false)
   const [showReviewReason, setShowReviewReason] = useState(false)
   const [showReviewPlatforms, setShowReviewPlatforms] = useState(false)
@@ -2302,6 +2304,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 >
                   Open in New Tab
                 </button>
+
+                <button
+                  onClick={() => {
+                    setStatusUpdateSmsMessage(buildStatusUpdateMessage(job!))
+                    setShowTrackingLinkModal(false)
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded transition-colors"
+                >
+                  Send Status Update to Customer
+                </button>
               </div>
 
               <button
@@ -2811,6 +2823,16 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           job={job}
           initialMessage={diagnosticSmsMessage}
           onClose={() => setDiagnosticSmsMessage(null)}
+          onSent={loadJobData}
+        />
+      )}
+
+      {/* Status Update SMS Composer */}
+      {statusUpdateSmsMessage && (
+        <CustomSmsComposer
+          job={job}
+          initialMessage={statusUpdateSmsMessage}
+          onClose={() => setStatusUpdateSmsMessage(null)}
           onSent={loadJobData}
         />
       )}

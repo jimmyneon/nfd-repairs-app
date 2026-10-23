@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
+import { customerStatusMessage } from '@/lib/status-messages'
 import { repairPaymentLink, shortTrackingLink, shortFastDropoffLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry } from '@/lib/resilience'
 import { requireStaffOrCron } from '@/lib/api-auth'
@@ -97,28 +98,12 @@ export async function POST(request: NextRequest) {
         : undefined
     const depositUrl = repairPaymentLink(job)
 
-    const statusMessages: Record<string, string> = {
-      'QUOTE_APPROVED': 'Your repair quote has been approved! Please use the booking link below to get started.',
-      'AWAITING_DEVICE': 'Your repair is ready for drop-off. Bring the device in whenever suits you during opening hours — no appointment needed.',
-      'DROPPED_OFF': 'We have received your device and will begin the repair process.',
-      'RECEIVED': 'Your device is now booked in with us. We will keep you updated throughout the repair.',
-      'AWAITING_DEPOSIT': 'We need a deposit to order the parts for your repair. Please use the payment link below.',
-      'PARTS_ORDERED': 'Parts have been ordered. We will let you know as soon as they arrive — usually 2-3 working days.',
-      'PARTS_ARRIVED': 'Great news! The parts for your repair have arrived. Please bring your device in whenever suits you.',
-      'IN_REPAIR': 'Your device is now being repaired. We will update you as soon as it is ready to collect.',
-      'READY_TO_COLLECT': 'Your repair is complete! Your device is ready to collect.',
-      'COLLECTED': 'Thank you for collecting your device!',
-      'COMPLETED': 'Your repair is all done. If you notice any issues, just let us know.',
-      'CANCELLED': 'This repair has been cancelled. If you have any questions, please contact us.',
-      'DELAYED': 'There is a slight delay with your repair. We will contact you with more information shortly.',
-    }
-
     const emailTemplate = generateEmbeddedJobEmail(
       {
         job,
         trackingUrl,
         depositUrl,
-        statusMessage: type === 'STATUS_UPDATE' ? job.status === 'AWAITING_DEPOSIT' && (job.deposit_received || job.payment_received) ? 'Payment received. We are arranging your parts order and will text you when the parts arrive.' : statusMessages[job.status] : undefined,
+        statusMessage: type === 'STATUS_UPDATE' ? customerStatusMessage(job) : undefined,
         fastDropoffUrl,
         includePrice: sendPriceInSms !== false,
       },

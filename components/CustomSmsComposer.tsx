@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { Send, Plus, DollarSign, FileText, Link as LinkIcon, Clock, CheckCircle, AlertCircle, MessageSquare, X, MessageCircle, Lock } from 'lucide-react'
 import { Job } from '@/lib/types-v3'
 import { getFirstName } from '@/lib/sms-template'
+import { buildStatusUpdateMessage } from '@/lib/status-messages'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import SlideUpPanel from './SlideUpPanel'
 
@@ -49,6 +50,10 @@ export default function CustomSmsComposer({ job, onClose, onSent, initialMessage
   const hasPhone = !!(job.customer_phone || '').trim()
 
   const messageTemplates = [
+    {
+      label: 'Status Update',
+      text: buildStatusUpdateMessage(job),
+    },
     {
       label: 'Parts In Stock',
       text: `Hi ${firstName}, we've got the parts for your ${deviceName} in stock! Pop it in any time at your convenience and we'll get it sorted.\n\nPlease check our live hours before setting off: ${hoursLink}`,

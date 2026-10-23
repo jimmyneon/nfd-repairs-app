@@ -88,6 +88,7 @@ export interface Job {
   
   // Tracking
   tracking_token: string
+  short_token?: string | null
   
   // Onboarding
   onboarding_completed?: boolean
