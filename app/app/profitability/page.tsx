@@ -57,14 +57,16 @@ type ApiData = {
 }
 
 type Period = {
-  key: 'week' | 'four_weeks' | 'three_months' | 'rolling_seven' | 'rolling_thirty'
+  key: 'this_week' | 'last_week' | 'two_weeks' | 'four_weeks' | 'three_months' | 'rolling_seven' | 'rolling_thirty'
   label: string
   short: string
   days: number
 }
 
 const PERIODS: Period[] = [
-  { key: 'week', label: '1 week', short: '1W', days: 7 },
+  { key: 'this_week', label: 'This week', short: 'TW', days: 7 },
+  { key: 'last_week', label: 'Last week', short: 'LW', days: 7 },
+  { key: 'two_weeks', label: 'Last 2 weeks', short: '2W', days: 14 },
   { key: 'four_weeks', label: '4 weeks', short: '4W', days: 28 },
   { key: 'three_months', label: '3 months', short: '3M', days: 90 },
   { key: 'rolling_seven', label: 'Rolling 7 days', short: 'R7', days: 7 },
@@ -107,12 +109,14 @@ function summarise(entries: ProfitabilityEntry[]) {
   const sumupTakings = entries.reduce((sum, entry) => sum + entry.sumup_takings, 0)
   const sumupFees = entries.reduce((sum, entry) => sum + entrySumUpFee(entry), 0)
   const cashAdvance = entries.reduce((sum, entry) => sum + entryCashAdvanceRepayment(entry), 0)
+  const gross = revenue - parts
   const net = entries.reduce((sum, entry) => sum + entryNetProfit(entry), 0)
   const cashAfterAdvance = entries.reduce((sum, entry) => sum + entryCashAfterAdvance(entry), 0)
   const activeDays = entries.length
 
   return {
     revenue,
+    gross,
     parts,
     petty,
     overhead,
@@ -267,9 +271,15 @@ export default function ProfitabilityPage() {
       return { currentEntries: [], previousEntries: [], current: empty, previous: empty }
     }
 
-    // Only include completed trading dates; today's entry is still in progress.
-    const currentTo = dateOffsetKey(data.today, -1)
-    const currentFrom = dateOffsetKey(currentTo, -(period.days - 1))
+    // Calendar weeks run Monday–Sunday; include today's saved entry when present.
+    const weekday = new Date(`${data.today}T12:00:00Z`).getUTCDay()
+    const mondayOffset = (weekday + 6) % 7
+    const thisMonday = dateOffsetKey(data.today, -mondayOffset)
+    const currentTo = period.key === 'last_week' ? dateOffsetKey(thisMonday, -1) :
+      period.key === 'this_week' ? data.today :
+      period.key === 'two_weeks' || period.key === 'four_weeks' ? data.today : dateOffsetKey(data.today, -1)
+    const currentFrom = period.key === 'last_week' ? dateOffsetKey(thisMonday, -7) :
+      period.key === 'this_week' ? thisMonday : dateOffsetKey(currentTo, -(period.days - 1))
     const previousTo = dateOffsetKey(currentFrom, -1)
     const previousFrom = dateOffsetKey(previousTo, -(period.days - 1))
 
@@ -282,7 +292,7 @@ export default function ProfitabilityPage() {
       current: summarise(currentRows),
       previous: summarise(previousRows),
     }
-  }, [data, period.days])
+  }, [data, period.days, period.key])
 
   const insights = useMemo(() => {
     if (!data) return ['Add your first day to start building useful trends.']
@@ -855,6 +865,26 @@ export default function ProfitabilityPage() {
                 <Stat icon={<WalletCards className="h-4 w-4" />} label="Net profit" value={money(current.net)} note={`${money(current.avgNet)} / entered day`} />
                 <Stat icon={<Wrench className="h-4 w-4" />} label="Jobs" value={String(current.jobs)} note={`${current.avgJobs.toFixed(1)} / entered day`} />
                 <Stat icon={<TrendingUp className="h-4 w-4" />} label="Avg job" value={money(current.avgJobValue)} note={`Parts ${current.partsPct.toFixed(1)}% of revenue`} />
+              </div>
+
+              <div className="mt-4 rounded-xl border border-gray-200 p-3 text-sm dark:border-gray-700">
+                <h3 className="mb-2 font-bold text-gray-900 dark:text-white">Where the money goes</h3>
+                {([
+                  ['Revenue', current.revenue],
+                  ['Parts', -current.parts],
+                  ['Gross profit', current.gross],
+                  ['Petty cash / other costs', -current.petty],
+                  ['Allocated overheads', -current.overhead],
+                  ['SumUp fees', -current.sumupFees],
+                  ['Net profit', current.net],
+                  ['Advance repayment (cash flow)', -current.cashAdvance],
+                  ['Cash after deductions', current.cashAfterAdvance],
+                ] as [string, number][]).map(([label, value]) => (
+                  <div key={label} className={`flex justify-between gap-3 py-1 ${['Gross profit', 'Net profit', 'Cash after deductions'].includes(label) ? 'font-black text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'}`}>
+                    <span>{label}</span><span className="tabular-nums">{money(value, 2)}</span>
+                  </div>
+                ))}
+                <p className="mt-2 text-xs text-gray-500">Gross profit is revenue less parts. SumUp fees are already deducted in net profit; advance repayments only reduce available cash. Overheads reflect costs allocated when each day was saved.</p>
               </div>
 
               {current.sumupTakings > 0 && (
