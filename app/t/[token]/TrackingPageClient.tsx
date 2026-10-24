@@ -230,6 +230,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
       AWAITING_DEPOSIT: 'We need a deposit to order the parts for your repair.',
       PARTS_ORDERED: 'Parts have been ordered and are on their way to us.',
       PARTS_ARRIVED: 'Parts have arrived — bring your device in or we will start if you have already dropped it off.',
+      AWAITING_WORKSHOP: 'Your device is safely checked in and awaiting dedicated workshop time. Some repairs require uninterrupted technician time to complete safely. We will update this page when the repair progresses; no additional update request is needed.',
       IN_REPAIR: 'Your device is being repaired by our technician.',
       READY_TO_COLLECT: 'Your device is fully repaired and ready for collection.',
       COLLECTED: 'You collected your device. Thank you for choosing us!',
@@ -310,6 +311,9 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
     reassuranceMessage = 'Payment received. We are arranging your parts order and will text you when the parts arrive.'
   }
   // Override PARTS_ARRIVED message if device is already in shop
+  if (job.status === 'AWAITING_WORKSHOP') {
+    reassuranceMessage = 'Your device is safely checked in and awaiting dedicated workshop time. We will update this page when meaningful progress is made. There is no need to request additional updates.'
+  }
   if (job.status === 'PARTS_ARRIVED' && job.device_in_shop) {
     reassuranceMessage = `Good news — your parts have arrived and we're getting started. ${estimate.display} from this point.`
   }
@@ -338,6 +342,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
     const needsPartsSteps = job.parts_required || ['PARTS_ORDERED', 'PARTS_ARRIVED'].includes(journeyBaseStatus)
     if (needsDepositStep) steps.push('AWAITING_DEPOSIT')
     if (needsPartsSteps) { steps.push('PARTS_ORDERED'); steps.push('PARTS_ARRIVED') }
+    if (journeyBaseStatus === 'AWAITING_WORKSHOP' || statusTimestamps.AWAITING_WORKSHOP) steps.push('AWAITING_WORKSHOP')
     steps.push('IN_REPAIR')
     steps.push('READY_TO_COLLECT')
     steps.push('COLLECTED')
