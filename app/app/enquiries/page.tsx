@@ -127,6 +127,7 @@ function EnquiriesContent() {
     tracking_url: string
     fast_dropoff_url?: string | null
     status: string
+    kind?: string
     sms_sent: boolean
     sms_error?: string | null
     email_sent: boolean
@@ -135,8 +136,8 @@ function EnquiriesContent() {
   } | null>(null)
   const [showMessageComposer, setShowMessageComposer] = useState(false)
   const [messageMethod, setMessageMethod] = useState<'sms' | 'email' | 'both'>('both')
-  // Convert-to-job form state (In Stock / Need Parts / Device Dropped Off)
-  const [convertFormOpen, setConvertFormOpen] = useState<'in_stock' | 'parts_needed' | 'device_in_shop' | null>(null)
+  // Convert-to-job form state (In Stock / Need Parts / No Parts / Device Dropped Off)
+  const [convertFormOpen, setConvertFormOpen] = useState<'in_stock' | 'parts_needed' | 'device_in_shop' | 'no_parts' | null>(null)
   const [convertEarliestDate, setConvertEarliestDate] = useState('')
   const [convertNotes, setConvertNotes] = useState('')
   // Personalised quote response panel state
@@ -145,7 +146,7 @@ function EnquiriesContent() {
   const [quotePriceHigh, setQuotePriceHigh] = useState('')
   const [quotePersonalisedMsg, setQuotePersonalisedMsg] = useState('')
   const [quoteMethod, setQuoteMethod] = useState<'sms' | 'email' | 'both' | 'call' | 'sms_and_call'>('sms')
-  const [quotePartStatus, setQuotePartStatus] = useState<'in_stock' | 'parts_needed'>('in_stock')
+  const [quotePartStatus, setQuotePartStatus] = useState<'in_stock' | 'parts_needed' | 'no_parts'>('in_stock')
   const [sendingQuote, setSendingQuote] = useState(false)
   const [callingAiFollowup, setCallingAiFollowup] = useState(false)
   const [aiFollowupMsg, setAiFollowupMsg] = useState<string | null>(null)
@@ -435,7 +436,7 @@ function EnquiriesContent() {
     setShowTemplatePicker(false)
   }
 
-  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_needed' | 'device_in_shop') => {
+  const handleConvertToJob = async (stockStatus: 'in_stock' | 'parts_needed' | 'device_in_shop' | 'no_parts') => {
     if (!selectedEnquiry) return
     setConverting(true)
     try {
@@ -457,6 +458,7 @@ function EnquiriesContent() {
           tracking_url: data.tracking_url,
           fast_dropoff_url: data.fast_dropoff_url || null,
           status: data.status,
+          kind: stockStatus,
           sms_sent: data.sms_sent === true,
           sms_error: data.sms_error || null,
           email_sent: data.email_sent === true,
@@ -1303,7 +1305,11 @@ function EnquiriesContent() {
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Job Created!</h3>
                   <p className="text-sm text-gray-500 mt-1">Job ref: <span className="font-mono font-bold">{convertResult.job_ref}</span></p>
                   <p className="text-sm text-gray-500 mt-1">
-                    {convertResult.status === 'AWAITING_DEPOSIT' ? 'Parts required · awaiting £20 deposit' : 'In stock · ready to book in'}
+                    {convertResult.status === 'AWAITING_DEPOSIT'
+                      ? 'Parts required · awaiting £20 deposit'
+                      : convertResult.kind === 'no_parts'
+                        ? 'No parts needed · ready to book in'
+                        : 'In stock · ready to book in'}
                   </p>
                   <div className="mt-3 space-y-1">
                     {selectedEnquiry?.customer_email && (
@@ -1555,7 +1561,7 @@ function EnquiriesContent() {
                     {/* Parts stock — drives what Alex says after approval and whether a deposit text goes out */}
                     <div>
                       <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">Parts</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => setQuotePartStatus('in_stock')}
                           className={`py-2.5 px-2 rounded-lg text-xs font-bold transition-colors ${
@@ -1565,6 +1571,16 @@ function EnquiriesContent() {
                           }`}
                         >
                           ✓ In stock — pop in anytime
+                        </button>
+                        <button
+                          onClick={() => setQuotePartStatus('no_parts')}
+                          className={`py-2.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                            quotePartStatus === 'no_parts'
+                              ? 'bg-teal-600 text-white'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          🔧 No parts — service job
                         </button>
                         <button
                           onClick={() => setQuotePartStatus('parts_needed')}
@@ -1580,7 +1596,9 @@ function EnquiriesContent() {
                       <p className="text-xs text-gray-500 mt-1">
                         {quotePartStatus === 'parts_needed'
                           ? 'If they approve on the call, Alex texts a £20 deposit link and the job is created awaiting deposit.'
-                          : 'If they approve on the call, Alex tells them to pop in during opening hours.'}
+                          : quotePartStatus === 'no_parts'
+                            ? 'If they approve on the call, Alex tells them to pop in — convert it with No Parts so no deposit is asked for.'
+                            : 'If they approve on the call, Alex tells them to pop in during opening hours.'}
                       </p>
                     </div>
 
@@ -1838,7 +1856,7 @@ function EnquiriesContent() {
                             <span className="text-xs opacity-80">— Book in & send received message</span>
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <button
                             onClick={() => setConvertFormOpen('in_stock')}
                             disabled={converting}
@@ -1847,6 +1865,15 @@ function EnquiriesContent() {
                             <CheckCircle className="h-7 w-7" />
                             <span className="text-sm">In Stock</span>
                             <span className="text-xs opacity-80">Book in & message →</span>
+                          </button>
+                          <button
+                            onClick={() => setConvertFormOpen('no_parts')}
+                            disabled={converting}
+                            className="flex flex-col items-center justify-center gap-2 py-6 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition-colors active:scale-95 disabled:opacity-50"
+                          >
+                            <Wrench className="h-7 w-7" />
+                            <span className="text-sm">No Parts</span>
+                            <span className="text-xs opacity-80">Service job — bring it in →</span>
                           </button>
                           <button
                             onClick={() => setConvertFormOpen('parts_needed')}
@@ -1867,6 +1894,7 @@ function EnquiriesContent() {
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
                             {convertFormOpen === 'in_stock' && '✅ In Stock — Book in & message'}
+                            {convertFormOpen === 'no_parts' && '🔧 No Parts — service job, just bring it in'}
                             {convertFormOpen === 'parts_needed' && '⏳ Need Parts — Send deposit request'}
                             {convertFormOpen === 'device_in_shop' && '🏪 Device Dropped Off — Book in'}
                           </p>
@@ -1967,7 +1995,7 @@ function EnquiriesContent() {
                               priceText: selectedEnquiry.display_price || (selectedEnquiry.quoted_price ? `£${selectedEnquiry.quoted_price}` : undefined),
                               notes: selectedEnquiry.staff_notes || undefined,
                               enquiryRef: selectedEnquiry.enquiry_ref,
-                              partStatus: selectedEnquiry.part_status || 'in_stock',
+                              partStatus: selectedEnquiry.part_status === 'parts_needed' ? 'parts_needed' : 'in_stock',
                             }),
                           })
                           const data = await res.json()

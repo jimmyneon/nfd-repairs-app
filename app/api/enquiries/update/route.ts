@@ -354,10 +354,14 @@ export async function POST(request: NextRequest) {
         }
         const personalisedMessage = clampLength(data?.personalised_message || '', 2000)
         const method = data?.method || 'sms'
-        // Whether the part is on the shelf or must be ordered — drives what
-        // Alex tells the customer after they approve on an AI call, and
-        // whether a deposit link is texted automatically.
-        const partStatus = data?.part_status === 'parts_needed' ? 'parts_needed' : 'in_stock'
+        // Whether the part is on the shelf, must be ordered, or isn't needed
+        // at all (service job) — drives what Alex tells the customer after
+        // they approve on an AI call, and whether a deposit link goes out.
+        const partStatus = data?.part_status === 'parts_needed'
+          ? 'parts_needed'
+          : data?.part_status === 'no_parts'
+            ? 'no_parts'
+            : 'in_stock'
 
         updateFields.quoted_price = price
         updateFields.quote_type = 'personalised'
@@ -699,7 +703,9 @@ export async function POST(request: NextRequest) {
                 notes: personalisedMessage || undefined,
                 quoteUrl,
                 enquiryRef: enquiry.enquiry_ref,
-                partStatus: (pendingQuoteSend as any)?.partStatus || 'in_stock',
+                // AI Desk only understands in_stock/parts_needed — a service
+                // job gets the same "pop in during opening hours" instruction.
+                partStatus: (pendingQuoteSend as any)?.partStatus === 'parts_needed' ? 'parts_needed' : 'in_stock',
               }),
               signal: AbortSignal.timeout(15_000),
             })

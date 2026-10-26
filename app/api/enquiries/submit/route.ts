@@ -610,7 +610,7 @@ export async function POST(request: NextRequest) {
       const firstName = sanitizedName.split(/\s+/)[0] || sanitizedName || 'there'
 
       if (sanitizedPhone) {
-        const smsBody = `Hi ${firstName}! 👋\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're checking the part now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNFD Repairs`
+        const smsBody = `Hi ${firstName}! 👋\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're taking a look at it now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNFD Repairs`
         try {
           const smsResult = await sendSms(sanitizedPhone, smsBody)
           acknowledgement.sms = smsResult.ok
@@ -643,12 +643,12 @@ export async function POST(request: NextRequest) {
             <h2 style="color:#009B4D;">Repair request received</h2>
             <p>Hi ${safeName},</p>
             <p>We've got your request for the <strong>${safeDevice}</strong> ${safeRepair}${safePrice ? ` at <strong>${safePrice}</strong>` : ''}.</p>
-            <p>We're checking the part now. We'll let you know if there's anything you need to know before coming in.</p>
+            <p>We're taking a look at it now. We'll let you know if there's anything you need to know before coming in.</p>
             ${safeUrl ? `<p><a href="${safeUrl}" style="display:inline-block;background:#009B4D;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:bold;">View your quote</a></p>` : ''}
             <p style="color:#666;font-size:14px;">Nothing else is required right now. If a part needs ordering, we'll let you know before asking for any deposit.</p>
             <p>NFD Repairs</p>
           </div>`
-        const emailText = `Hi ${firstName},\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're checking the part now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNothing else is required right now. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
+        const emailText = `Hi ${firstName},\n\nWe've got your request for the ${deviceLabel} ${repairLabel}${priceText}.\n\nWe're taking a look at it now. We'll let you know if there's anything you need to know before coming in.${secureQuoteUrl ? `\n\nYour quote: ${secureQuoteUrl}` : ''}\n\nNothing else is required right now. If a part needs ordering, we'll let you know before asking for any deposit.\n\nNFD Repairs`
         try {
           const emailResult = await sendEmail(sanitizedEmail, subject, emailHtml, emailText)
           acknowledgement.email = emailResult.success === true
@@ -666,7 +666,7 @@ export async function POST(request: NextRequest) {
       repair_offer_applied: Boolean(offerClaims),
       quoted_price: verifiedQuotedPrice,
       message: isProceed
-        ? 'Your repair request has been saved. We are checking the part now.'
+        ? 'Your repair request has been saved. We are taking a look at it now.'
         : 'Your enquiry has been submitted successfully. We will contact you within 24 hours.',
     }, {
       headers,

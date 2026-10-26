@@ -76,10 +76,10 @@ export async function POST(request: NextRequest) {
       return templateBody + infoBlock
     }
 
-    const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop']
+    const validStatuses = ['in_stock', 'parts_needed', 'parts_deposit_paid', 'device_in_shop', 'no_parts']
     if (!validStatuses.includes(stock_status)) {
       return NextResponse.json(
-        { error: 'stock_status must be "in_stock", "parts_needed", "parts_deposit_paid", or "device_in_shop"' },
+        { error: 'stock_status must be "in_stock", "parts_needed", "parts_deposit_paid", "device_in_shop", or "no_parts"' },
         { status: 400 }
       )
     }
@@ -126,7 +126,9 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString()
     const isDeviceInShop = stock_status === 'device_in_shop'
-    const requiresParts = stock_status !== 'in_stock' && !isDeviceInShop
+    const isNoParts = stock_status === 'no_parts'
+    // 'no_parts' is a service job — nothing to order, no deposit to chase.
+    const requiresParts = stock_status === 'parts_needed' || stock_status === 'parts_deposit_paid'
     const depositAlreadyPaid = stock_status === 'parts_deposit_paid'
     const partsRequired = requiresParts
     const depositRequired = requiresParts
@@ -260,7 +262,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const fastDropoffUrl = stock_status === 'in_stock' && !enquiry.terms_accepted
+    const fastDropoffUrl = (stock_status === 'in_stock' || stock_status === 'no_parts') && !enquiry.terms_accepted
       ? shortFastDropoffLink(job.tracking_token)
       : null
 
@@ -272,6 +274,9 @@ export async function POST(request: NextRequest) {
         converted_job_id: job.id,
         converted_to_job: true,
         converted_at: now,
+        // Record no-parts so the customer quote page doesn't claim a part
+        // is in stock for a service job.
+        ...(isNoParts ? { part_status: 'no_parts' } : {}),
         updated_at: now,
       })
       .eq('id', enquiry_id)
@@ -289,7 +294,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('job_events').insert({
       job_id: job.id,
       type: 'SYSTEM',
-      message: `Job created from enquiry ${enquiry.enquiry_ref} (${isDeviceInShop ? 'Device dropped off - booked in' : depositAlreadyPaid ? 'Parts needed - deposit paid' : requiresParts ? 'Parts needed - awaiting deposit' : 'In stock'})`,
+      message: `Job created from enquiry ${enquiry.enquiry_ref} (${isDeviceInShop ? 'Device dropped off - booked in' : isNoParts ? 'No parts needed - service job' : depositAlreadyPaid ? 'Parts needed - deposit paid' : requiresParts ? 'Parts needed - awaiting deposit' : 'In stock'})`,
     })
 
     // Create staff notification
@@ -354,6 +359,17 @@ export async function POST(request: NextRequest) {
             job_ref: job.job_ref,
           }))
         : `Hi ${getFirstName(enquiry.customer_name)}!\n\nWe need to order parts for your ${safeDeviceLabel(enquiry.device_make, enquiry.device_model)} repair.\n\nPay a £20 deposit (deducted from your total), or pay in full by card or Klarna where eligible.\n\nIf you choose the deposit, pay the remaining balance cash/card when you collect.\n\nPay online here:\n${depositUrl}\n\nWe will confirm payment automatically and arrange your parts order.${getInfoBlock()}\n\nNFD Repairs`
+    } else if (isNoParts) {
+      // Service job — nothing to order, customer just needs to bring it in
+      const { data: hoursSetting } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'opening_hours_link')
+        .single()
+
+      const hoursLink = hoursSetting?.value || shortHoursLink()
+
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! ✅\n\nGood news — your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair is ready to come in. There's no part to order for this one, so just pop in anytime during opening hours and we'll get it done.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase

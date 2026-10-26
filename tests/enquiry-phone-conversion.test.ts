@@ -122,8 +122,8 @@ describe('secure quote customer messaging and live status', () => {
       'utf-8'
     )
     expect(route).toContain('converted_job_id')
-    expect(route).toContain('customer_update: buildCustomerUpdate(linkedJob)')
-    expect(route).toContain('We’re checking the part')
+    expect(route).toContain('customer_update: buildCustomerUpdate(linkedJob, enquiry.part_status === \'no_parts\')')
+    expect(route).toContain('We’re looking at it now')
     expect(route).toContain('Parts confirmed — ready to bring it in')
     expect(route).toContain('We need to order the part')
     expect(route).toContain('Your part has been ordered')
