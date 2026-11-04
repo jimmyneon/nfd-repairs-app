@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { enquiry_id, stock_status, earliest_date, staff_notes } = await request.json()
+    const { enquiry_id, stock_status, earliest_date, staff_notes, send_pay_link } = await request.json()
 
     if (!enquiry_id || !stock_status) {
       return NextResponse.json(
@@ -309,6 +309,15 @@ export async function POST(request: NextRequest) {
     // Send SMS to customer
     const webhookUrl = process.env.MACRODROID_WEBHOOK_URL
 
+    // Whether "prefer to pay online" links are attached automatically —
+    // a shop-wide toggle plus a per-conversion opt-out.
+    const { data: payLinkSetting } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'auto_payment_links')
+      .maybeSingle()
+    const autoPayLinks = payLinkSetting?.value !== 'false' && send_pay_link !== false
+
     let smsBody = ''
     if (isDeviceInShop) {
       // Device already dropped off in the shop — send the normal "booked in" message
@@ -369,7 +378,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! ✅\n\nGood news — your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair is ready to come in. There's no part to order for this one, so just pop in anytime during opening hours and we'll get it done.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! ✅\n\nGood news — your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair is ready to come in. There's no part to order for this one, so just pop in anytime during opening hours and we'll get it done.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 && autoPayLinks ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
     } else {
       // In stock — parts ready, customer needs to bring device in
       const { data: hoursSetting } = await supabase
@@ -380,7 +389,7 @@ export async function POST(request: NextRequest) {
 
       const hoursLink = hoursSetting?.value || shortHoursLink()
 
-      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
+      smsBody = `Hi ${getFirstName(enquiry.customer_name)}! 📦\n\nGreat news — we have the parts in stock for your ${enquiry.device_make || ''} ${enquiry.device_model || ''} repair!\n\nJust pop your device in anytime during opening hours — no appointment needed.\n\n${fastDropoffUrl ? `⚡ Want a quicker drop-off? Complete the 1-minute repair agreement before you come, then simply hand us the device and go:\n${fastDropoffUrl}\n\nOr ignore this and we’ll do it with you when you arrive.\n\n` : ''}📍 Directions & hours: ${hoursLink}\n🔗 Track your repair: ${shortTrackingLink(job.short_token || trackingToken)}${totalPrice > 0 && autoPayLinks ? `\n\nPrefer to pay online? Card or eligible Klarna:\n${repairPaymentLink(job)}` : ''}${getInfoBlock()}\n\nNFD Repairs`
     }
 
     let smsSent = false

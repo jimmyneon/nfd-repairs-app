@@ -32,6 +32,7 @@ describe('parts payment messages', () => {
         update: () => query, delete: () => query,
         insert: () => { inserted = true; return query },
         single: async () => ({ data: table === 'enquiries' ? enquiry : table === 'jobs' ? job : null }),
+        maybeSingle: async () => ({ data: table === 'admin_settings' ? null : table === 'enquiries' ? enquiry : table === 'jobs' ? job : null, error: null }),
         then: (resolve: any) => Promise.resolve({ data: table === 'sms_templates' && template ? [{ key: 'DEPOSIT_REQUEST', body: template }] : null, count: 0, error: null }).then(resolve),
       }
       return query

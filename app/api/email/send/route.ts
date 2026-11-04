@@ -96,7 +96,17 @@ export async function POST(request: NextRequest) {
       (job.status === 'AWAITING_DEVICE' || job.status === 'PARTS_ARRIVED')
         ? shortFastDropoffLink(job.tracking_token)
         : undefined
-    const depositUrl = repairPaymentLink(job)
+    // Optional "pay online" links follow the shop toggle — but a genuinely
+    // required deposit still sends its link regardless.
+    const { data: payLinkSetting } = await supabase
+      .from('admin_settings')
+      .select('value')
+      .eq('key', 'auto_payment_links')
+      .maybeSingle()
+    const autoPayLinks = payLinkSetting?.value !== 'false'
+    const depositUrl = autoPayLinks || (job.deposit_required && !job.deposit_received)
+      ? repairPaymentLink(job)
+      : undefined
 
     const emailTemplate = generateEmbeddedJobEmail(
       {

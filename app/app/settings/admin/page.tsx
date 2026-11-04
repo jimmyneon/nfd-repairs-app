@@ -34,6 +34,7 @@ export default function AdminSettingsPage() {
     Friday:    { isOpen: true,  open: '10:00', close: '17:00' },
     Saturday:  { isOpen: true,  open: '10:00', close: '15:00' },
   })
+  const [autoPaymentLinks, setAutoPaymentLinks] = useState(true)
   const [specialHoursActive, setSpecialHoursActive] = useState(false)
   const [specialHoursNote, setSpecialHoursNote] = useState('')
   const [specialHoursExpiry, setSpecialHoursExpiry] = useState('')
@@ -47,7 +48,7 @@ export default function AdminSettingsPage() {
     const { data, error } = await supabase
       .from('admin_settings')
       .select('*')
-      .in('key', ['google_review_link', 'google_maps_link', 'warranty_api_key'])
+      .in('key', ['google_review_link', 'google_maps_link', 'warranty_api_key', 'auto_payment_links'])
 
     if (!error && data) {
       setSettings(data as any)
@@ -58,6 +59,7 @@ export default function AdminSettingsPage() {
       if (reviewLink) setGoogleReviewLink(reviewLink.value)
       if (mapsLink) setGoogleMapsLink(mapsLink.value)
       if (apiKey) setWarrantyApiKey(apiKey.value)
+      setAutoPaymentLinks(data.find((s: any) => s.key === 'auto_payment_links')?.value !== 'false')
     }
 
     // Load GPS coordinates from the first (and only) admin_settings record
@@ -136,6 +138,25 @@ export default function AdminSettingsPage() {
       await loadSettings()
       alert('Google review link saved successfully!')
     } else {
+      alert('Failed to save: ' + error.message)
+    }
+    setSaving(false)
+  }
+
+  const saveAutoPaymentLinks = async (enabled: boolean) => {
+    setSaving(true)
+    setAutoPaymentLinks(enabled)
+    const value = enabled ? 'true' : 'false'
+    const { data: existing } = await supabase
+      .from('admin_settings')
+      .select('id')
+      .eq('key', 'auto_payment_links')
+      .maybeSingle()
+    const { error } = existing
+      ? await supabase.from('admin_settings').update({ value }).eq('key', 'auto_payment_links')
+      : await supabase.from('admin_settings').insert({ key: 'auto_payment_links', value })
+    if (error) {
+      setAutoPaymentLinks(!enabled)
       alert('Failed to save: ' + error.message)
     }
     setSaving(false)
@@ -317,6 +338,32 @@ export default function AdminSettingsPage() {
               <span>Save Google Review Link</span>
             </button>
           </div>
+        </div>
+
+        {/* Online payment links */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center mb-4">
+            <LinkIcon className="h-6 w-6 text-amber-500 mr-2" />
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Automatic Payment Links</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            When on, "prefer to pay online" card/Klarna links are automatically included in
+            job-created texts and status emails for unpaid jobs. Turn it off to send payment
+            links only when you choose (from the job page or a custom message). Required
+            deposit requests are always sent either way.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoPaymentLinks}
+              onChange={(e) => saveAutoPaymentLinks(e.target.checked)}
+              disabled={saving}
+              className="w-5 h-5 rounded text-primary focus:ring-primary"
+            />
+            <span className="text-sm font-bold text-gray-900 dark:text-white">
+              {autoPaymentLinks ? 'On — pay-online links are attached automatically' : 'Off — payment links only go out when you send them'}
+            </span>
+          </label>
         </div>
 
         {/* Google Maps Link */}
