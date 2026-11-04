@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
             .from('payments')
             .update({ status: 'refunded', updated_at: new Date().toISOString() })
             .eq('stripe_payment_intent_id', piId)
-            .select('id, job_id')
+            .select('id, job_id, kind, amount_pence')
             .single()
           if (payment?.job_id) {
             await supabase.from('job_events').insert({
@@ -89,6 +89,17 @@ export async function POST(request: NextRequest) {
               message: 'Stripe payment refunded — review job before continuing',
             })
           }
+          const amount = (charge.amount_refunded ?? payment?.amount_pence ?? 0) / 100
+          await notifyStaffPayment(supabase, {
+            title: `Refund issued — £${amount.toFixed(2)}`,
+            body: payment
+              ? `${paymentKindLabel(payment.kind)} refunded — review the job before continuing.`
+              : 'A Stripe payment was refunded — review the job before continuing.',
+            jobId: payment?.job_id || null,
+            deepLink: payment?.job_id
+              ? `https://nfd-repairs-app.vercel.app/app/jobs/${payment.job_id}`
+              : 'https://nfd-repairs-app.vercel.app/app/notifications',
+          })
         }
         break
       }
@@ -319,6 +330,137 @@ async function handleSessionCompleted(
         .eq('id', fundId)
       if (funded) await sendFundedSms(supabase, fundId)
     }
+  }
+
+  // Staff notification — only on the open→paid transition, so Stripe
+  // redeliveries don't spam the bell.
+  if (ranTransition) {
+    await notifyStaffOfPayment(supabase, {
+      kind,
+      jobId,
+      enquiryRef,
+      fundId,
+      amountPence,
+      payerEmail: session.customer_details?.email ?? null,
+    })
+  }
+}
+
+const NOTIFY_URL = 'https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send'
+const APP_URL = 'https://nfd-repairs-app.vercel.app'
+
+function paymentKindLabel(kind: string | null | undefined): string {
+  switch (kind) {
+    case 'job_deposit': return 'Repair deposit'
+    case 'job_payment': return 'Repair payment'
+    case 'enquiry_deposit': return 'Enquiry deposit'
+    case 'enquiry_payment': return 'Enquiry payment'
+    case 'fund_topup': return 'Repair fund top-up'
+    case 'remote_support': return 'Remote support session'
+    default: return 'Stripe payment'
+  }
+}
+
+/** In-app bell notification + device push for staff. Never throws — payment
+ * processing must not fail because a notification couldn't be delivered. */
+async function notifyStaffPayment(
+  supabase: ReturnType<typeof createServiceClient>,
+  opts: { title: string; body: string; jobId?: string | null; deepLink: string }
+) {
+  try {
+    await supabase.from('notifications').insert({
+      type: 'PAYMENT',
+      title: opts.title,
+      body: opts.body,
+      job_id: opts.jobId || null,
+      is_read: false,
+    })
+  } catch (err) {
+    console.error('[Stripe webhook] notification insert failed:', err)
+  }
+  try {
+    await fetch(NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        app_id: 'nfd-repairs',
+        title: opts.title,
+        body: opts.body,
+        category: 'payment',
+        priority: 'high',
+        deep_link: opts.deepLink,
+      }),
+    })
+  } catch (err) {
+    console.error('[Stripe webhook] push notification failed:', err)
+  }
+}
+
+/** Builds the who/what/for detail line for a paid checkout session. */
+async function notifyStaffOfPayment(
+  supabase: ReturnType<typeof createServiceClient>,
+  opts: {
+    kind: string
+    jobId: string | null
+    enquiryRef: string | null
+    fundId: string | null
+    amountPence: number
+    payerEmail: string | null
+  }
+) {
+  const amount = `£${(opts.amountPence / 100).toFixed(2)}`
+  const label = paymentKindLabel(opts.kind)
+  const payer = opts.payerEmail ? ` (${opts.payerEmail})` : ''
+
+  try {
+    let subject = 'A customer'
+    let context = ''
+    let deepLink = `${APP_URL}/app/notifications`
+
+    if (opts.jobId) {
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('customer_name, device_make, device_model, job_ref')
+        .eq('id', opts.jobId)
+        .maybeSingle()
+      if (job) {
+        subject = job.customer_name || subject
+        context = ` — ${[job.device_make, job.device_model].filter(Boolean).join(' ') || 'device'} (${job.job_ref})`
+        deepLink = `${APP_URL}/app/jobs/${opts.jobId}`
+      }
+    } else if (opts.enquiryRef) {
+      const { data: enquiry } = await supabase
+        .from('enquiries')
+        .select('customer_name, device_make, device_model, repair_type')
+        .eq('enquiry_ref', opts.enquiryRef)
+        .maybeSingle()
+      if (enquiry) {
+        subject = enquiry.customer_name || subject
+        context = ` — ${[enquiry.device_make, enquiry.device_model].filter(Boolean).join(' ') || 'device'} ${enquiry.repair_type || ''} (${opts.enquiryRef})`.trim()
+        deepLink = `${APP_URL}/app/enquiries?ref=${opts.enquiryRef}`
+      }
+    } else if (opts.fundId) {
+      const { data: fund } = await supabase
+        .from('repair_funds')
+        .select('customer_name, device_summary')
+        .eq('id', opts.fundId)
+        .maybeSingle()
+      if (fund) {
+        subject = fund.customer_name || subject
+        context = ` — ${fund.device_summary || 'repair fund'}`
+      }
+    } else {
+      context = ` — ${label.toLowerCase()}`
+    }
+
+    await notifyStaffPayment(supabase, {
+      title: `${label} — ${amount}`,
+      body: `${subject}${payer} paid ${amount}${context}.`,
+      jobId: opts.jobId,
+      deepLink,
+    })
+  } catch (err) {
+    console.error('[Stripe webhook] staff payment notification failed:', err)
   }
 }
 

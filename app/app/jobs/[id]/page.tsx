@@ -46,6 +46,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [events, setEvents] = useState<JobEvent[]>([])
   const [smsLogs, setSmsLogs] = useState<SMSLog[]>([])
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
+  const [payments, setPayments] = useState<{ id: string; kind: string; status: string; amount_pence: number; description?: string | null; customer_email?: string | null; paid_at?: string | null; created_at?: string | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const actionLoadingRef = useRef(false)
@@ -214,6 +215,11 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     if (eventsData) setEvents(eventsData)
     if (smsData) setSmsLogs(smsData)
     if (emailData) setEmailLogs(emailData)
+    // Payments table is service-role only — read it through the staff API
+    fetch(`/api/jobs/${params.id}/payments`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.payments) setPayments(d.payments) })
+      .catch(() => {})
     setLoading(false)
   }
 
@@ -1141,6 +1147,43 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         </div>
+
+        {/* Payments ledger — who paid, what for, when */}
+        {payments.length > 0 && (
+          <div className="card space-y-2">
+            <p className="text-sm font-black text-gray-700 dark:text-gray-300 uppercase tracking-wide">Payments</p>
+            {payments.map((p) => {
+              const amount = `£${(p.amount_pence / 100).toFixed(2)}`
+              const when = p.paid_at || p.created_at
+              const statusStyle =
+                p.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                : p.status === 'refunded' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                : p.status === 'open' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              const kindLabel =
+                p.kind === 'job_deposit' || p.kind === 'enquiry_deposit' ? 'Deposit'
+                : p.kind === 'job_payment' || p.kind === 'enquiry_payment' ? 'Payment'
+                : p.kind === 'fund_topup' ? 'Repair fund'
+                : p.kind === 'remote_support' ? 'Remote support'
+                : 'Payment'
+              return (
+                <div key={p.id} className="flex items-start justify-between gap-3 border-t border-gray-100 dark:border-gray-700 pt-2 first:border-0 first:pt-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                      {amount} · {kindLabel}
+                      {p.description && <span className="block text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">{p.description}</span>}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {p.customer_email ? `${p.customer_email} · ` : ''}
+                      {when ? new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-black uppercase px-2 py-1 rounded-lg ${statusStyle}`}>{p.status}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* HDMI postal booking — address, postage and refund controls */}
         {job!.source === 'hdmi_repair_uk' && <HdmiPostalPanel jobId={job!.id} />}
