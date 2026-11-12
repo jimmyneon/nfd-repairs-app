@@ -494,8 +494,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create notification for staff
-    const isProceed = quote_source === 'customer_wants_to_proceed' && proceed_with_repair
+    // Create notification for staff.
+    // AI Desk phone enquiries set proceed_with_repair only when the caller
+    // has accepted on the call — treat them like the website's "I want to
+    // proceed" button so staff get the same CHECK STOCK & CONVERT TO JOB
+    // notification and the customer gets the same acknowledgement text.
+    const isProceed = (quote_source === 'customer_wants_to_proceed' || quote_source === 'ai-desk-phone') && proceed_with_repair
     const isPayday = quote_source === 'reserve_for_payday' && proceed_with_repair
     const isTimingLossRisk = quote_source === 'timing_loss_risk'
     // Store conversion linkage server-side, even if the browser closes before
