@@ -6,6 +6,7 @@ import { Search, Home, Plus, Wrench, Briefcase, Code, MessageSquare, Mail, Check
 import Link from 'next/link'
 import { renderSmsTemplate, getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { pollAiCallStatus, describeAiCallStatus } from '@/lib/ai-call-status'
+import { ENQUIRY_SEARCH_MAX_LENGTH, matchesEnquirySearch } from '@/lib/enquiry-search'
 import SlideUpPanel from '@/components/SlideUpPanel'
 import ConversationThread from '@/components/ConversationThread'
 
@@ -16,7 +17,7 @@ interface Enquiry {
   enquiry_ref: string
   enquiry_type: 'web_services' | 'home_services' | 'business' | 'repair_quote' | 'remote_support'
   customer_name: string
-  customer_email: string
+  customer_email: string | null
   customer_phone: string | null
   status: 'pending' | 'approved' | 'rejected' | 'more_info_requested' | 'converted'
   created_at: string
@@ -109,6 +110,7 @@ function EnquiriesContent() {
   const [enquiries, setEnquiries] = useState<Enquiry[]>([])
   const [filteredEnquiries, setFilteredEnquiries] = useState<Enquiry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedEnquiry, setSelectedEnquiry] = useState<Enquiry | null>(null)
@@ -171,15 +173,20 @@ function EnquiriesContent() {
   const [savingEdit, setSavingEdit] = useState(false)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const didLongPress = useRef(false)
+  const enquiryLoad = useRef({ sequence: 0 })
   const supabase = createClient() as any
 
   useEffect(() => {
+    const loadState = enquiryLoad.current
     loadEnquiries()
     const subscription = supabase
       .channel('enquiries-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'enquiries' }, () => loadEnquiries())
       .subscribe()
-    return () => { subscription.unsubscribe() }
+    return () => {
+      loadState.sequence++
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Deep link: auto-open enquiry if ?ref= is in URL
@@ -209,17 +216,8 @@ function EnquiriesContent() {
 
   useEffect(() => {
     let filtered = enquiries
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase()
-      filtered = filtered.filter(e =>
-        e.enquiry_ref.toLowerCase().includes(search) ||
-        e.customer_name.toLowerCase().includes(search) ||
-        e.customer_email.toLowerCase().includes(search) ||
-        (e.customer_phone && e.customer_phone.includes(search)) ||
-        (e.device_make && e.device_make.toLowerCase().includes(search)) ||
-        (e.device_model && e.device_model.toLowerCase().includes(search)) ||
-        (e.company && e.company.toLowerCase().includes(search))
-      )
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(e => matchesEnquirySearch(e, searchTerm))
     }
     if (statusFilter !== 'all') {
       if (statusFilter === 'action_needed') {
@@ -243,21 +241,41 @@ function EnquiriesContent() {
       }
     }
     // Sort by priority: action needed first, then pending, then everything else
-    filtered.sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       const aPriority = getPriority(a)
       const bPriority = getPriority(b)
       if (aPriority !== bPriority) return aPriority - bPriority
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
-    setFilteredEnquiries(filtered)
+    setFilteredEnquiries(sorted)
   }, [enquiries, searchTerm, statusFilter])
 
   const loadEnquiries = async () => {
-    const { data, error } = await supabase
-      .from('enquiries')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (!error && data) setEnquiries(data as Enquiry[])
+    const loadState = enquiryLoad.current
+    const load = ++loadState.sequence
+    const pageSize = 500
+    const rows: Enquiry[] = []
+
+    // The Data API caps rows per request. Include older enquiries in searches.
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('enquiries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1)
+      if (load !== loadState.sequence) return
+      if (error || !data) {
+        setLoadFailed(true)
+        setLoading(false)
+        return
+      }
+      rows.push(...data)
+      if (data.length < pageSize) break
+    }
+
+    setEnquiries(rows)
+    setLoadFailed(false)
     setLoading(false)
   }
 
@@ -887,7 +905,9 @@ function EnquiriesContent() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, ref, phone..."
+              aria-label="Search enquiries by name, phone, device, repair or reference"
+              placeholder="Name, phone, device, repair or ref"
+              maxLength={ENQUIRY_SEARCH_MAX_LENGTH}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full h-14 pl-10 pr-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -972,6 +992,12 @@ function EnquiriesContent() {
 
       {/* Enquiry Tiles */}
       <main className="p-4">
+        {loadFailed && (
+          <div role="alert" className="mb-4 text-sm text-red-700 dark:text-red-400">
+            Could not load all enquiries.{' '}
+            <button type="button" onClick={loadEnquiries} className="font-bold underline">Try again</button>
+          </div>
+        )}
         {loading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -979,7 +1005,7 @@ function EnquiriesContent() {
         ) : filteredEnquiries.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-2 text-gray-500">No enquiries found</p>
+            {!loadFailed && <p className="mt-2 text-gray-500">No enquiries found</p>}
           </div>
         ) : (
           <>

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Search, FileText, Phone, User, Loader2, CheckCircle } from 'lucide-react'
+import { Search, FileText, Phone, Loader2, CheckCircle } from 'lucide-react'
+import { ENQUIRY_SEARCH_MAX_LENGTH } from '@/lib/enquiry-search'
 import SlideUpPanel from './SlideUpPanel'
 
 interface Quote {
@@ -32,75 +33,45 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
   const [searchType, setSearchType] = useState<'all' | 'phone' | 'name' | 'quote_id'>('all')
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [error, setError] = useState('')
+  const [searchAttempt, setSearchAttempt] = useState(0)
 
-  // Auto-load last 5 quotes when modal opens
-  useEffect(() => {
-    if (isOpen && !searched) {
-      loadRecentQuotes()
-    }
-  }, [isOpen])
-
-  // Dynamic search as user types (debounced)
   useEffect(() => {
     if (!isOpen) return
 
-    const debounceTimer = setTimeout(() => {
-      handleSearch()
-    }, 300) // Wait 300ms after user stops typing
-
-    return () => clearTimeout(debounceTimer)
-  }, [searchQuery, searchType, isOpen])
-
-  const loadRecentQuotes = async () => {
+    const controller = new AbortController()
+    const query = searchQuery.trim()
     setLoading(true)
-    setSearched(true)
+    setError('')
+    const debounceTimer = setTimeout(async () => {
+      const params = query
+        ? new URLSearchParams({ q: query, type: searchType })
+        : new URLSearchParams({ limit: '5' })
 
-    try {
-      const response = await fetch('/api/quotes/search?limit=5')
-      const result = await response.json()
-
-      if (response.ok) {
-        setQuotes(result.quotes || [])
-      } else {
-        console.error('Failed to load quotes:', result.error)
+      try {
+        const response = await fetch(`/api/quotes/search?${params}`, { signal: controller.signal })
+        if (!response.ok) {
+          if (!controller.signal.aborted) {
+            setError(response.status === 401 ? 'Sign in again to search quotes.' : 'Could not search quotes. Try again.')
+          }
+          return
+        }
+        const result = await response.json()
+        if (!controller.signal.aborted) setQuotes(result.quotes || [])
+      } catch {
+        if (!controller.signal.aborted) setError('Could not search quotes. Try again.')
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
       }
-    } catch (error) {
-      console.error('Error loading quotes:', error)
-    } finally {
-      setLoading(false)
+    }, query ? 300 : 0)
+
+    return () => {
+      clearTimeout(debounceTimer)
+      controller.abort()
     }
-  }
+  }, [searchQuery, searchType, isOpen, searchAttempt])
 
   if (!isOpen) return null
-
-  const handleSearch = async () => {
-    setLoading(true)
-    setSearched(true)
-
-    try {
-      const params = new URLSearchParams()
-      if (searchQuery.trim()) {
-        params.append('q', searchQuery.trim())
-      }
-      params.append('type', searchType)
-
-      const response = await fetch(`/api/quotes/search?${params.toString()}`)
-      const result = await response.json()
-
-      if (response.ok) {
-        setQuotes(result.quotes || [])
-      } else {
-        console.error('Search failed:', result.error)
-        alert(`Search failed: ${result.error}`)
-      }
-    } catch (error) {
-      console.error('Search error:', error)
-      alert('Failed to search quotes')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSelectQuote = (quote: Quote) => {
     onSelectQuote(quote)
@@ -134,7 +105,9 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Phone, name, or leave empty for recent"
+                aria-label="Search quotes by name, phone, device, repair or reference"
+                placeholder="Name, phone, device or ref"
+                maxLength={ENQUIRY_SEARCH_MAX_LENGTH}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 autoFocus
               />
@@ -150,7 +123,9 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
               <option value="quote_id">ID</option>
             </select>
             <button
-              onClick={handleSearch}
+              type="button"
+              aria-label="Search quotes"
+              onClick={() => setSearchAttempt(attempt => attempt + 1)}
               disabled={loading}
               className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold disabled:opacity-50 transition-all flex items-center gap-2"
             >
@@ -171,14 +146,18 @@ export default function QuoteLookupModal({ isOpen, onClose, onSelectQuote }: Quo
             </div>
           )}
 
-          {!loading && quotes.length === 0 && (
+          {!loading && error && (
+            <p role="alert" className="py-8 text-center text-red-700 dark:text-red-400">{error}</p>
+          )}
+
+          {!loading && !error && quotes.length === 0 && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
               <p>No quotes found matching your search</p>
             </div>
           )}
 
-          {quotes.length > 0 && (
+          {!loading && !error && quotes.length > 0 && (
             <div className="space-y-3">
               {quotes.map((quote) => (
                 <div

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireStaffUser } from '@/lib/api-auth'
+import { ENQUIRY_SEARCH_MAX_LENGTH, quoteSearchFilters } from '@/lib/enquiry-search'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -14,14 +15,19 @@ export const dynamic = 'force-dynamic'
  * doesn't need to change.
  */
 export async function GET(request: NextRequest) {
-  const { response: authResponse } = await requireStaffUser(request)
-  if (authResponse) return authResponse
-
   try {
+    const { response: authResponse } = await requireStaffUser(request)
+    if (authResponse) return authResponse
+
     const searchParams = request.nextUrl.searchParams
-    const query = searchParams.get('q')
+    const search = searchParams.get('q')?.trim() ?? ''
     const searchType = searchParams.get('type') || 'all'
-    const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const requestedLimit = Number(searchParams.get('limit') ?? 50)
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 50
+
+    if (search.length > ENQUIRY_SEARCH_MAX_LENGTH) {
+      return NextResponse.json({ error: 'Search term is too long' }, { status: 400 })
+    }
 
     // Create Supabase client with service role for server-side access
     const supabase = createClient(
@@ -33,25 +39,19 @@ export async function GET(request: NextRequest) {
       .from('enquiries')
       .select('*')
       .eq('enquiry_type', 'repair_quote')
-      .eq('converted_to_job', false)
+      .not('converted_to_job', 'is', true)
+      .is('converted_job_id', null)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(limit)
 
-    if (query && query.trim()) {
-      const searchTerm = query.trim()
-
-      switch (searchType) {
-        case 'phone':
-          dbQuery = dbQuery.ilike('customer_phone', `%${searchTerm}%`)
-          break
-        case 'name':
-          dbQuery = dbQuery.ilike('customer_name', `%${searchTerm}%`)
-          break
-        case 'quote_id':
-          dbQuery = dbQuery.eq('enquiry_ref', searchTerm)
-          break
-        default:
-          dbQuery = dbQuery.or(`customer_phone.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,device_make.ilike.%${searchTerm}%,device_model.ilike.%${searchTerm}%`)
+    if (search) {
+      if (searchType === 'quote_id') {
+        dbQuery = dbQuery.eq('enquiry_ref', search)
+      } else {
+        for (const filter of quoteSearchFilters(search, searchType)) {
+          dbQuery = dbQuery.or(filter)
+        }
       }
     }
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Enquiry search error:', error)
       return NextResponse.json(
-        { error: 'Failed to search enquiries', details: error.message },
+        { error: 'Could not search quotes' },
         { status: 500 }
       )
     }
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Enquiry search error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Could not search quotes' },
       { status: 500 }
     )
   }
