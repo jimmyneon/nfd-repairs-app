@@ -18,6 +18,7 @@ const CANCELLATION_REASONS = [
   { value: 'PARTS_UNAVAILABLE', label: 'Parts Unavailable' },
   { value: 'CUSTOMER_FOUND_ALTERNATIVE', label: 'Customer Found Alternative Solution' },
   { value: 'CUSTOMER_DECLINED_QUOTE', label: 'Customer Declined Quote' },
+  { value: 'DUPLICATE', label: 'Duplicate Job' },
   { value: 'OTHER', label: 'Other Reason' },
 ]
 

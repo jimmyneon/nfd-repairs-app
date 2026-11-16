@@ -93,17 +93,15 @@ describe('New consolidation routes', () => {
       expect(content).toContain('@/lib/quote-acceptance-detector')
     })
 
-    it('checks active enquiries before jobs', () => {
+    it('uses pickBestJob and links superseded enquiries to the job', () => {
       const content = fs.readFileSync(
         path.join(process.cwd(), 'app/api/sms/reply/route.ts'),
         'utf-8'
       )
-      // Enquiry lookup should come before job lookup
-      const enquiryIdx = content.indexOf("from('enquiries')")
-      const jobIdx = content.indexOf("from('jobs')")
-      expect(enquiryIdx).toBeGreaterThan(-1)
-      expect(jobIdx).toBeGreaterThan(-1)
-      expect(enquiryIdx).toBeLessThan(jobIdx)
+      // Job lookup runs before enquiry routing — an existing job supersedes a
+      // stale open enquiry, which is linked to the job instead of converting.
+      expect(content).toContain('pickBestJob')
+      expect(content).toContain('linkOpenEnquiriesToJob')
     })
 
     it('handles all four acceptance classifications', () => {

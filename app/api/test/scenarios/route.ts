@@ -652,7 +652,7 @@ function buildTurnaroundSms(job: any, workload: WorkloadInfo, eta: string): stri
     return `Hi ${firstName},\n\nGood news — the parts have arrived! Once you bring your device in, the repair itself takes about ${cleanEta}.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nOnce you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
     return `Hi ${firstName},\n\nOnce we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.\n\nNew Forest Device Repairs`
@@ -690,7 +690,7 @@ function buildCollectionSms(job: any): string {
     return `Hi ${firstName},\n\nNot yet — the parts have arrived but we need your device first! Bring it in during opening hours and we'll get started straight away.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
     return `Hi ${firstName},\n\nNot yet — your device is in the queue. We'll text you the moment work starts and again when it's ready to collect.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
@@ -728,7 +728,7 @@ function buildDoneCheckSms(job: any): string {
     return `Hi ${firstName},\n\nNot yet — the parts are here but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+    return `Hi ${firstName},\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
   }
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
     return `Hi ${firstName},\n\nNot yet — it's in the queue. We'll text you the moment we start on it and again when it's done.\n\nNew Forest Device Repairs`

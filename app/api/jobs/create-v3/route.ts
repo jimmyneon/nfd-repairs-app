@@ -4,6 +4,7 @@ import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-temp
 import { repairPaymentLink, shortTrackingLink, shortOnboardingLink, getAppUrl, shortHoursLink } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, fetchWithTimeout } from '@/lib/resilience'
 import { requireStaffUser } from '@/lib/api-auth'
+import { linkOpenEnquiriesToJob } from '@/lib/enquiry-linking'
 
 // Updated API endpoint to accept quote_requests format from AI responder
 export async function POST(request: NextRequest) {
@@ -236,6 +237,16 @@ export async function POST(request: NextRequest) {
       type: 'SYSTEM',
       message: `Job created via API from ${jobData.source}`,
     } as any)
+
+    // Link any still-open repair_quote enquiries for this customer/device to
+    // the new job so later SMS replies land here instead of auto-converting
+    // the stale enquiry into a duplicate job.
+    if (!is_warranty) {
+      const linkedRefs = await linkOpenEnquiriesToJob(supabase, job)
+      if (linkedRefs.length > 0) {
+        console.log(`✅ Linked open enquiries to job ${job.job_ref}:`, linkedRefs.join(', '))
+      }
+    }
 
     // A warranty ticket's matched_job_id is the original repair. Do not replace
     // it with the new warranty work order; the new job is found through its

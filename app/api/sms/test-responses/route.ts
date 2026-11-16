@@ -266,7 +266,7 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       }
     }
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-      return `Hi ${firstName},\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [
@@ -322,7 +322,7 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       }
     }
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-      return `Hi ${firstName},\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nOnce you bring your device in, this type of repair takes about ${eta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [
@@ -383,7 +383,7 @@ function buildResponseForIntent(intent: string, job: any, smsCount: number): str
       }
     }
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-      return `Hi ${firstName},\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
+      return `Hi ${firstName},\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNew Forest Device Repairs`
     }
     if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
       const variants = [

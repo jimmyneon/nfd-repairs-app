@@ -56,6 +56,13 @@ describe('missed call followed by first text', () => {
         const query: any = {
           select: (_columns?: string, options?: { head?: boolean }) => { countOnly = !!options?.head; return query },
           eq: (key: string, value: unknown) => { filters.push(row => row[key] === value); return query },
+          neq: (key: string, value: unknown) => { filters.push(row => row[key] !== value); return query },
+          is: (key: string, value: unknown) => { filters.push(row => row[key] === value); return query },
+          like: (key: string, pattern: string) => {
+            const prefix = pattern.replace(/%+$/, '')
+            filters.push(row => typeof row[key] === 'string' && row[key].startsWith(prefix))
+            return query
+          },
           in: (key: string, values: unknown[]) => { filters.push(row => values.includes(row[key])); return query },
           gte: (key: string, value: string) => { filters.push(row => row[key] >= value); return query },
           contains: () => query,

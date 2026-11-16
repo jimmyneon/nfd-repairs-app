@@ -7,6 +7,8 @@ import { getFirstName, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortHoursLink } from '@/lib/utils'
 import { getTurnaroundEstimate, getShortEta, calculateWorkloadFromJobs, type WorkloadInfo } from '@/lib/tracking-utils'
 import { SHOP_INFO } from '@/lib/constants'
+import { normaliseUkPhoneForLookup, phoneLookupVariants } from '@/lib/phone-lookup'
+import { linkOpenEnquiriesToJob } from '@/lib/enquiry-linking'
 
 /**
  * POST /api/sms/reply
@@ -130,17 +132,7 @@ export async function POST(request: NextRequest) {
     // +447... depending on how they were created. Build all possible variants
     // so the lookup always finds the matching record.
     const normalisedPhone = normaliseUkPhoneForLookup(phone)
-    const lookupSet = new Set<string>([normalisedPhone, phone.trim()])
-    // Also add the 07... form (strip +44 prefix)
-    if (normalisedPhone.startsWith('+447')) {
-      lookupSet.add('0' + normalisedPhone.slice(3))
-    }
-    // And the 447... form (no + prefix)
-    if (normalisedPhone.startsWith('+447')) {
-      lookupSet.add(normalisedPhone.slice(1))
-      lookupSet.add('00' + normalisedPhone.slice(1))
-    }
-    const lookupPhones = Array.from(lookupSet).filter(Boolean)
+    const lookupPhones = phoneLookupVariants(phone)
 
     console.log(`[sms/reply] Normalised: "${normalisedPhone}"`)
     console.log(`[sms/reply] Lookup variants: ${JSON.stringify(lookupPhones)}`)
@@ -164,12 +156,36 @@ export async function POST(request: NextRequest) {
     const activeEnquiry = enquiries?.[0]
     console.log(`[sms/reply] Enquiry lookup: ${activeEnquiry ? `found ${activeEnquiry.enquiry_ref} (${activeEnquiry.status})` : 'none'}`)
 
+    // -----------------------------------------------------------------------
+    // 2. Look up jobs BEFORE deciding whether the enquiry handler runs.
+    //    A job the customer already has (e.g. created manually by staff while
+    //    an old enquiry stayed open) supersedes a stale open enquiry — the
+    //    enquiry gets linked to the job instead of auto-converting into a
+    //    duplicate job.
+    // -----------------------------------------------------------------------
+    const { data: jobs } = await supabase
+      .from('jobs')
+      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, issue, tracking_token, short_token, review_platforms_completed, device_in_shop, created_at, updated_at, quote_request_id, parts_required, requires_parts_order')
+      .in('customer_phone', lookupPhones)
+      .neq('status', 'CANCELLED')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    const job = pickBestJob(jobs)
+    console.log(`[sms/reply] Job lookup: ${job ? `found ${job.job_ref} (${job.status}) ${job.customer_name}` : 'none'}`)
+
     // Check if this message looks like a status/update query (not a quote response)
     const detectedIntent = detectSmsIntent(message)
     const looksLikeStatusQuery = detectedIntent !== null
     console.log(`[sms/reply] Intent: ${detectedIntent || 'null (unclear)'}`)
 
-    if (activeEnquiry && !looksLikeStatusQuery) {
+    const jobIsActive = !!job && !['COMPLETED', 'COLLECTED'].includes(job.status)
+    const jobSupersedesEnquiry = !!(activeEnquiry && jobIsActive && (
+      job.quote_request_id === activeEnquiry.id ||
+      new Date(job.created_at) >= new Date(activeEnquiry.created_at)
+    ))
+
+    if (activeEnquiry && !looksLikeStatusQuery && !jobSupersedesEnquiry) {
       console.log(`[sms/reply] → Routing to enquiry handler (${activeEnquiry.enquiry_ref})`)
       return handleEnquiryReply({
         supabase,
@@ -181,18 +197,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // -----------------------------------------------------------------------
-    // 2. Check for an active job
-    // -----------------------------------------------------------------------
-    const { data: jobs } = await supabase
-      .from('jobs')
-      .select('id, job_ref, customer_name, customer_phone, status, device_make, device_model, issue, tracking_token, short_token, review_platforms_completed')
-      .in('customer_phone', lookupPhones)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    const job = jobs?.[0]
-    console.log(`[sms/reply] Job lookup: ${job ? `found ${job.job_ref} (${job.status}) ${job.customer_name}` : 'none'}`)
+    if (jobSupersedesEnquiry) {
+      console.log(`[sms/reply] Job ${job.job_ref} supersedes open enquiry ${activeEnquiry.enquiry_ref} — linking and routing to job`)
+      await linkOpenEnquiriesToJob(supabase, job)
+    }
 
     if (job) {
       // --- Suppress auto-replies when staff are actively in conversation ---
@@ -241,12 +249,21 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      // --- Quote approval by SMS ---
+      // Customer approved the quoted price on a job that's waiting on their
+      // go-ahead (e.g. staff texted a quote while the job is in DIAGNOSTIC).
+      const isQuoteApproval =
+        ['DIAGNOSTIC', 'AWAITING_CUSTOMER'].includes(job.status) &&
+        detectQuoteAcceptance(message).classification === 'accept'
+
       // Notify staff
       try {
         await supabase.from('notifications').insert({
           type: 'CUSTOMER_REPLY',
-          title: `Customer replied: ${job.job_ref}`,
-          body: `${job.customer_name}: ${message.substring(0, 80)}${message.length > 80 ? '...' : ''}`,
+          title: isQuoteApproval ? `Quote approved: ${job.job_ref}` : `Customer replied: ${job.job_ref}`,
+          body: isQuoteApproval
+            ? `${job.customer_name} approved the quote by text: "${message.substring(0, 80)}"`
+            : `${job.customer_name}: ${message.substring(0, 80)}${message.length > 80 ? '...' : ''}`,
           job_id: job.id,
           is_read: false,
         } as any)
@@ -255,6 +272,41 @@ export async function POST(request: NextRequest) {
       }
 
       console.log(`[sms/reply] Logged reply as CUSTOMER_SMS on job ${job.job_ref}`)
+
+      if (isQuoteApproval) {
+        // Record the approval on the job timeline — used by status replies so
+        // they don't tell the customer we're still "checking the device" after
+        // they've already approved, and so staff can see the approval source.
+        // Job status is NOT changed here — staff move it on when ready.
+        await supabase.from('job_events').insert({
+          job_id: job.id,
+          type: 'NOTE',
+          message: `Customer approved the quote by SMS: "${message.substring(0, 200)}"`,
+        })
+
+        let approvalSmsSent = false
+        if (!staffInConversation && !autoReplyRateLimited && isSmsConfigured()) {
+          const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
+          const first = getFirstName(job.customer_name)
+          const smsBody = `Hi ${first} 👋\n\nThanks — that's noted. We'll get your ${safeDeviceLabel(job.device_make, job.device_model)} repair underway and text you with any updates.\n\nTrack it here: ${trackingLink}\n\nNFD Repairs`
+          const result = await sendSms(phone, smsBody)
+          await logSms(supabase, 'AUTO_QUOTE_APPROVAL_ACK', smsBody, result.ok, job.id, phone)
+          await supabase.from('job_events').insert({
+            job_id: job.id,
+            type: 'SYSTEM',
+            message: 'Auto-reply sent: AUTO_QUOTE_APPROVAL_ACK',
+          })
+          approvalSmsSent = result.ok
+          console.log(`[sms/reply] Quote approval ack sent for job ${job.job_ref}`)
+        }
+
+        return NextResponse.json({
+          success: true,
+          routed_to: 'job_quote_approval',
+          job_ref: job.job_ref,
+          sms_sent: approvalSmsSent,
+        })
+      }
 
       // --- PAID detection: customer says they've paid the deposit ---
       // Only triggers if the job has a deposit required that hasn't been received yet
@@ -384,6 +436,23 @@ export async function POST(request: NextRequest) {
         statusSmsCount = autoCount || 0
       } catch (e) {
         console.error('[sms/reply] Failed to count status SMS:', e)
+      }
+
+      // If the job is still in DIAGNOSTIC but the customer already approved
+      // the quote by SMS, flag it so status replies stop saying "we're still
+      // checking your device" and instead acknowledge the approval.
+      if (job.status === 'DIAGNOSTIC') {
+        try {
+          const { count: approvalNotes } = await supabase
+            .from('job_events')
+            .select('id', { count: 'exact', head: true })
+            .eq('job_id', job.id)
+            .eq('type', 'NOTE')
+            .like('message', 'Customer approved the quote by SMS%')
+          if ((approvalNotes || 0) > 0) job.quote_approved_by_customer = true
+        } catch (e) {
+          console.error('[sms/reply] Failed to check quote approval notes:', e)
+        }
       }
 
       const autoReply = await detectAutoReply(message, job, statusSmsCount, supabase)
@@ -1245,15 +1314,24 @@ function buildHoursReply(hoursStatus: {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: normalise UK phone to +44XXXXXXXXX for DB lookup
+// Pick the best job for an inbound reply when a customer has several.
+// The jobs list is expected to be ordered by created_at descending.
+// Preference: active jobs (not COMPLETED/COLLECTED); among those, jobs with
+// the device in the shop first; then most recently updated. If every job is
+// finished, return the newest one so the warranty/post-repair flow still works.
 // ---------------------------------------------------------------------------
-function normaliseUkPhoneForLookup(raw: string): string {
-  const digits = raw.replace(/[^\d+]/g, '')
-  if (/^\+447\d{9}$/.test(digits)) return digits
-  if (/^00447\d{9}$/.test(digits)) return `+447${digits.slice(5)}`
-  if (/^447\d{9}$/.test(digits)) return `+${digits}`
-  if (/^07\d{9}$/.test(digits)) return `+44${digits.slice(1)}`
-  return raw.trim() // fallback: return as-is for non-UK or unusual formats
+export function pickBestJob(jobs: any[] | null | undefined): any | null {
+  if (!jobs || jobs.length === 0) return null
+
+  const active = jobs.filter(j => !['COMPLETED', 'COLLECTED'].includes(j.status))
+  if (active.length === 0) return jobs[0]
+
+  const inShop = active.filter(j => j.device_in_shop === true)
+  const pool = inShop.length > 0 ? inShop : active
+  return pool.slice().sort((a, b) =>
+    new Date(b.updated_at || b.created_at || 0).getTime() -
+    new Date(a.updated_at || a.created_at || 0).getTime()
+  )[0]
 }
 
 // ---------------------------------------------------------------------------
@@ -1579,7 +1657,7 @@ function buildCollectionReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName} 👋\n\nNot yet — we've got the parts in stock, but we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
+    return `Hi ${firstName} 👋\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1600,6 +1678,9 @@ NFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
+    if (job.quote_approved_by_customer) {
+      return `Hi ${firstName} 👋\n\nNot yet — thanks for approving the quote. We're getting the repair done and will text you as soon as it's ready.\n\nNFD Repairs`
+    }
     return `Hi ${firstName} 👋\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNFD Repairs`
   }
 
@@ -1668,7 +1749,7 @@ function buildTurnaroundReply(job: any, smsCount: number, workload?: WorkloadInf
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED' || status === 'AWAITING_DEVICE') {
     if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
       // Device still with customer, parts in stock
-      return `Hi ${firstName} 👋\n\nWe've got the parts in stock — once you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNFD Repairs`
+      return `Hi ${firstName} 👋\n\nOnce you bring your device in, this type of repair takes about ${cleanEta}. No appointment needed!\n\nOur hours: ${hoursLink}\nNFD Repairs`
     }
     const variants = [
       `Once we start on it, this type of repair takes about ${cleanEta}. Your device is in the queue — we'll text you the moment work begins.`,
@@ -1689,6 +1770,9 @@ NFD Repairs`
 
   // Diagnostic
   if (status === 'DIAGNOSTIC') {
+    if (job.quote_approved_by_customer) {
+      return `Hi ${firstName} 👋\n\nNot yet — thanks for approving the quote. We're getting the repair done and will text you as soon as it's ready.\n\nNFD Repairs`
+    }
     return `Hi ${firstName} 👋\n\nWe're still checking your device over. Once we know what's needed, we'll text you a quote and an ETA. Shouldn't be too long.\n\nNFD Repairs`
   }
 
@@ -1753,7 +1837,7 @@ function buildDoneCheckReply(job: any, smsCount: number): string {
   }
 
   if (status === 'AWAITING_DEVICE' || (status === 'QUOTE_APPROVED' && !job.device_in_shop)) {
-    return `Hi ${firstName} 👋\n\nNot yet — we've got the parts ready but we need your device! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
+    return `Hi ${firstName} 👋\n\nNot yet — we need your device first! Bring it in during opening hours and we'll get started.\n\nOur hours: ${hoursLink}\nNFD Repairs`
   }
 
   if (status === 'RECEIVED' || status === 'QUOTE_APPROVED') {
@@ -1774,6 +1858,9 @@ NFD Repairs`
   }
 
   if (status === 'DIAGNOSTIC') {
+    if (job.quote_approved_by_customer) {
+      return `Hi ${firstName} 👋\n\nNot yet — thanks for approving the quote. We're getting the repair done and will text you as soon as it's ready.\n\nNFD Repairs`
+    }
     return `Hi ${firstName} 👋\n\nNot yet — we're still checking your device over. We'll text you with a quote and then we can get started.\n\nNFD Repairs`
   }
 
@@ -1788,7 +1875,11 @@ NFD Repairs`
 function buildUpdateReply(job: any, smsCount: number): AutoReply {
   const firstName = getFirstName(job.customer_name)
   const trackingLink = job.short_token ? shortTrackingLink(job.short_token) : shortTrackingLink(job.tracking_token)
-  const statusInfo = job.status === 'AWAITING_DEPOSIT' ? partsPaymentMessage(job) : pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
+  const statusInfo = job.status === 'AWAITING_DEPOSIT'
+    ? partsPaymentMessage(job)
+    : (job.status === 'DIAGNOSTIC' && job.quote_approved_by_customer)
+    ? "Not yet — thanks for approving the quote. We're getting the repair done and will text you as soon as it's ready."
+    : pickVariant(job.status, smsCount) || fallbackStatusMessage(job.status)
   return {
     templateKey: 'AUTO_STATUS_REPLY',
     body: `Hi ${firstName} 👋\n\n${statusInfo}\n\nTrack it here: ${trackingLink}\nOur hours: ${shortHoursLink()}\n\nNFD Repairs`,
