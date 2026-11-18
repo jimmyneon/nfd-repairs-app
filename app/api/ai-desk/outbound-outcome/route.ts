@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       | 'thinking'
       | 'will_collect'
       | 'question'
+      | 'voicemail'
       | 'unreachable'
     const notes = typeof body.notes === 'string' ? body.notes.trim() : ''
     const enquiryRef = typeof body.enquiryRef === 'string' ? body.enquiryRef.trim() : ''

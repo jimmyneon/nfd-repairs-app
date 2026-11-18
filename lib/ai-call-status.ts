@@ -48,7 +48,9 @@ export function describeAiCallStatus(d: AiCallStatusUpdate, name: string): strin
     case 'in_call':
       return `Alex is on the call with ${name} now...`
     case 'completed':
-      return `Call finished${d.outcome ? ` — ${d.outcome}` : ''}.`
+      return d.outcome === 'voicemail'
+        ? `Left a voicemail for ${name}.`
+        : `Call finished${d.outcome ? ` — ${d.outcome}` : ''}.`
     case 'unreachable':
       return `${d.unreachableReason || "Couldn't get through"} — press the button to try again.`
     default:
