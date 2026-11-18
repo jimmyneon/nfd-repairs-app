@@ -153,6 +153,10 @@ function EnquiriesContent() {
   const [sendingQuote, setSendingQuote] = useState(false)
   const [callingAiFollowup, setCallingAiFollowup] = useState(false)
   const [aiFollowupMsg, setAiFollowupMsg] = useState<string | null>(null)
+  const [showAlexMessage, setShowAlexMessage] = useState(false)
+  const [alexMessage, setAlexMessage] = useState('')
+  const [alexPrice, setAlexPrice] = useState('')
+  const [sendingAlexMessage, setSendingAlexMessage] = useState(false)
   const [sendingInspection, setSendingInspection] = useState(false)
   const [sendingDropoff, setSendingDropoff] = useState(false)
   const [quoteResult, setQuoteResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -2065,6 +2069,77 @@ function EnquiriesContent() {
                   )}
                   {aiFollowupMsg && (
                     <p className="text-xs font-semibold text-center text-indigo-700 dark:text-indigo-300">{aiFollowupMsg}</p>
+                  )}
+                  {selectedEnquiry.customer_phone && (
+                  <button
+                    onClick={() => setShowAlexMessage(!showAlexMessage)}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 font-bold rounded-xl hover:bg-violet-200 dark:hover:bg-violet-900/60 transition-colors active:scale-95"
+                  >
+                    <Phone className="h-4 w-4" /> Message from Alex (AI callback)
+                  </button>
+                  )}
+                  {showAlexMessage && selectedEnquiry.customer_phone && (
+                    <div className="space-y-2 p-3 bg-violet-50 dark:bg-violet-900/20 rounded-xl border border-violet-200 dark:border-violet-800">
+                      <textarea
+                        value={alexMessage}
+                        onChange={(e) => setAlexMessage(e.target.value)}
+                        placeholder="What should Alex tell them? e.g. 'Your part's arrived — you can pop in any time we're open.'"
+                        rows={3}
+                        className="w-full p-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100"
+                      />
+                      <input
+                        value={alexPrice}
+                        onChange={(e) => setAlexPrice(e.target.value)}
+                        placeholder="Price to mention (optional) e.g. £45"
+                        inputMode="decimal"
+                        className="w-full p-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 dark:text-gray-100"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!alexMessage.trim() || !selectedEnquiry.customer_phone) return
+                          setSendingAlexMessage(true)
+                          setAiFollowupMsg(null)
+                          try {
+                            const res = await fetch('/api/ai-desk/outbound-call', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                to: selectedEnquiry.customer_phone,
+                                purpose: 'callback_message',
+                                customerName: selectedEnquiry.customer_name,
+                                device: `${selectedEnquiry.device_make || ''} ${selectedEnquiry.device_model || ''}`.trim() || 'your device',
+                                repair: selectedEnquiry.repair_type || 'repair',
+                                message: alexMessage.trim(),
+                                priceText: alexPrice.trim() || undefined,
+                                enquiryRef: selectedEnquiry.enquiry_ref,
+                              }),
+                            })
+                            const data = await res.json()
+                            if (res.ok && data.ok) {
+                              setAiFollowupMsg(`Alex is calling ${selectedEnquiry.customer_name} with your message...`)
+                              setShowAlexMessage(false)
+                              setAlexMessage('')
+                              setAlexPrice('')
+                              if (data.callSid) {
+                                pollAiCallStatus(data.callSid, (d) => {
+                                  const label = describeAiCallStatus(d, selectedEnquiry.customer_name || 'the customer')
+                                  if (label) setAiFollowupMsg(label)
+                                })
+                              }
+                            } else {
+                              setAiFollowupMsg(data.error || 'Could not start AI call.')
+                            }
+                          } catch {
+                            setAiFollowupMsg('Could not reach AI Desk.')
+                          }
+                          setSendingAlexMessage(false)
+                        }}
+                        disabled={sendingAlexMessage || !alexMessage.trim()}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 text-white font-bold rounded-lg hover:bg-violet-700 transition-colors active:scale-95 disabled:opacity-50"
+                      >
+                        {sendingAlexMessage ? 'Calling…' : 'Have Alex deliver it'}
+                      </button>
+                    </div>
                   )}
                   <button
                     onClick={() => setShowMessageComposer(true)}
