@@ -759,13 +759,13 @@ function EnquiriesContent() {
   }
 
   const handleMarkDealtWith = async (enquiriesToMark: Enquiry[]) => {
-    const eligible = enquiriesToMark.filter(e => !isConverted(e) && e.status !== 'more_info_requested')
+    const eligible = enquiriesToMark.filter(e => !isConverted(e) && e.status !== 'approved' && e.status !== 'rejected')
     if (!eligible.length) { setSelectedIds(new Set()); return }
     setBulkUpdating(true)
     const now = new Date().toISOString()
     const { error } = await supabase
       .from('enquiries')
-      .update({ status: 'more_info_requested', updated_at: now })
+      .update({ status: 'approved', updated_at: now })
       .in('id', eligible.map(e => e.id))
     setBulkUpdating(false)
     if (error) {
