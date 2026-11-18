@@ -103,11 +103,17 @@ function CustomerConfirmContent() {
   const isSmallDevice = ['phone', 'tablet', 'watch'].includes(jobData.device_type)
   const diagnosticFee = isSmallDevice ? '£20' : '£40'
 
+  const nameIsEmail = customerName.includes('@')
+  const nameEmailError = 'Please enter your full name, not an email address. We will ask for your email address separately.'
+  const summaryNameEmailError = 'Please enter your full name, not an email address. Use the email field below.'
+  const nameStepError = nameIsEmail ? nameEmailError : validationErrors.customerName
+  const summaryNameError = nameIsEmail ? summaryNameEmailError : validationErrors.customerName
+
   // Wizard navigation
   const goNext = () => {
     // Validate current step before proceeding
-    if (currentStep === 0 && !customerName.trim()) {
-      setValidationErrors({ customerName: 'Please enter your full name' })
+    if (currentStep === 0 && (!customerName.trim() || nameIsEmail)) {
+      setValidationErrors({ customerName: nameIsEmail ? nameEmailError : 'Please enter your full name' })
       setShowValidationSummary(true)
       return
     }
@@ -145,7 +151,9 @@ function CustomerConfirmContent() {
   const handleSubmit = async () => {
     const errors: Record<string, string> = {}
 
-    if (!customerName.trim()) {
+    if (nameIsEmail) {
+      errors.customerName = summaryNameEmailError
+    } else if (!customerName.trim()) {
       errors.customerName = 'Please enter your full name'
     }
 
@@ -410,6 +418,8 @@ function CustomerConfirmContent() {
             <input
               type="text"
               value={customerName}
+              aria-invalid={!!nameStepError}
+              aria-describedby={nameStepError ? 'customer-name-error' : undefined}
               onChange={(e) => {
                 setCustomerName(e.target.value)
                 if (validationErrors.customerName) {
@@ -419,15 +429,15 @@ function CustomerConfirmContent() {
               }}
               onKeyDown={(e) => { if (e.key === 'Enter') goNext() }}
               className={`w-full px-4 py-4 text-xl border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
-                validationErrors.customerName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
+                nameStepError ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary'
               }`}
               placeholder="Enter your full name"
               autoFocus
             />
-            {validationErrors.customerName && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+            {nameStepError && (
+              <p id="customer-name-error" role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" />
-                {validationErrors.customerName}
+                {nameStepError}
               </p>
             )}
             <button
@@ -589,7 +599,22 @@ function CustomerConfirmContent() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Your Details</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Tap any field to edit</p>
             <div className="space-y-3 mb-6">
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Full name" />
+              <div data-field="customerName">
+                <input type="text" value={customerName} aria-invalid={!!summaryNameError} aria-describedby={summaryNameError ? 'summary-name-error' : undefined} onChange={(e) => {
+                  setCustomerName(e.target.value)
+                  setValidationErrors(prev => {
+                    const next = { ...prev }
+                    delete next.customerName
+                    return next
+                  })
+                }} className={`w-full px-4 py-3 text-lg border-2 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white ${summaryNameError ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-600 focus:ring-primary'}`} placeholder="Full name" />
+                {summaryNameError && (
+                  <p id="summary-name-error" role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {summaryNameError}
+                  </p>
+                )}
+              </div>
 
               <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Mobile phone" />
 
