@@ -5,8 +5,10 @@ import type Stripe from 'stripe'
 import { createServiceClient, sendSms, isSmsConfigured } from '@/lib/resilience'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { getStripe } from '@/lib/stripe'
+import { sendStaffPaymentNotification } from '@/lib/staff-payment-notification'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 /**
  * POST /api/webhooks/stripe
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
             })
           }
           const amount = (charge.amount_refunded ?? payment?.amount_pence ?? 0) / 100
-          await notifyStaffPayment(supabase, {
+          await sendStaffPaymentNotification(supabase, {
             title: `Refund issued — £${amount.toFixed(2)}`,
             body: payment
               ? `${paymentKindLabel(payment.kind)} refunded — review the job before continuing.`
@@ -332,9 +334,9 @@ async function handleSessionCompleted(
     }
   }
 
-  // Staff notification — only on the open→paid transition, so Stripe
-  // redeliveries don't spam the bell.
-  if (ranTransition) {
+  // Retry undelivered staff alerts even when a previous webhook already marked
+  // the payment paid. Delivery acknowledgement and the bell use stable IDs.
+  if (settled && payment) {
     await notifyStaffOfPayment(supabase, {
       kind,
       jobId,
@@ -342,11 +344,11 @@ async function handleSessionCompleted(
       fundId,
       amountPence,
       payerEmail: session.customer_details?.email ?? null,
+      paymentId: payment.id,
     })
   }
 }
 
-const NOTIFY_URL = 'https://notify-50nol3u3c-jimmys-projects-9bf84ee4.vercel.app/api/send'
 const APP_URL = 'https://nfd-repairs-app.vercel.app'
 
 function paymentKindLabel(kind: string | null | undefined): string {
@@ -361,41 +363,6 @@ function paymentKindLabel(kind: string | null | undefined): string {
   }
 }
 
-/** In-app bell notification + device push for staff. Never throws — payment
- * processing must not fail because a notification couldn't be delivered. */
-async function notifyStaffPayment(
-  supabase: ReturnType<typeof createServiceClient>,
-  opts: { title: string; body: string; jobId?: string | null; deepLink: string }
-) {
-  try {
-    await supabase.from('notifications').insert({
-      type: 'PAYMENT',
-      title: opts.title,
-      body: opts.body,
-      job_id: opts.jobId || null,
-      is_read: false,
-    })
-  } catch (err) {
-    console.error('[Stripe webhook] notification insert failed:', err)
-  }
-  try {
-    await fetch(NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        app_id: 'nfd-repairs',
-        title: opts.title,
-        body: opts.body,
-        category: 'payment',
-        priority: 'high',
-        deep_link: opts.deepLink,
-      }),
-    })
-  } catch (err) {
-    console.error('[Stripe webhook] push notification failed:', err)
-  }
-}
-
 /** Builds the who/what/for detail line for a paid checkout session. */
 async function notifyStaffOfPayment(
   supabase: ReturnType<typeof createServiceClient>,
@@ -406,6 +373,7 @@ async function notifyStaffOfPayment(
     fundId: string | null
     amountPence: number
     payerEmail: string | null
+    paymentId: string
   }
 ) {
   const amount = `£${(opts.amountPence / 100).toFixed(2)}`
@@ -453,14 +421,15 @@ async function notifyStaffOfPayment(
       context = ` — ${label.toLowerCase()}`
     }
 
-    await notifyStaffPayment(supabase, {
+    await sendStaffPaymentNotification(supabase, {
       title: `${label} — ${amount}`,
       body: `${subject}${payer} paid ${amount}${context}.`,
       jobId: opts.jobId,
       deepLink,
-    })
+    }, opts.paymentId)
   } catch (err) {
     console.error('[Stripe webhook] staff payment notification failed:', err)
+    throw err // Stripe retries; the payment remains paid.
   }
 }
 
