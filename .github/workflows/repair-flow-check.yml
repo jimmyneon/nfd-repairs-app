@@ -5,10 +5,6 @@ on:
     branches:
       - main
     paths:
-      - 'app/api/webhooks/stripe/**'
-      - 'lib/staff-payment-notification.ts'
-      - 'tests/staff-payment-notification.test.ts'
-      - 'tests/parts-full-payment.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -42,10 +38,6 @@ on:
       - '.github/workflows/repair-flow-check.yml'
   pull_request:
     paths:
-      - 'app/api/webhooks/stripe/**'
-      - 'lib/staff-payment-notification.ts'
-      - 'tests/staff-payment-notification.test.ts'
-      - 'tests/parts-full-payment.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -125,9 +117,6 @@ jobs:
           grep -Fq "What happens next" "app/quote/approve/[jobId]/page.tsx"
           grep -Fq "parts_expected_at: requiresParts && earliest_date" app/api/enquiries/convert-to-job/route.ts
           grep -Fq "converted_job_id" "app/api/public/quote/[ref]/options/route.ts"
-
-      - name: Verify payment alerts and retry behaviour
-        run: npx vitest run tests/staff-payment-notification.test.ts tests/parts-full-payment.test.ts tests/job-payment-state.test.ts tests/job-payment-routes.test.ts
 
       - name: Type-check application
         run: npx tsc --noEmit

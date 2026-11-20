@@ -48,7 +48,12 @@ describe('staff payment notification delivery', () => {
       : { ok: true, json: async () => ({ success: true, sent: 0 }) })
     fetchMock.mockResolvedValueOnce({ ok: true })
     await send()
-    expect(fetchMock.mock.calls[1]).toEqual(['https://macro.example.test/alert', expect.objectContaining({ method: 'POST', body: alert.deepLink })])
+    const [url, options] = fetchMock.mock.calls[1]
+    const webhook = new URL(url)
+    expect(webhook.origin + webhook.pathname).toBe('https://macro.example.test/alert')
+    expect(webhook.searchParams.get('nfdr_payment_title')).toBe(alert.title)
+    expect(webhook.searchParams.get('nfdr_payment_message')).toBe(alert.body)
+    expect(options).toMatchObject({ method: 'POST', body: alert.deepLink })
     expect(metadata.staff_alert_channel).toBe('macrodroid')
   })
   it('keeps both-service failures retryable and does not mark them delivered', async () => {

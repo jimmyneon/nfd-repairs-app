@@ -1,0 +1,40 @@
+name: Payment alert validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/api/webhooks/stripe/**'
+      - 'lib/staff-payment-notification.ts'
+      - 'lib/job-payment-state.ts'
+      - 'tests/staff-payment-notification.test.ts'
+      - 'tests/parts-full-payment.test.ts'
+      - '.github/workflows/payment-alert-check.yml'
+  pull_request:
+    paths:
+      - 'app/api/webhooks/stripe/**'
+      - 'lib/staff-payment-notification.ts'
+      - 'lib/job-payment-state.ts'
+      - 'tests/staff-payment-notification.test.ts'
+      - 'tests/parts-full-payment.test.ts'
+      - '.github/workflows/payment-alert-check.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Verify payments, alert content and retries
+        run: npx vitest run tests/staff-payment-notification.test.ts tests/parts-full-payment.test.ts tests/job-payment-state.test.ts tests/job-payment-routes.test.ts
+      - run: npx tsc --noEmit
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-build-placeholder
+        run: npm run build

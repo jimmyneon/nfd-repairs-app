@@ -49,8 +49,13 @@ export async function sendStaffPaymentNotification(
     channel = 'macrodroid'
     // This is the staff-alert macro, separate from the customer SMS webhook.
     // It opens the raw request body as a URL, so do not wrap it in JSON/text.
-    const response = await fetch(process.env.MACRODROID_NOTIFICATION_WEBHOOK_URL ||
-      'https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request', {
+    const webhookUrl = new URL(process.env.MACRODROID_NOTIFICATION_WEBHOOK_URL ||
+      'https://trigger.macrodroid.com/4e59ada0-b4c6-443d-b189-3c7aa21a8454/repair-request')
+    // MacroDroid sets pre-defined string variables from URL parameters. The
+    // phone's Display Notification action must use these variables to show text.
+    webhookUrl.searchParams.set('nfdr_payment_title', alert.title)
+    webhookUrl.searchParams.set('nfdr_payment_message', alert.body)
+    const response = await fetch(webhookUrl.toString(), {
       method: 'POST', body: alert.deepLink, signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) throw new Error(`Staff alert webhook returned ${response.status}`)

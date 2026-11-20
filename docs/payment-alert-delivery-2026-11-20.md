@@ -10,8 +10,15 @@ Payment alerts now check the notification service's response, including whether
 any device received the message. If NF Hub fails, they use the existing
 MacroDroid **staff notification** webhook, which accepted a live request with
 HTTP 200 / `OK`. Its body must be a bare deep link because the phone macro opens
-the request body as a URL. This fallback uses the macro's existing notification
-wording; the payment amount and customer remain visible in the app.
+the request body as a URL. The title and message are passed separately as
+`nfdr_payment_title` and `nfdr_payment_message` URL parameters, correctly encoded.
+To display these on the phone, define matching string variables in MacroDroid
+and select them in the notification action's title and message fields. If a
+variable whitelist is enabled on the trigger, allow these two variables.
+The app cannot remotely change the phone macro; until it is updated, the macro
+retains its existing wording. Keep the existing tap action using the POST body.
+If this macro also handles non-payment alerts, only use the payment variables
+for payment requests and reset them after use to avoid showing stale text.
 
 The payment UUID is also the bell notification UUID, making insertion safe to
 repeat without resetting read state. After a delivery service accepts the alert,
