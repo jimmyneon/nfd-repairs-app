@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-const mocks = vi.hoisted(() => ({ createClient: vi.fn(), constructEvent: vi.fn(), sendSms: vi.fn(), smsEnabled: vi.fn() }))
+const mocks = vi.hoisted(() => ({ createClient: vi.fn(), constructEvent: vi.fn(), sendSms: vi.fn(), smsEnabled: vi.fn(), notify: vi.fn() }))
+vi.mock('@/lib/staff-payment-notification', () => ({ sendStaffPaymentNotification: mocks.notify }))
 vi.mock('@/lib/resilience', () => ({ createServiceClient: mocks.createClient, sendSms: mocks.sendSms, isSmsConfigured: mocks.smsEnabled }))
 vi.mock('@/lib/stripe', () => ({ getStripe: () => ({ webhooks: { constructEvent: mocks.constructEvent } }) }))
 import { POST } from '@/app/api/webhooks/stripe/route'
@@ -21,6 +22,7 @@ describe('full repair payment satisfies parts deposit', () => {
     redelivery = false
     updateError = null
     mocks.smsEnabled.mockReturnValue(false)
+    mocks.notify.mockResolvedValue(undefined)
     event = { type: 'checkout.session.completed', data: { object: { id: 'test-session', payment_status: 'paid', amount_total: 10000, metadata: { kind: 'job_payment', job_id: 'test-job' } } } }
     mocks.constructEvent.mockImplementation(() => event)
     mocks.createClient.mockReturnValue({ from: (table: string) => {
@@ -46,6 +48,7 @@ describe('full repair payment satisfies parts deposit', () => {
     event.data.object.payment_status = 'unpaid'
     await send()
     expect(updates).toEqual([])
+    expect(mocks.notify).not.toHaveBeenCalled()
   })
   it('fulfils delayed payment when Stripe confirms success', async () => {
     event.type = 'checkout.session.async_payment_succeeded'
@@ -71,6 +74,14 @@ describe('full repair payment satisfies parts deposit', () => {
     updateError = null
     expect((await send()).status).toBe(200)
     expect(updates.filter(update => update.table === 'jobs').at(-1).values.payment_received).toBe(true)
+  })
+  it('retries a failed staff alert on an already-paid webhook redelivery', async () => {
+    mocks.notify.mockRejectedValueOnce(new Error('Alert service unavailable'))
+    expect((await send()).status).toBe(500)
+    redelivery = true
+    expect((await send()).status).toBe(200)
+    expect(mocks.notify).toHaveBeenCalledTimes(2)
+    expect(mocks.notify.mock.calls[1][2]).toBe('test-payment')
   })
   it('fills the tracking URL in a deposit receipt', async () => {
     mocks.smsEnabled.mockReturnValue(true)
