@@ -36,7 +36,7 @@ export async function invoiceStaff(request: NextRequest) {
         { status: 403 },
       ),
     }
-  return { db }
+  return { db, user: auth.user }
 }
 export async function billingSettings(
   db: SupabaseClient,

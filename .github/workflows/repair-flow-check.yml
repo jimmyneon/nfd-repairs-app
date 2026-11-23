@@ -9,7 +9,8 @@ on:
       - 'app/app/invoices/**'
       - 'lib/invoice*.ts'
       - 'components/CustomerInvoice.tsx'
-      - 'tests/invoices.test.ts'
+      - 'components/invoices/**'
+      - 'tests/invoice*.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -47,7 +48,8 @@ on:
       - 'app/app/invoices/**'
       - 'lib/invoice*.ts'
       - 'components/CustomerInvoice.tsx'
-      - 'tests/invoices.test.ts'
+      - 'components/invoices/**'
+      - 'tests/invoice*.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -97,7 +99,7 @@ jobs:
         run: npm ci
 
       - name: Run repair-flow tests
-        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts tests/diagnostic-reports.test.ts tests/invoices.test.ts
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts tests/diagnostic-reports.test.ts tests/invoices.test.ts tests/invoice-editor.test.ts tests/invoice-preview.test.ts tests/invoice-workspace.test.ts
 
       - name: Verify progressive quote commitment safeguards
         run: |
