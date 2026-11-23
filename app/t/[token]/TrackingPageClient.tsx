@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { JOB_STATUS_LABELS, JOB_STATUS_COLORS, SHOP_INFO } from '@/lib/constants'
 import { Package, Clock, CheckCircle, MapPin, MessageSquare, ChevronDown, ChevronUp, Smartphone, Laptop, Tablet, Monitor, Gamepad2, Watch, AlertCircle, QrCode } from 'lucide-react'
+import CustomerInvoice from '@/components/CustomerInvoice'
 import CustomerDiagnosticReports from '@/components/CustomerDiagnosticReports'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import ImHereButton from '@/components/ImHereButton'
@@ -259,6 +260,7 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
               Live tracking has expired. Your published diagnostic report remains available below.
             </p>
           </div>
+          <CustomerInvoice token={resolvedToken} />
           <CustomerDiagnosticReports endpoint={`/api/tracking/${resolvedToken}/diagnostic-reports`} />
           <a href="https://nfdr.uk/quote/" target="_blank" rel="noopener noreferrer"
             className="block mt-4 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-2xl shadow-lg p-6 text-center transition-all active:scale-95">
@@ -403,7 +405,8 @@ export default function TrackingPageClient({ resolvedToken, shortToken }: { reso
           </div>
         </div>
 
-        <CustomerDiagnosticReports endpoint={`/api/tracking/${resolvedToken}/diagnostic-reports`} />
+        <CustomerInvoice token={resolvedToken} />
+          <CustomerDiagnosticReports endpoint={`/api/tracking/${resolvedToken}/diagnostic-reports`} />
 
         {/* Current Status — Clean and Scannable */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border-2 border-gray-100 dark:border-gray-700">

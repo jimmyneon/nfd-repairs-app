@@ -1049,6 +1049,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           />
         )}
 
+        <Link href={`/app/invoices?jobId=${job!.id}`} className="block rounded-xl border border-primary/30 p-4 font-bold text-primary bg-white dark:bg-gray-800">Invoice · preview, download or email</Link>
         {/* Device Info Card */}
         <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-lg p-5 border-2 border-gray-100 dark:border-gray-700">
           <div className="flex items-start gap-4 mb-3">
