@@ -190,13 +190,40 @@ export function validateBilling(value: any): BillingSettings {
   }
   if (!out.business_name || !out.legal_name || !out.address || !out.email)
     throw Error('Business name, legal name, address and email are required.')
-  if (!/^https:\/\/[^\s<>"']+$/.test(out.website))
-    throw Error('Website must start with https://.')
+  if (out.website) {
+    if (!/^https?:\/\//i.test(out.website))
+      out.website = 'https://' + out.website
+    try {
+      const website = new URL(out.website)
+      if (
+        website.protocol !== 'https:' ||
+        !website.hostname.includes('.') ||
+        website.username ||
+        website.password ||
+        /[\s<>"']/.test(out.website)
+      )
+        throw Error()
+    } catch {
+      throw Error('Enter a valid website, for example nfdr.uk.')
+    }
+  }
+  const account = normaliseBank(out)
+  Object.assign(out, account)
   if (out.sort_code && !/^\d{2}-?\d{2}-?\d{2}$/.test(out.sort_code))
     throw Error('Sort code must contain six digits.')
   if (out.account_number && !/^\d{8}$/.test(out.account_number))
     throw Error('Account number must contain eight digits.')
   return out
+}
+function normaliseBank<T extends InvoiceBankAccount>(account: T): T {
+  const digits = account.sort_code.replace(/[\s-]/g, '')
+  return {
+    ...account,
+    sort_code: /^\d{6}$/.test(digits)
+      ? digits.match(/.{2}/g)!.join('-')
+      : account.sort_code,
+    account_number: account.account_number.replace(/\s/g, ''),
+  }
 }
 export function validateInvoiceBank(value: unknown): InvoiceBankAccount {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -208,6 +235,7 @@ export function validateInvoiceBank(value: unknown): InvoiceBankAccount {
       throw Error('Check the invoice bank details.')
     out[key] = v.trim()
   }
+  Object.assign(out, normaliseBank(out))
   if (out.sort_code && !/^\d{2}-?\d{2}-?\d{2}$/.test(out.sort_code))
     throw Error('Sort code must contain six digits.')
   if (out.account_number && !/^\d{8}$/.test(out.account_number))

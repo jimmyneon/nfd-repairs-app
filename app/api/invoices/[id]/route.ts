@@ -14,10 +14,10 @@ export async function GET(
   try {
     const auth = await invoiceStaff(request)
     if (auth.response) return auth.response
-    return await invoiceResponse(
-      request,
-      await loadInvoice(auth.db!, params.id),
-    )
+    const invoice = await loadInvoice(auth.db!, params.id)
+    if (!request.nextUrl.searchParams.get('format'))
+      return NextResponse.json({ invoice }, { headers: invoiceHeaders })
+    return await invoiceResponse(request, invoice)
   } catch {
     return NextResponse.json(
       { error: 'Invoice not found.' },
