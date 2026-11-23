@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       }
       if (enquiryRef) {
         const { data: enq } = await supabase.from('enquiries')
-          .select('id, enquiry_ref, customer_name, customer_email, device_make, device_model, status, created_at, customer_notes, converted_job_id')
+          .select('id, enquiry_ref, customer_name, customer_email, device_make, device_model, status, created_at, customer_notes, converted_job_id, enquiry_type')
           .eq('enquiry_ref', enquiryRef).maybeSingle()
         if (enq) candidates.push({ kind: 'enquiry', ...enq })
       }
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           .in('customer_phone', variants)
           .order('created_at', { ascending: false }).limit(MAX_CANDIDATES),
         supabase.from('enquiries')
-          .select('id, enquiry_ref, customer_name, customer_email, device_make, device_model, status, created_at, customer_notes, converted_job_id')
+          .select('id, enquiry_ref, customer_name, customer_email, device_make, device_model, status, created_at, customer_notes, converted_job_id, enquiry_type')
           .in('customer_phone', variants)
           .order('created_at', { ascending: false }).limit(MAX_CANDIDATES),
       ])
@@ -195,6 +195,9 @@ export async function POST(request: NextRequest) {
       const entry: Record<string, unknown> = {
         kind: c.kind,
         ref: isJob ? c.job_ref : c.enquiry_ref,
+        // 'business' enquiries are floating take_message notes — context,
+        // not repairs the caller might mean; they must not create ambiguity.
+        is_note: !isJob && c.enquiry_type === 'business',
         status,
         open,
         device_label: [c.device_make, c.device_model].filter(Boolean).join(' ') || null,
@@ -216,7 +219,9 @@ export async function POST(request: NextRequest) {
       results.push(entry)
     }
 
-    const openCount = results.filter(r => r.open).length
+    // Ambiguity counts only real repair candidates — jobs and non-'business'
+    // enquiries. Floating take_message notes must never create ambiguity.
+    const openCount = results.filter(r => r.open && !r.is_note).length
     const matchStatus =
       jobRef || enquiryRef ? (results.length ? 'confirmed' : 'not_found')
       : results.length === 0 ? 'not_found'
