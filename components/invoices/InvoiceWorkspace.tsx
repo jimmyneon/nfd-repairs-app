@@ -814,7 +814,7 @@ export default function InvoiceWorkspace({
                           monthly
                         </p>
                         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                          Next invoice: {prettyDate(s.next_date)} ·{' '}
+                          Next invoice: {prettyDate(s.next_date)} at 06:00 UK time ·{' '}
                           {s.auto_email
                             ? 'Email customer automatically'
                             : 'Create invoice only'}
@@ -947,7 +947,7 @@ export default function InvoiceWorkspace({
                     {schedule && (
                       <Section
                         title="Schedule"
-                        hint="Choose when this invoice repeats and whether it should be emailed."
+                        hint="The repair app processes recurring invoices at 06:00 UK time on the selected date, including British Summer Time."
                       >
                         <Field label="Schedule name">
                           <input
