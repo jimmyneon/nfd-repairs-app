@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { repairInvoiceEmail } from '@/lib/invoice-email'
 import { sendEmail } from '@/lib/email'
 import { generateEmbeddedJobEmail } from '@/lib/email-templates-embedded'
 import { customerStatusMessage } from '@/lib/status-messages'
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
       ? repairPaymentLink(job)
       : undefined
 
-    const emailTemplate = generateEmbeddedJobEmail(
+    let emailTemplate = generateEmbeddedJobEmail(
       {
         job,
         trackingUrl,
@@ -119,6 +120,11 @@ export async function POST(request: NextRequest) {
       },
       type as 'JOB_CREATED' | 'STATUS_UPDATE'
     )
+
+    const invoiceEmail = type === 'STATUS_UPDATE' && sendPriceInSms !== false
+      ? await repairInvoiceEmail(supabase, job, emailTemplate)
+      : { template: emailTemplate, attachments: [] }
+    emailTemplate = { ...emailTemplate, ...invoiceEmail.template }
 
     // Log email attempt
     console.log('📝 Creating email log entry...')
@@ -149,7 +155,8 @@ export async function POST(request: NextRequest) {
       job.customer_email,
       emailTemplate.subject,
       emailTemplate.html,
-      emailTemplate.text
+      emailTemplate.text,
+      invoiceEmail.attachments
     )
     console.log('📬 sendEmail result:', result)
 

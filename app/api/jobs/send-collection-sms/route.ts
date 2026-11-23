@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generatePostCollectionEmail } from '@/lib/email-post-collection'
+import { repairInvoiceEmail } from '@/lib/invoice-email'
 import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
@@ -183,16 +184,19 @@ export async function POST(request: NextRequest) {
 
     // Send email with dynamic cross-sell content
     if (shouldSendEmail) {
-      const emailTemplate = generatePostCollectionEmail({
+      let emailTemplate = generatePostCollectionEmail({
         job,
         googleReviewLink: reviewLink
       })
 
+      const invoiceEmail = await repairInvoiceEmail(supabase, job, emailTemplate)
+      emailTemplate = { ...emailTemplate, ...invoiceEmail.template }
       const emailResult = await sendEmail(
         job.customer_email,
         emailTemplate.subject,
         emailTemplate.html,
-        emailTemplate.text
+        emailTemplate.text,
+        invoiceEmail.attachments
       )
 
       emailDeliveryStatus = emailResult.success ? 'SENT' : 'FAILED'

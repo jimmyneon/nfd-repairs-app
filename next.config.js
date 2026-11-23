@@ -5,6 +5,11 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     outputFileTracingIncludes: {
+      '/api/invoices/**/*': ['./assets/fonts/*', './public/nfdr-logo.png'],
+      '/api/invoices': ['./assets/fonts/*', './public/nfdr-logo.png'],
+      '/api/tracking/*/invoice': ['./assets/fonts/*', './public/nfdr-logo.png'],
+      '/api/email/send': ['./assets/fonts/*', './public/nfdr-logo.png'],
+      '/api/jobs/send-collection-sms': ['./assets/fonts/*', './public/nfdr-logo.png'],
       '/api/tracking/*/diagnostic-reports': ['./assets/fonts/*'],
       '/api/repair/*/diagnostic-reports': ['./assets/fonts/*'],
     },

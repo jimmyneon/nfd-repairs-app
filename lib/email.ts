@@ -12,7 +12,8 @@ export async function sendEmail(
   to: string,
   subject: string,
   html: string,
-  text?: string
+  text?: string,
+  attachments?: { filename: string; content: Buffer }[]
 ) {
   try {
     // Check if API key is configured
@@ -27,6 +28,7 @@ export async function sendEmail(
       subject,
       html,
       text: text || stripHtml(html),
+      ...(attachments?.length ? { attachments } : {}),
     })
 
     if (error) {
