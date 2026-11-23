@@ -48,9 +48,11 @@ export async function POST(request: NextRequest) {
     if (
       active &&
       template.payment_method === 'bank_transfer' &&
-      !bankReady(await billingSettings(a.db!))
+      !bankReady(template.bank_account ?? (await billingSettings(a.db!)))
     )
-      throw Error('Add bank details in Invoice settings before activating.')
+      throw Error(
+        'Add complete bank details to this schedule or Invoice settings before activating.',
+      )
     const value = {
       name: b.name.trim(),
       template,

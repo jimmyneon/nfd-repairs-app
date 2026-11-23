@@ -7,6 +7,8 @@ import { Suspense } from 'react'
 import {
   BillingSettings,
   DEFAULT_BILLING,
+  EMPTY_INVOICE_BANK,
+  InvoiceBankAccount,
   Invoice,
   InvoicePayload,
   InvoiceSeries,
@@ -623,7 +625,14 @@ function InvoiceWorkspace() {
                       : 'Record payments received below.'}
                   </p>
                 )}
-                {selected?.email_error && <p role="alert" className="rounded-lg p-4 bg-amber-50 text-amber-900">Last email attempt: {selected.email_error}</p>}
+                {selected?.email_error && (
+                  <p
+                    role="alert"
+                    className="rounded-lg p-4 bg-amber-50 text-amber-900"
+                  >
+                    Last email attempt: {selected.email_error}
+                  </p>
+                )}
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 items-start">
                   <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-5 space-y-5">
                     {schedule && (
@@ -917,6 +926,60 @@ function InvoiceWorkspace() {
                           </option>
                         </select>
                       </Field>
+                      {payload.payment_method === 'bank_transfer' && (
+                        <div className="space-y-3 rounded-lg border border-gray-300 dark:border-gray-600 p-4">
+                          <label className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              className="w-5 h-5"
+                              checked={!!payload.bank_account}
+                              onChange={(e) =>
+                                set(
+                                  'bank_account',
+                                  e.target.checked
+                                    ? { ...EMPTY_INVOICE_BANK }
+                                    : undefined,
+                                )
+                              }
+                            />
+                            <span>
+                              Separate bank details for this invoice or schedule
+                            </span>
+                          </label>
+                          {payload.bank_account && (
+                            <>
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                These bank details are used only for this
+                                invoice or recurring schedule.
+                              </p>
+                              <div className="grid sm:grid-cols-2 gap-3">
+                                {(
+                                  [
+                                    ['bank_name', 'Bank / account provider'],
+                                    ['account_name', 'Account name'],
+                                    ['sort_code', 'Sort code'],
+                                    ['account_number', 'Account number'],
+                                  ] as [keyof InvoiceBankAccount, string][]
+                                ).map(([key, label]) => (
+                                  <Field key={key} label={label}>
+                                    <input
+                                      className={input}
+                                      maxLength={200}
+                                      value={payload.bank_account![key]}
+                                      onChange={(e) =>
+                                        set('bank_account', {
+                                          ...payload.bank_account!,
+                                          [key]: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </Field>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <Field label="Additional payment instructions">
                         <textarea
                           className={input}
