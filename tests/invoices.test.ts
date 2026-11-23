@@ -4,6 +4,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'fs'
 import { PDFDocument } from 'pdf-lib'
 import {
   DEFAULT_BILLING,
+  EMPTY_INVOICE_BANK,
   emptyInvoice,
   invoiceTotal,
   validateInvoice,
@@ -106,6 +107,12 @@ beforeAll(async () => {
       'utf8',
     ),
   )
+  await pg.exec(
+    readFileSync(
+      'supabase/migrations/20261123135632_invoice_specific_bank_details.sql',
+      'utf8',
+    ),
+  )
 })
 afterAll(async () => {
   await pg.close()
@@ -170,6 +177,57 @@ describe('Invoice calculations and input', () => {
     vi.setSystemTime(new Date('2026-07-01T23:30:00Z'))
     expect(todayUK()).toBe('2026-07-02')
     vi.useRealTimers()
+  })
+  it('validates invoice-specific bank details without changing business defaults', () => {
+    const p = validateInvoice({
+      ...payload(),
+      payment_method: 'bank_transfer',
+      bank_account: {
+        ...EMPTY_INVOICE_BANK,
+        bank_name: 'Scoped Bank',
+        account_name: 'Rent account',
+        sort_code: '11-22-33',
+        account_number: '11112222',
+        private_extra: 'drop me',
+      },
+    })
+    expect(p.bank_account).toEqual({
+      bank_name: 'Scoped Bank',
+      account_name: 'Rent account',
+      sort_code: '11-22-33',
+      account_number: '11112222',
+    })
+    expect(DEFAULT_BILLING.account_number).toBe('')
+    expect(() =>
+      validateInvoice({
+        ...payload(),
+        bank_account: { ...EMPTY_INVOICE_BANK, sort_code: 'bad' },
+      }),
+    ).toThrow()
+    expect(() =>
+      validateInvoice({ ...payload(), bank_account: null }),
+    ).toThrow()
+  })
+  it('renders the scoped bank account in both formats, leaving other invoice payments alone', () => {
+    const scoped = {
+      ...EMPTY_INVOICE_BANK,
+      bank_name: 'Scoped Bank',
+      account_name: 'Rent account',
+      sort_code: '11-22-33',
+      account_number: '11112222',
+    }
+    const p = {
+      ...payload(),
+      seller: bank,
+      payment_method: 'bank_transfer' as const,
+      bank_account: scoped,
+    }
+    expect(paymentText(p)).toContain('11112222')
+    expect(paymentText(p)).not.toContain(bank.account_number)
+    expect(invoiceHtml(invoice(p))).toContain('11112222')
+    expect(paymentText({ ...p, payment_method: 'in_shop' })).not.toContain(
+      '11112222',
+    )
   })
   it('never asks for payment against a voided invoice', () => {
     const html = invoiceHtml({ ...invoice(), status: 'void' })
@@ -236,6 +294,57 @@ describe('Database billing invariants', () => {
     expect(
       await save({ ...payload(), payment_method: 'bank_transfer' }),
     ).toBeTruthy()
+  })
+  it('issues a scoped bank invoice without storing its account in global settings', async () => {
+    await sql('UPDATE billing_settings SET data=$1', [
+      JSON.stringify(DEFAULT_BILLING),
+    ])
+    const scoped = {
+      ...EMPTY_INVOICE_BANK,
+      bank_name: 'Scoped Bank',
+      account_name: 'Rent account',
+      sort_code: '11-22-33',
+      account_number: '11112222',
+    }
+    const p = {
+      ...payload(),
+      payment_method: 'bank_transfer' as const,
+      bank_account: scoped,
+    }
+    const id = await save(p)
+    const stored = (
+      await sql('SELECT payload FROM billing_invoices WHERE id=$1', [id])
+    )[0].payload
+    expect(stored.bank_account).toEqual(scoped)
+    expect(stored.seller.account_number).toBe('')
+    expect(
+      (await sql('SELECT data FROM billing_settings'))[0].data.account_number,
+    ).toBe('')
+    const schedule = await series('2026-11-23', 23, null, p)
+    const generated = await occurrence(schedule, '2026-11-23')
+    expect(
+      (
+        await sql('SELECT payload FROM billing_invoices WHERE id=$1', [
+          generated,
+        ])
+      )[0].payload.bank_account,
+    ).toEqual(scoped)
+    const other = await save(payload())
+    expect(
+      (
+        await sql('SELECT payload FROM billing_invoices WHERE id=$1', [other])
+      )[0].payload.bank_account,
+    ).toBeUndefined()
+    await sql('UPDATE billing_settings SET data=$1', [JSON.stringify(bank)])
+  })
+  it('never falls back to global bank details when scoped details are incomplete', async () => {
+    await expect(
+      save({
+        ...payload(),
+        payment_method: 'bank_transfer',
+        bank_account: { ...EMPTY_INVOICE_BANK },
+      }),
+    ).rejects.toThrow('bank account details')
   })
   it('only creates invoices for completed repairs and reuses one invoice per job', async () => {
     expect(

@@ -44,9 +44,11 @@ export async function POST(request: NextRequest) {
     if (
       body.action === 'issue' &&
       payload.payment_method === 'bank_transfer' &&
-      !bankReady(settings)
+      !bankReady(payload.bank_account ?? settings)
     )
-      throw Error('Add bank details in Invoice settings before issuing.')
+      throw Error(
+        'Add complete bank details to this invoice or Invoice settings before issuing.',
+      )
     const { data: id, error } = await auth.db!.rpc('billing_save_invoice', {
       p_id: body.id || null,
       p_payload: payload,

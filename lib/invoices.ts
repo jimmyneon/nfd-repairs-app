@@ -4,6 +4,18 @@ export type InvoiceItem = {
   quantity: number
   unit_pence: number
 }
+export type InvoiceBankAccount = {
+  bank_name: string
+  account_name: string
+  sort_code: string
+  account_number: string
+}
+export const EMPTY_INVOICE_BANK: InvoiceBankAccount = {
+  bank_name: '',
+  account_name: '',
+  sort_code: '',
+  account_number: '',
+}
 export type BillingSettings = {
   business_name: string
   legal_name: string
@@ -29,6 +41,7 @@ export type InvoicePayload = {
   notes: string
   payment_method: 'bank_transfer' | 'in_shop'
   payment_instructions: string
+  bank_account?: InvoiceBankAccount
   seller?: BillingSettings
   period_start?: string
   period_end?: string
@@ -163,6 +176,8 @@ export function validateInvoice(value: any): InvoicePayload {
     payment_method: value.payment_method,
     payment_instructions: text('payment_instructions', 3000),
   }
+  if (value.bank_account !== undefined)
+    p.bank_account = validateInvoiceBank(value.bank_account)
   if (invoiceTotal(p) > 100000000) throw Error('Invoice total is too large.')
   return p
 }
@@ -183,7 +198,23 @@ export function validateBilling(value: any): BillingSettings {
     throw Error('Account number must contain eight digits.')
   return out
 }
-export function bankReady(s: BillingSettings) {
+export function validateInvoiceBank(value: unknown): InvoiceBankAccount {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw Error('Check the invoice bank details.')
+  const out = { ...EMPTY_INVOICE_BANK }
+  for (const key of Object.keys(out) as (keyof InvoiceBankAccount)[]) {
+    const v = (value as Record<string, unknown>)[key]
+    if (typeof v !== 'string' || v.length > 200)
+      throw Error('Check the invoice bank details.')
+    out[key] = v.trim()
+  }
+  if (out.sort_code && !/^\d{2}-?\d{2}-?\d{2}$/.test(out.sort_code))
+    throw Error('Sort code must contain six digits.')
+  if (out.account_number && !/^\d{8}$/.test(out.account_number))
+    throw Error('Account number must contain eight digits.')
+  return out
+}
+export function bankReady(s: InvoiceBankAccount) {
   return !!(
     s.account_name &&
     /^\d{2}-?\d{2}-?\d{2}$/.test(s.sort_code) &&
@@ -192,13 +223,14 @@ export function bankReady(s: BillingSettings) {
 }
 export function paymentText(p: InvoicePayload, number = 'your invoice number') {
   const s = p.seller || DEFAULT_BILLING
+  const account = p.bank_account ?? s
   if (p.payment_method === 'bank_transfer')
     return [
       'Please pay by bank transfer or standing order.',
-      s.bank_name,
-      `Account name: ${s.account_name}`,
-      `Sort code: ${s.sort_code}`,
-      `Account number: ${s.account_number}`,
+      account.bank_name,
+      `Account name: ${account.account_name}`,
+      `Sort code: ${account.sort_code}`,
+      `Account number: ${account.account_number}`,
       `Payment reference: ${p.reference || number}`,
       p.payment_instructions || s.payment_instructions,
     ]
