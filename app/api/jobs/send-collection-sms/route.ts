@@ -5,6 +5,7 @@ import { sendEmail } from '@/lib/email'
 import { getFirstName, renderSmsTemplate, safeDeviceLabel } from '@/lib/sms-template'
 import { shortTrackingLink, shortReviewLink, getAppUrl } from '@/lib/utils'
 import { createServiceClient, supabaseRetry, sendSms, sendViaMacroDroid, isWithinUKSendingHours } from '@/lib/resilience'
+import { normaliseUkPhoneForLookup } from '@/lib/phone-lookup'
 
 // Allow up to 5 minutes for the cron handler (it has 30s delays between sends)
 export const maxDuration = 300
@@ -312,7 +313,7 @@ export async function GET(request: NextRequest) {
     // (exclude flagged/skipped customers and unrepaired devices)
     const { data: aftercareJobs, error: aftercareError } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_phone, customer_name, device_make, device_model')
+      .select('id, job_ref, customer_phone, customer_name, device_make, device_model, aftercare_sms_delivery_status')
       .not('aftercare_sms_scheduled_at', 'is', null)
       .is('aftercare_sms_sent_at', null)
       .lte('aftercare_sms_scheduled_at', new Date().toISOString())
@@ -325,7 +326,7 @@ export async function GET(request: NextRequest) {
     // (exclude flagged/skipped customers and unrepaired devices)
     const { data: reviewReminderJobs, error: reviewReminderError } = await supabase
       .from('jobs')
-      .select('id, job_ref, customer_phone, customer_name, review_platforms_completed')
+      .select('id, job_ref, customer_phone, customer_name, review_platforms_completed, review_reminder_sms_delivery_status')
       .not('review_reminder_sms_scheduled_at', 'is', null)
       .is('review_reminder_sms_sent_at', null)
       .lte('review_reminder_sms_scheduled_at', new Date().toISOString())
@@ -431,6 +432,32 @@ export async function GET(request: NextRequest) {
         const job = aftercareJobs[i]
 
         try {
+          // Terminal gate: missing or non-mobile numbers can never send —
+          // mark them done instead of retrying every cron tick forever.
+          const normalisedPhone = job.customer_phone
+            ? normaliseUkPhoneForLookup(String(job.customer_phone))
+            : null
+          if (!normalisedPhone?.startsWith('+447')) {
+            await supabaseRetry(() =>
+              supabase
+                .from('jobs')
+                .update({
+                  aftercare_sms_sent_at: new Date().toISOString(),
+                  aftercare_sms_delivery_status: 'FAILED_NO_PHONE',
+                })
+                .eq('id', job.id)
+            )
+            await supabaseRetry(() =>
+              supabase.from('job_events').insert({
+                job_id: job.id,
+                type: 'SYSTEM',
+                message: 'Aftercare SMS not sent — no valid mobile number on file',
+              } as any)
+            )
+            results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'aftercare', success: false, error: 'No valid mobile number' })
+            continue
+          }
+
           const firstName = getFirstName(job.customer_name)
           const aftercareReviewLink = shortReviewLink(job.job_ref)
           let aftercareBody: string
@@ -464,17 +491,20 @@ export async function GET(request: NextRequest) {
 
           console.log(`Sending aftercare SMS ${i + 1}/${aftercareJobs.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResult = await sendSms(job.customer_phone, aftercareBody)
+          const smsResult = await sendSms(normalisedPhone, aftercareBody)
 
           const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()
+          // One retry on failure — a second failure stamps sent_at so the
+          // job leaves the queue instead of re-failing every 15 minutes.
+          const secondFailure =
+            !smsResult.ok && job.aftercare_sms_delivery_status === 'FAILED'
 
-          // Only write sent_at if actually sent — otherwise the cron never retries it
           await supabaseRetry(() =>
             supabase
               .from('jobs')
               .update({
-                ...(smsResult.ok ? { aftercare_sms_sent_at: now } : {}),
+                ...(smsResult.ok || secondFailure ? { aftercare_sms_sent_at: now } : {}),
                 aftercare_sms_delivery_status: deliveryStatus,
                 aftercare_sms_body: aftercareBody,
               })
@@ -485,7 +515,7 @@ export async function GET(request: NextRequest) {
             supabase.from('job_events').insert({
               job_id: job.id,
               type: 'SYSTEM',
-              message: `Aftercare SMS ${deliveryStatus.toLowerCase()}: check-in sent`,
+              message: `Aftercare SMS ${smsResult.ok ? 'sent' : 'send failed'}: check-in`,
             } as any)
           )
 
@@ -541,6 +571,33 @@ export async function GET(request: NextRequest) {
         const job = jobsNeedingReminder[i]
 
         try {
+          // Terminal gate: missing or non-mobile numbers can never send —
+          // mark them done instead of retrying (and logging) every cron
+          // tick forever. Only +447 UK mobiles go through MacroDroid.
+          const normalisedPhone = job.customer_phone
+            ? normaliseUkPhoneForLookup(String(job.customer_phone))
+            : null
+          if (!normalisedPhone?.startsWith('+447')) {
+            await supabaseRetry(() =>
+              supabase
+                .from('jobs')
+                .update({
+                  review_reminder_sms_sent_at: new Date().toISOString(),
+                  review_reminder_sms_delivery_status: 'FAILED_NO_PHONE',
+                })
+                .eq('id', job.id)
+            )
+            await supabaseRetry(() =>
+              supabase.from('job_events').insert({
+                job_id: job.id,
+                type: 'SYSTEM',
+                message: 'Review reminder SMS not sent — no valid mobile number on file',
+              } as any)
+            )
+            results.push({ jobRef: job.job_ref, customerName: job.customer_name, type: 'review_reminder', success: false, error: 'No valid mobile number' })
+            continue
+          }
+
           const firstName = getFirstName(job.customer_name)
           const reminderReviewLink = shortReviewLink(job.job_ref)
           let reminderBody: string
@@ -571,17 +628,21 @@ export async function GET(request: NextRequest) {
 
           console.log(`Sending review reminder SMS ${i + 1}/${jobsNeedingReminder.length} for job ${job.job_ref} to ${job.customer_name}`)
 
-          const smsResult = await sendSms(job.customer_phone, reminderBody)
+          const smsResult = await sendSms(normalisedPhone, reminderBody)
 
           const deliveryStatus = smsResult.ok ? 'SENT' : 'FAILED'
           const now = new Date().toISOString()
+          // Real send failures get ONE retry on the next tick — a second
+          // failure stamps sent_at so the job leaves the queue instead of
+          // re-failing (and re-logging) every 15 minutes forever.
+          const secondFailure =
+            !smsResult.ok && job.review_reminder_sms_delivery_status === 'FAILED'
 
-          // Only write sent_at if actually sent
           await supabaseRetry(() =>
             supabase
               .from('jobs')
               .update({
-                ...(smsResult.ok ? { review_reminder_sms_sent_at: now } : {}),
+                ...(smsResult.ok || secondFailure ? { review_reminder_sms_sent_at: now } : {}),
                 review_reminder_sms_delivery_status: deliveryStatus,
                 review_reminder_sms_body: reminderBody,
               })
@@ -592,7 +653,7 @@ export async function GET(request: NextRequest) {
             supabase.from('job_events').insert({
               job_id: job.id,
               type: 'SYSTEM',
-              message: `Review reminder SMS ${deliveryStatus.toLowerCase()}: sent (no review clicked within 5 days)`,
+              message: `Review reminder SMS ${smsResult.ok ? 'sent' : 'send failed'} (no review clicked within 5 days)`,
             } as any)
           )
 
