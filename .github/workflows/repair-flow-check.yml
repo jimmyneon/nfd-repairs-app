@@ -5,6 +5,11 @@ on:
     branches:
       - main
     paths:
+      - 'app/api/invoices/**'
+      - 'app/app/invoices/**'
+      - 'lib/invoice*.ts'
+      - 'components/CustomerInvoice.tsx'
+      - 'tests/invoices.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -38,6 +43,11 @@ on:
       - '.github/workflows/repair-flow-check.yml'
   pull_request:
     paths:
+      - 'app/api/invoices/**'
+      - 'app/app/invoices/**'
+      - 'lib/invoice*.ts'
+      - 'components/CustomerInvoice.tsx'
+      - 'tests/invoices.test.ts'
       - 'app/api/email/**'
       - 'app/api/enquiries/**'
       - 'app/api/analytics/quote-ux/**'
@@ -87,7 +97,7 @@ jobs:
         run: npm ci
 
       - name: Run repair-flow tests
-        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts tests/diagnostic-reports.test.ts
+        run: npx vitest run tests/fast-dropoff.test.ts tests/enquiry-phone-conversion.test.ts tests/awaiting-device-followup.test.ts tests/quote-followup.test.ts tests/quote-followup-analytics.test.ts tests/diagnostic-reports.test.ts tests/invoices.test.ts
 
       - name: Verify progressive quote commitment safeguards
         run: |
@@ -112,7 +122,7 @@ jobs:
           grep -Fq "Quote follow-up recovery" app/app/analytics/quote-ux/page.tsx
           grep -Fq "isShopOpenOnDate" app/api/enquiries/send-quote-followups/route.ts
           grep -Fq "available_addons" "app/api/public/quote/[ref]/route.ts"
-          grep -Fq "customer_update: buildCustomerUpdate(linkedJob)" "app/api/public/quote/[ref]/route.ts"
+          grep -Fq "customer_update: buildCustomerUpdate(linkedJob, enquiry.part_status === 'no_parts')" "app/api/public/quote/[ref]/route.ts"
           grep -Fq "Save selected extras" "app/quote/approve/[jobId]/page.tsx"
           grep -Fq "What happens next" "app/quote/approve/[jobId]/page.tsx"
           grep -Fq "parts_expected_at: requiresParts && earliest_date" app/api/enquiries/convert-to-job/route.ts
