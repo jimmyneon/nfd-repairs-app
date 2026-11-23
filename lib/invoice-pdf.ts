@@ -214,14 +214,25 @@ export async function invoicePdf(invoice: Invoice) {
   y -= 6
   const total = invoiceTotal(p),
     paid = invoice.paid_pence,
-    balance = Math.max(0, total - paid)
+    balance = invoice.status === 'void' ? 0 : Math.max(0, total - paid)
   draw('Total', 330, y, 11)
   right(money(total), 543, y, 11, bold)
   y -= 24
   draw('Payments received', 330, y, 10)
   right(money(paid), 543, y)
   y -= 32
-  draw(balance ? 'Balance due' : 'Paid in full', 330, y, 14, bold, green)
+  draw(
+    invoice.status === 'void'
+      ? 'No payment due'
+      : balance
+        ? 'Balance due'
+        : 'Paid in full',
+    330,
+    y,
+    14,
+    bold,
+    green,
+  )
   right(money(balance), 543, y, 16, bold)
   y -= 24
   if (paid > total) {

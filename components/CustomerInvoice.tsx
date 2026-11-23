@@ -8,21 +8,28 @@ export default function CustomerInvoice({ token }: { token: string }) {
   const endpoint = `/api/tracking/${encodeURIComponent(token)}/invoice`
   useEffect(() => {
     let live = true
-    fetch(endpoint, { cache: 'no-store' })
-      .then(async (r) => {
-        if (!r.ok)
-          throw Error(
-            'Your invoice could not be loaded. Please refresh or contact us for a copy.',
-          )
-        return r.json()
-      })
-      .then((d) => {
-        if (live) setInvoice(d.invoice)
-      })
-      .catch((e) => {
-        if (live) setError(e.message)
-      })
+    const load = () =>
+      fetch(endpoint, { cache: 'no-store' })
+        .then(async (r) => {
+          if (!r.ok)
+            throw Error(
+              'Your invoice could not be loaded. Please refresh or contact us for a copy.',
+            )
+          return r.json()
+        })
+        .then((d) => {
+          if (live) {
+            setInvoice(d.invoice)
+            setError('')
+          }
+        })
+        .catch((e) => {
+          if (live) setError(e.message)
+        })
+    load()
+    const timer = setInterval(load, 30000)
     return () => {
+      clearInterval(timer)
       live = false
     }
   }, [endpoint])

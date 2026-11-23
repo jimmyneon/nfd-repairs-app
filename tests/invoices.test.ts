@@ -171,6 +171,12 @@ describe('Invoice calculations and input', () => {
     expect(todayUK()).toBe('2026-07-02')
     vi.useRealTimers()
   })
+  it('never asks for payment against a voided invoice', () => {
+    const html = invoiceHtml({ ...invoice(), status: 'void' })
+    expect(html).toContain('No payment due')
+    expect(html).not.toContain('Balance due')
+    expect(html).not.toContain('Account number:')
+  })
   it('escapes HTML in descriptions and notes', () => {
     const i = invoice({
       ...payload(),
