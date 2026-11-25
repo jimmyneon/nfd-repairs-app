@@ -1079,7 +1079,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
                 {job.payment_received && (
                   <p className="text-xs text-green-600 font-bold">Paid in full</p>
                 )}
-                {job!.deposit_required && !job!.deposit_received && (
+                {!job.payment_received && job!.deposit_required && !job!.deposit_received && (
                   <p className="text-xs text-yellow-600 font-bold">Deposit needed</p>
                 )}
                 {job!.deposit_required && job!.deposit_received && !job.payment_received && (
@@ -1463,7 +1463,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job!.deposit_required && !job!.deposit_received && !job.is_warranty && (
+        {!job.payment_received && job!.deposit_required && !job!.deposit_received && !job.is_warranty && (
           <div className="card bg-yellow-50 border-2 border-yellow-300">
             <div className="flex items-start space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
@@ -1511,20 +1511,22 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {job!.deposit_required && job!.deposit_received && !job.is_warranty && (
+        {(job.payment_received || (job!.deposit_required && job!.deposit_received)) && !job.is_warranty && (
           <div className="card bg-green-50 border-2 border-green-300">
             <div className="flex items-start space-x-3">
               <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <p className="font-bold text-green-900 text-lg mb-1">
-                  Deposit Paid
+                  {job.payment_received ? 'Paid in full' : 'Deposit paid'}
                 </p>
                 <p className="text-green-800 text-sm">
-                  £{job!.deposit_amount?.toFixed(2) || '20.00'} deposit received
+                  {job.payment_received
+                    ? `Repair total paid: £${job.price_total.toFixed(2)}`
+                    : `£${job.deposit_amount?.toFixed(2) || '20.00'} deposit received`}
                 </p>
                 {job!.price_total > 0 && (
                   <p className="text-green-700 text-sm font-semibold mt-1">
-                    Balance remaining: £{(job!.price_total - (job!.deposit_amount || 0)).toFixed(2)}
+                    Balance remaining: £{(job.payment_received ? 0 : Math.max(job!.price_total - (job!.deposit_amount ?? 20), 0)).toFixed(2)}
                   </p>
                 )}
               </div>
